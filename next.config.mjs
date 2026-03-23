@@ -9,9 +9,19 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com'],
   },
+  // Exclude heavy native binaries from serverless function bundling.
+  // These packages require a local ffmpeg/onnx runtime and cannot run on Vercel anyway.
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@imgly/background-removal-node/**',
+      'node_modules/onnxruntime-node/**',
+      'node_modules/@ffmpeg-installer/**',
+      'node_modules/@ffprobe-installer/**',
+      'node_modules/fluent-ffmpeg/**',
+      'node_modules/sharp/**',
+    ],
+  },
   experimental: {
-    // after() — runs code after response is sent; works on Vercel + local dev
-    after: true,
     serverComponentsExternalPackages: ['fluent-ffmpeg', '@ffmpeg-installer/ffmpeg', '@ffprobe-installer/ffprobe', 'sharp', '@imgly/background-removal-node', 'onnxruntime-node'],
     serverActions: {
       bodySizeLimit: '500mb',
