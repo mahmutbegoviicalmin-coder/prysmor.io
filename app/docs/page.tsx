@@ -22,10 +22,10 @@ const installSteps = [
 
 const vfxpilotSteps = [
   "Select a clip in your Premiere Pro timeline.",
-  "Click "Select Clip" in the VFXPilot panel to load it.",
-  "Type your effect prompt — or use "AI Enhance" to generate one based on your scene.",
-  "Click "Generate Effect" and wait for the AI to process your clip.",
-  "Once done, click "Insert to Timeline" to place the result on V2.",
+  'Click "Select Clip" in the VFXPilot panel to load it.',
+  'Type your effect prompt, or use "AI Enhance" to generate one based on your scene.',
+  'Click "Generate Effect" and wait for the AI to process your clip.',
+  'Once done, click "Insert to Timeline" to place the result on V2.',
 ];
 
 export default function DocsPage() {
