@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #070708;
+  --surface: #0F1012;
+  --accent: #A3FF12;
+  --accent-glow: rgba(163, 255, 18, 0.20);
+  --ink: #F0F4F8;
+  --ink-muted: #8A9BB0;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--ink);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+::selection {
+  background-color: rgba(163, 255, 18, 0.25);
+  color: #070708;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+:focus-visible {
+  outline: 2px solid rgba(163, 255, 18, 0.60);
+  outline-offset: 2px;
+}
+
+/* subtle grain */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.022;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+@layer utilities {
+  .text-gradient-lime {
+    background: linear-gradient(135deg, #A3FF12 0%, #B7FF3C 50%, #22FFB0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    animation: glowPulse 5s ease-in-out infinite;
+  }
+
+  .card-glass {
+    background: rgba(15, 16, 18, 0.70);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+  }
+}
+
+@keyframes particleRise {
+  0%   { transform: translateY(0px) translateX(0px) scale(1);   opacity: 0; }
+  12%  { opacity: 0.9; }
+  45%  { transform: translateY(-65px) translateX(10px) scale(0.85); }
+  78%  { opacity: 0.35; }
+  100% { transform: translateY(-140px) translateX(-6px) scale(0.3); opacity: 0; }
+}
+
+@keyframes particleRise2 {
+  0%   { transform: translateY(0px) translateX(0px) scale(1);   opacity: 0; }
+  10%  { opacity: 0.7; }
+  50%  { transform: translateY(-80px) translateX(-12px) scale(0.75); }
+  80%  { opacity: 0.2; }
+  100% { transform: translateY(-160px) translateX(8px) scale(0.2); opacity: 0; }
+}
+
+@keyframes particleTwinkle {
+  0%, 100% { opacity: 0.05; transform: scale(0.5); }
+  30%       { opacity: 0.55; transform: scale(1.3); }
+  60%       { opacity: 0.2;  transform: scale(0.9); }
+  80%       { opacity: 0.65; transform: scale(1.5); }
+}
+
+@keyframes badgeShimmer {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(300%)  skewX(-18deg); }
+}
+
+@keyframes beamSlide {
+  0%   { opacity: 0; transform: translateX(-60%) skewX(-25deg); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(160%) skewX(-25deg); }
+}

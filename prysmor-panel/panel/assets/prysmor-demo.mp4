@@ -1,0 +1,14 @@
+PLACEHOLDER  Replace this file with a real MP4.
+
+File required:  prysmor-demo.mp4
+Location:       prysmor-panel/panel/assets/prysmor-demo.mp4
+
+Recommended specs:
+  Format:     H.264 MP4
+  Resolution: 1920x1080 (16:9)
+  Duration:   4-6 seconds
+  Audio:      optional
+
+This placeholder text file must be replaced with a binary MP4 before
+Import to Project / Insert to Timeline will work in Premiere Pro.
+The thumbnail (prysmor-demo.svg) can also be replaced with a real JPEG/PNG.
