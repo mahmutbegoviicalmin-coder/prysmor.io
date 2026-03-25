@@ -53,7 +53,20 @@ export default async function DashboardOverviewPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const data = await getDashboardData(user.id, user);
+  let data;
+  try {
+    data = await getDashboardData(user.id, user);
+  } catch (err) {
+    console.error("[dashboard] getDashboardData failed:", err);
+    // Fallback data when Firebase is unavailable
+    data = {
+      license: { planName: "Starter", status: "active" as const, renewalDate: "—", lastVerifiedAt: "—" },
+      panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
+      limits: { usedThisCycle: 0, monthlyAllowance: 250, devicesUsed: 0, deviceLimit: 3, resetDate: "—" },
+      security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
+      activity: [],
+    };
+  }
   const { license, panel, limits, security, activity } = data;
   const pct = Math.min(100, Math.round((limits.usedThisCycle / limits.monthlyAllowance) * 100));
 
