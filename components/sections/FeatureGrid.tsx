@@ -28,7 +28,7 @@ export default function FeatureGrid({
   cols = 3,
 }: FeatureGridProps) {
   return (
-    <section className="relative py-24">
+    <section className="relative py-24 overflow-hidden">
       {/* haze */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
       <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8">

@@ -51,7 +51,7 @@ export default function PricingSection({
   const [infoOpen, setInfoOpen] = useState(false);
 
   return (
-    <section className="relative py-24" id="pricing">
+    <section className="relative py-24 overflow-hidden" id="pricing">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
       <div
         className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-[800px] h-[400px] rounded-full blur-[130px]"

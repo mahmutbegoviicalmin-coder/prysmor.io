@@ -19,7 +19,7 @@ const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function Testimonials({ title = "What creators say", items }: TestimonialsProps) {
   return (
-    <section className="relative py-24">
+    <section className="relative py-24 overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
       <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8">
         <motion.div

@@ -85,23 +85,24 @@ export default function Comparison({ title, subtitle, ourLabel, theirLabel, rows
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_0_80px_-20px_rgba(0,0,0,0.6)]"
+          className="overflow-x-auto rounded-2xl border border-white/[0.08] shadow-[0_0_80px_-20px_rgba(0,0,0,0.6)]"
         >
+          <div className="min-w-[480px]">
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_1fr_1fr] bg-white/[0.03] border-b border-white/[0.08]">
+          <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-white/[0.03] border-b border-white/[0.08]">
             {/* Empty feature col */}
-            <div className="px-5 py-4" />
+            <div className="px-4 py-4" />
 
             {/* Our col header — highlighted */}
-            <div className="relative px-4 py-4 flex flex-col items-center justify-center border-x border-accent/20 bg-accent/[0.06]">
+            <div className="relative px-3 py-4 flex flex-col items-center justify-center border-x border-accent/20 bg-accent/[0.06]">
               <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
-              <p className="text-[13px] font-bold text-accent tracking-wide">{ourLabel}</p>
-              <span className="text-[10px] text-accent/50 font-medium">what our users use</span>
+              <p className="text-[12px] sm:text-[13px] font-bold text-accent tracking-wide">{ourLabel}</p>
+              <span className="text-[10px] text-accent/50 font-medium hidden sm:block">what our users use</span>
             </div>
 
             {/* Their col header */}
-            <div className="px-4 py-4 flex items-center justify-center">
-              <p className="text-[13px] font-semibold text-ink-faint">{theirLabel}</p>
+            <div className="px-3 py-4 flex items-center justify-center">
+              <p className="text-[12px] sm:text-[13px] font-semibold text-ink-faint text-center">{theirLabel}</p>
             </div>
           </div>
 
@@ -114,41 +115,42 @@ export default function Comparison({ title, subtitle, ourLabel, theirLabel, rows
               viewport={{ once: true }}
               transition={{ duration: 0.3, delay: 0.05 * i }}
               className={cn(
-                "grid grid-cols-[1fr_1fr_1fr] group",
+                "grid grid-cols-[1.4fr_1fr_1fr] group",
                 i < rows.length - 1 && "border-b border-white/[0.05]",
                 "hover:bg-white/[0.02] transition-colors duration-150"
               )}
             >
               {/* Feature name */}
-              <div className="px-5 py-4 flex items-center">
-                <span className="text-[13px] sm:text-[14px] text-ink-subtle group-hover:text-ink-muted transition-colors">
+              <div className="px-4 py-3.5 flex items-center">
+                <span className="text-[12px] sm:text-[13px] text-ink-subtle group-hover:text-ink-muted transition-colors">
                   {row.feature}
                 </span>
               </div>
 
               {/* Our value */}
-              <div className="px-4 py-4 flex items-center justify-center border-x border-accent/10 bg-accent/[0.04]">
+              <div className="px-3 py-3.5 flex items-center justify-center border-x border-accent/10 bg-accent/[0.04]">
                 <OursCell value={row.ours} />
               </div>
 
               {/* Their value */}
-              <div className="px-4 py-4 flex items-center justify-center">
+              <div className="px-3 py-3.5 flex items-center justify-center">
                 <TheirsCell value={row.theirs} />
               </div>
             </motion.div>
           ))}
 
           {/* Footer CTA strip */}
-          <div className="grid grid-cols-[1fr_1fr_1fr] border-t border-white/[0.07] bg-white/[0.02]">
-            <div className="px-5 py-4 flex items-center">
-              <span className="text-[12px] text-ink-faint">7-day money-back guarantee</span>
+          <div className="grid grid-cols-[1.4fr_1fr_1fr] border-t border-white/[0.07] bg-white/[0.02]">
+            <div className="px-4 py-3.5 flex items-center">
+              <span className="text-[11px] sm:text-[12px] text-ink-faint">7-day money-back guarantee</span>
             </div>
-            <div className="px-4 py-4 flex items-center justify-center border-x border-accent/10 bg-accent/[0.05]">
+            <div className="px-3 py-3.5 flex items-center justify-center border-x border-accent/10 bg-accent/[0.05]">
               <span className="text-[12px] font-semibold text-accent">✓ Included</span>
             </div>
-            <div className="px-4 py-4 flex items-center justify-center">
+            <div className="px-3 py-3.5 flex items-center justify-center">
               <span className="text-[12px] text-ink-faint">✗ No</span>
             </div>
+          </div>
           </div>
         </motion.div>
 

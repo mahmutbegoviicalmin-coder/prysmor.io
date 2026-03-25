@@ -107,7 +107,7 @@ function PromptBar() {
   };
 
   return (
-    <div className="w-full max-w-[560px]">
+    <div className="w-full max-w-[560px] px-0">
       {/* main bar */}
       <div
         className="flex items-center gap-3 rounded-[18px] border bg-surface-1 p-2 pl-5 shadow-[0_16px_60px_rgba(0,0,0,0.55)] transition-all duration-300"
@@ -456,7 +456,7 @@ export default function VFXPilotPage() {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative min-h-[100svh] flex flex-col items-center justify-center pt-[120px] pb-24 overflow-hidden text-center">
+      <section className="relative min-h-[100svh] flex flex-col items-center justify-center pt-[100px] sm:pt-[120px] pb-16 sm:pb-24 overflow-hidden text-center">
 
         {/* ── backgrounds ── */}
 
@@ -484,7 +484,7 @@ export default function VFXPilotPage() {
           style={{ background: "linear-gradient(90deg,transparent 5%,rgba(163,255,18,0.25) 35%,rgba(34,255,176,0.25) 65%,transparent 95%)" }} />
 
         {/* ── main content ── */}
-        <div className="relative z-10 flex flex-col items-center gap-12 px-4 sm:px-8 max-w-[860px] mx-auto">
+        <div className="relative z-10 flex flex-col items-center gap-8 sm:gap-12 px-4 sm:px-8 max-w-[860px] mx-auto w-full">
 
 
           {/* headline */}
@@ -493,7 +493,7 @@ export default function VFXPilotPage() {
               initial={{ opacity: 0, y: 28 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.65, delay: 0.1, ease }}
-              className="font-heading text-[58px] sm:text-[76px] lg:text-[92px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white"
+              className="font-heading text-[40px] sm:text-[72px] lg:text-[92px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white"
             >
               Text to <span className="text-gradient-lime">VFX</span>
             </motion.h1>
@@ -501,7 +501,7 @@ export default function VFXPilotPage() {
               initial={{ opacity: 0, y: 28 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.65, delay: 0.22, ease }}
-              className="font-heading text-[58px] sm:text-[76px] lg:text-[92px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white"
+              className="font-heading text-[40px] sm:text-[72px] lg:text-[92px] font-extrabold leading-[1.05] tracking-[-0.04em] text-white"
             >
               Inside <span className="text-gradient-lime">Adobe.</span> Instantly.
             </motion.div>
@@ -551,7 +551,7 @@ export default function VFXPilotPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.82 }}
-            className="flex flex-wrap justify-center items-center gap-x-8 gap-y-3"
+            className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 sm:gap-x-8"
           >
             {[
               { value: "300+", label: "creators" },
@@ -560,8 +560,8 @@ export default function VFXPilotPage() {
               { value: "7-day", label: "guarantee" },
             ].map(({ value, label }, i) => (
               <div key={label} className="flex items-baseline gap-1.5">
-                {i > 0 && <span className="mr-4 w-px h-3.5 bg-white/[0.10]" />}
-                <span className="text-[16px] font-bold text-white font-heading">{value}</span>
+                {i > 0 && <span className="hidden sm:inline-block mr-4 w-px h-3.5 bg-white/[0.10]" />}
+                <span className="text-[15px] sm:text-[16px] font-bold text-white font-heading">{value}</span>
                 <span className="text-[12px] text-ink-faint">{label}</span>
               </div>
             ))}
