@@ -16,7 +16,7 @@
 ; ── Defines ──────────────────────────────────────────────────────────────────
 
 #define AppName      "Prysmor Panel"
-#define AppVersion   "1.1.0"
+#define AppVersion   "1.2.0"
 #define AppPublisher "Prysmor"
 #define AppURL       "https://prysmor.com"
 #define ExtensionId  "prysmor-panel"

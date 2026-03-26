@@ -5,7 +5,7 @@
 const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
-const API_BASE  = 'https://prysmor.io';
+const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS   = 3500;
 const MAX_POLL_MS = 10 * 60 * 1000; // 10 min for job polling
 
