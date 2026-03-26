@@ -8,7 +8,7 @@ import {
   ExternalLink, FileVideo, RotateCcw, Package,
 } from "lucide-react";
 
-const PANEL_VERSION = "1.0.0";
+const PANEL_VERSION = "1.1.0";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
