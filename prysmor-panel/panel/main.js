@@ -27,13 +27,14 @@ const state = {
   settingsOpen: false,
   _extRoot:     '',
   auth: {
-    token:      null,
-    userId:     null,
-    plan:       null,
-    planLabel:  null,
+    token:         null,
+    userId:        null,
+    plan:          null,
+    planLabel:     null,
     authPollTimer: null,
     authPollStart: 0,
-    deviceCode: null,
+    deviceCode:    null,
+    heartbeatTimer: null,
   },
   mf: {
     jobId:          null,
@@ -253,6 +254,28 @@ function setLoginStatus(msg, isError) {
   el2.style.color = isError ? '#F87171' : '#A3FF12';
 }
 
+function sendHeartbeat() {
+  if (!state.auth.token) return;
+  fetch(API_BASE + '/api/panel/heartbeat', {
+    method: 'POST',
+    headers: apiHeaders(),
+  }).catch(function () {}); // fire-and-forget
+}
+
+function startHeartbeat() {
+  stopHeartbeat();
+  sendHeartbeat(); // immediate ping
+  // Repeat every 4 minutes so the 30-min window always stays fresh
+  state.auth.heartbeatTimer = setInterval(sendHeartbeat, 4 * 60 * 1000);
+}
+
+function stopHeartbeat() {
+  if (state.auth.heartbeatTimer) {
+    clearInterval(state.auth.heartbeatTimer);
+    state.auth.heartbeatTimer = null;
+  }
+}
+
 function enterPanel() {
   // Update plan label in topbar if element exists
   var planEl = el('topbar-plan');
@@ -262,6 +285,9 @@ function enterPanel() {
   }
 
   showView('main');
+
+  // Start heartbeat — keeps device "Online" in dashboard
+  startHeartbeat();
 
   // Fetch real credit balance from server
   fetchCredits();
@@ -279,6 +305,7 @@ function enterPanel() {
 function logout() {
   stopMfPolling();
   stopAuthPolling();
+  stopHeartbeat();
   clearSession();
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,

@@ -62,7 +62,7 @@ export default async function DashboardOverviewPage() {
     data = {
       license: { planName: "Starter", status: "active" as const, renewalDate: "—", lastVerifiedAt: "—" },
       panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
-      limits: { usedThisCycle: 0, monthlyAllowance: 250, devicesUsed: 0, deviceLimit: 3, resetDate: "—" },
+      limits: { credits: 1000, creditsTotal: 1000, devicesUsed: 0, deviceLimit: 3, resetDate: "—" },
       security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
       activity: [],
     };

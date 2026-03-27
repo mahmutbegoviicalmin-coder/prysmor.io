@@ -51,11 +51,14 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const sessionExpiry = new Date(now.getTime() + SESSION_TTL_MS);
 
+  const deviceId = `panel-${user.id.slice(-8)}-${code.toUpperCase()}`;
+
   await db.collection("panel_sessions").doc(token).set({
     userId: user.id,
     plan,
     planLabel,
     deviceCode: code.toUpperCase(),
+    deviceId,
     createdAt: now,
     expiresAt: sessionExpiry,
   });
@@ -67,8 +70,7 @@ export async function POST(req: NextRequest) {
   const cepVersion     = codeData.cepVersion      ?? undefined;
   const deviceName     = codeData.deviceName      ?? undefined;
 
-  // Device ID = stable fingerprint based on code (replace with real device ID later)
-  const deviceId = `panel-${user.id.slice(-8)}-${code.toUpperCase()}`;
+  // Device ID already computed above for session storage
 
   await registerDevice(user.id, deviceId, platform, deviceName, {
     hostApp,

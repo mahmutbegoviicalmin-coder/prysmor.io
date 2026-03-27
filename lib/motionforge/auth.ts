@@ -15,10 +15,11 @@ export function validatePanelKey(req: NextRequest): boolean {
 // ─── Panel session token ───────────────────────────────────────────────────────
 
 export interface PanelSession {
-  userId: string;
-  plan: string;
+  userId:    string;
+  plan:      string;
   planLabel: string;
   expiresAt: Date;
+  deviceId?: string;
 }
 
 /**
@@ -45,6 +46,7 @@ export async function validatePanelToken(
       plan:      data.plan,
       planLabel: data.planLabel,
       expiresAt,
+      deviceId:  data.deviceId ?? undefined,
     };
   } catch {
     return null;
