@@ -23,7 +23,7 @@ const LS_TOKEN_EXP = 'prysmor_token_exp';
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const state = {
-  usage:        { used: 0, limit: 25 },
+  usage:        { credits: 0, creditsTotal: 1000 },
   settingsOpen: false,
   _extRoot:     '',
   auth: {
@@ -261,12 +261,11 @@ function enterPanel() {
     planEl.style.display = '';
   }
 
-  // Update render limit based on plan
-  var planLimits = { starter: 25, pro: 50, exclusive: 100, creator: 50, 'creator-suite': 100 };
-  state.usage.limit = planLimits[state.auth.plan] || 25;
-
   showView('main');
-  renderUsage();
+
+  // Fetch real credit balance from server
+  fetchCredits();
+
   // Resolve system temp dir
   cs.evalScript('getTempDir()', function (res) {
     if (res && res.indexOf('error') !== 0) {
@@ -487,20 +486,36 @@ async function mfGenerate() {
   }
 
   state.mf.replaceMode = replaceMode;
+  hideNoCreditsMessage();
   setGenerating(true);
   setStatus('Creating job…', 8);
 
-  // ── Step 1: Create job ────────────────────────────────────────────────────
+  // ── Step 1: Create job (deducts credits atomically on server) ────────────
   let jobId;
   try {
+    var clipDurSec = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
     const created = await apiFetch('/api/v1/motionforge/jobs', {
       method:  'POST',
-      headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body:    JSON.stringify({ userId: state.auth.userId }),
+      headers: apiHeaders({
+        'Content-Type':    'application/json',
+        'X-Clip-Duration': clipDurSec.toFixed(6),
+      }),
+      body: JSON.stringify({ userId: state.auth.userId }),
     });
     jobId = created.jobId;
     state.mf.jobId = jobId;
+    // Live-update credit balance from server response
+    if (typeof created.creditsRemaining === 'number') {
+      state.usage.credits = created.creditsRemaining;
+      renderUsage();
+    }
   } catch (err) {
+    // Distinguish "out of credits" from generic errors
+    if (err.message && err.message.toLowerCase().indexOf('insufficient') !== -1) {
+      setGenerating(false);
+      showNoCreditsMessage();
+      return;
+    }
     return fail('Failed to create job: ' + err.message);
   }
 
@@ -610,8 +625,8 @@ function startPolling(jobId) {
         }
       }
 
-      state.usage.used = (state.usage.used || 0) + 1;
-      renderUsage();
+      // Refresh credit balance from server after successful generation
+      fetchCredits();
       setGenerating(false);
     }
 
@@ -853,13 +868,57 @@ function fallbackCopy(text) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
+// ─── Credits ──────────────────────────────────────────────────────────────────
+
+async function fetchCredits() {
+  try {
+    var data = await apiFetch('/api/v1/motionforge/credits');
+    state.usage.credits      = data.credits      || 0;
+    state.usage.creditsTotal = data.creditsTotal || 1000;
+    renderUsage();
+  } catch (e) {
+    console.warn('[Prysmor] fetchCredits failed:', e);
+  }
+}
+
 function renderUsage() {
-  const used  = state.usage.used  || 0;
-  const limit = state.usage.limit || 100;
-  const pct   = Math.min(Math.round((used / limit) * 100), 100);
-  el('usage-used').textContent    = used;
-  el('usage-limit').textContent   = limit;
-  el('progress-fill').style.width = pct + '%';
+  var credits = state.usage.credits      || 0;
+  var total   = state.usage.creditsTotal || 1000;
+  var pct     = total > 0 ? Math.min(Math.round((credits / total) * 100), 100) : 0;
+  var seconds = Math.floor(credits / 4);
+
+  var usedEl = el('usage-used');
+  var limEl  = el('usage-limit');
+  var barEl  = el('progress-fill');
+
+  if (usedEl) usedEl.textContent = credits;
+  if (limEl)  limEl.textContent  = total;
+  if (barEl) {
+    barEl.style.width = pct + '%';
+    // Turn bar orange when below 20%
+    barEl.style.background = pct < 20 ? '#fb923c' : '#A3FF12';
+  }
+
+  // Update seconds label if it exists
+  var secEl = el('usage-seconds');
+  if (secEl) secEl.textContent = '≈ ' + seconds + 's remaining';
+}
+
+function showNoCreditsMessage() {
+  var credits = state.usage.credits || 0;
+  var planLabel = (state.auth && state.auth.planLabel) || 'Starter';
+  // Show a toast with upgrade link
+  showToast('No credits left (' + credits + ' remaining). Upgrade your plan to continue.', 'error');
+  // Also show inline banner below the generate button if element exists
+  var banner = el('no-credits-banner');
+  if (banner) {
+    banner.classList.remove('hidden');
+  }
+}
+
+function hideNoCreditsMessage() {
+  var banner = el('no-credits-banner');
+  if (banner) banner.classList.add('hidden');
 }
 
 function showView(name) {
@@ -988,6 +1047,15 @@ function bindEvents() {
   el('btn-dashboard').addEventListener('click', function () {
     cs.openURLInDefaultBrowser(SITE_URL + '/dashboard');
   });
+
+  // No-credits upgrade link
+  var upgradeLink = el('no-credits-upgrade-link');
+  if (upgradeLink) {
+    upgradeLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      cs.openURLInDefaultBrowser(SITE_URL + '/dashboard/billing');
+    });
+  }
   el('btn-updates').addEventListener('click', function () {
     cs.openURLInDefaultBrowser(SITE_URL + '/downloads');
   });

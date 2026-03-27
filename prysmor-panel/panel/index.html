@@ -242,11 +242,18 @@
       <div class="usage-row-wrap">
         <div class="usage-left">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Renders this cycle
+          Credits
         </div>
-        <span class="usage-count"><b id="usage-used">0</b> / <span id="usage-limit">25</span></span>
+        <span class="usage-count"><b id="usage-used">–</b> / <span id="usage-limit">1000</span></span>
       </div>
       <div class="usage-bar-track"><div class="usage-bar-fill" id="progress-fill" style="width:0%"></div></div>
+      <div id="usage-seconds" style="font-size:10px;color:#4B5563;margin-top:2px;"></div>
+
+      <!-- No-credits banner (hidden by default) -->
+      <div id="no-credits-banner" class="hidden" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(251,146,60,0.10);border:1px solid rgba(251,146,60,0.25);font-size:11px;color:#fb923c;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>No credits left. Upgrade your plan to keep generating.</span>
+        <a id="no-credits-upgrade-link" href="#" style="color:#A3FF12;text-decoration:underline;white-space:nowrap;font-size:11px;">Upgrade ↗</a>
+      </div>
 
       <!-- SETTINGS -->
       <div class="settings-wrap" id="section-settings">

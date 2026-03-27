@@ -62,7 +62,7 @@ const PLAN_MONTHLY_RENDERS: Record<string, number> = {
 };
 
 /**
- * Returns how many renders the given plan allows per month.
+ * Returns how many renders the given plan allows per month (legacy fallback).
  */
 export function planRenderLimit(plan: string): number {
   return PLAN_MONTHLY_RENDERS[plan] ?? 25;
@@ -73,4 +73,15 @@ export function planRenderLimit(plan: string): number {
  */
 export function planHasVFXAccess(plan: string): boolean {
   return ['starter', 'pro', 'exclusive', 'creator', 'creator-suite'].includes(plan);
+}
+
+/** Credits per second of video generated */
+export const CREDITS_PER_SECOND = 4;
+
+/**
+ * Calculates the credits cost for a given clip duration.
+ * Cost = ceil(durationSec) × CREDITS_PER_SECOND
+ */
+export function calcCreditCost(durationSec: number): number {
+  return Math.ceil(Math.max(durationSec, 1)) * CREDITS_PER_SECOND;
 }

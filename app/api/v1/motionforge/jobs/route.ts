@@ -1,12 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createJob } from '@/lib/motionforge/jobs';
-import { validatePanelToken, planHasVFXAccess, planRenderLimit } from '@/lib/motionforge/auth';
-import { db } from '@/lib/firebaseAdmin';
-
-function cycleStart(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-}
+import { NextRequest, NextResponse }   from 'next/server';
+import { createJob }                   from '@/lib/motionforge/jobs';
+import { validatePanelToken, planHasVFXAccess, calcCreditCost } from '@/lib/motionforge/auth';
+import { deductCredits }               from '@/lib/firestore/users';
 
 export async function POST(req: NextRequest) {
   // ── Authenticate panel session ────────────────────────────────────────────
@@ -26,46 +21,44 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Monthly usage check ───────────────────────────────────────────────────
-  // Query only by userId (no composite index needed), then filter in memory.
-  const limit = planRenderLimit(session.plan);
-  let usedThisCycle = 0;
+  // ── Calculate credit cost from clip duration ──────────────────────────────
+  // The panel sends X-Clip-Duration (seconds). If missing, default to 8s max.
+  const clipDurHeader = req.headers.get('x-clip-duration');
+  const clipDurSec    = clipDurHeader ? Math.max(0.5, parseFloat(clipDurHeader) || 8) : 8;
+  const creditCost    = calcCreditCost(clipDurSec);
+
+  // ── Atomically deduct credits ─────────────────────────────────────────────
+  let creditsRemaining: number;
   try {
-    const snap = await db
-      .collection('motionforge_jobs')
-      .where('userId', '==', session.userId)
-      .limit(500)
-      .get();
+    creditsRemaining = await deductCredits(session.userId, creditCost);
+  } catch (err: unknown) {
+    const e = err as Error & { code?: string; creditsRemaining?: number; needed?: number };
 
-    const cycleMs = cycleStart().getTime();
-    usedThisCycle = snap.docs.filter((d) => {
-      const createdAt = d.data().createdAt;
-      const ms = createdAt?.toDate
-        ? createdAt.toDate().getTime()
-        : new Date(createdAt ?? 0).getTime();
-      return ms >= cycleMs;
-    }).length;
-  } catch (err) {
-    // If usage check fails, log but don't block the user
-    console.error('[jobs/POST] usage check failed:', err);
-  }
+    if (e.code === 'insufficient_credits') {
+      return NextResponse.json(
+        {
+          error:             `Not enough credits — need ${e.needed}, have ${e.creditsRemaining}. Upgrade your plan to continue.`,
+          code:              'insufficient_credits',
+          creditsRemaining:  e.creditsRemaining ?? 0,
+          needed:            e.needed ?? creditCost,
+        },
+        { status: 429 }
+      );
+    }
 
-  if (usedThisCycle >= limit) {
-    return NextResponse.json(
-      {
-        error: `Monthly render limit reached (${usedThisCycle}/${limit}). Resets next cycle.`,
-        usedThisCycle,
-        limit,
-      },
-      { status: 429 }
-    );
+    console.error('[jobs/POST] deductCredits failed:', err);
+    return NextResponse.json({ error: 'Could not process credits' }, { status: 500 });
   }
 
   // ── Create job ────────────────────────────────────────────────────────────
   try {
     const jobId = await createJob(session.userId);
     return NextResponse.json(
-      { jobId, usedThisCycle: usedThisCycle + 1, limit },
+      {
+        jobId,
+        creditCost,
+        creditsRemaining,
+      },
       { status: 201 }
     );
   } catch (err: unknown) {

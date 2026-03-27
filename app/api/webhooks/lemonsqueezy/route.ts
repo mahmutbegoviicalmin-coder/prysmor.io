@@ -2,6 +2,7 @@ import crypto                        from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN }           from '@/lib/lemonsqueezy';
+import { topUpCredits }              from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
@@ -29,8 +30,8 @@ async function setUserPlan(
 
   const data: Record<string, unknown> = {
     plan,
-    licenseStatus:  status,
-    updatedAt:      new Date(),
+    licenseStatus: status,
+    updatedAt:     new Date(),
   };
   if (subscriptionId) data.lsSubscriptionId = subscriptionId;
   if (renewalDate)    data.renewalDate = renewalDate;
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Misconfigured' }, { status: 500 });
   }
 
-  const rawBody  = await req.text();
+  const rawBody   = await req.text();
   const sigHeader = req.headers.get('x-signature') ?? '';
 
   if (!verifySignature(rawBody, sigHeader, secret)) {
@@ -77,7 +78,6 @@ export async function POST(req: NextRequest) {
   console.log(`[ls-webhook] event=${eventName} userId=${userId}`);
 
   if (!userId) {
-    // No user ID — can happen for test events without custom_data
     console.warn('[ls-webhook] No user_id in custom_data, skipping');
     return NextResponse.json({ received: true });
   }
@@ -90,31 +90,48 @@ export async function POST(req: NextRequest) {
   try {
     switch (eventName) {
       case 'subscription_created':
-      case 'subscription_payment_success':
+        // New subscription — set plan + top-up credits to plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
+        await topUpCredits(userId, plan);
+        console.log(`[ls-webhook] Credits topped up for new subscription: userId=${userId} plan=${plan}`);
+        break;
+
+      case 'subscription_payment_success':
+        // Monthly renewal — set plan + reset credits to plan cap
+        await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
+        await topUpCredits(userId, plan);
+        console.log(`[ls-webhook] Credits reset on renewal: userId=${userId} plan=${plan}`);
         break;
 
       case 'subscription_updated':
-        // Handle plan changes (upgrade/downgrade)
+        // Plan change (upgrade/downgrade) — update plan + top-up to new plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
-        break;
-
-      case 'subscription_cancelled':
-        // Still active until end of period — keep plan, mark as cancelled
-        await db.collection('users').doc(userId).update({
-          licenseStatus:  'inactive',
-          lsCancelledAt:  new Date(),
-          updatedAt:      new Date(),
-        });
-        break;
-
-      case 'subscription_expired':
-        // Access fully ended — downgrade
-        await setUserPlan(userId, 'starter', 'inactive', subscriptionId);
+        await topUpCredits(userId, plan);
+        console.log(`[ls-webhook] Credits updated on plan change: userId=${userId} plan=${plan}`);
         break;
 
       case 'subscription_resumed':
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
+        await topUpCredits(userId, plan);
+        break;
+
+      case 'subscription_cancelled':
+        // Still active until end of billing period — keep credits, mark cancelled
+        await db.collection('users').doc(userId).update({
+          licenseStatus: 'inactive',
+          lsCancelledAt: new Date(),
+          updatedAt:     new Date(),
+        });
+        break;
+
+      case 'subscription_expired':
+        // Access fully ended — zero out credits, downgrade
+        await setUserPlan(userId, 'starter', 'inactive', subscriptionId);
+        await db.collection('users').doc(userId).update({
+          credits:      0,
+          creditsTotal: 0,
+          updatedAt:    new Date(),
+        });
         break;
 
       default:
