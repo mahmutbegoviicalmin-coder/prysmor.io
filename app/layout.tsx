@@ -69,7 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={`${bricolage.variable} ${dmSans.variable}`}>
         <body className="bg-background text-ink antialiased">
           <ConditionalShell>{children}</ConditionalShell>
-          <Script src="https://assets.lemonsqueezy.com/lemon.js" strategy="lazyOnload" />
+          <Script src="https://assets.lemonsqueezy.com/lemon.js" strategy="afterInteractive" />
         </body>
       </html>
     </ClerkProvider>

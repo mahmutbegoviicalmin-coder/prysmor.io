@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,16 @@ import { Check, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+
+declare global {
+  interface Window {
+    LemonSqueezy?: {
+      Setup: () => void;
+      Url: { Open: (url: string) => void; Close: () => void };
+    };
+    createLemonSqueezy?: () => void;
+  }
+}
 
 export interface PriceTier {
   id: string;
@@ -54,6 +64,22 @@ export default function PricingSection({
   const [yearly, setYearly] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
+
+  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    const userId = user?.id ?? '';
+    const url = `${baseUrl}?embed=1&dark=1${userId ? `&checkout[custom][user_id]=${userId}` : ''}`;
+
+    if (window.LemonSqueezy?.Url?.Open) {
+      window.LemonSqueezy.Url.Open(url);
+    } else if (window.createLemonSqueezy) {
+      window.createLemonSqueezy();
+      window.LemonSqueezy?.Url?.Open(url);
+    } else {
+      // Fallback: lemon.js not yet loaded, open in same tab
+      window.location.href = url;
+    }
+  }, [user?.id]);
 
   return (
     <section className="relative py-24 overflow-hidden" id="pricing">
@@ -133,11 +159,8 @@ export default function PricingSection({
               ? `${tier.ctaHref}&billing=${isYearly ? 'yearly' : 'monthly'}`
               : tier.ctaHref;
 
-            // Build Lemon Squeezy embed URL for popup overlay
+            // Pick the right LS base URL based on billing toggle
             const lsBaseUrl = isYearly ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl) : tier.lsMonthlyUrl;
-            const lsEmbedUrl = lsBaseUrl
-              ? `${lsBaseUrl}?embed=1&dark=1${user?.id ? `&checkout[custom][user_id]=${user.id}` : ''}`
-              : null;
             return (
               <motion.div
                 key={tier.id}
@@ -224,19 +247,19 @@ export default function PricingSection({
                         </li>
                       ))}
                     </ul>
-                    {lsEmbedUrl ? (
-                      /* Lemon Squeezy overlay checkout */
-                      <a
-                        href={lsEmbedUrl}
+                    {lsBaseUrl ? (
+                      /* Lemon Squeezy overlay checkout — onClick forces popup, never navigates */
+                      <button
+                        onClick={(e) => openLSOverlay(lsBaseUrl, e)}
                         className={cn(
-                          "lemonsqueezy-button w-full mt-auto inline-flex items-center justify-center rounded-lg text-[13px] font-semibold h-10 px-4 transition-all duration-200",
+                          "w-full mt-auto inline-flex items-center justify-center rounded-lg text-[13px] font-semibold h-10 px-4 transition-all duration-200 cursor-pointer",
                           tier.featured
                             ? "bg-accent text-black hover:bg-accent/90"
                             : "border border-white/[0.15] text-white hover:bg-white/[0.06] hover:border-white/25"
                         )}
                       >
                         {tier.cta}
-                      </a>
+                      </button>
                     ) : (tier.onCtaClick ?? onCtaClick) ? (
                       <Button
                         variant={tier.featured ? "default" : "outline"}

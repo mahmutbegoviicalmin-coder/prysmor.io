@@ -310,6 +310,7 @@ const pricingTiers: PriceTier[] = [
     cta: "Get Started",
     ctaHref: "/checkout?plan=starter",
     lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/c44b1138-5022-4a77-9ffc-f34a141f8999",
+    lsYearlyUrl:  "https://vfxpilot1.lemonsqueezy.com/checkout/buy/ec075c85-1c0b-43f2-a19a-5f92d6b8e652",
   },
   {
     id: "pro",
@@ -333,6 +334,7 @@ const pricingTiers: PriceTier[] = [
     cta: "Get Started",
     ctaHref: "/checkout?plan=pro",
     lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/85a598e3-f100-466b-be78-7d7a90c933ab",
+    lsYearlyUrl:  "https://vfxpilot1.lemonsqueezy.com/checkout/buy/f6e4d82f-75dc-4eaa-897c-981119375475",
   },
   {
     id: "exclusive",
@@ -355,6 +357,7 @@ const pricingTiers: PriceTier[] = [
     cta: "Get Started",
     ctaHref: "/checkout?plan=exclusive",
     lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/717c1894-de84-4710-9936-c53946d4777e",
+    lsYearlyUrl:  "https://vfxpilot1.lemonsqueezy.com/checkout/buy/8a5a6b84-56a9-46e3-a576-5f0b56d502c6",
   },
 ];
 
