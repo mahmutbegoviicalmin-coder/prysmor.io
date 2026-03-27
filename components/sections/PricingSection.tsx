@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,9 @@ export interface PriceTier {
   cta: string;
   ctaHref: string;
   onCtaClick?: () => void;
+  /** Lemon Squeezy embed checkout URLs — opens as popup overlay */
+  lsMonthlyUrl?: string;
+  lsYearlyUrl?: string;
 }
 
 interface PricingSectionProps {
@@ -49,6 +53,7 @@ export default function PricingSection({
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const { user } = useUser();
 
   return (
     <section className="relative py-24 overflow-hidden" id="pricing">
@@ -127,6 +132,12 @@ export default function PricingSection({
             const resolvedHref = tier.ctaHref.startsWith('/checkout')
               ? `${tier.ctaHref}&billing=${isYearly ? 'yearly' : 'monthly'}`
               : tier.ctaHref;
+
+            // Build Lemon Squeezy embed URL for popup overlay
+            const lsBaseUrl = isYearly ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl) : tier.lsMonthlyUrl;
+            const lsEmbedUrl = lsBaseUrl
+              ? `${lsBaseUrl}?embed=1&dark=1${user?.id ? `&checkout[custom][user_id]=${user.id}` : ''}`
+              : null;
             return (
               <motion.div
                 key={tier.id}
@@ -213,7 +224,20 @@ export default function PricingSection({
                         </li>
                       ))}
                     </ul>
-                    {(tier.onCtaClick ?? onCtaClick) ? (
+                    {lsEmbedUrl ? (
+                      /* Lemon Squeezy overlay checkout */
+                      <a
+                        href={lsEmbedUrl}
+                        className={cn(
+                          "lemonsqueezy-button w-full mt-auto inline-flex items-center justify-center rounded-lg text-[13px] font-semibold h-10 px-4 transition-all duration-200",
+                          tier.featured
+                            ? "bg-accent text-black hover:bg-accent/90"
+                            : "border border-white/[0.15] text-white hover:bg-white/[0.06] hover:border-white/25"
+                        )}
+                      >
+                        {tier.cta}
+                      </a>
+                    ) : (tier.onCtaClick ?? onCtaClick) ? (
                       <Button
                         variant={tier.featured ? "default" : "outline"}
                         className="w-full mt-auto"

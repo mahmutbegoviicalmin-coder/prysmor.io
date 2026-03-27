@@ -309,6 +309,7 @@ const pricingTiers: PriceTier[] = [
     ],
     cta: "Get Started",
     ctaHref: "/checkout?plan=starter",
+    lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/c44b1138-5022-4a77-9ffc-f34a141f8999",
   },
   {
     id: "pro",
@@ -331,6 +332,7 @@ const pricingTiers: PriceTier[] = [
     ],
     cta: "Get Started",
     ctaHref: "/checkout?plan=pro",
+    lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/85a598e3-f100-466b-be78-7d7a90c933ab",
   },
   {
     id: "exclusive",
@@ -352,6 +354,7 @@ const pricingTiers: PriceTier[] = [
     ],
     cta: "Get Started",
     ctaHref: "/checkout?plan=exclusive",
+    lsMonthlyUrl: "https://vfxpilot1.lemonsqueezy.com/checkout/buy/717c1894-de84-4710-9936-c53946d4777e",
   },
 ];
 

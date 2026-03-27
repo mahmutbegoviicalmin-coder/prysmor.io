@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import "./globals.css";
 import ConditionalShell from "@/components/site/ConditionalShell";
 
@@ -68,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" className={`${bricolage.variable} ${dmSans.variable}`}>
         <body className="bg-background text-ink antialiased">
           <ConditionalShell>{children}</ConditionalShell>
+          <Script src="https://assets.lemonsqueezy.com/lemon.js" strategy="lazyOnload" />
         </body>
       </html>
     </ClerkProvider>
