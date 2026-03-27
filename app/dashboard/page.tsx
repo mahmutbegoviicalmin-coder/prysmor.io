@@ -68,7 +68,10 @@ export default async function DashboardOverviewPage() {
     };
   }
   const { license, panel, limits, security, activity } = data;
-  const pct = Math.min(100, Math.round((limits.usedThisCycle / limits.monthlyAllowance) * 100));
+  const pct = limits.creditsTotal > 0
+    ? Math.min(100, Math.round((limits.credits / limits.creditsTotal) * 100))
+    : 0;
+  const creditSeconds = Math.floor(limits.credits / 4);
 
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[1100px]">
@@ -163,34 +166,40 @@ export default async function DashboardOverviewPage() {
           </Link>
         </Card>
 
-        {/* Usage */}
+        {/* Credits */}
         <Card>
           <div className="flex items-start justify-between mb-4">
-            <p className="text-[13px] font-medium text-[#9CA3AF]">Usage &amp; Limits</p>
+            <p className="text-[13px] font-medium text-[#9CA3AF]">Credits</p>
             <span className="text-[11px] text-[#6B7280]">This cycle</span>
           </div>
           <div className="mb-4">
             <div className="flex items-end justify-between mb-2">
               <p className="text-[28px] font-semibold text-white leading-none">
-                {limits.usedThisCycle}
+                {limits.credits.toLocaleString()}
                 <span className="text-[16px] font-normal text-[#4B5563] ml-1">
-                  / {limits.monthlyAllowance}
+                  / {limits.creditsTotal.toLocaleString()}
                 </span>
               </p>
-              <span className="text-[12px] text-[#6B7280]">{pct}%</span>
+              <span className={`text-[12px] font-medium ${pct < 20 ? "text-orange-400" : "text-[#6B7280]"}`}>
+                {pct}%
+              </span>
             </div>
             <div className="h-[3px] w-full rounded-full bg-white/[0.07] overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#A3FF12] transition-all"
-                style={{ width: `${pct}%`, opacity: 0.85 }}
+                className="h-full rounded-full transition-all"
+                style={{ width: `${pct}%`, opacity: 0.9, background: pct < 20 ? "#fb923c" : "#A3FF12" }}
               />
             </div>
-            <p className="mt-1.5 text-[11px] text-[#4B5563]">Monthly renders</p>
+            <p className="mt-1.5 text-[11px] text-[#4B5563]">≈ {creditSeconds}s of AI VFX remaining</p>
           </div>
           <div className="space-y-0">
             <DataRow label="Device seats" value={`${limits.devicesUsed} / ${limits.deviceLimit}`} />
-            <DataRow label="Resets on" value={limits.resetDate} />
+            <DataRow label="Resets on"    value={limits.resetDate} />
           </div>
+          <Link href="/dashboard/billing"
+            className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#A3FF12] hover:underline underline-offset-2">
+            Manage credits <ChevronRight className="w-3 h-3" />
+          </Link>
         </Card>
       </div>
 

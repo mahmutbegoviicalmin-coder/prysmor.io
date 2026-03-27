@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/lib/firebaseAdmin";
-import { getUser, PLAN_LABELS, PLAN_ALLOWANCE } from "./users";
+import { getUser, PLAN_LABELS, PLAN_CREDITS } from "./users";
 import { getDevices } from "./devices";
 import type { User } from "@clerk/nextjs/server";
 
@@ -83,8 +83,8 @@ export interface DashboardPanel {
 }
 
 export interface DashboardLimits {
-  usedThisCycle: number;
-  monthlyAllowance: number;
+  credits: number;
+  creditsTotal: number;
   devicesUsed: number;
   deviceLimit: number;
   resetDate: string;
@@ -203,17 +203,17 @@ export async function getDashboardData(
   }
 
   // ── Usage / Limits ─────────────────────────────────────────────────────────
-  const monthlyAllowance =
-    userDoc?.monthlyAllowance ?? PLAN_ALLOWANCE[plan] ?? 25;
-  const usedThisCycle = thisMonthJobs.length;
+  const planCap      = PLAN_CREDITS[plan] ?? 1000;
+  const credits      = typeof userDoc?.credits      === "number" ? userDoc.credits      : planCap;
+  const creditsTotal = typeof userDoc?.creditsTotal === "number" ? userDoc.creditsTotal : planCap;
 
   const resetAt = new Date();
   resetAt.setMonth(resetAt.getMonth() + 1, 1);
   resetAt.setDate(0);
 
   const limits: DashboardLimits = {
-    usedThisCycle,
-    monthlyAllowance,
+    credits,
+    creditsTotal,
     devicesUsed: devices.length,
     deviceLimit: userDoc?.deviceLimit ?? 2,
     resetDate: formatDate(resetAt),
