@@ -308,7 +308,7 @@ const pricingTiers: PriceTier[] = [
       "4K output quality",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=starter",
   },
   {
     id: "pro",
@@ -330,7 +330,7 @@ const pricingTiers: PriceTier[] = [
       "4K output quality",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=pro",
   },
   {
     id: "exclusive",
@@ -351,7 +351,7 @@ const pricingTiers: PriceTier[] = [
       "Priority support included",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=exclusive",
   },
 ];
 
@@ -625,7 +625,6 @@ export default function VFXPilotPage() {
         tiers={pricingTiers}
         showToggle={true}
         footerNote="7-Day Money-Back Guarantee · Cancel Anytime"
-        onCtaClick={() => openSignUp({ afterSignUpUrl: "/dashboard" })}
       />
 
       {/* ── TESTIMONIALS ── */}

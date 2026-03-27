@@ -123,6 +123,10 @@ export default function PricingSection({
             const price    = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
             const suffix   = isYearly ? "/yr" : "/mo";
             const origYr   = tier.monthlyPrice * 12; // e.g. $348
+            // Append billing interval to checkout links so the server knows which variant to use
+            const resolvedHref = tier.ctaHref.startsWith('/checkout')
+              ? `${tier.ctaHref}&billing=${isYearly ? 'yearly' : 'monthly'}`
+              : tier.ctaHref;
             return (
               <motion.div
                 key={tier.id}
@@ -219,7 +223,7 @@ export default function PricingSection({
                       </Button>
                     ) : (
                       <Button variant={tier.featured ? "default" : "outline"} className="w-full mt-auto" asChild>
-                        <Link href={tier.ctaHref}>{tier.cta}</Link>
+                        <Link href={resolvedHref}>{tier.cta}</Link>
                       </Button>
                     )}
                   </div>
