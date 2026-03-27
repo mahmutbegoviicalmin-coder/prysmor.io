@@ -886,22 +886,31 @@ function renderUsage() {
   var total   = state.usage.creditsTotal || 1000;
   var pct     = total > 0 ? Math.min(Math.round((credits / total) * 100), 100) : 0;
   var seconds = Math.floor(credits / 4);
+  var isLow   = pct < 20;
 
   var usedEl = el('usage-used');
   var limEl  = el('usage-limit');
   var barEl  = el('progress-fill');
 
-  if (usedEl) usedEl.textContent = credits;
-  if (limEl)  limEl.textContent  = total;
+  if (usedEl) usedEl.textContent = credits.toLocaleString();
+  if (limEl)  limEl.textContent  = total.toLocaleString();
   if (barEl) {
-    barEl.style.width = pct + '%';
-    // Turn bar orange when below 20%
-    barEl.style.background = pct < 20 ? '#fb923c' : '#A3FF12';
+    barEl.style.width      = pct + '%';
+    barEl.style.background = isLow ? '#fb923c' : '#A3FF12';
   }
 
-  // Update seconds label if it exists
+  // Seconds remaining label
   var secEl = el('usage-seconds');
-  if (secEl) secEl.textContent = '≈ ' + seconds + 's remaining';
+  if (secEl) secEl.textContent = '≈ ' + seconds + 's of AI VFX remaining';
+
+  // Topbar credits badge
+  var badge    = el('topbar-credits');
+  var badgeVal = el('topbar-credits-val');
+  if (badge && badgeVal) {
+    badge.style.display = '';
+    badgeVal.textContent = credits.toLocaleString() + ' cr';
+    badge.classList.toggle('low', isLow);
+  }
 }
 
 function showNoCreditsMessage() {

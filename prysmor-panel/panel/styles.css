@@ -348,6 +348,14 @@ html,body{
   background:var(--lime-dim);border:1px solid var(--bdr-lime);color:var(--lime);
   margin-left:2px;
 }
+.tb-credits-badge {
+  display:flex;align-items:center;gap:3px;
+  font-size:10px;font-weight:600;color:#9CA3AF;
+  padding:2px 7px;border-radius:99px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  margin-right:4px;transition:color .2s,border-color .2s;
+}
+.tb-credits-badge.low { color:#fb923c;border-color:rgba(251,146,60,0.3); }
 .tb-right{display:flex;align-items:center;gap:6px;}
 .tb-status-dot{
   width:6px;height:6px;border-radius:50%;
