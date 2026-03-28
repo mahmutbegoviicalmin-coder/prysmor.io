@@ -382,12 +382,16 @@ function updateCostPreview() {
   var canAfford = bal >= cost;
 
   preview.style.display = '';
-  preview.className = 'gen-cost-preview' + (canAfford ? '' : ' insufficient');
+  preview.className = 'cc-cost-preview' + (canAfford ? '' : ' insufficient');
 
   if (canAfford) {
-    preview.innerHTML = 'Will cost <b>' + cost + ' credits</b> · ' + secs + 's clip · ' + bal + ' remaining';
+    preview.innerHTML =
+      '<span>Will deduct <b>' + cost + ' credits</b></span>' +
+      '<span style="color:var(--t3)">' + bal + ' → ' + Math.max(0, bal - cost) + '</span>';
   } else {
-    preview.innerHTML = 'Need <b>' + cost + ' credits</b> · only ' + bal + ' available — <b>upgrade plan</b>';
+    preview.innerHTML =
+      '<span>Need <b>' + cost + ' credits</b></span>' +
+      '<span>only <b>' + bal + '</b> available</span>';
   }
 }
 
@@ -942,6 +946,24 @@ async function fetchCredits() {
   }
 }
 
+// Smoothly animates a number element from its current displayed value to target
+function animateNumber(elId, toValue, duration) {
+  var elem = el(elId);
+  if (!elem) return;
+  var from = parseInt(elem.textContent.replace(/[^0-9]/g, ''), 10) || 0;
+  if (from === toValue) { elem.textContent = toValue.toLocaleString(); return; }
+  var start = null;
+  function step(ts) {
+    if (!start) start = ts;
+    var pct = Math.min((ts - start) / (duration || 500), 1);
+    var ease = 1 - Math.pow(1 - pct, 3); // ease-out cubic
+    var cur = Math.round(from + (toValue - from) * ease);
+    elem.textContent = cur.toLocaleString();
+    if (pct < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 function renderUsage() {
   var credits = state.usage.credits      || 0;
   var total   = state.usage.creditsTotal || 1000;
@@ -949,41 +971,42 @@ function renderUsage() {
   var seconds = Math.floor(credits / 4);
   var isLow   = pct < 20;
 
-  var usedEl = el('usage-used');
-  var limEl  = el('usage-limit');
-  var barEl  = el('progress-fill');
+  // Animate the big number
+  animateNumber('usage-used', credits, 600);
 
-  if (usedEl) usedEl.textContent = credits.toLocaleString();
-  if (limEl)  limEl.textContent  = total.toLocaleString();
+  var limEl = el('usage-limit');
+  if (limEl) limEl.textContent = total.toLocaleString();
+
+  var barEl = el('progress-fill');
   if (barEl) {
     barEl.style.width      = pct + '%';
-    barEl.style.background = isLow ? '#fb923c' : '#A3FF12';
+    barEl.style.background = isLow
+      ? 'linear-gradient(90deg,#fb923c,#fbbf24)'
+      : 'linear-gradient(90deg,#A3FF12,#5DFF00)';
   }
 
-  // Seconds remaining label
-  var secEl = el('usage-seconds');
-  if (secEl) secEl.textContent = '≈ ' + seconds + 's of AI VFX remaining';
+  // Credits card low state
+  var card = el('credits-card');
+  if (card) card.classList.toggle('low', isLow);
 
-  // Topbar credits badge
+  // Seconds remaining
+  var secEl = el('usage-seconds');
+  if (secEl) secEl.textContent = seconds > 0 ? '≈ ' + seconds + 's of AI VFX' : 'No time remaining';
+
+  // Topbar badge
   var badge    = el('topbar-credits');
   var badgeVal = el('topbar-credits-val');
   if (badge && badgeVal) {
-    badge.style.display = '';
+    badge.style.display  = '';
     badgeVal.textContent = credits.toLocaleString() + ' cr';
     badge.classList.toggle('low', isLow);
   }
 }
 
 function showNoCreditsMessage() {
-  var credits = state.usage.credits || 0;
-  var planLabel = (state.auth && state.auth.planLabel) || 'Starter';
-  // Show a toast with upgrade link
-  showToast('No credits left (' + credits + ' remaining). Upgrade your plan to continue.', 'error');
-  // Also show inline banner below the generate button if element exists
+  showToast('No credits left. Upgrade your plan to continue generating.', 'error');
   var banner = el('no-credits-banner');
-  if (banner) {
-    banner.classList.remove('hidden');
-  }
+  if (banner) banner.classList.remove('hidden');
 }
 
 function hideNoCreditsMessage() {
