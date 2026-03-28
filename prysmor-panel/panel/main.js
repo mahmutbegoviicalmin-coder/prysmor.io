@@ -377,32 +377,34 @@ function calcCostPreview(durationSec) {
 }
 
 function updateCostPreview() {
-  var preview = el('gen-cost-preview');
-  if (!preview) return;
+  var costBadge    = el('gen-btn-cost');
+  var costBadgeVal = el('gen-btn-cost-val');
 
   if (!state.mf.selInfo) {
-    preview.style.display = 'none';
+    if (costBadge) costBadge.style.display = 'none';
     return;
   }
 
   var dur  = Math.min(state.mf.selInfo.durationSec || 0, 8);
   var cost = calcCostPreview(dur);
   var bal  = state.usage.credits || 0;
-  var secs = dur.toFixed(1);
   var canAfford = bal >= cost;
 
-  preview.style.display = '';
-  preview.className = 'cc-cost-preview' + (canAfford ? '' : ' insufficient');
-
-  if (canAfford) {
-    preview.innerHTML =
-      '<span>Will deduct <b>' + cost + ' credits</b></span>' +
-      '<span style="color:var(--t3)">' + bal + ' → ' + Math.max(0, bal - cost) + '</span>';
-  } else {
-    preview.innerHTML =
-      '<span>Need <b>' + cost + ' credits</b></span>' +
-      '<span>only <b>' + bal + '</b> available</span>';
+  // Show cost on the Generate button
+  if (costBadge && costBadgeVal) {
+    costBadge.style.display = '';
+    costBadgeVal.textContent = cost;
   }
+
+  // Disable generate button if can't afford
+  var genBtn = el('mf-btn-generate');
+  if (genBtn && !state.mf.generating) {
+    genBtn.disabled = !canAfford;
+  }
+
+  // Legacy hidden element (kept for compat)
+  var preview = el('gen-cost-preview');
+  if (preview) preview.style.display = 'none';
 }
 
 function showClipInfo(info) {
@@ -821,6 +823,9 @@ function setGenerating(active) {
   state.mf.generating = active;
   const btn = el('mf-btn-generate');
   if (btn) { btn.disabled = active; btn.style.display = active ? 'none' : ''; }
+  // Hide cost badge during generation
+  var costBadge = el('gen-btn-cost');
+  if (costBadge && active) costBadge.style.display = 'none';
   const gs = el('mf-gen-state');
   if (gs) gs.classList.toggle('hidden', !active);
   const rs = el('mf-section-result');
@@ -829,6 +834,7 @@ function setGenerating(active) {
     const bar = el('mf-gen-bar');
     if (bar) { bar.style.width = '0%'; }
   }
+  if (!active) updateCostPreview(); // restore cost badge after generation
 }
 
 function setStatus(text, pct) {
@@ -1114,8 +1120,8 @@ function bindEvents() {
 
     function setMode(replace) {
       checkbox.checked = replace;
-      btnV2.classList.toggle('out-opt-active', !replace);
-      btnReplace.classList.toggle('out-opt-active', replace);
+      btnV2.classList.toggle('seg-active', !replace);
+      btnReplace.classList.toggle('seg-active', replace);
       hint.textContent = replace
         ? 'Result overwrites your original clip in the timeline'
         : 'Result added on a new V2 track — your original clip is untouched';

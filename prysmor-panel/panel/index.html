@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=15"/>
+  <link rel="stylesheet" href="styles.css?v=17"/>
 </head>
 <body>
 
@@ -20,15 +20,12 @@
        LOGIN VIEW
   ══════════════════════════════════════ -->
   <div id="view-login" class="view login-view">
-
-    <!-- Background lighting -->
     <div class="lbg" aria-hidden="true">
       <div class="lbg-glow-center"></div>
       <div class="lbg-glow-br"></div>
     </div>
     <canvas id="grain" aria-hidden="true"></canvas>
 
-    <!-- TOP BAR -->
     <header class="lv-topbar">
       <div class="lv-tb-brand">
         <img src="assets/vecilogo.png" class="lv-tb-logo" alt=""/>
@@ -39,10 +36,7 @@
       </div>
     </header>
 
-    <!-- SCROLL CONTENT -->
     <div class="lv-content">
-
-      <!-- BRAND BLOCK -->
       <div class="lv-brand">
         <div class="lv-brand-glow" aria-hidden="true"></div>
         <img src="assets/vecilogo.png" class="lv-brand-logo" alt="Prysmor"/>
@@ -56,12 +50,9 @@
         </div>
       </div>
 
-      <!-- DIVIDER -->
       <div class="lv-divider"></div>
 
-      <!-- ACCESS WORKSPACE CARD -->
       <div class="lv-workspace-card">
-
         <div class="lwc-header">
           <div class="lwc-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
@@ -71,19 +62,15 @@
             <p class="lwc-desc">Sign in to sync your subscription, available credits and generation tools.</p>
           </div>
         </div>
-
         <button id="btn-continue" class="lv-cta-btn">
           <span class="lv-cta-label">Continue with Prysmor</span>
           <span class="lv-cta-arrow" aria-hidden="true">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </span>
         </button>
-
         <p id="login-status" style="display:none"></p>
-
       </div>
 
-      <!-- STATS STRIP -->
       <div class="lv-stats">
         <div class="lv-stat">
           <span class="lv-stat-label">Plan</span>
@@ -100,9 +87,8 @@
           <span class="lv-stat-value">v1.1.0</span>
         </div>
       </div>
-
-    </div><!-- /lv-content -->
-  </div><!-- /view-login -->
+    </div>
+  </div>
 
 
   <!-- ══════════════════════════════════════
@@ -111,39 +97,51 @@
   <div id="view-main" class="view main-view hidden">
 
     <div class="amb" aria-hidden="true">
-      <div class="amb-1"></div>
-      <div class="amb-2"></div>
+      <div class="amb-1"></div><div class="amb-2"></div>
     </div>
 
-    <!-- TOP BAR -->
+    <!-- ── TOPBAR ───────────────────────── -->
     <header class="topbar">
       <div class="tb-brand">
         <img src="assets/vecilogo.png" class="tb-logo" alt=""/>
-        <div class="tb-names">
-          <span class="tb-name">Prysmor</span>
-          <span class="tb-sub">VFXPilot</span>
-        </div>
+        <span class="tb-name">Prysmor</span>
         <span id="topbar-plan" class="tb-plan" style="display:none"></span>
       </div>
       <div class="tb-right">
-        <div class="tb-credits-badge" id="topbar-credits" style="display:none">
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <div class="tb-credits-pill" id="topbar-credits" style="display:none">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span id="topbar-credits-val">–</span>
         </div>
-        <div class="tb-status-dot"></div>
-        <button class="tb-icon-btn" id="btn-scroll-settings" title="Settings">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <div class="tb-dot"></div>
+        <button class="tb-settings-btn" id="btn-scroll-settings" title="Settings">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
     </header>
 
     <div class="panel-scroll">
 
-      <!-- CLIP -->
-      <div class="p-card">
-        <div class="p-card-head">
-          <span class="p-label">Clip</span>
-          <button class="p-chip" id="btn-refresh-clip">
+      <!-- ── CREDITS BAR (top, always visible) ─── -->
+      <div class="top-credits" id="credits-card">
+        <div class="top-credits-left">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span class="top-credits-nums">
+            <b id="usage-used">–</b><span class="top-credits-sep">/</span><span id="usage-limit">1000</span>
+          </span>
+          <span class="top-credits-label">credits</span>
+        </div>
+        <span id="usage-seconds" class="top-credits-time">–</span>
+      </div>
+      <div class="top-credits-bar"><div class="top-credits-fill" id="progress-fill" style="width:0%"></div></div>
+
+      <!-- ── CLIP ──────────────────────── -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            <span class="card-label">Clip</span>
+          </div>
+          <button class="chip-btn" id="btn-refresh-clip">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
             Refresh
           </button>
@@ -151,82 +149,108 @@
 
         <div id="clip-empty" class="clip-empty">
           <div class="clip-empty-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2.5"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2.5"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </div>
           <p class="clip-empty-t">No clip selected</p>
-          <p class="clip-empty-s">Select a clip in the timeline and tap Refresh</p>
+          <p class="clip-empty-s">Click a clip in the timeline, then tap Refresh</p>
         </div>
 
-        <div id="clip-info" class="clip-loaded hidden">
-          <div class="clip-loaded-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        <div id="clip-info" class="clip-row hidden">
+          <div class="clip-row-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
           </div>
-          <div class="clip-info-text">
-            <div class="clip-filename" id="clip-name">clip.mp4</div>
-            <div class="clip-meta">
-              <span class="meta-pill" id="clip-dur-badge">—</span>
-              <span class="meta-pill meta-pill-dim" id="clip-start-badge">—</span>
-              <span class="meta-pill meta-pill-warn" id="clip-trim-badge" style="display:none">Trimmed</span>
+          <div class="clip-row-info">
+            <span class="clip-row-name" id="clip-name">clip.mp4</span>
+            <div class="clip-row-meta">
+              <span class="tag tag-lime" id="clip-dur-badge">—</span>
+              <span class="tag tag-dim"  id="clip-start-badge">—</span>
+              <span class="tag tag-warn" id="clip-trim-badge" style="display:none">Trimmed to 8s</span>
             </div>
           </div>
-          <div class="clip-live-dot"></div>
+          <div class="clip-live"></div>
         </div>
-        <p id="clip-trim-warning" class="clip-trim-warn" style="display:none"></p>
+
+        <p id="clip-trim-warning" class="clip-warn" style="display:none"></p>
       </div>
 
-      <!-- GENERATE -->
-      <div class="p-card" id="section-motionforge">
-        <div class="p-card-head">
-          <span class="p-label">Prompt</span>
-          <button class="ai-chip" id="btn-compile-prompt">
+      <!-- ── PROMPT ─────────────────────── -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <span class="card-label">Prompt</span>
+          </div>
+          <button class="ai-btn" id="btn-compile-prompt">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
             <span id="compile-label">AI Enhance</span>
           </button>
         </div>
-
-        <div class="prompt-field">
+        <div class="prompt-wrap">
           <textarea id="mf-prompt" rows="4" maxlength="1000"
-            placeholder="luxury villa at golden hour… cyberpunk neon rain… frozen winter storm…"></textarea>
+            placeholder="make the scene frozen… add cinematic fire… neon rain cyberpunk…"></textarea>
           <span class="prompt-count"><span id="mf-char-count">0</span>/1000</span>
         </div>
+      </div>
 
+      <!-- ── GENERATE ───────────────────── -->
+      <div class="card gen-card">
+
+        <!-- Output mode -->
         <div class="output-row">
-          <span class="output-label">Output</span>
+          <span class="output-lbl">Output</span>
           <div class="output-seg">
             <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
-            <button class="seg-opt seg-opt-on" id="out-btn-v2" type="button">New track</button>
-            <button class="seg-opt" id="out-btn-replace" type="button">Replace</button>
+            <button class="seg-opt seg-active" id="out-btn-v2"      type="button">New track</button>
+            <button class="seg-opt"            id="out-btn-replace"  type="button">Replace</button>
           </div>
         </div>
         <p class="output-hint" id="output-hint">Added on V2 — original clip untouched</p>
 
+        <!-- Generate button with cost badge -->
         <button id="mf-btn-generate" class="gen-btn">
-          <span class="gen-btn-inner">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span class="gen-btn-left">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Generate Effect
+          </span>
+          <span class="gen-cost-badge" id="gen-btn-cost" style="display:none">
+            <span id="gen-btn-cost-val">–</span> cr
           </span>
         </button>
 
+        <!-- Progress (shown during generation) -->
         <div id="mf-gen-state" class="gen-progress hidden">
-          <div class="gen-track"><div class="gen-fill" id="mf-gen-bar" style="width:0%"><span class="gen-shimmer"></span></div></div>
+          <div class="gen-bar-track"><div class="gen-bar-fill" id="mf-gen-bar" style="width:0%"><span class="gen-shimmer"></span></div></div>
           <div class="gen-status-row">
             <span class="gen-dots"><i></i><i></i><i></i></span>
             <span id="mf-status-text" class="gen-status-txt">Initializing…</span>
           </div>
         </div>
+
+        <!-- No credits warning (inside gen card) -->
+        <div id="no-credits-banner" class="no-credits-bar hidden">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>No credits remaining.</span>
+          <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade plan ↗</a>
+        </div>
+
+        <!-- hidden cost preview (kept for JS compat) -->
+        <div id="gen-cost-preview" style="display:none"></div>
       </div>
 
-      <!-- RESULT -->
-      <div class="p-card hidden" id="mf-section-result">
-        <div class="p-card-head">
-          <span class="p-label">Result</span>
-          <button class="ghost-lnk" id="mf-btn-new-gen">↺ New</button>
+      <!-- ── RESULT ─────────────────────── -->
+      <div class="card hidden" id="mf-section-result">
+        <div class="card-head">
+          <div class="card-head-left">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span class="card-label">Result</span>
+          </div>
+          <button class="ghost-lnk" id="mf-btn-new-gen">↺ New generation</button>
         </div>
-        <div class="result-preview">
+        <div class="result-wrap">
           <video id="mf-result-video" src="" muted loop playsinline controls></video>
-          <div class="result-badges">
-            <span class="rbadge rbadge-green">AI Generated</span>
-            <span class="rbadge rbadge-blue" id="mf-insert-chip">V2</span>
+          <div class="result-tags">
+            <span class="rtag rtag-lime">AI Generated</span>
+            <span class="rtag rtag-blue" id="mf-insert-chip">V2</span>
           </div>
         </div>
         <div class="result-actions">
@@ -242,32 +266,7 @@
         </div>
       </div>
 
-      <!-- CREDITS CARD -->
-      <div class="credits-card" id="credits-card">
-        <div class="cc-header">
-          <div class="cc-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          </div>
-          <div class="cc-meta">
-            <span class="cc-label">Credits</span>
-            <span id="usage-seconds" class="cc-time">–</span>
-          </div>
-          <div class="cc-balance">
-            <span class="cc-val" id="usage-used">–</span>
-            <span class="cc-total">/ <span id="usage-limit">1000</span></span>
-          </div>
-        </div>
-        <div class="cc-bar-track">
-          <div class="cc-bar-fill" id="progress-fill" style="width:0%"></div>
-        </div>
-        <div id="gen-cost-preview" class="cc-cost-preview" style="display:none"></div>
-        <div id="no-credits-banner" class="cc-no-credits hidden">
-          <span>No credits left — upgrade to keep generating.</span>
-          <a id="no-credits-upgrade-link" href="#">Upgrade ↗</a>
-        </div>
-      </div>
-
-      <!-- SETTINGS -->
+      <!-- ── SETTINGS ───────────────────── -->
       <div class="settings-wrap" id="section-settings">
         <button class="settings-toggle" id="settings-trigger">
           <span class="st-left">
@@ -315,23 +314,22 @@
         <div class="foot-links"><a id="link-docs">Docs</a><span>·</span><a id="link-terms">Terms</a></div>
       </footer>
 
-    </div>
-  </div>
+    </div><!-- /panel-scroll -->
+  </div><!-- /view-main -->
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=16"></script>
+  <script src="main.js?v=17"></script>
   <script>
     (function(){
       const c=document.getElementById('grain');
       if(!c)return;
       const ctx=c.getContext('2d');
       function draw(){
-        c.width=c.offsetWidth; c.height=c.offsetHeight;
+        c.width=c.offsetWidth;c.height=c.offsetHeight;
         const img=ctx.createImageData(c.width,c.height);
         const d=img.data;
         for(let i=0;i<d.length;i+=4){const v=Math.random()*22|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=16;}
-        ctx.putImageData(img,0,0);
-        setTimeout(draw,80);
+        ctx.putImageData(img,0,0);setTimeout(draw,80);
       }
       draw();
     })();
