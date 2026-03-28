@@ -348,6 +348,7 @@ function refreshClip(silent) {
 
     state.mf.selInfo = parsed;
     showClipInfo(parsed);
+    updateCostPreview();
     if (!silent) {
       var dbg = parsed.debugTimes ? JSON.stringify(parsed.debugTimes) : 'n/a';
       showToast('Clip: ' + (parsed.clipName || 'clip') + ' | mediaIn=' + (parsed.mediaInSec || 0).toFixed(2) + 's | times=' + dbg, 'success');
@@ -358,6 +359,36 @@ function refreshClip(silent) {
 function showClipEmpty() {
   el('clip-empty').classList.remove('hidden');
   el('clip-info').classList.add('hidden');
+}
+
+function calcCostPreview(durationSec) {
+  var dur  = Math.min(durationSec || 0, 8); // Runway caps at 8s
+  return Math.ceil(Math.max(dur, 1)) * 4;   // 4 credits per second
+}
+
+function updateCostPreview() {
+  var preview = el('gen-cost-preview');
+  if (!preview) return;
+
+  if (!state.mf.selInfo) {
+    preview.style.display = 'none';
+    return;
+  }
+
+  var dur  = Math.min(state.mf.selInfo.durationSec || 0, 8);
+  var cost = calcCostPreview(dur);
+  var bal  = state.usage.credits || 0;
+  var secs = dur.toFixed(1);
+  var canAfford = bal >= cost;
+
+  preview.style.display = '';
+  preview.className = 'gen-cost-preview' + (canAfford ? '' : ' insufficient');
+
+  if (canAfford) {
+    preview.innerHTML = 'Will cost <b>' + cost + ' credits</b> · ' + secs + 's clip · ' + bal + ' remaining';
+  } else {
+    preview.innerHTML = 'Need <b>' + cost + ' credits</b> · only ' + bal + ' available — <b>upgrade plan</b>';
+  }
 }
 
 function showClipInfo(info) {
@@ -514,6 +545,8 @@ async function mfGenerate() {
 
   state.mf.replaceMode = replaceMode;
   hideNoCreditsMessage();
+  var costPrev = el('gen-cost-preview');
+  if (costPrev) costPrev.style.display = 'none';
   setGenerating(true);
   setStatus('Creating job…', 8);
 
@@ -653,7 +686,7 @@ function startPolling(jobId) {
       }
 
       // Refresh credit balance from server after successful generation
-      fetchCredits();
+      fetchCredits(); // also calls updateCostPreview()
       setGenerating(false);
     }
 
@@ -903,6 +936,7 @@ async function fetchCredits() {
     state.usage.credits      = data.credits      || 0;
     state.usage.creditsTotal = data.creditsTotal || 1000;
     renderUsage();
+    updateCostPreview();
   } catch (e) {
     console.warn('[Prysmor] fetchCredits failed:', e);
   }

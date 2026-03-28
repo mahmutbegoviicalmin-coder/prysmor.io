@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse }          from 'next/server';
 import { validatePanelToken, validatePanelKey } from '@/lib/motionforge/auth';
-import { getUser, PLAN_CREDITS }               from '@/lib/firestore/users';
+import { getUser, createUser, PLAN_CREDITS }   from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +13,9 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'Session required' }, { status: 401 });
   }
+
+  // Auto-create doc for accounts made before the credits system
+  await createUser(session.userId).catch(() => {});
 
   const user = await getUser(session.userId).catch(() => null);
   if (!user) {

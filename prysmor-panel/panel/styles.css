@@ -505,6 +505,17 @@ html,body{
 .gen-btn:active{transform:translateY(0) scale(.99);}
 .gen-btn:disabled{opacity:.38;cursor:not-allowed;transform:none;box-shadow:0 2px 8px rgba(163,255,18,.1);}
 
+.gen-cost-preview {
+  margin-top: 7px;
+  text-align: center;
+  font-size: 11px;
+  color: #6B7280;
+  letter-spacing: 0.01em;
+}
+.gen-cost-preview b { color: #A3FF12; font-weight: 700; }
+.gen-cost-preview.insufficient { color: #fb923c; }
+.gen-cost-preview.insufficient b { color: #fb923c; }
+
 .gen-progress{padding-top:12px;}
 .gen-track{height:2px;border-radius:99px;background:rgba(255,255,255,.05);overflow:hidden;margin-bottom:9px;}
 .gen-fill {height:100%;border-radius:99px;background:linear-gradient(90deg,var(--lime),#5DFF00);position:relative;transition:width .6s var(--ease);}

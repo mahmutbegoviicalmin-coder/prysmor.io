@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse }   from 'next/server';
 import { createJob }                   from '@/lib/motionforge/jobs';
 import { validatePanelToken, planHasVFXAccess, calcCreditCost } from '@/lib/motionforge/auth';
-import { deductCredits }               from '@/lib/firestore/users';
+import { deductCredits, createUser }   from '@/lib/firestore/users';
 
 export async function POST(req: NextRequest) {
   // ── Authenticate panel session ────────────────────────────────────────────
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
       { status: 403 }
     );
   }
+
+  // ── Ensure user doc exists (handles accounts created before credits system) ─
+  await createUser(session.userId).catch(() => {});
 
   // ── Calculate credit cost from clip duration ──────────────────────────────
   // The panel sends X-Clip-Duration (seconds). If missing, default to 8s max.
