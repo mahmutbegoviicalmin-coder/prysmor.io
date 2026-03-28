@@ -78,45 +78,48 @@ export async function deductCredits(
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(ref);
 
-    let current: number;
+    const throwInsufficient = (have: number) => {
+      const err = new Error(
+        `Insufficient credits — need ${cost}, have ${have}`,
+      ) as Error & { code: string; creditsRemaining: number; needed: number };
+      err.code             = "insufficient_credits";
+      err.creditsRemaining = have;
+      err.needed           = cost;
+      throw err;
+    };
 
     if (!doc.exists) {
-      // Auto-initialise with starter credits for accounts pre-dating the credits system
-      const cap = PLAN_CREDITS.starter;
+      // New user — initialise with Starter plan credits and deduct in one write
+      const cap       = PLAN_CREDITS.starter;
+      const remaining = cap - cost;
+      if (remaining < 0) throwInsufficient(cap);
       tx.set(ref, {
         plan:          "starter",
         licenseStatus: "active",
         deviceLimit:   2,
-        credits:       cap,
+        credits:       remaining,
         creditsTotal:  cap,
         createdAt:     new Date(),
+        updatedAt:     new Date(),
       });
-      current = cap;
-    } else {
-      const data = doc.data()!;
-      const plan = data.plan ?? "starter";
-      const cap  = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
-      // If credits field missing, initialise from plan cap
-      if (typeof data.credits !== "number") {
-        tx.update(ref, { credits: cap, creditsTotal: cap, updatedAt: new Date() });
-        current = cap;
-      } else {
-        current = data.credits;
-      }
+      return remaining;
     }
 
-    if (current < cost) {
-      const err = new Error(
-        `Insufficient credits — need ${cost}, have ${current}`,
-      ) as Error & { code: string; creditsRemaining: number; needed: number };
-      err.code             = "insufficient_credits";
-      err.creditsRemaining = current;
-      err.needed           = cost;
-      throw err;
-    }
+    const data    = doc.data()!;
+    const plan    = data.plan ?? "starter";
+    const cap     = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
+    // Treat missing credits field as full plan cap
+    const current = typeof data.credits === "number" ? data.credits : cap;
+
+    if (current < cost) throwInsufficient(current);
 
     const remaining = current - cost;
-    tx.update(ref, { credits: remaining, updatedAt: new Date() });
+    tx.update(ref, {
+      credits:      remaining,
+      // Back-fill creditsTotal if missing
+      ...(typeof data.creditsTotal !== "number" && { creditsTotal: cap }),
+      updatedAt:    new Date(),
+    });
     return remaining;
   });
 }
