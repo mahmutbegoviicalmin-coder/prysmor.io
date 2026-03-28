@@ -10,7 +10,8 @@ import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
 
-export const runtime = 'nodejs';
+export const runtime     = 'nodejs';
+export const maxDuration = 30; // give Runway status API enough time to respond
 
 const TAG = 'poll';
 

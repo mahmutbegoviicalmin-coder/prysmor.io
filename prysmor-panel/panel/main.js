@@ -13,6 +13,16 @@ const MAX_POLL_MS = 10 * 60 * 1000; // 10 min for job polling
 const AUTH_POLL_MS  = 2500;  // how often to check if browser auth completed
 const AUTH_MAX_MS   = 5 * 60 * 1000; // 5 min before code expires
 
+// Generation status labels by elapsed time
+const GEN_STATUS_LABELS = [
+  { after:   0, text: 'Starting generation…'        },
+  { after:  10, text: 'Uploading to Runway…'         },
+  { after:  30, text: 'Queued at Runway…'            },
+  { after:  90, text: 'Runway is processing…'        },
+  { after: 180, text: 'Still generating (can take 3–5 min)…' },
+  { after: 300, text: 'Almost there — Runway is busy…'       },
+];
+
 // LocalStorage keys
 const LS_TOKEN     = 'prysmor_token';
 const LS_USER_ID   = 'prysmor_user_id';
@@ -635,22 +645,54 @@ async function mfGenerate() {
   startPolling(jobId);
 }
 
+function getGenStatusLabel(elapsedSec) {
+  var label = GEN_STATUS_LABELS[0].text;
+  for (var i = 0; i < GEN_STATUS_LABELS.length; i++) {
+    if (elapsedSec >= GEN_STATUS_LABELS[i].after) label = GEN_STATUS_LABELS[i].text;
+  }
+  return label;
+}
+
 function startPolling(jobId) {
   stopMfPolling();
+  var pollErrors = 0;
   state.mf.pollTimer = setInterval(async function () {
 
-    if (Date.now() - state.mf.pollStart > MAX_POLL_MS) {
+    var elapsedMs  = Date.now() - state.mf.pollStart;
+    var elapsedSec = Math.floor(elapsedMs / 1000);
+
+    if (elapsedMs > MAX_POLL_MS) {
       stopMfPolling();
-      return fail('Generation timed out (10 min)');
+      return fail('Generation timed out after ' + Math.round(elapsedMs / 60000) + ' min. Runway may be busy — try again.');
     }
 
+    // Show elapsed time
+    var mins = Math.floor(elapsedSec / 60);
+    var secs = elapsedSec % 60;
+    var elapsed = mins > 0
+      ? mins + 'm ' + String(secs).padStart(2,'0') + 's'
+      : secs + 's';
+
     let job;
-    try { job = await apiFetch('/api/v1/motionforge/jobs/' + jobId); }
-    catch (_) { return; }
+    try {
+      job = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
+      pollErrors = 0;
+    } catch (_) {
+      pollErrors++;
+      if (pollErrors >= 3) {
+        var statusLabel = getGenStatusLabel(elapsedSec);
+        setStatus(statusLabel + ' (' + elapsed + ')', 58);
+      }
+      return;
+    }
 
     if (job.status === 'generating') {
-      const pct = 55 + Math.round((job.progress || 0) * 0.4);
-      setStatus('Generating… ' + (job.progress || 0) + '%', pct);
+      var progress = job.progress || 0;
+      var pct = 55 + Math.round(progress * 0.4);
+      var label = progress > 0
+        ? 'Generating… ' + progress + '% (' + elapsed + ')'
+        : getGenStatusLabel(elapsedSec) + ' (' + elapsed + ')';
+      setStatus(label, pct);
       return;
     }
 
