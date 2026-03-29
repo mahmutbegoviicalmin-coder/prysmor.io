@@ -5,21 +5,25 @@
 #
 #  Installs:
 #   1. CEP panel → ~/Library/Application Support/Adobe/CEP/extensions/
-#   2. Identity Lock sidecar → /Applications/Prysmor/
-#   3. LaunchAgent → starts sidecar automatically on login
+#   2. Identity Lock sidecar (Python) → ~/Library/Prysmor/
+#   3. Python dependencies (pip3 install, one-time ~5 min)
+#   4. LaunchAgent → starts sidecar automatically on login
 # ─────────────────────────────────────────────────────────────
 
 set -e
 cd "$(dirname "$0")"
 
 PANEL_SRC="./prysmor-panel"
-SIDECAR_SRC="./prysmor-sidecar"          # PyInstaller folder bundle
-SIDECAR_DEST="/Applications/Prysmor"
-SIDECAR_EXE="$SIDECAR_DEST/prysmor-sidecar"
+SIDECAR_PY="./face_embedding_server.py"  # Python script (no exe needed)
+SIDECAR_DEST="$HOME/Library/Prysmor"
+SIDECAR_SCRIPT="$SIDECAR_DEST/face_embedding_server.py"
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 PLIST="$LAUNCH_AGENTS/io.prysmor.sidecar.plist"
 CEP_DIR="$HOME/Library/Application Support/Adobe/CEP/extensions"
 DEST="$CEP_DIR/prysmor-panel"
+
+# Python dependencies needed for Identity Lock
+PIP_DEPS="insightface fastapi uvicorn opencv-python numpy torch torchvision huggingface_hub Pillow"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -58,27 +62,53 @@ fi
 cp -R "$PANEL_SRC" "$DEST"
 echo "  ✓ Panel installed → $DEST"
 
-# ── Step 5: Install Identity Lock sidecar ──────────────────────
+# ── Step 5: Check Python3 ──────────────────────────────────────
 echo ""
-echo "▸ Installing Identity Lock sidecar..."
-if [ -d "$SIDECAR_SRC" ]; then
-  sudo mkdir -p "$SIDECAR_DEST" 2>/dev/null || mkdir -p "$SIDECAR_DEST"
-  cp -R "$SIDECAR_SRC/"* "$SIDECAR_DEST/"
-  chmod +x "$SIDECAR_EXE" 2>/dev/null || true
-  # Remove quarantine flag (macOS Gatekeeper)
-  xattr -rd com.apple.quarantine "$SIDECAR_DEST" 2>/dev/null || true
-  echo "  ✓ Sidecar installed → $SIDECAR_DEST"
+echo "▸ Checking Python3..."
+PYTHON3=""
+for CMD in python3 python3.12 python3.11 python3.10 python3.9; do
+  if command -v $CMD &>/dev/null; then
+    PYTHON3=$CMD
+    break
+  fi
+done
+
+if [ -z "$PYTHON3" ]; then
+  echo "  ⚠ Python3 not found — Identity Lock will be disabled."
+  echo "    Install Python from https://python.org and re-run this installer."
+  SKIP_SIDECAR=1
 else
-  echo "  ⚠ Sidecar bundle not found (prysmor-sidecar folder missing)"
-  echo "    Identity Lock will be unavailable until sidecar is installed."
+  PY_VER=$($PYTHON3 --version 2>&1)
+  echo "  ✓ Found: $PY_VER"
+  SKIP_SIDECAR=0
 fi
 
-# ── Step 6: Create LaunchAgent (auto-start on login) ───────────
-echo ""
-echo "▸ Setting up auto-start on login..."
-if [ -f "$SIDECAR_EXE" ]; then
+# ── Step 6: Install Python dependencies ────────────────────────
+if [ "$SKIP_SIDECAR" = "0" ]; then
+  echo ""
+  echo "▸ Installing Identity Lock dependencies..."
+  echo "  (This may take 5-10 minutes on first install — please wait)"
+  echo ""
+  $PYTHON3 -m pip install --quiet --upgrade pip 2>/dev/null || true
+  $PYTHON3 -m pip install --quiet $PIP_DEPS
+  echo "  ✓ Dependencies installed"
+fi
+
+# ── Step 7: Install sidecar Python script ──────────────────────
+if [ "$SKIP_SIDECAR" = "0" ] && [ -f "$SIDECAR_PY" ]; then
+  echo ""
+  echo "▸ Installing Identity Lock sidecar..."
+  mkdir -p "$SIDECAR_DEST"
+  cp "$SIDECAR_PY" "$SIDECAR_SCRIPT"
+  echo "  ✓ Sidecar installed → $SIDECAR_SCRIPT"
+
+  # ── Step 8: Create LaunchAgent (auto-start on login) ──────────
+  echo ""
+  echo "▸ Setting up auto-start on login..."
   mkdir -p "$LAUNCH_AGENTS"
-  cat > "$PLIST" <<PLIST_EOF
+
+  # Write plist — LaunchAgent runs python3 face_embedding_server.py
+  cat > "$PLIST" << PLIST_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -88,8 +118,11 @@ if [ -f "$SIDECAR_EXE" ]; then
   <string>io.prysmor.sidecar</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$SIDECAR_EXE</string>
+    <string>$(which $PYTHON3)</string>
+    <string>$SIDECAR_SCRIPT</string>
   </array>
+  <key>WorkingDirectory</key>
+  <string>$SIDECAR_DEST</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
@@ -101,16 +134,18 @@ if [ -f "$SIDECAR_EXE" ]; then
 </dict>
 </plist>
 PLIST_EOF
-  # Load LaunchAgent now (start immediately without reboot)
+
+  # Load LaunchAgent now — starts sidecar immediately
   launchctl unload "$PLIST" 2>/dev/null || true
   launchctl load -w "$PLIST"
-  echo "  ✓ LaunchAgent created → sidecar starts automatically on login"
-  echo "  ✓ Sidecar started now (warming up face models, ~15s)"
-else
-  echo "  ⚠ Skipped LaunchAgent (no sidecar exe)"
+  echo "  ✓ LaunchAgent created → sidecar auto-starts on every login"
+  echo "  ✓ Sidecar started now (loading face models ~15s)"
+
+elif [ "$SKIP_SIDECAR" = "0" ]; then
+  echo "  ⚠ face_embedding_server.py not found — Identity Lock disabled"
 fi
 
-# ── Step 7: Clear CEP caches ───────────────────────────────────
+# ── Step 9: Clear CEP caches ───────────────────────────────────
 echo ""
 echo "▸ Clearing CEP caches..."
 for CACHE in \
@@ -118,7 +153,7 @@ for CACHE in \
   "$HOME/Library/Caches/Adobe/CEP"
 do
   if [ -d "$CACHE" ]; then
-    rm -rf "$CACHE" && echo "  ✓ Cleared $CACHE"
+    rm -rf "$CACHE" && echo "  ✓ Cleared: $CACHE"
   fi
 done
 
@@ -128,10 +163,16 @@ echo "╔═══════════════════════�
 echo "║         ✅  Installation complete!        ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
+if [ "$SKIP_SIDECAR" = "0" ]; then
+  echo "  Identity Lock: ✅ Active (sidecar running)"
+else
+  echo "  Identity Lock: ⚠ Disabled (Python not found)"
+fi
+echo ""
 echo "  Next steps:"
 echo "  1. Restart Adobe Premiere Pro"
 echo "  2. Window → Extensions → Prysmor"
-echo "  3. Sign in — Identity Lock runs automatically"
+echo "  3. Sign in — everything works automatically"
 echo ""
 echo "  Sidecar log: /tmp/prysmor-sidecar.log"
 echo "  Need help?   https://prysmor.io/docs"
