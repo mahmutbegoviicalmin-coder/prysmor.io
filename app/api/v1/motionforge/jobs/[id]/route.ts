@@ -95,6 +95,17 @@ export async function GET(
     try {
       const task = await getRunwayTaskStatus(job.runwayTaskId);
 
+      // Log the full raw task response so we can diagnose unexpected shapes
+      log(TAG, `Runway raw response for task ${job.runwayTaskId}`, {
+        status:   task.status,
+        progress: task.progress,
+        hasOutput: Array.isArray(task.output) ? task.output.length : typeof task.output,
+        output0:  Array.isArray(task.output) && task.output.length > 0
+          ? JSON.stringify(task.output[0]).slice(0, 120)
+          : 'none',
+        failure:  task.failure ?? task.failureCode ?? null,
+      });
+
       // Normalise status to uppercase for consistent matching
       const taskStatus = (task.status ?? '').toUpperCase();
 
@@ -116,7 +127,6 @@ export async function GET(
         safeUnlink(job.originalVideoPath ?? '');
         cleanupAnchorFrames(job.identityAnchorPaths ?? []);
         await updateJob(params.id, { status: 'failed', error: reason });
-        // Refund credits — Runway failed so user shouldn't be charged
         if (job.userId && job.creditCost) {
           refundCredits(job.userId, job.creditCost).catch(e =>
             warn(TAG, `Credit refund failed for job ${params.id}`, e),
@@ -127,43 +137,87 @@ export async function GET(
 
       // ── Runway succeeded — output array may be empty on first poll, retry ─
       if (taskStatus === 'SUCCEEDED' && (!task.output || task.output.length === 0)) {
-        warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty — retrying`);
-        return NextResponse.json({ status: 'generating', progress: 95 });
+        warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty — retrying next poll`);
+        // Mark polledAt so we don't hammer Runway on empty-output retries
+        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: 98 } as any);
+        return NextResponse.json({ status: 'generating', progress: 98 });
       }
 
       // ── Runway succeeded with output ─────────────────────────────────────
       if (taskStatus === 'SUCCEEDED' && task.output && task.output.length > 0) {
-        const rawUrl  = task.output[0];
+        // Safe URL extraction: Runway API declares output as string[] but the
+        // actual runtime shape varies. Handle both plain string and object forms
+        // so a shape mismatch never causes a TypeError that swallows the success.
+        const rawItem = task.output[0] as unknown;
+        let rawUrl: string;
+
+        if (typeof rawItem === 'string') {
+          rawUrl = rawItem;
+        } else if (rawItem && typeof rawItem === 'object') {
+          // Some API versions wrap URLs: { url: '...' } or { uri: '...' }
+          const obj = rawItem as Record<string, unknown>;
+          const candidate = (obj.url ?? obj.uri ?? obj.downloadUrl) as string | undefined;
+          if (candidate && typeof candidate === 'string') {
+            rawUrl = candidate;
+            warn(TAG, `task.output[0] was an object — extracted URL from key`, { key: Object.keys(obj).join(',') });
+          } else {
+            logError(TAG, `SUCCEEDED but task.output[0] has unrecognised shape — cannot extract URL`, {
+              shape: JSON.stringify(rawItem).slice(0, 200),
+            });
+            await updateJob(params.id, {
+              status: 'failed',
+              error:  `Runway output shape unrecognised: ${JSON.stringify(rawItem).slice(0, 200)}`,
+            });
+            return NextResponse.json({ status: 'failed', error: 'Runway output URL could not be extracted' });
+          }
+        } else {
+          logError(TAG, `SUCCEEDED but task.output[0] is neither string nor object`, {
+            type: typeof rawItem, value: String(rawItem).slice(0, 100),
+          });
+          await updateJob(params.id, { status: 'failed', error: `Unexpected output type: ${typeof rawItem}` });
+          return NextResponse.json({ status: 'failed', error: 'Runway output URL has unexpected type' });
+        }
+
         const origPath = job.originalVideoPath;
         const hasOrig  = origPath && fs.existsSync(origPath);
 
-        log(TAG, `Runway succeeded for job ${params.id}`, { hasOrig, rawUrl: rawUrl.slice(0, 60) });
+        log(TAG, `Runway SUCCEEDED for job ${params.id}`, {
+          hasOrig,
+          rawUrl: rawUrl.slice(0, 100),
+          origPath: origPath ?? 'none',
+        });
+
+        // Mark polledAt so repeated SUCCEEDED polls don't re-run this block
+        // while the Firestore write below is in-flight.
+        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: 100 } as any);
 
         if (!hasOrig) {
-          // No original clip — skip compositing
-          log(TAG, 'No original clip available — using raw Runway output');
-          await updateJob(params.id, {
-            status:    'completed',
-            outputUrl: rawUrl,
-            rawOutputUrl: rawUrl,
-            progress:  100,
-          });
+          log(TAG, 'No original clip on disk — skipping compositing, returning raw Runway output');
+          try {
+            await updateJob(params.id, {
+              status:      'completed',
+              outputUrl:   rawUrl,
+              rawOutputUrl: rawUrl,
+              progress:    100,
+            });
+          } catch (updateErr) {
+            logError(TAG, `Firestore write failed when marking job ${params.id} completed`, updateErr);
+            // Return completed anyway — panel will re-poll and the next call will
+            // read the partially updated doc; worst case it retries the write.
+            return NextResponse.json({ status: 'failed', error: 'Database write failed after Runway succeeded — retry generation' });
+          }
+          log(TAG, `Job ${params.id} marked completed, outputUrl set`);
           return NextResponse.json({ status: 'completed', progress: 100, outputUrl: rawUrl });
         }
 
-        // Transition to compositing immediately so panel shows progress
+        // Transition to compositing — original clip is on disk (local dev only)
         await updateJob(params.id, {
           status:      'compositing',
           rawOutputUrl: rawUrl,
           progress:    92,
         });
 
-        // Run Identity Lock v2 asynchronously — pass effectType so the pipeline
-        // uses FULL_SUBJECT_COMPOSITE for background/environment effects and
-        // RAW_ACCEPT for lighting/overlay effects.
         const effectType = (job as any).effectType ?? 'overlay';
-        // `after()` runs after the response is sent — works on Vercel AND local dev.
-        // Falls back to setImmediate if after is unavailable (older Next.js builds).
         try {
           after(() => runCompositingAsync(params.id, origPath!, rawUrl, job.identityAnchorPaths ?? [], effectType));
         } catch {
@@ -173,13 +227,14 @@ export async function GET(
         return NextResponse.json({ status: 'compositing', progress: 92 });
       }
 
-      // Unexpected status
+      // Unexpected status — log it so we can diagnose
+      warn(TAG, `Runway task ${job.runwayTaskId} returned unexpected status: "${task.status}"`);
       const progress = Math.round((task.progress ?? 0) * 100);
       return NextResponse.json({ status: 'generating', progress });
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Polling error';
-      warn(TAG, `Runway polling error for job ${params.id}: ${msg}`);
+      logError(TAG, `Runway polling threw for job ${params.id}: ${msg}`, err);
       return NextResponse.json({ status: 'generating', error: msg });
     }
   }
