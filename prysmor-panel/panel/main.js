@@ -8,7 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 3500;
 const POLL_MS_SLOW    = 10000;              // slower after 10 min
-const MAX_POLL_MS     = 20 * 60 * 1000;    // 20 min hard timeout
+const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 
 // Auth polling
@@ -597,17 +597,12 @@ async function mfGenerate() {
     return fail('Failed to create job: ' + err.message);
   }
 
-  // ── Step 2: Read clip from disk ───────────────────────────────────────────
-  setStatus('Reading clip…', 12);
-  let fileBase64;
-  try {
-    fileBase64 = await readFileBase64(state.mf.selInfo.sourcePath);
-  } catch (err) {
-    return fail('Cannot read clip: ' + err.message);
-  }
+  var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
+  var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
+  var sourcePath = state.mf.selInfo.sourcePath;
 
-  // ── Step 3a: Get Runway pre-signed upload URL ───────────────────────────
-  setStatus('Preparing upload…', 18);
+  // ── Step 2: Get Runway pre-signed upload URL ──────────────────────────────
+  setStatus('Preparing upload…', 12);
   var uploadSlot;
   try {
     uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url');
@@ -615,30 +610,64 @@ async function mfGenerate() {
     return fail('Upload init failed: ' + err.message);
   }
 
-  // ── Step 3b: Upload video DIRECTLY to Runway S3 (bypasses Vercel) ───────
-  setStatus('Uploading clip…', 22);
+  // ── Step 3: Trim + upload via local sidecar (fast, no full-file read) ────
+  //   Sidecar uses ffmpeg to cut the exact clip, then uploads directly to S3.
+  //   Falls back to browser-side upload if sidecar is unavailable.
+  setStatus('Trimming clip…', 18);
+  var sidecarOk = false;
   try {
-    var blob = base64ToBlob(fileBase64, 'video/mp4');
-    var formData = new FormData();
-    var fields = uploadSlot.fields || {};
-    Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
-    formData.append('file', blob, 'clip.mp4');
-
-    var s3Res = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
-    // S3 returns 204 No Content or 2xx on success
-    if (!s3Res.ok && s3Res.status !== 204) {
-      var errText = await s3Res.text().catch(function () { return ''; });
-      throw new Error('S3 upload HTTP ' + s3Res.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+    var scRes = await fetch('http://127.0.0.1:7788/trim-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        file_path:    sourcePath,
+        media_in_sec: mediaInSec,
+        clip_dur_sec: clipDurSec,
+        upload_url:   uploadSlot.uploadUrl,
+        fields:       uploadSlot.fields || {},
+      }),
+    });
+    if (scRes.ok) {
+      sidecarOk = true;
+    } else {
+      var scErr = await scRes.json().catch(function () { return {}; });
+      console.warn('[sidecar] /trim-upload failed:', scErr.detail || scRes.status, '— falling back');
     }
-  } catch (err) {
-    return fail('Upload failed: ' + err.message);
+  } catch (scEx) {
+    console.warn('[sidecar] unreachable:', scEx.message, '— falling back to browser upload');
   }
 
-  // ── Step 3c: Notify server that upload is complete ───────────────────────
+  if (!sidecarOk) {
+    // Fallback: read full file in browser and upload to S3 directly
+    setStatus('Reading clip…', 20);
+    var fileBase64;
+    try {
+      fileBase64 = await readFileBase64(sourcePath);
+    } catch (err) {
+      return fail('Cannot read clip: ' + err.message);
+    }
+
+    setStatus('Uploading clip…', 28);
+    try {
+      var blob = base64ToBlob(fileBase64, 'video/mp4');
+      var formData = new FormData();
+      var fields = uploadSlot.fields || {};
+      Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
+      formData.append('file', blob, 'clip.mp4');
+
+      var s3Res = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+      if (!s3Res.ok && s3Res.status !== 204) {
+        var errText = await s3Res.text().catch(function () { return ''; });
+        throw new Error('S3 upload HTTP ' + s3Res.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+      }
+    } catch (err) {
+      return fail('Upload failed: ' + err.message);
+    }
+  }
+
+  // ── Step 4: Notify server that upload is complete ─────────────────────────
   setStatus('Uploading clip…', 36);
   try {
-    var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
-    var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-complete', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
@@ -722,7 +751,7 @@ function startPolling(jobId) {
     } catch (_) {
       pollErrors++;
       if (pollErrors >= 3) {
-        setStatus(getGenStatusLabel(elapsedSec) + ' (network…)', 58, elapsed);
+        setStatus(getGenStatusLabel(elapsedSec), 58, elapsed);
       }
       return;
     }

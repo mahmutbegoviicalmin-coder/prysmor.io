@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   // ── Create job ────────────────────────────────────────────────────────────
   try {
-    const jobId = await createJob(session.userId);
+    const jobId = await createJob(session.userId, creditCost);
     return NextResponse.json(
       {
         jobId,

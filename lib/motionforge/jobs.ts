@@ -89,6 +89,10 @@ export interface MotionForgeJob {
   identityAnalysis?:  IdentityAnalysisMeta;
   compositingMeta?:   CompositingMeta;
 
+  // ── Credits ───────────────────────────────────────────────────────────────
+  /** Credits deducted when this job was created — used for refunds on failure */
+  creditCost?: number;
+
   // ── Diagnostics ───────────────────────────────────────────────────────────
   error?:    string;
   warnings?: string[];
@@ -103,11 +107,12 @@ export interface MotionForgeJob {
 
 const COLLECTION = 'motionforge_jobs';
 
-export async function createJob(userId: string): Promise<string> {
+export async function createJob(userId: string, creditCost?: number): Promise<string> {
   const ref = db.collection(COLLECTION).doc();
   await ref.set({
     userId,
     status:    'created' as JobStatus,
+    ...(creditCost !== undefined && { creditCost }),
     createdAt: new Date(),
     updatedAt: new Date(),
   });

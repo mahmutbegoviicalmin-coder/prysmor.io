@@ -3,6 +3,7 @@ import { getJob, updateJob }          from '@/lib/motionforge/jobs';
 import { getRunwayTaskStatus }        from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
+import { refundCredits }              from '@/lib/firestore/users';
 import { getConfig }                  from '@/lib/motionforge/config';
 import { safeUnlink }                 from '@/lib/motionforge/frameExtract';
 import { runIdentityLockV2 }          from '@/lib/motionforge/compositingPipeline';
@@ -62,6 +63,11 @@ export async function GET(
         return NextResponse.json({ status: 'completed', progress: 100, outputUrl: fallbackUrl });
       }
       await updateJob(params.id, { status: 'failed', error: 'Compositing timed out with no fallback URL' });
+      if (job.userId && job.creditCost) {
+        refundCredits(job.userId, job.creditCost).catch(e =>
+          warn(TAG, `Credit refund failed for job ${params.id}`, e),
+        );
+      }
       return NextResponse.json({ status: 'failed', error: 'Compositing timed out' });
     }
 
@@ -87,6 +93,12 @@ export async function GET(
         safeUnlink(job.originalVideoPath ?? '');
         cleanupAnchorFrames(job.identityAnchorPaths ?? []);
         await updateJob(params.id, { status: 'failed', error: reason });
+        // Refund credits — Runway failed so user shouldn't be charged
+        if (job.userId && job.creditCost) {
+          refundCredits(job.userId, job.creditCost).catch(e =>
+            warn(TAG, `Credit refund failed for job ${params.id}`, e),
+          );
+        }
         return NextResponse.json({ status: 'failed', error: reason });
       }
 

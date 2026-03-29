@@ -153,7 +153,7 @@ export function getConfig(): MotionForgeConfig {
     forceLegacyComposite:       envBool('MF_FORCE_LEGACY_COMPOSITE',      false),
 
     compositingFps:             envFloat('MF_COMPOSITING_FPS',            24),
-    compositingTimeoutMs:       Math.round(envFloat('MF_COMPOSITING_TIMEOUT_MS', 8 * 60 * 1000)),
+    compositingTimeoutMs:       Math.round(envFloat('MF_COMPOSITING_TIMEOUT_MS', 90_000)),
     segmentationBatchSize:      Math.round(envFloat('MF_SEG_BATCH_SIZE',   1)),
     segmentationSampleRate:     Math.round(envFloat('MF_SEG_SAMPLE_RATE',  3)),
   };

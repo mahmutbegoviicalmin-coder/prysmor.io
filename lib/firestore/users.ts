@@ -125,6 +125,31 @@ export async function deductCredits(
 }
 
 /**
+ * Refunds `amount` credits to a user's balance (called when a job fails).
+ * Never exceeds the plan cap.
+ */
+export async function refundCredits(
+  userId: string,
+  amount: number,
+): Promise<void> {
+  if (amount <= 0) return;
+  const ref = db.collection("users").doc(userId);
+
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return;
+
+    const data    = doc.data()!;
+    const plan    = data.plan ?? "starter";
+    const cap     = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
+    const current = typeof data.credits === "number" ? data.credits : cap;
+    const restored = Math.min(current + amount, cap);
+
+    tx.update(ref, { credits: restored, updatedAt: new Date() });
+  });
+}
+
+/**
  * Top-ups a user's credits to the plan cap (called on subscription payment).
  * If the user already has more credits than the plan cap, keeps the higher value.
  */
