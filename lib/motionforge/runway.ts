@@ -15,6 +15,30 @@ function runwayHeaders(): Record<string, string> {
   };
 }
 
+export interface RunwayUploadSlot {
+  uploadUrl: string;
+  fields:    Record<string, string>;
+  runwayUri: string;
+}
+
+/**
+ * Creates an ephemeral Runway upload slot and returns the pre-signed S3 URL,
+ * the required FormData fields, and the runway:// URI.
+ * The caller is responsible for uploading the file to uploadUrl.
+ */
+export async function createRunwayUploadSlot(filename: string): Promise<RunwayUploadSlot> {
+  const res = await fetch(`${RUNWAY_API_BASE}/v1/uploads`, {
+    method:  'POST',
+    headers: runwayHeaders(),
+    body:    JSON.stringify({ filename, type: 'ephemeral' }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Runway /v1/uploads init failed ${res.status}: ${body}`);
+  }
+  return res.json() as Promise<RunwayUploadSlot>;
+}
+
 /**
  * Uploads a local video file to Runway's ephemeral upload storage
  * and returns a runway:// URI valid for 24 hours.

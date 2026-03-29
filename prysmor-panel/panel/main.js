@@ -606,29 +606,50 @@ async function mfGenerate() {
     return fail('Cannot read clip: ' + err.message);
   }
 
-  // ── Step 3: Upload raw binary to backend (ffmpeg trims on server) ───────
-  setStatus('Uploading clip…', 20);
+  // ── Step 3a: Get Runway pre-signed upload URL ───────────────────────────
+  setStatus('Preparing upload…', 18);
+  var uploadSlot;
   try {
-    const blob       = base64ToBlob(fileBase64, 'video/mp4');
-    const mediaInSec = (state.mf.selInfo.mediaInSec || 0).toFixed(6);
-    const clipDurSec = (state.mf.selInfo.durationSec || 8).toFixed(6);
+    uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url');
+  } catch (err) {
+    return fail('Upload init failed: ' + err.message);
+  }
 
-    const res = await fetch(
-      API_BASE + '/api/v1/motionforge/jobs/' + jobId + '/upload',
-      {
-        method: 'POST',
-        headers: apiHeaders({
-          'Content-Type':    'video/mp4',
-          'X-Media-In':      mediaInSec,
-          'X-Clip-Duration': clipDurSec,
-        }),
-        body: blob,
-      }
-    );
-    const json = await res.json().catch(function () { return { error: 'Invalid response' }; });
-    if (!res.ok) throw new Error(json.error || 'Upload failed HTTP ' + res.status);
+  // ── Step 3b: Upload video DIRECTLY to Runway S3 (bypasses Vercel) ───────
+  setStatus('Uploading clip…', 22);
+  try {
+    var blob = base64ToBlob(fileBase64, 'video/mp4');
+    var formData = new FormData();
+    var fields = uploadSlot.fields || {};
+    Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
+    formData.append('file', blob, 'clip.mp4');
+
+    var s3Res = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+    // S3 returns 204 No Content or 2xx on success
+    if (!s3Res.ok && s3Res.status !== 204) {
+      var errText = await s3Res.text().catch(function () { return ''; });
+      throw new Error('S3 upload HTTP ' + s3Res.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+    }
   } catch (err) {
     return fail('Upload failed: ' + err.message);
+  }
+
+  // ── Step 3c: Notify server that upload is complete ───────────────────────
+  setStatus('Uploading clip…', 36);
+  try {
+    var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
+    var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
+    await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-complete', {
+      method:  'POST',
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
+      body:    JSON.stringify({
+        runwayUri:  uploadSlot.runwayUri,
+        mediaInSec: mediaInSec,
+        clipDurSec: clipDurSec,
+      }),
+    });
+  } catch (err) {
+    return fail('Upload confirm failed: ' + err.message);
   }
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
