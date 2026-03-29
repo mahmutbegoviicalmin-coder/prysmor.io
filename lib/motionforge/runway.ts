@@ -254,7 +254,7 @@ export async function getRunwayTaskStatus(
       Authorization: runwayHeaders().Authorization,
       'X-Runway-Version': RUNWAY_VERSION,
     },
-    signal: AbortSignal.timeout(20_000), // 20s — leaves buffer before Vercel's 60s maxDuration
+    signal: AbortSignal.timeout(50_000), // 50s — maxDuration=60s, Firebase overhead ~5s, leaves 5s buffer
   });
 
   if (!res.ok) {

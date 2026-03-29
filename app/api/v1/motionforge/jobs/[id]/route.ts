@@ -88,14 +88,11 @@ export async function GET(
 
     if (msSinceLastPoll < 8_000) {
       const cachedProgress = job.runwayProgress ?? 0;
-      log(TAG, `Returning cached Runway progress ${cachedProgress}% (${Math.round(msSinceLastPoll / 1000)}s since last poll)`);
+      log(TAG, `Cached ${cachedProgress}% (${Math.round(msSinceLastPoll / 1000)}s since last Runway poll)`);
       return NextResponse.json({ status: 'generating', progress: cachedProgress });
     }
 
     try {
-      // Mark poll time immediately so concurrent requests don't double-poll Runway
-      await updateJob(params.id, { runwayPolledAt: new Date() } as any);
-
       const task = await getRunwayTaskStatus(job.runwayTaskId);
 
       // Normalise status to uppercase for consistent matching
@@ -105,8 +102,10 @@ export async function GET(
       if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
         const progress = Math.round((task.progress ?? 0) * 100);
         log(TAG, `Runway task ${job.runwayTaskId} → ${taskStatus} ${progress}%`);
-        // Cache progress so fast panel polls get instant cached responses
-        updateJob(params.id, { runwayProgress: progress } as any).catch(() => {});
+        // Atomically update both polledAt + progress so cached responses are accurate.
+        // Do this AFTER getting the response (not before) so failed calls don't
+        // eat the 8s window — they'll retry on the next poll.
+        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: progress } as any);
         return NextResponse.json({ status: 'generating', progress });
       }
 
