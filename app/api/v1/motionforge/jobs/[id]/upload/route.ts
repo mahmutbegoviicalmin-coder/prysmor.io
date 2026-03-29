@@ -10,9 +10,59 @@ import * as fs   from 'fs';
 import { uploadToRunway } from '@/lib/motionforge/runway';
 
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
+const MAX_CLIP_SEC   = 8;                  // Runway hard cap
 
 function tmpPath(name: string) {
   return path.join(os.tmpdir(), name);
+}
+
+/**
+ * Trims, strips audio, and compresses the clip with ffmpeg.
+ * Returns the output path on success, or null if ffmpeg is unavailable.
+ * Smaller file = faster Runway queue + faster processing.
+ */
+async function transcodeClip(
+  inputPath:  string,
+  outputPath: string,
+  mediaInSec: number,
+  clipDurSec: number,
+): Promise<boolean> {
+  try {
+    const [{ default: ffmpegFn }, { default: installer }] = await Promise.all([
+      import('fluent-ffmpeg'),
+      import('@ffmpeg-installer/ffmpeg'),
+    ]);
+    ffmpegFn.setFfmpegPath(installer.path);
+
+    const startSec = Math.max(0, mediaInSec);
+    const durSec   = Math.min(clipDurSec, MAX_CLIP_SEC);
+
+    await new Promise<void>((resolve, reject) => {
+      ffmpegFn(inputPath)
+        .setStartTime(startSec)
+        .setDuration(durSec)
+        .noAudio()
+        .videoCodec('libx264')
+        .outputOptions([
+          '-vf', "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2",
+          '-crf',    '23',
+          '-preset', 'fast',
+          '-movflags', '+faststart',
+          '-pix_fmt', 'yuv420p',
+        ])
+        .on('end',   resolve)
+        .on('error', reject)
+        .save(outputPath);
+    });
+
+    const inMb  = (fs.statSync(inputPath).size  / 1024 / 1024).toFixed(1);
+    const outMb = (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1);
+    console.log(`[upload] ffmpeg: ${inMb} MB → ${outMb} MB (start=${startSec}s dur=${durSec}s)`);
+    return true;
+  } catch (e) {
+    console.warn('[upload] ffmpeg unavailable, uploading raw:', e instanceof Error ? e.message : e);
+    return false;
+  }
 }
 
 export async function POST(
@@ -56,21 +106,25 @@ export async function POST(
       return NextResponse.json({ error: 'File exceeds 500 MB limit' }, { status: 413 });
     }
 
-    // Write to tmp so we can upload to Runway using the existing helper
+    // Write raw bytes to tmp
     fs.writeFileSync(inputTmp, buffer);
     console.log(`[upload] Written ${buffer.byteLength} bytes to ${inputTmp}`);
 
-    // Upload directly to Runway — returns a runway:// URI valid 24 h
-    // This bypasses local ffmpeg (not available on Vercel serverless)
-    console.log(`[upload] Uploading to Runway…`);
-    const runwayUri = await uploadToRunway(inputTmp);
-    console.log(`[upload] Runway URI: ${runwayUri}`);
-
-    // Store the runway:// URI and the panel's timing metadata so generate
-    // can use them directly without needing a local trimmed file.
+    // Read timing headers sent by the panel
     const mediaInSec  = parseFloat(req.headers.get('x-media-in')      ?? '0') || 0;
     const clipDurSec  = parseFloat(req.headers.get('x-clip-duration') ?? '8') || 8;
 
+    // Try to transcode with ffmpeg: trim, strip audio, compress → much smaller file
+    const transcodedTmp = tmpPath(`mf-${params.id}-tc.mp4`);
+    const didTranscode  = await transcodeClip(inputTmp, transcodedTmp, mediaInSec, clipDurSec);
+    const uploadPath    = didTranscode ? transcodedTmp : inputTmp;
+
+    // Upload to Runway — returns a runway:// URI valid 24 h
+    console.log(`[upload] Uploading to Runway (transcoded=${didTranscode})…`);
+    const runwayUri = await uploadToRunway(uploadPath);
+    console.log(`[upload] Runway URI: ${runwayUri}`);
+
+    // Store the runway:// URI and timing metadata
     await updateJob(params.id, {
       assetUrl:       runwayUri,   // runway:// URI — used by generate route
       mediaInSec,
@@ -85,6 +139,7 @@ export async function POST(
     await updateJob(params.id, { status: 'failed', error: msg }).catch(() => {});
     return NextResponse.json({ error: msg }, { status: 500 });
   } finally {
-    try { if (fs.existsSync(inputTmp)) fs.unlinkSync(inputTmp); } catch (_) {}
+    try { if (fs.existsSync(inputTmp))                                  fs.unlinkSync(inputTmp);          } catch (_) {}
+    try { if (fs.existsSync(tmpPath(`mf-${params.id}-tc.mp4`)))         fs.unlinkSync(tmpPath(`mf-${params.id}-tc.mp4`)); } catch (_) {}
   }
 }
