@@ -6,8 +6,10 @@ const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
-const POLL_MS   = 3500;
-const MAX_POLL_MS = 10 * 60 * 1000; // 10 min for job polling
+const POLL_MS         = 3500;
+const POLL_MS_SLOW    = 10000;              // slower after 10 min
+const MAX_POLL_MS     = 20 * 60 * 1000;    // 20 min hard timeout
+const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 
 // Auth polling
 const AUTH_POLL_MS  = 2500;  // how often to check if browser auth completed
@@ -657,24 +659,41 @@ function getGenStatusLabel(elapsedSec) {
 
 function startPolling(jobId) {
   stopMfPolling();
-  var pollErrors = 0;
-  state.mf.pollTimer = setInterval(async function () {
+  var pollErrors  = 0;
+  var slowMode    = false;
 
+  async function doPoll() {
     var elapsedMs  = Date.now() - state.mf.pollStart;
     var elapsedSec = Math.floor(elapsedMs / 1000);
-
-    if (elapsedMs > MAX_POLL_MS) {
-      stopMfPolling();
-      return fail('Generation timed out after ' + Math.round(elapsedMs / 60000) + ' min. Runway may be busy — try again.');
-    }
-
-    // Show elapsed time
     var mins = Math.floor(elapsedSec / 60);
     var secs = elapsedSec % 60;
     var elapsed = mins > 0
       ? mins + 'm ' + String(secs).padStart(2,'0') + 's'
       : secs + 's';
 
+    // ── Hard timeout: do one final check before giving up ─────────────────
+    if (elapsedMs > MAX_POLL_MS) {
+      stopMfPolling();
+      setStatus('Checking if Runway finished…', 99, elapsed);
+      try {
+        var finalJob = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
+        if (finalJob.status === 'completed' && finalJob.outputUrl) {
+          return handleJobComplete(finalJob, jobId);
+        }
+      } catch (_) {}
+      return fail('Generation timed out after 20 min. Try again or check your Runway dashboard.');
+    }
+
+    // ── Switch to slow polling after soft timeout ──────────────────────────
+    if (!slowMode && elapsedMs > SOFT_TIMEOUT_MS) {
+      slowMode = true;
+      stopMfPolling();
+      setStatus('Runway is still processing… (' + elapsed + ')', 85, elapsed);
+      state.mf.pollTimer = setInterval(doPoll, POLL_MS_SLOW);
+      return;
+    }
+
+    // ── Fetch job status ───────────────────────────────────────────────────
     let job;
     try {
       job = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
@@ -682,8 +701,7 @@ function startPolling(jobId) {
     } catch (_) {
       pollErrors++;
       if (pollErrors >= 3) {
-        var statusLabel = getGenStatusLabel(elapsedSec);
-        setStatus(statusLabel + ' (' + elapsed + ')', 58);
+        setStatus(getGenStatusLabel(elapsedSec) + ' (network…)', 58, elapsed);
       }
       return;
     }
@@ -692,53 +710,55 @@ function startPolling(jobId) {
       var progress = job.progress || 0;
       var pct = 55 + Math.round(progress * 0.4);
       var label = progress > 0
-        ? 'Generating… ' + progress + '% (' + elapsed + ')'
-        : getGenStatusLabel(elapsedSec) + ' (' + elapsed + ')';
-      setStatus(label, pct);
+        ? 'Generating… ' + progress + '%'
+        : getGenStatusLabel(elapsedSec);
+      setStatus(label, pct, elapsed);
       return;
     }
 
     if (job.status === 'compositing') {
-      setStatus('Preserving face identity…', 96);
+      setStatus('Finalising result…', 96, elapsed);
       return;
     }
 
     if (job.status === 'failed') {
       stopMfPolling();
-      return fail(job.error || 'Generation failed');
+      return fail(job.error || 'Generation failed on Runway.');
     }
 
     if (job.status === 'completed' && job.outputUrl) {
       stopMfPolling();
-      state.mf.outputUrl    = job.outputUrl;
-      state.mf.rawOutputUrl = job.rawOutputUrl || null;
-      setStatus('Downloading result…', 95);
+      return handleJobComplete(job, jobId);
+    }
+  }
 
+  async function handleJobComplete(job, jobId) {
+    state.mf.outputUrl    = job.outputUrl;
+    state.mf.rawOutputUrl = job.rawOutputUrl || null;
+    setStatus('Downloading result…', 98);
+
+    try {
+      await downloadAndInsert(job.outputUrl, state.mf.selInfo.startTimeSec, state.mf.replaceMode);
+    } catch (err) {
+      showToast('Insert failed: ' + err.message + ' — open manually', 'error');
       try {
-        await downloadAndInsert(job.outputUrl, state.mf.selInfo.startTimeSec, state.mf.replaceMode);
-      } catch (err) {
-        showToast('Insert failed: ' + err.message + ' — open manually', 'error');
-        // Fallback: fetch video and create a blob URL so the <video> tag can play it
-        // (server URL requires auth header which <video> cannot send)
-        try {
-          var fbRes = await fetch(job.outputUrl, { headers: apiHeaders() });
-          if (fbRes.ok) {
-            var fbBlob = await fbRes.blob();
-            showResult(URL.createObjectURL(fbBlob));
-          } else {
-            showResult(job.outputUrl);
-          }
-        } catch (_) {
+        var fbRes = await fetch(job.outputUrl, { headers: apiHeaders() });
+        if (fbRes.ok) {
+          var fbBlob = await fbRes.blob();
+          showResult(URL.createObjectURL(fbBlob));
+        } else {
           showResult(job.outputUrl);
         }
+      } catch (_) {
+        showResult(job.outputUrl);
       }
-
-      // Refresh credit balance from server after successful generation
-      fetchCredits(); // also calls updateCostPreview()
-      setGenerating(false);
     }
 
-  }, POLL_MS);
+    fetchCredits();
+    setGenerating(false);
+  }
+
+  state.mf.pollTimer = setInterval(doPoll, POLL_MS);
 }
 
 function stopMfPolling() {
@@ -837,9 +857,21 @@ function setGenerating(active) {
   if (!active) updateCostPreview(); // restore cost badge after generation
 }
 
-function setStatus(text, pct) {
+function setStatus(text, pct, elapsed) {
   const t = el('mf-status-text'); if (t) t.textContent = text;
-  const b = el('mf-gen-bar');    if (b && pct != null) b.style.width = Math.min(pct, 100) + '%';
+  const b = el('mf-gen-bar');
+  if (b && pct != null) b.style.width = Math.min(pct, 100) + '%';
+  const pctLbl = el('mf-gen-pct');
+  if (pctLbl && pct != null) pctLbl.textContent = Math.min(pct, 100) + '%';
+  const elapsedEl = el('mf-gen-elapsed');
+  if (elapsedEl) {
+    if (elapsed) {
+      elapsedEl.textContent = elapsed;
+      elapsedEl.classList.add('visible');
+    } else {
+      elapsedEl.classList.remove('visible');
+    }
+  }
 }
 
 function fail(msg) {

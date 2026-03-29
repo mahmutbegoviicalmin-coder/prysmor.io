@@ -177,6 +177,49 @@ export async function createVideoToVideoTask(
 }
 
 /**
+ * Starts a Runway image-to-video task using gen3a_turbo.
+ * Much faster than video_to_video gen4_aleph (~30-60s vs 5-10 min).
+ *
+ * API shape (gen3a_turbo):
+ *   model:       "gen3a_turbo"
+ *   promptImage: runway:// URI of the input frame (JPEG/PNG)
+ *   promptText:  generation prompt
+ *   duration:    5 | 10 (seconds)
+ *   ratio:       "1280:768" | "768:1280" | "1104:832" | "832:1104" | "960:960"
+ */
+export async function createImageToVideoTask(
+  frameUri: string,
+  prompt: string,
+  durationSec: number,
+): Promise<RunwayTaskCreated> {
+  // gen3a_turbo supports 5s or 10s — pick the nearest
+  const duration = durationSec <= 5 ? 5 : 10;
+
+  const body = {
+    model:       'gen3a_turbo',
+    promptImage: frameUri,
+    promptText:  prompt,
+    duration,
+    ratio:       '1280:768', // standard 16:9 landscape
+    contentModeration: { publicFigureThreshold: 'low' },
+  };
+
+  const res = await fetch(`${RUNWAY_API_BASE}/v1/image_to_video`, {
+    method:  'POST',
+    headers: runwayHeaders(),
+    body:    JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`[runway] image_to_video ${res.status}:`, text);
+    throw new Error(`Runway image_to_video error ${res.status}: ${text}`);
+  }
+
+  return res.json() as Promise<RunwayTaskCreated>;
+}
+
+/**
  * Polls a single Runway task for its current status.
  */
 export async function getRunwayTaskStatus(
