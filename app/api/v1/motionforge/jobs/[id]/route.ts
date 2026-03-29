@@ -12,7 +12,7 @@ import * as path from 'path';
 import * as os   from 'os';
 
 export const runtime     = 'nodejs';
-export const maxDuration = 30; // give Runway status API enough time to respond
+export const maxDuration = 60; // Firebase cold start (5-8s) + Runway API (up to 20s) + buffer
 
 const TAG = 'poll';
 
@@ -76,7 +76,26 @@ export async function GET(
 
   // ── Poll Runway for generation status ──────────────────────────────────────
   if (job.status === 'generating' && job.runwayTaskId) {
+    // Rate-limit Runway API calls to once every 8s.
+    // The panel polls every 3.5s — return cached progress between Runway polls
+    // so Vercel functions stay fast and we don't hammer Runway.
+    const lastPolled = job.runwayPolledAt
+      ? (job.runwayPolledAt instanceof Date
+          ? job.runwayPolledAt
+          : (job.runwayPolledAt as FirebaseFirestore.Timestamp).toDate())
+      : null;
+    const msSinceLastPoll = lastPolled ? Date.now() - lastPolled.getTime() : Infinity;
+
+    if (msSinceLastPoll < 8_000) {
+      const cachedProgress = job.runwayProgress ?? 0;
+      log(TAG, `Returning cached Runway progress ${cachedProgress}% (${Math.round(msSinceLastPoll / 1000)}s since last poll)`);
+      return NextResponse.json({ status: 'generating', progress: cachedProgress });
+    }
+
     try {
+      // Mark poll time immediately so concurrent requests don't double-poll Runway
+      await updateJob(params.id, { runwayPolledAt: new Date() } as any);
+
       const task = await getRunwayTaskStatus(job.runwayTaskId);
 
       // Normalise status to uppercase for consistent matching
@@ -86,6 +105,8 @@ export async function GET(
       if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
         const progress = Math.round((task.progress ?? 0) * 100);
         log(TAG, `Runway task ${job.runwayTaskId} → ${taskStatus} ${progress}%`);
+        // Cache progress so fast panel polls get instant cached responses
+        updateJob(params.id, { runwayProgress: progress } as any).catch(() => {});
         return NextResponse.json({ status: 'generating', progress });
       }
 

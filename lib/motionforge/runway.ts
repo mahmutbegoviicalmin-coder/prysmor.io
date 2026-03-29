@@ -254,7 +254,7 @@ export async function getRunwayTaskStatus(
       Authorization: runwayHeaders().Authorization,
       'X-Runway-Version': RUNWAY_VERSION,
     },
-    signal: AbortSignal.timeout(25_000), // 25s — Runway can be slow returning SUCCEEDED response
+    signal: AbortSignal.timeout(20_000), // 20s — leaves buffer before Vercel's 60s maxDuration
   });
 
   if (!res.ok) {

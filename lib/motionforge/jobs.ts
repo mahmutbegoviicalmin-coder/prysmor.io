@@ -78,6 +78,10 @@ export interface MotionForgeJob {
 
   // ── Generation backend ────────────────────────────────────────────────────
   runwayTaskId?: string;
+  /** Timestamp of the last Runway API status poll — used to rate-limit polling */
+  runwayPolledAt?: FirebaseFirestore.Timestamp | Date;
+  /** Last cached Runway progress (0-100) to return between Runway polls */
+  runwayProgress?: number;
 
   // ── Output URLs ───────────────────────────────────────────────────────────
   /** Raw Runway output URL (pre-compositing) */
