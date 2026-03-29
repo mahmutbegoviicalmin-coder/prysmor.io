@@ -820,8 +820,11 @@ function stopMfPolling() {
 // ─── Download & Insert into Premiere ─────────────────────────────────────────
 
 async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
-  // Download video with auth header
-  const res = await fetch(outputUrl, { headers: apiHeaders() });
+  // Runway output URLs are public S3/CDN presigned URLs — do NOT send auth headers
+  // (extra Authorization header invalidates S3 presigned signatures)
+  const isOwnApi = outputUrl.startsWith(API_BASE) || outputUrl.startsWith('/api/');
+  const fetchOpts = isOwnApi ? { headers: apiHeaders() } : {};
+  const res = await fetch(outputUrl, fetchOpts);
   if (!res.ok) throw new Error('Download HTTP ' + res.status);
 
   const arrayBuf = await res.arrayBuffer();

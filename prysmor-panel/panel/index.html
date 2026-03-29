@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=17"/>
+  <link rel="stylesheet" href="styles.css?v=18"/>
 </head>
 <body>
 
@@ -220,22 +220,13 @@
         <!-- Progress (shown during generation) -->
         <div id="mf-gen-state" class="gen-state hidden">
 
-          <!-- Stage pills -->
-          <div class="gen-stages">
-            <div class="gen-stage" id="gs-upload">
-              <div class="gs-dot"></div>
-              <span>Upload</span>
+          <!-- Top row: status pulse + label left / elapsed right -->
+          <div class="gen-top-row">
+            <div class="gen-status-left">
+              <div class="gen-pulse"></div>
+              <span id="mf-status-text" class="gen-status-txt">Starting…</span>
             </div>
-            <div class="gs-line" id="gs-line-1"></div>
-            <div class="gen-stage" id="gs-generate">
-              <div class="gs-dot"></div>
-              <span>Generate</span>
-            </div>
-            <div class="gs-line" id="gs-line-2"></div>
-            <div class="gen-stage" id="gs-done">
-              <div class="gs-dot"></div>
-              <span>Done</span>
-            </div>
+            <span class="gen-elapsed" id="mf-gen-elapsed"></span>
           </div>
 
           <!-- Progress bar -->
@@ -245,16 +236,22 @@
             </div>
           </div>
 
-          <!-- Status row -->
-          <div class="gen-footer">
-            <div class="gen-status-left">
-              <div class="gen-pulse"></div>
-              <span id="mf-status-text" class="gen-status-txt">Starting…</span>
+          <!-- Bottom row: step labels left / big pct right -->
+          <div class="gen-bottom-row">
+            <div class="gen-steps">
+              <span class="gen-step" id="gs-upload">Upload</span>
+              <span class="gen-step-sep">›</span>
+              <span class="gen-step" id="gs-generate">Generate</span>
+              <span class="gen-step-sep">›</span>
+              <span class="gen-step" id="gs-done">Done</span>
             </div>
-            <div class="gen-status-right">
-              <span class="gen-pct-label" id="mf-gen-pct">0%</span>
-              <span class="gen-elapsed" id="mf-gen-elapsed"></span>
-            </div>
+            <span class="gen-pct-label" id="mf-gen-pct">0%</span>
+          </div>
+
+          <!-- Hidden compat elements (JS still references these) -->
+          <div style="display:none">
+            <div id="gs-line-1"></div>
+            <div id="gs-line-2"></div>
           </div>
 
         </div>
@@ -351,7 +348,7 @@
   </div><!-- /view-main -->
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=17"></script>
+  <script src="main.js?v=18"></script>
   <script>
     (function(){
       const c=document.getElementById('grain');

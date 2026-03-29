@@ -394,83 +394,15 @@ html,body{
 /* ── PROGRESS ───────────────────── */
 .gen-state{
   margin-top:12px;
-  padding:14px 14px 13px;
+  padding:14px 14px 12px;
   border-radius:13px;
-  background:rgba(163,255,18,0.035);
-  border:1px solid rgba(163,255,18,0.11);
-  display:flex;flex-direction:column;gap:11px;
+  background:rgba(163,255,18,0.03);
+  border:1px solid rgba(163,255,18,0.10);
+  display:flex;flex-direction:column;gap:10px;
 }
 
-/* Stages */
-.gen-stages{
-  display:flex;align-items:center;gap:0;
-  padding:0 2px;
-}
-.gen-stage{
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  flex-shrink:0;
-}
-.gen-stage span{
-  font-size:9.5px;font-weight:600;color:var(--t3);
-  text-transform:uppercase;letter-spacing:.05em;
-  transition:color .25s;
-}
-.gs-dot{
-  width:8px;height:8px;border-radius:50%;
-  background:rgba(255,255,255,0.08);
-  border:1.5px solid rgba(255,255,255,0.12);
-  transition:all .25s;
-  position:relative;z-index:1;
-}
-.gs-line{
-  flex:1;height:1.5px;
-  background:rgba(255,255,255,0.07);
-  margin-bottom:14px;
-  transition:background .4s;
-}
-
-/* Stage states */
-.gen-stage.active span{color:var(--lime);}
-.gen-stage.active .gs-dot{
-  background:var(--lime);
-  border-color:var(--lime);
-  box-shadow:0 0 0 3px rgba(163,255,18,0.2);
-  animation:stagePulse 1.3s ease-in-out infinite;
-}
-.gen-stage.done span{color:var(--t2);}
-.gen-stage.done .gs-dot{
-  background:rgba(163,255,18,0.35);
-  border-color:rgba(163,255,18,0.4);
-  box-shadow:none;
-}
-.gs-line.done{background:rgba(163,255,18,0.25);}
-@keyframes stagePulse{
-  0%,100%{box-shadow:0 0 0 3px rgba(163,255,18,0.2)}
-  50%{box-shadow:0 0 0 5px rgba(163,255,18,0.08)}
-}
-
-/* Bar */
-.gen-bar-track{
-  height:5px;border-radius:99px;
-  background:rgba(255,255,255,0.05);
-  overflow:hidden;
-}
-.gen-bar-fill{
-  height:100%;border-radius:99px;
-  background:linear-gradient(90deg,#6BFF00,var(--lime2),rgba(255,255,255,0.9) 220%);
-  position:relative;
-  transition:width .8s cubic-bezier(0.16,1,0.3,1);
-  min-width:5px;
-}
-.gen-shimmer{
-  position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.65) 50%,transparent 100%);
-  animation:shimmer 1.7s ease-in-out infinite;
-}
-@keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(220%)}}
-
-/* Footer row */
-.gen-footer{
+/* Top row: pulse + label / elapsed */
+.gen-top-row{
   display:flex;align-items:center;justify-content:space-between;
 }
 .gen-status-left{display:flex;align-items:center;gap:7px;}
@@ -485,18 +417,63 @@ html,body{
   60%{box-shadow:0 0 0 6px rgba(163,255,18,0)}
   100%{box-shadow:0 0 0 0 rgba(163,255,18,0)}
 }
-.gen-status-txt{font-size:11.5px;color:var(--t2);font-weight:500;}
-.gen-status-right{display:flex;align-items:center;gap:6px;}
-.gen-pct-label{
-  font-size:12px;font-weight:800;color:var(--lime);
-  font-variant-numeric:tabular-nums;letter-spacing:-.3px;
+.gen-status-txt{
+  font-size:11.5px;color:var(--t2);font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:180px;
 }
 .gen-elapsed{
-  font-size:10px;color:var(--t3);
+  font-size:10.5px;color:var(--t3);
   font-variant-numeric:tabular-nums;
+  flex-shrink:0;
   display:none;
 }
 .gen-elapsed.visible{display:block;}
+
+/* Progress bar — tall, Runway-style */
+.gen-bar-track{
+  height:7px;border-radius:99px;
+  background:rgba(255,255,255,0.06);
+  overflow:hidden;
+  position:relative;
+}
+.gen-bar-fill{
+  height:100%;border-radius:99px;
+  background:linear-gradient(90deg,#5EFF00 0%,#A3FF12 50%,#D4FF6A 100%);
+  position:relative;
+  transition:width .9s cubic-bezier(0.16,1,0.3,1);
+  min-width:6px;
+}
+.gen-shimmer{
+  position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.55) 50%,transparent 100%);
+  animation:shimmer 1.8s ease-in-out infinite;
+}
+@keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(220%)}}
+
+/* Bottom row: step breadcrumb left / big % right */
+.gen-bottom-row{
+  display:flex;align-items:center;justify-content:space-between;
+}
+.gen-steps{
+  display:flex;align-items:center;gap:4px;
+}
+.gen-step{
+  font-size:10px;font-weight:500;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.04em;
+  transition:color .25s;
+}
+.gen-step.active{color:var(--lime);}
+.gen-step.done{color:var(--t2);}
+.gen-step-sep{
+  font-size:10px;color:rgba(255,255,255,0.15);
+  line-height:1;
+}
+.gen-pct-label{
+  font-size:20px;font-weight:800;color:var(--lime);
+  font-variant-numeric:tabular-nums;letter-spacing:-.5px;
+  line-height:1;
+}
 
 /* Dots (hidden) */
 .gen-dots{display:none;}
