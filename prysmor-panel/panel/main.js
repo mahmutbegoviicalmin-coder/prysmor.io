@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -741,7 +741,9 @@ function startPolling(jobId) {
       pollErrors = 0;
     } catch (_) {
       pollErrors++;
-      if (pollErrors >= 3) setStatus(getGenStatusLabel(elapsedSec), 58, elapsed);
+      // On repeated errors, keep the last known progress — don't freeze at 58
+      var lastPct = state.mf.lastKnownPct || 42;
+      setStatus(getGenStatusLabel(elapsedSec), lastPct, elapsed);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
@@ -751,11 +753,12 @@ function startPolling(jobId) {
       var pct, label;
       if (runwayPct > 0) {
         pct   = 40 + Math.round(runwayPct * 0.56);
-        label = 'Generating effect\u2026 ' + runwayPct + '%';
+        label = 'Generating\u2026 ' + runwayPct + '%';
       } else {
         pct   = 40 + Math.min(Math.round(elapsedSec * 0.08), 15);
         label = getGenStatusLabel(elapsedSec);
       }
+      state.mf.lastKnownPct = pct;
       setStatus(label, pct, elapsed);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;

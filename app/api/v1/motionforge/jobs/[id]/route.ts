@@ -79,17 +79,20 @@ export async function GET(
     try {
       const task = await getRunwayTaskStatus(job.runwayTaskId);
 
+      // Normalise status to uppercase for consistent matching
+      const taskStatus = (task.status ?? '').toUpperCase();
+
       // ── Runway still working ─────────────────────────────────────────────
-      if (task.status === 'PENDING' || task.status === 'RUNNING') {
+      if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
         const progress = Math.round((task.progress ?? 0) * 100);
-        log(TAG, `Runway task ${job.runwayTaskId} → ${task.status} ${progress}%`);
+        log(TAG, `Runway task ${job.runwayTaskId} → ${taskStatus} ${progress}%`);
         return NextResponse.json({ status: 'generating', progress });
       }
 
       // ── Runway failed / cancelled ────────────────────────────────────────
-      if (task.status === 'FAILED' || task.status === 'CANCELLED') {
-        const reason = task.failure || task.failureCode || `Task ${task.status}`;
-        logError(TAG, `Runway task ${job.runwayTaskId} ${task.status}`, reason);
+      if (taskStatus === 'FAILED' || taskStatus === 'CANCELLED') {
+        const reason = task.failure || task.failureCode || `Task ${taskStatus}`;
+        logError(TAG, `Runway task ${job.runwayTaskId} ${taskStatus}`, reason);
         safeUnlink(job.originalVideoPath ?? '');
         cleanupAnchorFrames(job.identityAnchorPaths ?? []);
         await updateJob(params.id, { status: 'failed', error: reason });
@@ -102,8 +105,14 @@ export async function GET(
         return NextResponse.json({ status: 'failed', error: reason });
       }
 
-      // ── Runway succeeded ─────────────────────────────────────────────────
-      if (task.status === 'SUCCEEDED' && task.output && task.output.length > 0) {
+      // ── Runway succeeded — output array may be empty on first poll, retry ─
+      if (taskStatus === 'SUCCEEDED' && (!task.output || task.output.length === 0)) {
+        warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty — retrying`);
+        return NextResponse.json({ status: 'generating', progress: 95 });
+      }
+
+      // ── Runway succeeded with output ─────────────────────────────────────
+      if (taskStatus === 'SUCCEEDED' && task.output && task.output.length > 0) {
         const rawUrl  = task.output[0];
         const origPath = job.originalVideoPath;
         const hasOrig  = origPath && fs.existsSync(origPath);
