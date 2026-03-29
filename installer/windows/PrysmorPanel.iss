@@ -24,8 +24,14 @@
 ; Path to the CEP panel source, relative to this .iss file
 #define SourceDir    "..\..\prysmor-panel"
 
+; Path to the built sidecar folder (from PyInstaller)
+#define SidecarDir   "..\..\dist\prysmor-sidecar"
+
 ; Where the compiled installer lands
 #define OutputDir    "..\..\dist"
+
+; Sidecar install path (system-wide, matches host.jsx lookup)
+#define SidecarDest  "{pf}\Prysmor"
 
 ; ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -78,6 +84,7 @@ FinishedLabel=Prysmor Panel installed!%n%nNext steps:%n  1. Restart Adobe Premie
 ; ── Files ─────────────────────────────────────────────────────────────────────
 
 [Files]
+; CEP Panel
 Source: "{#SourceDir}\CSXS\manifest.xml";   DestDir: "{app}\CSXS";         Flags: ignoreversion
 Source: "{#SourceDir}\panel\index.html";    DestDir: "{app}\panel";        Flags: ignoreversion
 Source: "{#SourceDir}\panel\main.js";       DestDir: "{app}\panel";        Flags: ignoreversion
@@ -87,11 +94,26 @@ Source: "{#SourceDir}\panel\lib\*";         DestDir: "{app}\panel\lib";    Flags
 Source: "{#SourceDir}\panel\assets\*";      DestDir: "{app}\panel\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceDir}\.debug";             DestDir: "{app}";              Flags: ignoreversion
 
+; Identity Lock Sidecar (PyInstaller folder bundle)
+; Built with: pyinstaller prysmor-sidecar.spec
+; If the dist\prysmor-sidecar folder does not exist, comment these lines out
+; and build the sidecar first.
+Source: "{#SidecarDir}\prysmor-sidecar.exe"; DestDir: "{#SidecarDest}";   Flags: ignoreversion
+Source: "{#SidecarDir}\*";                   DestDir: "{#SidecarDest}";   Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+
 ; ── Registry ──────────────────────────────────────────────────────────────────
 ; PlayerDebugMode=1 is required for Premiere to load unsigned CEP extensions.
 ; Set for all CSXS versions: .10 (older), .11 (2022-2024), .12 (2025), .13 (future).
+;
+; Windows Startup entry: launches prysmor-sidecar.exe when the user logs in.
+; This runs hidden in the background so Identity Lock is ready when Premiere opens.
 
 [Registry]
+; Sidecar auto-start on Windows login
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
+  ValueType: string; ValueName: "PrysmorSidecar"; \
+  ValueData: """{#SidecarDest}\prysmor-sidecar.exe"""; \
+  Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
 Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1
 Root: HKCU; Subkey: "Software\Adobe\CSXS.11"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
@@ -101,17 +123,20 @@ Root: HKCU; Subkey: "Software\Adobe\CSXS.12"; ValueType: dword; ValueName: "Play
 Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
 Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1
 
-; ── Post-install cache clear ───────────────────────────────────────────────────
+; ── Post-install cache clear + sidecar first launch ───────────────────────────
 
 [Run]
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\Cache"" 2>nul";            Flags: runhidden; StatusMsg: "Clearing CEP cache..."
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\CEPHtmlEngine"" 2>nul";    Flags: runhidden; StatusMsg: "Clearing CEP engine cache..."
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{localappdata}\Temp\cep_cache"" 2>nul";            Flags: runhidden; StatusMsg: "Clearing CEP temp cache..."
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\Cache"" 2>nul";                       Flags: runhidden; StatusMsg: "Clearing CEP cache..."
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\CEPHtmlEngine"" 2>nul";               Flags: runhidden; StatusMsg: "Clearing CEP engine cache..."
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{localappdata}\Temp\cep_cache"" 2>nul";                       Flags: runhidden; StatusMsg: "Clearing CEP temp cache..."
+; Start the sidecar immediately after install so it pre-warms face models
+Filename: "{#SidecarDest}\prysmor-sidecar.exe"; Flags: runhidden nowait skipifdoesntexist; StatusMsg: "Starting Identity Lock engine..."
 
 ; ── Uninstall ─────────────────────────────────────────────────────────────────
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{#SidecarDest}"
 
 ; ── Pascal Script ─────────────────────────────────────────────────────────────
 

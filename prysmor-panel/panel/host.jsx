@@ -264,6 +264,41 @@ function replaceSelection(filePath) {
   }
 }
 
+// ─── startSidecar ─────────────────────────────────────────────────────────────
+/**
+ * Launches prysmor-sidecar.exe if found in known install locations.
+ * Called by the CEP panel when localhost:7788/health is unreachable.
+ * Returns 'started:<path>' or 'error:<reason>'.
+ */
+function startSidecar() {
+  try {
+    if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
+
+    // Search locations in priority order
+    var locations = [
+      // System-wide install (admin installer)
+      'C:\\Program Files\\Prysmor\\prysmor-sidecar.exe',
+      // Per-user install fallback
+      Folder.userData.fsName + '\\Prysmor\\prysmor-sidecar.exe',
+      // Portable — same folder as the panel
+      File($.fileName).parent.parent.fsName + '\\prysmor-sidecar.exe',
+    ];
+
+    for (var i = 0; i < locations.length; i++) {
+      var f = new File(locations[i]);
+      if (f.exists) {
+        // callSystem() is fire-and-forget in ExtendScript (returns immediately)
+        var escaped = locations[i].replace(/\\/g, '\\\\');
+        app.system.callSystem('"' + escaped + '"');
+        return 'started:' + locations[i];
+      }
+    }
+    return 'error: prysmor-sidecar.exe not found in any known location.';
+  } catch (e) {
+    return 'error: ' + e.message;
+  }
+}
+
 // ─── getAppInfo ───────────────────────────────────────────────────────────────
 
 function getAppInfo() {

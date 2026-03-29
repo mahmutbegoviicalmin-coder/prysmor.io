@@ -25,6 +25,10 @@ const GEN_STATUS_LABELS = [
   { after: 300, text: 'Almost there, processing your effect…'      },
 ];
 
+// Sidecar auto-start
+const SIDECAR_URL        = 'http://127.0.0.1:7788';
+const SIDECAR_START_WAIT = 12000;  // ms to wait after launch before re-checking health
+
 // LocalStorage keys
 const LS_TOKEN     = 'prysmor_token';
 const LS_USER_ID   = 'prysmor_user_id';
@@ -88,9 +92,9 @@ window.addEventListener('DOMContentLoaded', function () {
     state._extRoot = raw.replace(/\\/g, '/').replace(/\/$/, '');
   } catch (_) {}
   bindEvents();
-  // Try to restore saved session
+  // Try to restore saved session — validate against server before showing main view
   if (restoreSession()) {
-    enterPanel();
+    validateSessionThenEnter();
   } else {
     showView('login');
   }
@@ -114,6 +118,33 @@ function restoreSession() {
   } catch (_) {
     return false;
   }
+}
+
+/**
+ * Validates the locally-restored session against the server before entering the panel.
+ * If the token has expired on the server, the user is sent back to the login view
+ * immediately rather than seeing the panel briefly and then being kicked out.
+ */
+async function validateSessionThenEnter() {
+  try {
+    var res = await fetch(API_BASE + '/api/v1/motionforge/credits', {
+      headers: apiHeaders(),
+    });
+    if (res.status === 401) {
+      clearSession();
+      showView('login');
+      setLoginStatus('Your session expired — please sign in again.', true);
+      return;
+    }
+    var data = res.ok ? await res.json().catch(function () { return {}; }) : {};
+    if (res.ok && typeof data.credits === 'number') {
+      state.usage.credits      = data.credits;
+      state.usage.creditsTotal = data.creditsTotal || 1000;
+    }
+  } catch (_) {
+    // Network error — allow panel to load anyway, fetchCredits will retry
+  }
+  enterPanel();
 }
 
 function saveSession(token, userId, plan, planLabel) {
@@ -298,10 +329,16 @@ function enterPanel() {
 
   showView('main');
 
+  // Render credits immediately if pre-loaded by validateSessionThenEnter()
+  if (state.usage.credits > 0 || state.usage.creditsTotal !== 1000) {
+    renderUsage();
+    updateCostPreview();
+  }
+
   // Start heartbeat — keeps device "Online" in dashboard
   startHeartbeat();
 
-  // Fetch real credit balance from server
+  // Fetch credit balance to keep it fresh
   fetchCredits();
 
   // Resolve system temp dir
@@ -312,6 +349,52 @@ function enterPanel() {
   });
   // Try to auto-load whatever is selected in Premiere right now
   refreshClip(true);
+
+  // Ensure the Identity Lock sidecar is running (non-blocking)
+  ensureSidecarRunning();
+}
+
+/**
+ * Checks if the sidecar is already running on localhost:7788.
+ * If not, asks ExtendScript to launch prysmor-sidecar.exe.
+ * Completely non-blocking — panel works fine without it.
+ */
+async function ensureSidecarRunning() {
+  try {
+    var res = await fetch(SIDECAR_URL + '/health', {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (res.ok) {
+      console.log('[Prysmor] Sidecar already running ✓');
+      return;
+    }
+  } catch (_) {
+    // Not running — try to launch it
+  }
+
+  console.log('[Prysmor] Sidecar not detected — attempting auto-start…');
+  cs.evalScript('startSidecar()', async function (result) {
+    console.log('[Prysmor] startSidecar result:', result);
+    if (result && result.indexOf('error') === 0) {
+      console.warn('[Prysmor] Could not start sidecar:', result,
+        '— Identity Lock will be skipped (panel still functional)');
+      return;
+    }
+    // Give it time to load models (InsightFace takes ~10s)
+    await new Promise(function (r) { setTimeout(r, SIDECAR_START_WAIT); });
+    try {
+      var health = await fetch(SIDECAR_URL + '/health', {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (health.ok) {
+        console.log('[Prysmor] Sidecar started and healthy ✓');
+      } else {
+        console.warn('[Prysmor] Sidecar started but not ready yet — will retry on generation');
+      }
+    } catch (_) {
+      console.warn('[Prysmor] Sidecar still warming up — Identity Lock will activate once ready');
+    }
+  });
 }
 
 function logout() {
@@ -485,6 +568,11 @@ async function compilePrompt() {
       });
       var json = await res.json().catch(function () { return {}; });
 
+      if (res.status === 401) {
+        logout();
+        showToast('Session expired — please sign in again', 'error');
+        return;
+      }
       if (!res.ok || !json.prompt) {
         throw new Error(json.error || 'Scene analysis failed');
       }
@@ -525,6 +613,11 @@ async function compilePrompt() {
     });
     var json2 = await res2.json().catch(function () { return {}; });
 
+    if (res2.status === 401) {
+      logout();
+      showToast('Session expired — please sign in again', 'error');
+      return;
+    }
     if (!res2.ok || !json2.compiledPrompt) {
       throw new Error(json2.error || 'Compile failed');
     }
@@ -535,7 +628,7 @@ async function compilePrompt() {
     textarea.focus();
 
   } catch (err) {
-    showToast('Failed to enhance prompt', 'error');
+    showToast(err.message || 'Failed to enhance prompt', 'error');
   } finally {
     btn.disabled    = false;
     lbl.textContent = 'AI Enhance';
@@ -739,9 +832,12 @@ function startPolling(jobId) {
     try {
       job = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
       pollErrors = 0;
-    } catch (_) {
+      console.log('[Prysmor] poll result:', job.status, 'progress:', job.progress,
+        job.outputUrl ? 'outputUrl:' + job.outputUrl.slice(0, 80) : '',
+        job.error ? 'error:' + job.error : '');
+    } catch (err) {
       pollErrors++;
-      // On repeated errors, keep the last known progress — don't freeze at 58
+      console.warn('[Prysmor] poll #' + pollErrors + ' threw:', err.message);
       var lastPct = state.mf.lastKnownPct || 42;
       setStatus(getGenStatusLabel(elapsedSec), lastPct, elapsed);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
@@ -774,31 +870,128 @@ function startPolling(jobId) {
       return fail(job.error || 'Generation failed.');
     }
 
-    if (job.status === 'completed' && job.outputUrl) {
+    if (job.status === 'completed') {
+      if (!job.outputUrl) {
+        // Completed in Firestore but outputUrl missing — fail loudly
+        console.error('[Prysmor] job COMPLETED but outputUrl is empty:', JSON.stringify(job));
+        return fail('Generation finished but no output URL was returned. Please try again.');
+      }
       return handleJobComplete(job, jobId);
     }
 
+    // Any other status — keep polling but log it
+    console.warn('[Prysmor] unexpected poll status "' + job.status + '" — continuing to poll');
     state.mf.pollTimer = setTimeout(doPoll, nextInterval);
   }
 
   async function handleJobComplete(job, jobId) {
     state.mf.outputUrl    = job.outputUrl;
     state.mf.rawOutputUrl = job.rawOutputUrl || null;
-    setStatus('Downloading result\u2026', 98);
+    console.log('[Prysmor] handleJobComplete — outputUrl:', job.outputUrl);
 
+    // ── Try local Identity Lock via sidecar ───────────────────────────────────
+    // If the sidecar is running and we know the original source path,
+    // run compositing locally instead of inserting the raw Runway output.
+    var sel = state.mf.selInfo;
+    if (sel && sel.sourcePath) {
+      var compAbort  = new AbortController();
+      var compTimer  = null;
+      var compStart  = Date.now();
+
+      // Show skip button so user can bypass Identity Lock at any time
+      showSkipIdentityLock(function () {
+        compAbort.abort('user-skipped');
+      });
+
+      // Tick every second: update status with elapsed time
+      compTimer = setInterval(function () {
+        var elapsed = Math.round((Date.now() - compStart) / 1000);
+        var mins    = Math.floor(elapsed / 60);
+        var secs    = String(elapsed % 60).padStart(2, '0');
+        var timeStr = mins > 0 ? mins + 'm ' + secs + 's' : elapsed + 's';
+        setStatus('Applying Identity Lock\u2026', 96, timeStr);
+      }, 1000);
+
+      try {
+        setStatus('Applying Identity Lock\u2026', 96);
+        console.log('[Prysmor] Calling sidecar /composite…');
+
+        var compRes = await fetch('http://127.0.0.1:7788/composite', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orig_path:     sel.sourcePath,
+            media_in_sec:  parseFloat((sel.mediaInSec  || 0).toFixed(6)),
+            clip_dur_sec:  parseFloat((Math.min(sel.durationSec || 8, 8)).toFixed(6)),
+            generated_url: job.outputUrl,
+            job_id:        jobId || state.mf.jobId || '',
+          }),
+          signal: compAbort.signal,
+        });
+
+        clearInterval(compTimer);
+        hideSkipIdentityLock();
+
+        if (compRes.ok) {
+          var compData = await compRes.json();
+          console.log('[Prysmor] Identity Lock done — mode:', compData.mode_used,
+            'similarity:', compData.avg_similarity,
+            'ms:', compData.duration_ms);
+
+          setStatus(
+            compData.mode_used === 'RAW_ACCEPT'
+              ? 'Inserting into timeline\u2026'
+              : 'Identity Lock applied \u2014 inserting\u2026',
+            99,
+          );
+
+          await insertFromLocalPath(
+            compData.output_path,
+            sel.startTimeSec,
+            state.mf.replaceMode,
+            compData.mode_used,
+          );
+          fetchCredits();
+          setGenerating(false);
+          return;
+        }
+
+        var compErr = await compRes.json().catch(function () { return {}; });
+        console.warn('[Prysmor] /composite HTTP', compRes.status,
+          compErr.detail || compErr.error || '— falling back to direct insert');
+
+      } catch (scEx) {
+        clearInterval(compTimer);
+        hideSkipIdentityLock();
+        if (scEx.message === 'user-skipped' || (scEx.name === 'AbortError')) {
+          console.log('[Prysmor] Identity Lock skipped by user — using raw Runway output');
+          showToast('Identity Lock skipped \u2014 using raw output', 'info');
+        } else {
+          console.warn('[Prysmor] /composite failed:', scEx.message,
+            '— falling back to direct download+insert');
+        }
+      }
+    }
+
+    // ── Fallback: download from URL and insert ────────────────────────────────
+    setStatus('Downloading result\u2026', 98);
     try {
-      await downloadAndInsert(job.outputUrl, state.mf.selInfo.startTimeSec, state.mf.replaceMode);
+      console.log('[Prysmor] downloadAndInsert start:', job.outputUrl);
+      await downloadAndInsert(job.outputUrl, sel ? sel.startTimeSec : 0, state.mf.replaceMode);
+      console.log('[Prysmor] downloadAndInsert complete');
     } catch (err) {
+      console.error('[Prysmor] downloadAndInsert threw:', err.message);
       showToast('Insert failed: ' + err.message + ' \u2014 open manually', 'error');
       try {
-        var fbRes = await fetch(job.outputUrl, { headers: apiHeaders() });
+        var isOwnUrl = job.outputUrl.startsWith(API_BASE) || job.outputUrl.startsWith('/api/');
+        var fbOpts   = isOwnUrl ? { headers: apiHeaders() } : {};
+        var fbRes    = await fetch(job.outputUrl, fbOpts);
         if (fbRes.ok) {
-          var fbBlob = await fbRes.blob();
-          showResult(URL.createObjectURL(fbBlob));
+          showResult(URL.createObjectURL(await fbRes.blob()));
         } else {
           showResult(job.outputUrl);
         }
-      } catch (_) {
+      } catch (fbErr) {
         showResult(job.outputUrl);
       }
     }
@@ -820,14 +1013,22 @@ function stopMfPolling() {
 // ─── Download & Insert into Premiere ─────────────────────────────────────────
 
 async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
+  console.log('[Prysmor] downloadAndInsert — url:', outputUrl);
+
   // Runway output URLs are public S3/CDN presigned URLs — do NOT send auth headers
   // (extra Authorization header invalidates S3 presigned signatures)
-  const isOwnApi = outputUrl.startsWith(API_BASE) || outputUrl.startsWith('/api/');
-  const fetchOpts = isOwnApi ? { headers: apiHeaders() } : {};
+  const isOwnApi  = outputUrl.startsWith(API_BASE) || outputUrl.startsWith('/api/');
+  const fetchOpts = isOwnApi
+    ? { headers: apiHeaders(), signal: AbortSignal.timeout(120_000) }
+    : { signal: AbortSignal.timeout(120_000) };  // 2-min download timeout
+
+  console.log('[Prysmor] fetch start (isOwnApi=' + isOwnApi + ')');
   const res = await fetch(outputUrl, fetchOpts);
+  console.log('[Prysmor] fetch response HTTP', res.status, res.ok ? 'OK' : 'FAIL');
   if (!res.ok) throw new Error('Download HTTP ' + res.status);
 
   const arrayBuf = await res.arrayBuffer();
+  console.log('[Prysmor] downloaded', arrayBuf.byteLength, 'bytes');
   const buffer   = new Uint8Array(arrayBuf);
 
   // Always create a blob URL for in-panel preview — this works in all CEP versions
@@ -850,6 +1051,7 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
 
   const tmpDir  = state.mf.tempDir || (state._extRoot + '/panel/temp');
   const outPath = tmpDir + '/mf-output-' + Date.now() + '.mp4';
+  console.log('[Prysmor] writing to disk:', outPath);
 
   // Use string literal 'Base64' — avoids crashes when cep.encoding is undefined
   // in some CEP 12 / Premiere 2025 builds
@@ -858,17 +1060,19 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
 
   const base64 = uint8ToBase64(buffer);
   const wr     = window.cep.fs.writeFile(outPath, base64, base64enc);
+  console.log('[Prysmor] writeFile err:', wr.err, '(0 = success)');
 
   if (wr.err !== 0) {
-    // Write failed — still show preview from blob
     showResult(blobUrl || outputUrl);
-    throw new Error('Could not save to disk (err ' + wr.err + '). Preview shown — use Insert button to retry.');
+    throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
   }
 
   state.mf.outputPath = outPath;
   const esc = outPath.replace(/\\/g, '/').replace(/"/g, '\\"');
 
-  setStatus(replaceMode ? 'Replacing original…' : 'Inserting on V2…', 98);
+  setStatus(replaceMode ? 'Replacing original\u2026' : 'Inserting on V2\u2026', 98);
+  console.log('[Prysmor] evalScript', replaceMode ? 'replaceSelection' : 'insertClipOnV2',
+    'path:', outPath, 'startTimeSec:', startTimeSec);
 
   await new Promise(function (resolve) {
     const fn = replaceMode
@@ -876,20 +1080,79 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
       : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
 
     cs.evalScript(fn, function (r) {
+      console.log('[Prysmor] evalScript result:', r);
       if (r && r.indexOf('error') === 0) {
         showToast(r.replace('error: ', ''), 'error');
       } else {
         showToast(replaceMode
           ? 'Original replaced with AI result!'
-          : 'AI clip inserted on V2 — aligned to selection!', 'success');
+          : 'AI clip inserted on V2 \u2014 aligned to selection!', 'success');
       }
       resolve();
     });
   });
 
   setStatus('Done!', 100);
-  // Use blob URL for preview — file:// URLs are sometimes blocked in newer CEP builds
+  console.log('[Prysmor] insert done, showing result');
   showResult(blobUrl || ('file:///' + outPath.replace(/\\/g, '/').replace(/^\//, '')));
+}
+
+// ─── Identity Lock skip button ────────────────────────────────────────────────
+
+function showSkipIdentityLock(onSkip) {
+  var btn  = el('btn-skip-identity-lock');
+  var wrap = el('btn-skip-identity-lock-wrap');
+  if (!btn) return;
+  btn.style.display  = '';
+  if (wrap) wrap.style.display = '';
+  btn.onclick = onSkip;
+}
+
+function hideSkipIdentityLock() {
+  var btn  = el('btn-skip-identity-lock');
+  var wrap = el('btn-skip-identity-lock-wrap');
+  if (btn)  btn.style.display  = 'none';
+  if (wrap) wrap.style.display = 'none';
+}
+
+// ─── Insert from local sidecar output path ────────────────────────────────────
+// Used after /composite returns a local file path.
+// No download needed — sidecar already wrote the file on the same machine.
+
+async function insertFromLocalPath(localPath, startTimeSec, replaceMode, modeUsed) {
+  console.log('[Prysmor] insertFromLocalPath:', localPath);
+
+  // Normalise path separators for ExtendScript
+  var esc = localPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+
+  // Show in-panel preview using file:// URL
+  var fileUrl = 'file:///' + esc.replace(/^\//, '');
+  try { showResult(fileUrl); } catch (_) {}
+
+  await new Promise(function (resolve) {
+    var fn = replaceMode
+      ? 'replaceSelection("' + esc + '")'
+      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
+
+    cs.evalScript(fn, function (r) {
+      console.log('[Prysmor] insertFromLocalPath evalScript result:', r);
+      if (r && r.indexOf('error') === 0) {
+        showToast(r.replace('error: ', ''), 'error');
+      } else {
+        var lockLabel = (modeUsed && modeUsed !== 'RAW_ACCEPT')
+          ? ' \u2014 Identity Lock applied!'
+          : '';
+        showToast(replaceMode
+          ? 'Original replaced with AI result!' + lockLabel
+          : 'AI clip inserted on V2' + lockLabel, 'success');
+      }
+      resolve();
+    });
+  });
+
+  state.mf.outputPath = localPath;
+  setStatus('Done!', 100);
+  console.log('[Prysmor] insertFromLocalPath done');
 }
 
 // ─── UI State Helpers ─────────────────────────────────────────────────────────
