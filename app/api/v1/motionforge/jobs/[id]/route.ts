@@ -5,11 +5,17 @@ import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { refundCredits }              from '@/lib/firestore/users';
 import { getConfig }                  from '@/lib/motionforge/config';
-import { safeUnlink }                 from '@/lib/motionforge/frameExtract';
-import { runIdentityLockV2 }          from '@/lib/motionforge/compositingPipeline';
+// frameExtract and compositingPipeline import @ffmpeg-installer/ffmpeg at their top level,
+// which is excluded from the Vercel bundle. Never import them statically in this route —
+// use lazy await import() only inside the compositing path (local dev only).
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
+
+/** Inline replacement for frameExtract.safeUnlink — avoids the ffmpeg static import. */
+function safeUnlink(filePath: string): void {
+  try { if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
+}
 
 export const runtime     = 'nodejs';
 export const maxDuration = 60; // Firebase cold start (5-8s) + Runway API (up to 20s) + buffer
@@ -266,9 +272,13 @@ async function runCompositingAsync(
   try {
     log(TAG, `Starting Identity Lock v2 compositing for job ${jobId}`);
 
-    // Pass effectType so the pipeline can pick the right restoration mode:
-    //   overlay     → RAW_ACCEPT    (lighting, glow, fog — Runway handles it natively)
-    //   background  → FULL_SUBJECT_COMPOSITE (fireworks, winter — protect all faces)
+    // Lazy import — compositingPipeline imports @ffmpeg-installer/ffmpeg at its top level
+    // which is excluded from the Vercel bundle. Dynamic import ensures the module is only
+    // loaded on local dev (where hasOrig is true and ffmpeg is available).
+    const { runIdentityLockV2 } = await import('@/lib/motionforge/compositingPipeline');
+
+    // overlay     → RAW_ACCEPT    (lighting, glow, fog — Runway handles it natively)
+    // background  → FULL_SUBJECT_COMPOSITE (fireworks, winter — protect all faces)
     const { outputPath, debugMetrics, identityAnalysis } = await runIdentityLockV2(
       origPath, rawUrl, jobId, effectType,
     );
