@@ -266,7 +266,8 @@ function replaceSelection(filePath) {
 
 // ─── startSidecar ─────────────────────────────────────────────────────────────
 /**
- * Launches prysmor-sidecar.exe if found in known install locations.
+ * Launches the Prysmor Identity Lock sidecar process.
+ * Cross-platform: detects Windows vs macOS and uses appropriate paths/commands.
  * Called by the CEP panel when localhost:7788/health is unreachable.
  * Returns 'started:<path>' or 'error:<reason>'.
  */
@@ -274,26 +275,45 @@ function startSidecar() {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
 
-    // Search locations in priority order
-    var locations = [
-      // System-wide install (admin installer)
-      'C:\\Program Files\\Prysmor\\prysmor-sidecar.exe',
-      // Per-user install fallback
-      Folder.userData.fsName + '\\Prysmor\\prysmor-sidecar.exe',
-      // Portable — same folder as the panel
-      File($.fileName).parent.parent.fsName + '\\prysmor-sidecar.exe',
-    ];
+    var isMac = ($.os && $.os.toLowerCase().indexOf('mac') !== -1);
 
-    for (var i = 0; i < locations.length; i++) {
-      var f = new File(locations[i]);
-      if (f.exists) {
-        // callSystem() is fire-and-forget in ExtendScript (returns immediately)
-        var escaped = locations[i].replace(/\\/g, '\\\\');
-        app.system.callSystem('"' + escaped + '"');
-        return 'started:' + locations[i];
+    if (isMac) {
+      // ── macOS paths ───────────────────────────────────────────────────────
+      var macLocations = [
+        '/Applications/Prysmor/prysmor-sidecar',
+        Folder.userData.fsName + '/Prysmor/prysmor-sidecar',
+        File($.fileName).parent.parent.fsName + '/prysmor-sidecar',
+      ];
+
+      for (var m = 0; m < macLocations.length; m++) {
+        var mf = new File(macLocations[m]);
+        if (mf.exists) {
+          // Run detached via nohup so it survives panel reload
+          app.system.callSystem('nohup "' + macLocations[m] + '" > /tmp/prysmor-sidecar.log 2>&1 &');
+          return 'started:' + macLocations[m];
+        }
       }
+      return 'error: prysmor-sidecar not found (tried /Applications/Prysmor/ and ~/Prysmor/).';
+
+    } else {
+      // ── Windows paths ─────────────────────────────────────────────────────
+      var winLocations = [
+        'C:\\Program Files\\Prysmor\\prysmor-sidecar.exe',
+        Folder.userData.fsName + '\\Prysmor\\prysmor-sidecar.exe',
+        File($.fileName).parent.parent.fsName + '\\prysmor-sidecar.exe',
+      ];
+
+      for (var w = 0; w < winLocations.length; w++) {
+        var wf = new File(winLocations[w]);
+        if (wf.exists) {
+          var escaped = winLocations[w].replace(/\\/g, '\\\\');
+          app.system.callSystem('"' + escaped + '"');
+          return 'started:' + winLocations[w];
+        }
+      }
+      return 'error: prysmor-sidecar.exe not found in any known location.';
     }
-    return 'error: prysmor-sidecar.exe not found in any known location.';
+
   } catch (e) {
     return 'error: ' + e.message;
   }
