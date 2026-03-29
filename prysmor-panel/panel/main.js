@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -709,95 +709,84 @@ function getGenStatusLabel(elapsedSec) {
 
 function startPolling(jobId) {
   stopMfPolling();
-  var pollErrors  = 0;
-  var slowMode    = false;
+  var pollErrors = 0;
+  state.mf.pollActive = true;
 
   async function doPoll() {
+    if (!state.mf.pollActive) return;
+
     var elapsedMs  = Date.now() - state.mf.pollStart;
     var elapsedSec = Math.floor(elapsedMs / 1000);
     var mins = Math.floor(elapsedSec / 60);
     var secs = elapsedSec % 60;
-    var elapsed = mins > 0
-      ? mins + 'm ' + String(secs).padStart(2,'0') + 's'
-      : secs + 's';
+    var elapsed = mins > 0 ? mins + 'm ' + String(secs).padStart(2,'0') + 's' : secs + 's';
+    var nextInterval = elapsedMs > SOFT_TIMEOUT_MS ? POLL_MS_SLOW : POLL_MS;
 
-    // ── Hard timeout: do one final check before giving up ─────────────────
+    // Hard timeout: one final check then give up
     if (elapsedMs > MAX_POLL_MS) {
-      stopMfPolling();
-      setStatus('Checking if Runway finished…', 99, elapsed);
+      setStatus('Checking if generation finished\u2026', 99, elapsed);
       try {
         var finalJob = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
         if (finalJob.status === 'completed' && finalJob.outputUrl) {
           return handleJobComplete(finalJob, jobId);
         }
       } catch (_) {}
-      return fail('Generation timed out after 20 min. Try again or check your Runway dashboard.');
+      return fail('Generation timed out after 40 min. Try again.');
     }
 
-    // ── Switch to slow polling after soft timeout ──────────────────────────
-    if (!slowMode && elapsedMs > SOFT_TIMEOUT_MS) {
-      slowMode = true;
-      stopMfPolling();
-      setStatus('Runway is still processing… (' + elapsed + ')', 85, elapsed);
-      state.mf.pollTimer = setInterval(doPoll, POLL_MS_SLOW);
-      return;
-    }
-
-    // ── Fetch job status ───────────────────────────────────────────────────
+    // Fetch job status
     let job;
     try {
       job = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
       pollErrors = 0;
     } catch (_) {
       pollErrors++;
-      if (pollErrors >= 3) {
-        setStatus(getGenStatusLabel(elapsedSec), 58, elapsed);
-      }
+      if (pollErrors >= 3) setStatus(getGenStatusLabel(elapsedSec), 58, elapsed);
+      state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
 
     if (job.status === 'generating') {
-      var runwayPct = job.progress || 0; // 0-100, real value from Runway task API
+      var runwayPct = job.progress || 0;
       var pct, label;
       if (runwayPct > 0) {
-        // Real progress from AI engine — map 1-100% → 40-96% on our bar
         pct   = 40 + Math.round(runwayPct * 0.56);
-        label = 'Generating effect… ' + runwayPct + '%';
+        label = 'Generating effect\u2026 ' + runwayPct + '%';
       } else {
-        // Still pending/queued — use time-based label, 40-55% zone
-        var pendingPct = 40 + Math.min(Math.round(elapsedSec * 0.08), 15);
-        pct   = pendingPct;
+        pct   = 40 + Math.min(Math.round(elapsedSec * 0.08), 15);
         label = getGenStatusLabel(elapsedSec);
       }
       setStatus(label, pct, elapsed);
+      state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
 
     if (job.status === 'compositing') {
-      setStatus('Applying final touches…', 97, elapsed);
+      setStatus('Applying final touches\u2026', 97, elapsed);
+      state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
 
     if (job.status === 'failed') {
-      stopMfPolling();
-      return fail(job.error || 'Generation failed on Runway.');
+      return fail(job.error || 'Generation failed.');
     }
 
     if (job.status === 'completed' && job.outputUrl) {
-      stopMfPolling();
       return handleJobComplete(job, jobId);
     }
+
+    state.mf.pollTimer = setTimeout(doPoll, nextInterval);
   }
 
   async function handleJobComplete(job, jobId) {
     state.mf.outputUrl    = job.outputUrl;
     state.mf.rawOutputUrl = job.rawOutputUrl || null;
-    setStatus('Downloading result…', 98);
+    setStatus('Downloading result\u2026', 98);
 
     try {
       await downloadAndInsert(job.outputUrl, state.mf.selInfo.startTimeSec, state.mf.replaceMode);
     } catch (err) {
-      showToast('Insert failed: ' + err.message + ' — open manually', 'error');
+      showToast('Insert failed: ' + err.message + ' \u2014 open manually', 'error');
       try {
         var fbRes = await fetch(job.outputUrl, { headers: apiHeaders() });
         if (fbRes.ok) {
@@ -815,11 +804,14 @@ function startPolling(jobId) {
     setGenerating(false);
   }
 
-  state.mf.pollTimer = setInterval(doPoll, POLL_MS);
+  // setTimeout not setInterval: next poll fires only AFTER current one fully
+  // completes, preventing concurrent overlapping Runway API calls.
+  state.mf.pollTimer = setTimeout(doPoll, POLL_MS);
 }
 
 function stopMfPolling() {
-  if (state.mf.pollTimer) { clearInterval(state.mf.pollTimer); state.mf.pollTimer = null; }
+  state.mf.pollActive = false;
+  if (state.mf.pollTimer) { clearTimeout(state.mf.pollTimer); state.mf.pollTimer = null; }
 }
 
 // ─── Download & Insert into Premiere ─────────────────────────────────────────
