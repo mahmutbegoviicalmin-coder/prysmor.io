@@ -15,14 +15,14 @@ const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 const AUTH_POLL_MS  = 2500;  // how often to check if browser auth completed
 const AUTH_MAX_MS   = 5 * 60 * 1000; // 5 min before code expires
 
-// Generation status labels by elapsed time
+// Generation status labels by elapsed time (no vendor names)
 const GEN_STATUS_LABELS = [
-  { after:   0, text: 'Starting generation…'        },
-  { after:  10, text: 'Uploading to Runway…'         },
-  { after:  30, text: 'Queued at Runway…'            },
-  { after:  90, text: 'Runway is processing…'        },
-  { after: 180, text: 'Still generating (can take 3–5 min)…' },
-  { after: 300, text: 'Almost there — Runway is busy…'       },
+  { after:   0, text: 'Starting generation…'                  },
+  { after:  10, text: 'Preparing your clip…'                  },
+  { after:  30, text: 'Queued for processing…'                },
+  { after:  90, text: 'Effect generation in progress…'        },
+  { after: 180, text: 'Still working — complex effects take time…' },
+  { after: 300, text: 'Almost there, processing your effect…'      },
 ];
 
 // LocalStorage keys
@@ -566,7 +566,7 @@ async function mfGenerate() {
   var costPrev = el('gen-cost-preview');
   if (costPrev) costPrev.style.display = 'none';
   setGenerating(true);
-  setStatus('Creating job…', 8);
+  setStatus('Starting…', 5);
 
   // ── Step 1: Create job (deducts credits atomically on server) ────────────
   let jobId;
@@ -598,7 +598,7 @@ async function mfGenerate() {
   }
 
   // ── Step 2: Read clip from disk ───────────────────────────────────────────
-  setStatus('Reading clip from disk…', 18);
+  setStatus('Reading clip…', 12);
   let fileBase64;
   try {
     fileBase64 = await readFileBase64(state.mf.selInfo.sourcePath);
@@ -607,7 +607,7 @@ async function mfGenerate() {
   }
 
   // ── Step 3: Upload raw binary to backend (ffmpeg trims on server) ───────
-  setStatus('Uploading to server…', 32);
+  setStatus('Uploading clip…', 20);
   try {
     const blob       = base64ToBlob(fileBase64, 'video/mp4');
     const mediaInSec = (state.mf.selInfo.mediaInSec || 0).toFixed(6);
@@ -632,7 +632,7 @@ async function mfGenerate() {
   }
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
-  setStatus('Starting AI generation…', 50);
+  setStatus('Starting effect generation…', 38);
   try {
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/generate', {
       method:  'POST',
@@ -644,7 +644,7 @@ async function mfGenerate() {
   }
 
   // ── Step 5: Poll until done ───────────────────────────────────────────────
-  setStatus('Generating your effect…', 55);
+  setStatus('Effect generation started…', 40);
   state.mf.pollStart = Date.now();
   startPolling(jobId);
 }
@@ -707,17 +707,24 @@ function startPolling(jobId) {
     }
 
     if (job.status === 'generating') {
-      var progress = job.progress || 0;
-      var pct = 55 + Math.round(progress * 0.4);
-      var label = progress > 0
-        ? 'Generating… ' + progress + '%'
-        : getGenStatusLabel(elapsedSec);
+      var runwayPct = job.progress || 0; // 0-100, real value from Runway task API
+      var pct, label;
+      if (runwayPct > 0) {
+        // Real progress from AI engine — map 1-100% → 40-96% on our bar
+        pct   = 40 + Math.round(runwayPct * 0.56);
+        label = 'Generating effect… ' + runwayPct + '%';
+      } else {
+        // Still pending/queued — use time-based label, 40-55% zone
+        var pendingPct = 40 + Math.min(Math.round(elapsedSec * 0.08), 15);
+        pct   = pendingPct;
+        label = getGenStatusLabel(elapsedSec);
+      }
       setStatus(label, pct, elapsed);
       return;
     }
 
     if (job.status === 'compositing') {
-      setStatus('Finalising result…', 96, elapsed);
+      setStatus('Applying final touches…', 97, elapsed);
       return;
     }
 
@@ -843,7 +850,6 @@ function setGenerating(active) {
   state.mf.generating = active;
   const btn = el('mf-btn-generate');
   if (btn) { btn.disabled = active; btn.style.display = active ? 'none' : ''; }
-  // Hide cost badge during generation
   var costBadge = el('gen-btn-cost');
   if (costBadge && active) costBadge.style.display = 'none';
   const gs = el('mf-gen-state');
@@ -852,25 +858,50 @@ function setGenerating(active) {
   if (rs && active) rs.classList.add('hidden');
   if (active) {
     const bar = el('mf-gen-bar');
-    if (bar) { bar.style.width = '0%'; }
+    if (bar) bar.style.width = '0%';
+    // Reset stage indicators
+    setStage('upload');
+    var pctLbl = el('mf-gen-pct'); if (pctLbl) pctLbl.textContent = '0%';
+    var elapsed2 = el('mf-gen-elapsed'); if (elapsed2) elapsed2.classList.remove('visible');
   }
-  if (!active) updateCostPreview(); // restore cost badge after generation
+  if (!active) updateCostPreview();
+}
+
+function setStage(stage) {
+  // stage: 'upload' | 'generate' | 'done'
+  var stages = ['upload', 'generate', 'done'];
+  var activeIdx = stages.indexOf(stage);
+  stages.forEach(function(s, i) {
+    var el2 = el('gs-' + s);
+    if (!el2) return;
+    el2.classList.remove('active', 'done');
+    if (i < activeIdx)       el2.classList.add('done');
+    else if (i === activeIdx) el2.classList.add('active');
+  });
+  // Lines
+  var line1 = el('gs-line-1');
+  var line2 = el('gs-line-2');
+  if (line1) line1.classList.toggle('done', activeIdx > 0);
+  if (line2) line2.classList.toggle('done', activeIdx > 1);
 }
 
 function setStatus(text, pct, elapsed) {
   const t = el('mf-status-text'); if (t) t.textContent = text;
   const b = el('mf-gen-bar');
-  if (b && pct != null) b.style.width = Math.min(pct, 100) + '%';
+  const clamped = pct != null ? Math.min(Math.max(pct, 0), 100) : null;
+  if (b && clamped != null) b.style.width = clamped + '%';
   const pctLbl = el('mf-gen-pct');
-  if (pctLbl && pct != null) pctLbl.textContent = Math.min(pct, 100) + '%';
+  if (pctLbl && clamped != null) pctLbl.textContent = Math.round(clamped) + '%';
   const elapsedEl = el('mf-gen-elapsed');
   if (elapsedEl) {
-    if (elapsed) {
-      elapsedEl.textContent = elapsed;
-      elapsedEl.classList.add('visible');
-    } else {
-      elapsedEl.classList.remove('visible');
-    }
+    if (elapsed) { elapsedEl.textContent = elapsed; elapsedEl.classList.add('visible'); }
+    else { elapsedEl.classList.remove('visible'); }
+  }
+  // Auto-update stage based on %
+  if (clamped != null) {
+    if (clamped < 38)      setStage('upload');
+    else if (clamped < 97) setStage('generate');
+    else                   setStage('done');
   }
 }
 

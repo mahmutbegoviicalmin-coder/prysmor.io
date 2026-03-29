@@ -218,12 +218,45 @@
         </button>
 
         <!-- Progress (shown during generation) -->
-        <div id="mf-gen-state" class="gen-progress hidden">
-          <div class="gen-bar-track"><div class="gen-bar-fill" id="mf-gen-bar" style="width:0%"><span class="gen-shimmer"></span></div></div>
-          <div class="gen-status-row">
-            <span class="gen-dots"><i></i><i></i><i></i></span>
-            <span id="mf-status-text" class="gen-status-txt">Initializing…</span>
+        <div id="mf-gen-state" class="gen-state hidden">
+
+          <!-- Stage pills -->
+          <div class="gen-stages">
+            <div class="gen-stage" id="gs-upload">
+              <div class="gs-dot"></div>
+              <span>Upload</span>
+            </div>
+            <div class="gs-line" id="gs-line-1"></div>
+            <div class="gen-stage" id="gs-generate">
+              <div class="gs-dot"></div>
+              <span>Generate</span>
+            </div>
+            <div class="gs-line" id="gs-line-2"></div>
+            <div class="gen-stage" id="gs-done">
+              <div class="gs-dot"></div>
+              <span>Done</span>
+            </div>
           </div>
+
+          <!-- Progress bar -->
+          <div class="gen-bar-track">
+            <div class="gen-bar-fill" id="mf-gen-bar" style="width:0%">
+              <span class="gen-shimmer"></span>
+            </div>
+          </div>
+
+          <!-- Status row -->
+          <div class="gen-footer">
+            <div class="gen-status-left">
+              <div class="gen-pulse"></div>
+              <span id="mf-status-text" class="gen-status-txt">Starting…</span>
+            </div>
+            <div class="gen-status-right">
+              <span class="gen-pct-label" id="mf-gen-pct">0%</span>
+              <span class="gen-elapsed" id="mf-gen-elapsed"></span>
+            </div>
+          </div>
+
         </div>
 
         <!-- No credits warning (inside gen card) -->
