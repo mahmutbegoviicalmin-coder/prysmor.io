@@ -19,10 +19,10 @@ export default authMiddleware({
   ],
   // ignoredRoutes bypass ALL Clerk processing (incl. bot detection).
   // Required for CEP browser requests which Clerk may fingerprint as bots.
+  // NOTE: confirm is NOT here — it calls currentUser() and needs Clerk context.
   ignoredRoutes: [
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
-    "/api/panel/auth/confirm",
   ],
 });
 
