@@ -1,37 +1,31 @@
 ; =============================================================================
-; Prysmor Panel — Windows Installer Script
+; Prysmor Panel v2.1.0 — Windows Installer
 ; Inno Setup 6  (https://jrsoftware.org/isinfo.php)
 ;
 ; Build:
 ;   ISCC.exe installer\windows\PrysmorPanel.iss
-;   (run from project root, or adjust SourceDir below)
 ;
 ; What this installer does:
-;   1. Detects installed Premiere Pro version (2025, 2024, 2023, 2022)
-;   2. Copies the extension to the correct CEP\extensions\ folder
-;   3. Sets PlayerDebugMode=1 in registry (CSXS.10 – CSXS.13)
-;   4. Clears all CEP caches so Premiere picks up the extension immediately
+;   1. Installs the CEP panel to the correct Premiere Pro extension folder
+;   2. Sets PlayerDebugMode=1 in registry (CSXS.10 – CSXS.13)
+;   3. Copies the Identity Lock Python sidecar (face_embedding_server.py)
+;   4. Installs Python dependencies via pip (insightface, torch, etc.)
+;   5. Registers auto-start so sidecar runs on every Windows login
+;   6. Clears CEP caches so panel loads immediately
 ; =============================================================================
 
 ; ── Defines ──────────────────────────────────────────────────────────────────
 
 #define AppName      "Prysmor Panel"
-#define AppVersion   "1.2.0"
+#define AppVersion   "2.1.0"
 #define AppPublisher "Prysmor"
-#define AppURL       "https://prysmor.com"
+#define AppURL       "https://prysmor.io"
 #define ExtensionId  "prysmor-panel"
 
-; Path to the CEP panel source, relative to this .iss file
 #define SourceDir    "..\..\prysmor-panel"
-
-; Path to the built sidecar folder (from PyInstaller)
-#define SidecarDir   "..\..\dist\prysmor-sidecar"
-
-; Where the compiled installer lands
+#define SidecarPy    "..\..\face_embedding_server.py"
+#define SidecarDest  "{userappdata}\Prysmor"
 #define OutputDir    "..\..\dist"
-
-; Sidecar install path (system-wide, matches host.jsx lookup)
-#define SidecarDest  "{pf}\Prysmor"
 
 ; ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -43,31 +37,23 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/docs
-AppUpdatesURL={#AppURL}/downloads
+AppUpdatesURL={#AppURL}/dashboard/downloads
 
-; Default: Premiere Pro 2025 system folder
-; The Pascal [Code] section overrides this at runtime if a different version is found.
 DefaultDirName={autopf}\Adobe\Adobe Premiere Pro 2025\CEP\extensions\{#ExtensionId}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 
-; Admin required to write to Program Files
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
 
-; ── Output ──
 OutputDir={#OutputDir}
 OutputBaseFilename=PrysmorPanelSetup
 
-; ── Appearance ──
 WizardStyle=modern
-
-; ── Compression ──
 Compression=lzma2/ultra64
 SolidCompression=yes
 InternalCompressLevel=ultra64
 
-; ── Uninstall ──
 UninstallDisplayName={#AppName}
 CreateUninstallRegKey=yes
 
@@ -79,41 +65,30 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; ── Finished page message ─────────────────────────────────────────────────────
 
 [Messages]
-FinishedLabel=Prysmor Panel installed!%n%nNext steps:%n  1. Restart Adobe Premiere Pro%n  2. Window %→ Extensions %→ Prysmor%n  3. Click "Continue to Prysmor" — no login needed.
+FinishedLabel=Prysmor Panel v2.1.0 installed successfully!%n%nNext steps:%n  1. Restart Adobe Premiere Pro%n  2. Window %→ Extensions %→ Prysmor%n  3. Sign in — Identity Lock starts automatically in the background.
 
 ; ── Files ─────────────────────────────────────────────────────────────────────
 
 [Files]
-; CEP Panel
+; CEP Panel files
 Source: "{#SourceDir}\CSXS\manifest.xml";   DestDir: "{app}\CSXS";         Flags: ignoreversion
 Source: "{#SourceDir}\panel\index.html";    DestDir: "{app}\panel";        Flags: ignoreversion
 Source: "{#SourceDir}\panel\main.js";       DestDir: "{app}\panel";        Flags: ignoreversion
 Source: "{#SourceDir}\panel\host.jsx";      DestDir: "{app}\panel";        Flags: ignoreversion
 Source: "{#SourceDir}\panel\styles.css";    DestDir: "{app}\panel";        Flags: ignoreversion
 Source: "{#SourceDir}\panel\lib\*";         DestDir: "{app}\panel\lib";    Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceDir}\panel\assets\*";      DestDir: "{app}\panel\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\panel\assets\*";      DestDir: "{app}\panel\assets"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "{#SourceDir}\.debug";             DestDir: "{app}";              Flags: ignoreversion
 
-; Identity Lock Sidecar (PyInstaller folder bundle)
-; Built with: pyinstaller prysmor-sidecar.spec
-; If the dist\prysmor-sidecar folder does not exist, comment these lines out
-; and build the sidecar first.
-Source: "{#SidecarDir}\prysmor-sidecar.exe"; DestDir: "{#SidecarDest}";   Flags: ignoreversion
-Source: "{#SidecarDir}\*";                   DestDir: "{#SidecarDest}";   Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+; Identity Lock Python sidecar
+Source: "{#SidecarPy}"; DestDir: "{#SidecarDest}"; Flags: ignoreversion
+
+; pip dependency installer helper script (written by [Code] section, not a file copy)
 
 ; ── Registry ──────────────────────────────────────────────────────────────────
-; PlayerDebugMode=1 is required for Premiere to load unsigned CEP extensions.
-; Set for all CSXS versions: .10 (older), .11 (2022-2024), .12 (2025), .13 (future).
-;
-; Windows Startup entry: launches prysmor-sidecar.exe when the user logs in.
-; This runs hidden in the background so Identity Lock is ready when Premiere opens.
 
 [Registry]
-; Sidecar auto-start on Windows login
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
-  ValueType: string; ValueName: "PrysmorSidecar"; \
-  ValueData: """{#SidecarDest}\prysmor-sidecar.exe"""; \
-  Flags: uninsdeletevalue
+; PlayerDebugMode=1 — required for unsigned CEP extensions
 Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
 Root: HKCU; Subkey: "Software\Adobe\CSXS.10"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1
 Root: HKCU; Subkey: "Software\Adobe\CSXS.11"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
@@ -123,28 +98,41 @@ Root: HKCU; Subkey: "Software\Adobe\CSXS.12"; ValueType: dword; ValueName: "Play
 Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1; Flags: createvalueifdoesntexist uninsdeletevalue
 Root: HKCU; Subkey: "Software\Adobe\CSXS.13"; ValueType: dword; ValueName: "PlayerDebugMode"; ValueData: 1
 
-; ── Post-install cache clear + sidecar first launch ───────────────────────────
+; Sidecar auto-start — runs python on every Windows login
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
+  ValueType: string; ValueName: "PrysmorSidecar"; \
+  ValueData: "pythonw.exe ""{userappdata}\Prysmor\face_embedding_server.py"""; \
+  Flags: uninsdeletevalue
+
+; ── Post-install steps ────────────────────────────────────────────────────────
 
 [Run]
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\Cache"" 2>nul";                       Flags: runhidden; StatusMsg: "Clearing CEP cache..."
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\CEPHtmlEngine"" 2>nul";               Flags: runhidden; StatusMsg: "Clearing CEP engine cache..."
-Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{localappdata}\Temp\cep_cache"" 2>nul";                       Flags: runhidden; StatusMsg: "Clearing CEP temp cache..."
-; Start the sidecar immediately after install so it pre-warms face models
-Filename: "{#SidecarDest}\prysmor-sidecar.exe"; Flags: runhidden nowait skipifdoesntexist; StatusMsg: "Starting Identity Lock engine..."
+; Clear CEP caches
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\Cache"" 2>nul";              Flags: runhidden; StatusMsg: "Clearing CEP cache..."
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{userappdata}\Adobe\CEP\CEPHtmlEngine"" 2>nul";      Flags: runhidden; StatusMsg: "Clearing CEP engine cache..."
+Filename: "cmd.exe"; Parameters: "/C rmdir /S /Q ""{localappdata}\Temp\cep_cache"" 2>nul";              Flags: runhidden; StatusMsg: "Clearing CEP temp cache..."
+
+; Install Python dependencies for Identity Lock (runs hidden, one-time)
+Filename: "cmd.exe"; \
+  Parameters: "/C pythonw -m pip install --quiet insightface fastapi uvicorn opencv-python numpy torch torchvision huggingface_hub Pillow 2>>{userappdata}\Prysmor\install.log"; \
+  Flags: runhidden nowait; StatusMsg: "Installing Identity Lock engine (background, ~5-10 min first time)..."
+
+; Start the sidecar immediately (it will wait for pip to finish if needed)
+Filename: "cmd.exe"; \
+  Parameters: "/C start /B pythonw.exe ""{userappdata}\Prysmor\face_embedding_server.py"" >> ""{userappdata}\Prysmor\sidecar.log"" 2>&1"; \
+  Flags: runhidden nowait; StatusMsg: "Starting Identity Lock engine..."
 
 ; ── Uninstall ─────────────────────────────────────────────────────────────────
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
-Type: filesandordirs; Name: "{#SidecarDest}"
+
+[UninstallRun]
+Filename: "cmd.exe"; Parameters: "/C taskkill /F /IM pythonw.exe /FI ""WINDOWTITLE eq face_embedding_server*"" 2>nul"; Flags: runhidden
 
 ; ── Pascal Script ─────────────────────────────────────────────────────────────
 
 [Code]
-
-{ ── Auto-detect Premiere Pro install folder ── }
-{ Checks for Premiere versions 2025, 2024, 2023, 2022 in Program Files.       }
-{ Falls back to %AppData%\Adobe\CEP\extensions\ if none found.                 }
 
 function GetInstallDir(Param: String): String;
 var
@@ -153,7 +141,6 @@ var
   i: Integer;
   Candidate: String;
 begin
-  { Build list of Premiere versions to check, newest first }
   SetArrayLength(Versions, 5);
   Versions[0] := 'Adobe Premiere Pro 2025';
   Versions[1] := 'Adobe Premiere Pro 2024';
@@ -173,11 +160,9 @@ begin
     end;
   end;
 
-  { No Premiere found — fall back to per-user AppData path }
   Result := ExpandConstant('{userappdata}') + '\Adobe\CEP\extensions\prysmor-panel';
 end;
 
-{ Override install dir before wizard starts }
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
@@ -188,7 +173,6 @@ begin
   WizardForm.DirEdit.Text := GetInstallDir('');
 end;
 
-{ Verify registry after install, show summary dialog }
 function CheckDebugMode(const SubKey: String): Boolean;
 var
   DwordVal: Cardinal;
@@ -197,18 +181,28 @@ begin
             and (DwordVal = 1);
 end;
 
+function PythonAvailable(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec('cmd.exe', '/C python --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+            and (ResultCode = 0);
+  if not Result then
+    Result := Exec('cmd.exe', '/C pythonw --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+              and (ResultCode = 0);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Msg: String;
-  InstallPath: String;
+  HasPython: Boolean;
 begin
   if CurStep = ssPostInstall then
   begin
-    InstallPath := WizardDirValue;
-
-    Msg := 'Prysmor Panel installed!' + #13#10 + #13#10;
-    Msg := Msg + 'Location:' + #13#10;
-    Msg := Msg + '  ' + InstallPath + #13#10 + #13#10;
+    HasPython := PythonAvailable();
+    Msg := 'Prysmor Panel v2.1.0 installed!' + #13#10 + #13#10;
+    Msg := Msg + 'Panel location:' + #13#10;
+    Msg := Msg + '  ' + WizardDirValue + #13#10 + #13#10;
 
     Msg := Msg + 'PlayerDebugMode = 1:' + #13#10;
     if CheckDebugMode('Software\Adobe\CSXS.11') then Msg := Msg + '  CSXS.11  OK' + #13#10
@@ -216,16 +210,21 @@ begin
     if CheckDebugMode('Software\Adobe\CSXS.12') then Msg := Msg + '  CSXS.12  OK' + #13#10
     else Msg := Msg + '  CSXS.12  not set' + #13#10;
 
+    Msg := Msg + #13#10;
+    if HasPython then
+      Msg := Msg + 'Identity Lock: Installing in background (~5-10 min)' + #13#10
+    else
+      Msg := Msg + 'Identity Lock: Python not found — install from python.org and re-run' + #13#10;
+
     Msg := Msg + #13#10 + 'Next steps:' + #13#10;
     Msg := Msg + '  1. Restart Adobe Premiere Pro' + #13#10;
     Msg := Msg + '  2. Window -> Extensions -> Prysmor' + #13#10;
-    Msg := Msg + '  3. Click "Continue to Prysmor"' + #13#10;
+    Msg := Msg + '  3. Sign in — Identity Lock runs automatically' + #13#10;
 
     MsgBox(Msg, mbInformation, MB_OK);
   end;
 end;
 
-{ Confirm before uninstall }
 function InitializeUninstall(): Boolean;
 begin
   Result := True;

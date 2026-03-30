@@ -27,8 +27,8 @@ PIP_DEPS="insightface fastapi uvicorn opencv-python numpy torch torchvision hugg
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║       Prysmor Panel Installer v1.5       ║"
-echo "║       AI VFX for Adobe Premiere Pro       ║"
+echo "║      Prysmor Panel Installer v2.1.0      ║"
+echo "║       AI VFX for Adobe Premiere Pro      ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
