@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    padding: 20px 24px;
+    color: #1a1a1a;
+    background: #fff;
+    margin: 0;
+  }
+  h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: #000;
+  }
+  p {
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 0 0 10px 0;
+    color: #333;
+  }
+  ul {
+    font-size: 13px;
+    line-height: 1.9;
+    padding-left: 18px;
+    margin: 8px 0 14px 0;
+    color: #333;
+  }
+  .version {
+    display: inline-block;
+    font-size: 11px;
+    color: #666;
+    background: #f0f0f0;
+    border-radius: 4px;
+    padding: 1px 7px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-weight: normal;
+  }
+  .note {
+    font-size: 11.5px;
+    color: #888;
+    border-top: 1px solid #e8e8e8;
+    padding-top: 10px;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+  <h1>Prysmor Panel <span class="version">v2.1.0</span></h1>
+  <p>
+    This installer sets up the <strong>Prysmor AI VFX extension</strong> for Adobe Premiere Pro —
+    including the Identity Lock engine that preserves your subject's face across AI-generated effects.
+  </p>
+  <p>The installer will automatically:</p>
+  <ul>
+    <li>Install the Prysmor CEP panel into Premiere Pro</li>
+    <li>Install the Identity Lock engine (<code>face_embedding_server.py</code>)</li>
+    <li>Install Python AI dependencies <em>(first install only, ~5–10 min in background)</em></li>
+    <li>Create a login item so Identity Lock starts automatically on every login</li>
+    <li>Clear CEP caches so the panel loads immediately after restart</li>
+  </ul>
+  <p>Click <strong>Install</strong> to continue. Your Mac password will be required.</p>
+  <div class="note">
+    Requires macOS 10.15 or later · Adobe Premiere Pro 2020–2025 · Python 3 (pre-installed on most Macs)
+  </div>
+</body>
+</html>

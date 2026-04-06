@@ -1,0 +1,81 @@
+name: Build macOS .pkg Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prysmor-panel/**"
+      - "face_embedding_server.py"
+      - "installer/mac/**"
+  workflow_dispatch:   # allows manual trigger from GitHub Actions tab
+
+jobs:
+  build-pkg:
+    runs-on: macos-latest
+    permissions:
+      contents: write   # needed to commit the .pkg back to the repo
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      # ── 2. Build package root (files that land in /) ─────────────────────────
+      - name: Prepare package root
+        run: |
+          mkdir -p pkg_root/Library/Prysmor
+          cp -R prysmor-panel pkg_root/Library/Prysmor/
+          cp face_embedding_server.py pkg_root/Library/Prysmor/
+
+      # ── 3. Make postinstall executable ───────────────────────────────────────
+      - name: Prepare install scripts
+        run: |
+          mkdir -p scripts
+          cp installer/mac/scripts/postinstall scripts/postinstall
+          chmod +x scripts/postinstall
+
+      # ── 4. Build component package ───────────────────────────────────────────
+      - name: pkgbuild — component package
+        run: |
+          pkgbuild \
+            --root           pkg_root \
+            --scripts        scripts \
+            --identifier     io.prysmor.panel \
+            --version        2.1.0 \
+            --install-location / \
+            PrysmorComponent.pkg
+
+      # ── 5. Build final installer with wizard UI ───────────────────────────────
+      - name: productbuild — final .pkg with installer UI
+        run: |
+          productbuild \
+            --distribution  installer/mac/distribution.xml \
+            --package-path  . \
+            --resources     installer/mac/resources \
+            PrysmorPanelSetup.pkg
+
+      # ── 6. Verify the package was created ────────────────────────────────────
+      - name: Verify output
+        run: |
+          ls -lh PrysmorPanelSetup.pkg
+          echo "Package size: $(du -sh PrysmorPanelSetup.pkg | cut -f1)"
+
+      # ── 7. Copy to public/downloads and commit ───────────────────────────────
+      - name: Commit .pkg to public/downloads
+        run: |
+          cp PrysmorPanelSetup.pkg public/downloads/PrysmorPanelSetup.pkg
+
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          git add public/downloads/PrysmorPanelSetup.pkg
+
+          if git diff --staged --quiet; then
+            echo "No changes to .pkg — skipping commit."
+          else
+            git commit -m "chore: rebuild macOS .pkg installer [skip ci]"
+            git push
+          fi

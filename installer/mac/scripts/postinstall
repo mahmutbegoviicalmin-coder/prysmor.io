@@ -1,0 +1,138 @@
+#!/bin/bash
+#
+# Prysmor Panel — macOS postinstall script
+# Executed automatically by the .pkg installer with root privileges.
+# Handles: panel copy, PlayerDebugMode, Python deps, LaunchAgent setup.
+#
+set -e
+
+log()     { echo "[Prysmor] $*"; }
+log_err() { echo "[Prysmor ERROR] $*" >&2; }
+
+# ── 1. Identify the actual logged-in user (not root) ──────────────────────────
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null || true)
+[ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ] && CONSOLE_USER="$SUDO_USER"
+[ -z "$CONSOLE_USER" ] && CONSOLE_USER=$(who | grep "console" | head -1 | awk '{print $1}' 2>/dev/null || true)
+if [ -z "$CONSOLE_USER" ]; then
+    log_err "Cannot determine logged-in user. Aborting."
+    exit 1
+fi
+
+USER_HOME=$(eval echo "~$CONSOLE_USER")
+log "Installing for user: $CONSOLE_USER  ($USER_HOME)"
+
+# ── 2. PlayerDebugMode — required for unsigned CEP extensions ─────────────────
+log "Setting PlayerDebugMode..."
+for VER in 10 11 12 13; do
+    sudo -u "$CONSOLE_USER" defaults write "com.adobe.CSXS.$VER" PlayerDebugMode 1 2>/dev/null || true
+done
+
+# ── 3. Install CEP panel into user's Premiere extensions folder ───────────────
+log "Installing Prysmor CEP panel..."
+CEP_EXT="$USER_HOME/Library/Application Support/Adobe/CEP/extensions"
+mkdir -p "$CEP_EXT"
+PANEL_DEST="$CEP_EXT/prysmor-panel"
+rm -rf "$PANEL_DEST"
+cp -R "/Library/Prysmor/prysmor-panel" "$PANEL_DEST"
+chown -R "$CONSOLE_USER" "$PANEL_DEST"
+log "Panel installed → $PANEL_DEST"
+
+# ── 4. Install Identity Lock sidecar ──────────────────────────────────────────
+log "Installing Identity Lock engine..."
+SIDECAR_DIR="$USER_HOME/Library/Prysmor"
+mkdir -p "$SIDECAR_DIR"
+cp "/Library/Prysmor/face_embedding_server.py" "$SIDECAR_DIR/"
+chown -R "$CONSOLE_USER" "$SIDECAR_DIR"
+log "Sidecar installed → $SIDECAR_DIR/face_embedding_server.py"
+
+# ── 5. Find Python3 ────────────────────────────────────────────────────────────
+PYTHON3=""
+for CMD in \
+    "/opt/homebrew/bin/python3" \
+    "/usr/local/bin/python3" \
+    "/usr/bin/python3" \
+    "python3"; do
+    if "$CMD" --version &>/dev/null 2>&1; then
+        PYTHON3="$CMD"
+        break
+    fi
+done
+
+if [ -z "$PYTHON3" ]; then
+    log "WARNING: Python3 not found."
+    log "  Install from https://python.org then re-run: sudo installer -pkg /tmp/PrysmorPanelSetup.pkg -target /"
+    log "  Identity Lock will be disabled until Python is available."
+    # Panel still installed — generation works, Identity Lock silently skipped
+    touch "$USER_HOME/Library/Prysmor/.no-python"
+else
+    PY_VER=$($PYTHON3 --version 2>&1)
+    log "Python: $PY_VER ($PYTHON3)"
+
+    # ── 6. Install Python dependencies in background ──────────────────────────
+    # This can take 5-10 min on first install; runs silently in the background.
+    log "Installing AI dependencies (background process — do NOT close this installer)..."
+    sudo -u "$CONSOLE_USER" "$PYTHON3" -m pip install --quiet --user \
+        insightface fastapi uvicorn "opencv-python-headless" numpy \
+        torch torchvision huggingface_hub Pillow \
+        >> /tmp/prysmor-pip.log 2>&1 &
+    PIP_PID=$!
+    log "pip install started (PID $PIP_PID). Log: /tmp/prysmor-pip.log"
+
+    # ── 7. Create LaunchAgent — auto-starts sidecar on every login ────────────
+    LAUNCH_AGENTS_DIR="$USER_HOME/Library/LaunchAgents"
+    PLIST="$LAUNCH_AGENTS_DIR/io.prysmor.sidecar.plist"
+    mkdir -p "$LAUNCH_AGENTS_DIR"
+
+    # Write plist — use printf to avoid heredoc variable-expansion issues
+    printf '%s' "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\"
+  \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+  <key>Label</key>
+  <string>io.prysmor.sidecar</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${PYTHON3}</string>
+    <string>${SIDECAR_DIR}/face_embedding_server.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>${SIDECAR_DIR}</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/prysmor-sidecar.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/prysmor-sidecar-err.log</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+</dict>
+</plist>
+" > "$PLIST"
+
+    chown "$CONSOLE_USER" "$PLIST"
+    chmod 644 "$PLIST"
+    log "LaunchAgent created → $PLIST"
+
+    # ── 8. Load LaunchAgent immediately (starts sidecar now) ──────────────────
+    sudo -u "$CONSOLE_USER" launchctl unload "$PLIST" 2>/dev/null || true
+    sudo -u "$CONSOLE_USER" launchctl load -w "$PLIST" 2>/dev/null || true
+    log "Identity Lock engine started (models load in ~15s)."
+fi
+
+# ── 9. Clear CEP caches ────────────────────────────────────────────────────────
+log "Clearing CEP caches..."
+for CACHE_PATH in \
+    "$USER_HOME/Library/Caches/CSXS" \
+    "$USER_HOME/Library/Caches/Adobe/CEP"; do
+    if [ -d "$CACHE_PATH" ]; then
+        sudo -u "$CONSOLE_USER" rm -rf "$CACHE_PATH" 2>/dev/null || true
+        log "  Cleared: $CACHE_PATH"
+    fi
+done
+
+log "===== Installation complete! ====="
+log "Next step: restart Premiere Pro → Window → Extensions → Prysmor"
+exit 0

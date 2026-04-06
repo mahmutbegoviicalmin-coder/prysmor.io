@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+
+    <title>Prysmor Panel 2.1.0</title>
+    <organization>io.prysmor</organization>
+
+    <!-- Require admin password for installation -->
+    <domains enable_localSystem="true" enable_currentUserHome="false"/>
+    <options customize="never" require-scripts="true" allow-external-scripts="no"/>
+
+    <!-- Installer pages -->
+    <welcome    file="welcome.html"    mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <!-- Single package, no choices shown -->
+    <choices-outline>
+        <line choice="io.prysmor.panel"/>
+    </choices-outline>
+    <choice id="io.prysmor.panel" visible="false"
+            title="Prysmor Panel" description="Prysmor AI VFX Panel for Adobe Premiere Pro">
+        <pkg-ref id="io.prysmor.panel"/>
+    </choice>
+    <pkg-ref id="io.prysmor.panel" version="2.1.0" onConclusion="none">
+        PrysmorComponent.pkg
+    </pkg-ref>
+
+</installer-gui-script>

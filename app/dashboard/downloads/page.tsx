@@ -194,17 +194,14 @@ export default function DownloadsPage() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              Download the ZIP, extract it, then{" "}
-              <strong className="text-[#9CA3AF]">double-click</strong>{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">
-                Install Prysmor Panel.command
-              </code>
-              {" "}— installs the panel and sets up the Identity Lock engine automatically.
+              Standard macOS installer — double-click the{" "}
+              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>
+              {" "}file and follow the wizard. Everything installs automatically — no manual steps, no Terminal.
             </p>
 
             <a
-              href="/downloads/prysmor-panel-mac.zip"
-              download="prysmor-panel-mac.zip"
+              href="/downloads/PrysmorPanelSetup.pkg"
+              download="PrysmorPanelSetup.pkg"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -212,17 +209,17 @@ export default function DownloadsPage() {
             </a>
 
             <p className="mt-3 text-[11px] text-[#4B5563] leading-relaxed">
-              After running the installer: restart Premiere Pro → Window → Extensions → Prysmor
+              After installing: restart Premiere Pro → Window → Extensions → Prysmor
             </p>
 
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
               {[
-                "CEP panel installed to ~/Library/Application Support/Adobe/CEP/extensions/",
-                "Identity Lock engine installed via Python — no separate download needed",
-                "pip3 install runs automatically on first install (~5–10 min, one-time only)",
-                "LaunchAgent created — Identity Lock engine starts automatically on login",
-                "PlayerDebugMode set for CSXS.10, 11, 12, 13 automatically",
-                "CEP caches cleared automatically",
+                "Standard .pkg installer — Next, Next, Install, Done",
+                "CEP panel installed automatically to correct Premiere Pro folder",
+                "Identity Lock engine installed and configured automatically",
+                "AI dependencies install silently in background (~5–10 min, first install only)",
+                "Login item created — Identity Lock starts automatically on every login",
+                "PlayerDebugMode set for CSXS.10, 11, 12, 13 — CEP caches cleared",
               ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
             </div>
           </div>
@@ -245,11 +242,10 @@ export default function DownloadsPage() {
           <div>
             <p className="text-[12px] font-semibold text-[#D1D5DB] mb-1">macOS Gatekeeper — first run</p>
             <p className="text-[11px] text-[#6B7280] leading-relaxed">
-              macOS may block the{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded">.command</code>{" "}
-              file on first run.{" "}
-              <strong className="text-[#9CA3AF]">Right-click → Open</strong> instead of double-clicking,
-              then click <strong className="text-[#9CA3AF]">&quot;Open&quot;</strong> in the dialog.
+              If macOS shows &quot;cannot be opened because it is from an unidentified developer&quot;:{" "}
+              <strong className="text-[#9CA3AF]">right-click the .pkg → Open</strong>, then click{" "}
+              <strong className="text-[#9CA3AF]">&quot;Open&quot;</strong> in the dialog.
+              Alternatively: <strong className="text-[#9CA3AF]">System Settings → Privacy &amp; Security → Open Anyway</strong>.
               You only need to do this once.
             </p>
           </div>
