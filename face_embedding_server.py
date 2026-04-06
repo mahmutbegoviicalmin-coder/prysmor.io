@@ -750,7 +750,7 @@ def trim_upload(req: TrimUploadRequest) -> dict:
 #   8. Return local output path to the panel
 
 COMPOSITE_RAW_ACCEPT_THRESHOLD = 0.75  # cosine similarity; above → no compositing needed
-COMPOSITE_FPS                  = 12    # extract frames at this fps (lower = faster)
+COMPOSITE_FPS_MAX              = 30    # hard cap — never exceed 30fps for compositing
 COMPOSITE_FACE_EXPAND_X        = 0.20  # horizontal face-box expansion fraction
 COMPOSITE_FACE_EXPAND_Y        = 0.25  # vertical   face-box expansion fraction
 COMPOSITE_FEATHER_PX           = 18    # Gaussian feather radius for blend edge
@@ -822,7 +822,7 @@ def _extract_frames(video_path: str, out_dir: str, fps: float) -> List[str]:
     _run_ffmpeg_cmd([
         ff, "-y", "-i", video_path,
         "-vf", f"fps={fps}",
-        "-q:v", "2",
+        "-q:v", "1",          # highest JPEG quality (was 2)
         os.path.join(out_dir, "frame-%04d.jpg"),
     ])
     return sorted(f for f in os.listdir(out_dir) if f.endswith(".jpg"))
@@ -949,8 +949,8 @@ def _reassemble_video(frames_dir: str, orig_path: str, out_path: str, fps: float
         "-i", os.path.join(frames_dir, "comp-%04d.jpg"),
         "-i", orig_path,
         "-map", "0:v:0", "-map", "1:a:0?",
-        "-c:v", "libx264", "-crf", "17", "-preset", "fast",
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+        "-c:v", "libx264", "-crf", "14", "-preset", "medium",  # higher quality (was crf 17, fast)
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest",
         "-movflags", "+faststart", out_path,
     ])
 
@@ -1012,7 +1012,9 @@ def composite(req: CompositeRequest) -> dict:  # type: ignore[return]
 
         w   = gen_info["width"]
         h   = gen_info["height"]
-        fps = min(gen_info["fps"], float(COMPOSITE_FPS))
+        # Use the generated video's actual fps — never cap below it.
+        # COMPOSITE_FPS_MAX is only a safety ceiling (e.g. 120fps slow-mo).
+        fps = min(gen_info["fps"], float(COMPOSITE_FPS_MAX))
 
         # ── 5. Extract mid-frame anchors for identity check ───────────────────
         anchor_dir  = os.path.join(work_dir, "anchors")
@@ -1043,7 +1045,9 @@ def composite(req: CompositeRequest) -> dict:  # type: ignore[return]
         else:
             log.info("Models not ready or anchors missing → RAW_ACCEPT fallback")
 
-        out_path = os.path.join(work_dir, "output.mp4")
+        # Unique filename per job so Premiere's findProjectItemByName never
+        # confuses this import with a previous one of the same session.
+        out_path = os.path.join(work_dir, f"prysmor-{job_id}.mp4")
 
         # ── 7a. RAW_ACCEPT: cleaned + upscaled generated is good enough ───────
         if mode_used == "RAW_ACCEPT":
@@ -1080,7 +1084,7 @@ def composite(req: CompositeRequest) -> dict:  # type: ignore[return]
             comp_fp = os.path.join(comp_dir, f"comp-{str(i + 1).zfill(4)}.jpg")
             try:
                 composed = _composite_frame_face(orig_fp, gen_fp, face_box, w, h)
-                cv2.imwrite(comp_fp, composed, [cv2.IMWRITE_JPEG_QUALITY, 92])
+                cv2.imwrite(comp_fp, composed, [cv2.IMWRITE_JPEG_QUALITY, 97])
             except Exception as exc:
                 log.warning("Frame %d composite failed (%s) — using gen frame", i, exc)
                 shutil.copy2(gen_fp, comp_fp)

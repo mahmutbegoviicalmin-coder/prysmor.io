@@ -17,6 +17,24 @@ function findProjectItemByName(parent, name) {
   return null;
 }
 
+// Finds a project item by its media file path (more reliable than name alone).
+// Falls back to name search if path matching fails.
+function findProjectItemByPath(parent, targetPath) {
+  if (!parent || !parent.children) return null;
+  var normalized = targetPath.replace(/\\/g, '/');
+  for (var i = 0; i < parent.children.numItems; i++) {
+    var child = parent.children[i];
+    var childPath = '';
+    try {
+      if (child.getMediaPath) childPath = child.getMediaPath().replace(/\\/g, '/');
+    } catch (_) {}
+    if (childPath && childPath === normalized) return child;
+    var found = findProjectItemByPath(child, targetPath);
+    if (found) return found;
+  }
+  return null;
+}
+
 function fileNameFromPath(filePath) {
   var normalized = filePath.replace(/\\/g, '/');
   var parts = normalized.split('/');
@@ -177,9 +195,15 @@ function insertClipOnV2(filePath, startTimeSec) {
     if (!seq) return 'error: No active sequence.';
 
     app.project.importFiles([filePath], true, app.project.rootItem, false);
-    var fileName = fileNameFromPath(filePath);
-    var item = findProjectItemByName(app.project.rootItem, fileName);
-    if (!item) return 'error: Clip imported but not found: ' + fileName;
+
+    // Try path-based lookup first (exact match, immune to naming conflicts).
+    // Falls back to name search for older Premiere versions.
+    var item = findProjectItemByPath(app.project.rootItem, filePath);
+    if (!item) {
+      var fileName = fileNameFromPath(filePath);
+      item = findProjectItemByName(app.project.rootItem, fileName);
+    }
+    if (!item) return 'error: Clip imported but not found: ' + fileNameFromPath(filePath);
 
     // Ensure V2 exists (index 1)
     while (seq.videoTracks.numTracks < 2) {
@@ -251,9 +275,12 @@ function replaceSelection(filePath) {
 
     // Import and insert replacement
     app.project.importFiles([filePath], true, app.project.rootItem, false);
-    var fileName = fileNameFromPath(filePath);
-    var item = findProjectItemByName(app.project.rootItem, fileName);
-    if (!item) return 'error: Replacement clip not found: ' + fileName;
+    var item = findProjectItemByPath(app.project.rootItem, filePath);
+    if (!item) {
+      var fileName = fileNameFromPath(filePath);
+      item = findProjectItemByName(app.project.rootItem, fileName);
+    }
+    if (!item) return 'error: Replacement clip not found: ' + fileNameFromPath(filePath);
 
     var track2 = seq.videoTracks[selectedTrackIdx];
     track2.insertClip(item, startSec);
@@ -278,22 +305,35 @@ function startSidecar() {
     var isMac = ($.os && $.os.toLowerCase().indexOf('mac') !== -1);
 
     if (isMac) {
-      // ── macOS paths ───────────────────────────────────────────────────────
-      var macLocations = [
-        '/Applications/Prysmor/prysmor-sidecar',
-        Folder.userData.fsName + '/Prysmor/prysmor-sidecar',
-        File($.fileName).parent.parent.fsName + '/prysmor-sidecar',
-      ];
+      // ── macOS: launch via Python (installer copies face_embedding_server.py
+      //           to ~/Library/Prysmor/ and registers a LaunchAgent)
+      var homeDir = Folder.userData.fsName; // e.g. /Users/username
+      // Strip /Library/Application Support suffix if present (userData on some versions returns that)
+      homeDir = homeDir.replace(/\/Library\/Application Support$/, '');
 
-      for (var m = 0; m < macLocations.length; m++) {
-        var mf = new File(macLocations[m]);
+      var pyScript = homeDir + '/Library/Prysmor/face_embedding_server.py';
+      var pyFile   = new File(pyScript);
+
+      if (pyFile.exists) {
+        // Launch detached — nohup ensures it survives after panel reload
+        var cmd = 'nohup python3 "' + pyScript + '" >> /tmp/prysmor-sidecar.log 2>&1 &';
+        app.system.callSystem(cmd);
+        return 'started:' + pyScript;
+      }
+
+      // Fallback: try pre-built executable locations
+      var macBinLocations = [
+        '/Applications/Prysmor/prysmor-sidecar',
+        homeDir + '/Library/Prysmor/prysmor-sidecar',
+      ];
+      for (var m = 0; m < macBinLocations.length; m++) {
+        var mf = new File(macBinLocations[m]);
         if (mf.exists) {
-          // Run detached via nohup so it survives panel reload
-          app.system.callSystem('nohup "' + macLocations[m] + '" > /tmp/prysmor-sidecar.log 2>&1 &');
-          return 'started:' + macLocations[m];
+          app.system.callSystem('nohup "' + macBinLocations[m] + '" >> /tmp/prysmor-sidecar.log 2>&1 &');
+          return 'started:' + macBinLocations[m];
         }
       }
-      return 'error: prysmor-sidecar not found (tried /Applications/Prysmor/ and ~/Prysmor/).';
+      return 'error: face_embedding_server.py not found at ' + pyScript + ' — run the macOS installer first.';
 
     } else {
       // ── Windows paths ─────────────────────────────────────────────────────
