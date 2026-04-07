@@ -17,7 +17,7 @@ export const maxDuration = 30;
  */
 
 import { NextRequest, NextResponse }    from 'next/server';
-import { getJob }                        from '@/lib/motionforge/jobs';
+import { getJob, getJobAny }              from '@/lib/motionforge/jobs';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { generateSceneAwarePrompt }      from '@/lib/motionforge/sceneAnalyzer';
 import { extractFrameAt, probeVideo }    from '@/lib/motionforge/frameExtract';
@@ -39,7 +39,9 @@ export async function POST(
   }
 
   // ── Job lookup ────────────────────────────────────────────────────────────
-  const job = await getJob(params.id);
+  const job = session
+    ? await getJob(session.userId, params.id)
+    : await getJobAny(params.id);
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 
   // Prefer the preserved original (survives generate), fall back to upload copy

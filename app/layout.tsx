@@ -41,25 +41,58 @@ export const metadata: Metadata = {
 
 const clerkAppearance = {
   variables: {
-    colorPrimary: "#A3FF12",
-    colorBackground: "#08080D",
-    colorInputBackground: "#0E0E15",
-    colorInputText: "#ffffff",
-    colorText: "#ffffff",
-    colorTextSecondary: "#8A9BB0",
-    colorNeutral: "#1C1C28",
-    colorDanger: "#FF5555",
-    colorSuccess: "#A3FF12",
-    borderRadius: "14px",
-    fontFamily: "'DM Sans', sans-serif",
-    fontSize: "14px",
+    colorPrimary:         "#A3FF12",
+    colorBackground:      "#09090F",
+    colorInputBackground: "#111118",
+    colorInputText:       "#ffffff",
+    colorText:            "#ffffff",
+    colorTextSecondary:   "#6B7280",
+    colorNeutral:         "#1C1C28",
+    colorDanger:          "#F87171",
+    colorSuccess:         "#A3FF12",
+    borderRadius:         "10px",
+    fontFamily:           "'DM Sans', sans-serif",
+    fontSize:             "14px",
+    spacingUnit:          "16px",
   },
   elements: {
-    card: "shadow-[0_32px_80px_rgba(0,0,0,0.9)] border border-white/[0.08]",
-    socialButtonsBlockButton: "border-white/[0.10] hover:bg-white/[0.05]",
-    dividerLine: "bg-white/[0.07]",
-    formFieldInput: "border-white/[0.10] focus:border-[#A3FF12]/50",
-    footer: "hidden",
+    // Card / modal
+    card:
+      "!bg-[#09090F] shadow-[0_40px_120px_rgba(0,0,0,0.95)] border !border-white/[0.08] !rounded-[18px]",
+    cardBox: "!rounded-[18px]",
+
+    // Header
+    headerTitle:    "!text-white !text-[20px] !font-semibold !tracking-tight",
+    headerSubtitle: "!text-[#6B7280] !text-[13px]",
+
+    // Social buttons styled via globals.css (white bg so Apple/FB/Google all visible)
+
+    // Divider
+    dividerLine:   "!bg-white/[0.07]",
+    dividerText:   "!text-[#4B5563] !text-[11px] !uppercase !tracking-wider",
+
+    // Input fields
+    formFieldLabel:   "!text-[#9CA3AF] !text-[12px] !font-medium",
+    formFieldInput:
+      "!bg-[#111118] !border !border-white/[0.10] focus:!border-[#A3FF12]/50 !text-white !rounded-[9px] !h-[44px]",
+    formFieldInputShowPasswordButton: "!text-[#6B7280] hover:!text-white",
+
+    // Primary action button
+    formButtonPrimary:
+      "!bg-[#A3FF12] !text-[#050505] hover:!bg-[#B6FF3C] !font-bold !rounded-[9px] !h-[44px] !text-[14px] !transition-all",
+
+    // Links
+    formResendCodeLink:        "!text-[#A3FF12] hover:!text-[#B6FF3C]",
+    identityPreviewEditButton: "!text-[#A3FF12] hover:!text-[#B6FF3C]",
+    footerActionLink:          "!text-[#A3FF12] hover:!text-[#B6FF3C]",
+
+    // Footer
+    footer:           "!border-t !border-white/[0.05] !bg-[#09090F]",
+    footerActionText: "!text-[#6B7280] !text-[12px]",
+    footerPages:      "!hidden",
+
+    // Internal badge
+    badge: "!bg-[#A3FF12]/10 !text-[#A3FF12] !border !border-[#A3FF12]/20",
   },
 };
 

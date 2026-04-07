@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
-import { getJob, updateJob }          from '@/lib/motionforge/jobs';
+import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { getRunwayTaskStatus }        from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
@@ -43,10 +43,16 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const job = await getJob(params.id);
+  // Prefer fast subcollection lookup; fall back to collection-group for panel-key auth
+  const job = session
+    ? await getJob(session.userId, params.id)
+    : await getJobAny(params.id);
   if (!job) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 });
   }
+
+  // Resolved userId — used for all subsequent updateJob calls
+  const userId = session?.userId ?? job.userId;
 
   const config = getConfig();
 
@@ -60,7 +66,7 @@ export async function GET(
       warn(TAG, `Compositing timed out for job ${params.id} after ${Math.round(elapsedMs / 1000)}s`);
       const fallbackUrl = job.rawOutputUrl;
       if (fallbackUrl) {
-        await updateJob(params.id, {
+        await updateJob(userId, params.id, {
           status:    'completed',
           outputUrl: fallbackUrl,
           progress:  100,
@@ -68,7 +74,7 @@ export async function GET(
         });
         return NextResponse.json({ status: 'completed', progress: 100, outputUrl: fallbackUrl });
       }
-      await updateJob(params.id, { status: 'failed', error: 'Compositing timed out with no fallback URL' });
+      await updateJob(userId, params.id, { status: 'failed', error: 'Compositing timed out with no fallback URL' });
       if (job.userId && job.creditCost) {
         refundCredits(job.userId, job.creditCost).catch(e =>
           warn(TAG, `Credit refund failed for job ${params.id}`, e),
@@ -122,7 +128,7 @@ export async function GET(
         // Atomically update both polledAt + progress so cached responses are accurate.
         // Do this AFTER getting the response (not before) so failed calls don't
         // eat the 8s window — they'll retry on the next poll.
-        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: progress } as any);
+        await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: progress } as any);
         return NextResponse.json({ status: 'generating', progress });
       }
 
@@ -132,7 +138,7 @@ export async function GET(
         logError(TAG, `Runway task ${job.runwayTaskId} ${taskStatus}`, reason);
         safeUnlink(job.originalVideoPath ?? '');
         cleanupAnchorFrames(job.identityAnchorPaths ?? []);
-        await updateJob(params.id, { status: 'failed', error: reason });
+        await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {
           refundCredits(job.userId, job.creditCost).catch(e =>
             warn(TAG, `Credit refund failed for job ${params.id}`, e),
@@ -145,7 +151,7 @@ export async function GET(
       if (taskStatus === 'SUCCEEDED' && (!task.output || task.output.length === 0)) {
         warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty — retrying next poll`);
         // Mark polledAt so we don't hammer Runway on empty-output retries
-        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: 98 } as any);
+        await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: 98 } as any);
         return NextResponse.json({ status: 'generating', progress: 98 });
       }
 
@@ -170,7 +176,7 @@ export async function GET(
             logError(TAG, `SUCCEEDED but task.output[0] has unrecognised shape — cannot extract URL`, {
               shape: JSON.stringify(rawItem).slice(0, 200),
             });
-            await updateJob(params.id, {
+            await updateJob(userId, params.id, {
               status: 'failed',
               error:  `Runway output shape unrecognised: ${JSON.stringify(rawItem).slice(0, 200)}`,
             });
@@ -180,7 +186,7 @@ export async function GET(
           logError(TAG, `SUCCEEDED but task.output[0] is neither string nor object`, {
             type: typeof rawItem, value: String(rawItem).slice(0, 100),
           });
-          await updateJob(params.id, { status: 'failed', error: `Unexpected output type: ${typeof rawItem}` });
+          await updateJob(userId, params.id, { status: 'failed', error: `Unexpected output type: ${typeof rawItem}` });
           return NextResponse.json({ status: 'failed', error: 'Runway output URL has unexpected type' });
         }
 
@@ -195,12 +201,12 @@ export async function GET(
 
         // Mark polledAt so repeated SUCCEEDED polls don't re-run this block
         // while the Firestore write below is in-flight.
-        await updateJob(params.id, { runwayPolledAt: new Date(), runwayProgress: 100 } as any);
+        await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: 100 } as any);
 
         if (!hasOrig) {
           log(TAG, 'No original clip on disk — skipping compositing, returning raw Runway output');
           try {
-            await updateJob(params.id, {
+            await updateJob(userId, params.id, {
               status:      'completed',
               outputUrl:   rawUrl,
               rawOutputUrl: rawUrl,
@@ -217,7 +223,7 @@ export async function GET(
         }
 
         // Transition to compositing — original clip is on disk (local dev only)
-        await updateJob(params.id, {
+        await updateJob(userId, params.id, {
           status:      'compositing',
           rawOutputUrl: rawUrl,
           progress:    92,
@@ -225,9 +231,9 @@ export async function GET(
 
         const effectType = (job as any).effectType ?? 'overlay';
         try {
-          after(() => runCompositingAsync(params.id, origPath!, rawUrl, job.identityAnchorPaths ?? [], effectType));
+          after(() => runCompositingAsync(userId, params.id, origPath!, rawUrl, job.identityAnchorPaths ?? [], effectType));
         } catch {
-          setImmediate(() => runCompositingAsync(params.id, origPath!, rawUrl, job.identityAnchorPaths ?? [], effectType));
+          setImmediate(() => runCompositingAsync(userId, params.id, origPath!, rawUrl, job.identityAnchorPaths ?? [], effectType));
         }
 
         return NextResponse.json({ status: 'compositing', progress: 92 });
@@ -261,6 +267,7 @@ export async function GET(
 // ─── Async compositing runner ─────────────────────────────────────────────────
 
 async function runCompositingAsync(
+  userId:        string,
   jobId:         string,
   origPath:      string,
   rawUrl:        string,
@@ -314,7 +321,7 @@ async function runCompositingAsync(
         }
       : undefined;
 
-    await updateJob(jobId, {
+    await updateJob(userId, jobId, {
       status:   'completed',
       outputUrl,
       progress: 100,
@@ -354,7 +361,7 @@ async function runCompositingAsync(
 
     // Graceful fallback: use raw Runway output
     try {
-      await updateJob(jobId, {
+      await updateJob(userId, jobId, {
         status:    'completed',
         outputUrl: rawUrl,
         progress:  100,

@@ -46,12 +46,14 @@ export async function createUser(userId: string) {
   const doc = await ref.get();
 
   if (!doc.exists) {
+    // New accounts start INACTIVE with 0 credits.
+    // licenseStatus → 'active' only after a successful payment webhook.
     await ref.set({
       plan:           "starter",
-      licenseStatus:  "active",
-      deviceLimit:    2,
-      credits:        PLAN_CREDITS.starter,
-      creditsTotal:   PLAN_CREDITS.starter,
+      licenseStatus:  "inactive",
+      deviceLimit:    1,
+      credits:        0,
+      creditsTotal:   0,
       createdAt:      new Date(),
     });
   }
@@ -61,6 +63,30 @@ export async function getUser(userId: string): Promise<UserDoc | null> {
   const doc = await db.collection("users").doc(userId).get();
   if (!doc.exists) return null;
   return doc.data() as UserDoc;
+}
+
+/**
+ * Syncs Clerk profile data (email, name) into the Firestore user doc.
+ * Uses set+merge so it's safe to call even if the doc doesn't exist yet.
+ */
+export async function syncUserProfile(
+  userId: string,
+  profile: { email?: string; firstName?: string; lastName?: string },
+): Promise<void> {
+  const displayName = [profile.firstName, profile.lastName]
+    .filter(Boolean)
+    .join(" ") || profile.email?.split("@")[0] || userId.slice(-8);
+
+  await db.collection("users").doc(userId).set(
+    {
+      email:       profile.email       ?? null,
+      firstName:   profile.firstName   ?? null,
+      lastName:    profile.lastName    ?? null,
+      displayName,
+      profileSyncedAt: new Date(),
+    },
+    { merge: true },
+  );
 }
 
 /**
@@ -89,27 +115,15 @@ export async function deductCredits(
     };
 
     if (!doc.exists) {
-      // New user — initialise with Starter plan credits and deduct in one write
-      const cap       = PLAN_CREDITS.starter;
-      const remaining = cap - cost;
-      if (remaining < 0) throwInsufficient(cap);
-      tx.set(ref, {
-        plan:          "starter",
-        licenseStatus: "active",
-        deviceLimit:   2,
-        credits:       remaining,
-        creditsTotal:  cap,
-        createdAt:     new Date(),
-        updatedAt:     new Date(),
-      });
-      return remaining;
+      // User doc missing entirely — treat as inactive with 0 credits
+      throwInsufficient(0);
     }
 
     const data    = doc.data()!;
     const plan    = data.plan ?? "starter";
     const cap     = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
-    // Treat missing credits field as full plan cap
-    const current = typeof data.credits === "number" ? data.credits : cap;
+    // Missing credits field → 0 (never grant free credits implicitly)
+    const current = typeof data.credits === "number" ? data.credits : 0;
 
     if (current < cost) throwInsufficient(current);
 
@@ -142,7 +156,8 @@ export async function refundCredits(
     const data    = doc.data()!;
     const plan    = data.plan ?? "starter";
     const cap     = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
-    const current = typeof data.credits === "number" ? data.credits : cap;
+    // Missing credits field → 0 (same safe default as deductCredits)
+    const current  = typeof data.credits === "number" ? data.credits : 0;
     const restored = Math.min(current + amount, cap);
 
     tx.update(ref, { credits: restored, updatedAt: new Date() });
@@ -150,8 +165,41 @@ export async function refundCredits(
 }
 
 /**
- * Top-ups a user's credits to the plan cap (called on subscription payment).
- * If the user already has more credits than the plan cap, keeps the higher value.
+ * Saves the user's country (from IP geolocation) to Firestore.
+ * Only writes if country is not already set (idempotent).
+ */
+export async function updateUserCountry(
+  userId:      string,
+  country:     string,
+  countryCode: string,
+): Promise<void> {
+  const ref = db.collection("users").doc(userId);
+  const doc = await ref.get();
+  if (!doc.exists) return;
+  const existing = doc.data()?.country;
+  // Don't overwrite an existing value
+  if (existing) return;
+  await ref.update({ country, countryCode, updatedAt: new Date() });
+}
+
+/**
+ * Adds credits to a user's current balance (called on credit top-up purchase).
+ * Unlike topUpCredits, this ACCUMULATES on top of the existing balance.
+ */
+export async function addCredits(userId: string, amount: number): Promise<void> {
+  const ref = db.collection("users").doc(userId);
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) throw new Error(`User ${userId} not found`);
+    const data    = doc.data()!;
+    const current = typeof data.credits === "number" ? data.credits : 0;
+    tx.update(ref, { credits: current + amount, updatedAt: new Date() });
+  });
+}
+
+/**
+ * Resets a user's credits to their plan cap (called on subscription payment/renewal).
+ * Always sets to the plan cap — this is the monthly reset, not an accumulation.
  */
 export async function topUpCredits(
   userId: string,
@@ -171,7 +219,7 @@ export async function topUpCredits(
     await ref.set({
       plan,
       licenseStatus: "active",
-      deviceLimit:   2,
+      deviceLimit:   1,
       credits:       cap,
       creditsTotal:  cap,
       createdAt:     new Date(),

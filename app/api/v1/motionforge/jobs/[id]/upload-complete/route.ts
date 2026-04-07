@@ -2,7 +2,7 @@ export const runtime    = 'nodejs';
 export const maxDuration = 10;
 
 import { NextRequest, NextResponse }  from 'next/server';
-import { getJob, updateJob }          from '@/lib/motionforge/jobs';
+import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { validatePanelToken, validatePanelKey } from '@/lib/motionforge/auth';
 
 export async function POST(
@@ -26,12 +26,16 @@ export async function POST(
     return NextResponse.json({ error: 'Missing or invalid runwayUri' }, { status: 400 });
   }
 
-  const job = await getJob(params.id).catch(() => null);
+  const job = session
+    ? await getJob(session.userId, params.id).catch(() => null)
+    : await getJobAny(params.id).catch(() => null);
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+
+  const userId = session?.userId ?? job.userId;
 
   try {
     // Keep status as 'uploading' — generate route validates this status
-    await updateJob(params.id, {
+    await updateJob(userId, params.id, {
       assetUrl:  runwayUri,
       mediaInSec,
       clipDurSec,

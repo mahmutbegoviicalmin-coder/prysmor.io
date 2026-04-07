@@ -1,401 +1,104 @@
-"use client";
-
+import { currentUser } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
-import {
-  Download, Monitor, ChevronDown, CheckCircle2,
-  AlertTriangle, Terminal, Info,
-  ExternalLink, RotateCcw, Package, Zap, Shield,
-} from "lucide-react";
+import { Lock, Zap, ArrowRight } from "lucide-react";
+import { getUser, PLAN_LABELS, PLAN_CREDITS } from "@/lib/firestore/users";
+import DownloadsContent from "./DownloadsContent";
 
-const PANEL_VERSION = "2.1.0";
+export const metadata = { title: "Download Plugin — Dashboard" };
 
-// ─── Primitives ───────────────────────────────────────────────────────────────
+// ─── Paywall shown to users without an active subscription ───────────────────
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function PaywallGate({ planName }: { planName: string }) {
+  const plans = [
+    { key: "starter",   label: "Starter",   price: "$29/mo",  credits: 1000, seconds: "250s" },
+    { key: "pro",       label: "Pro",        price: "$49/mo",  credits: 2000, seconds: "500s" },
+    { key: "exclusive", label: "Exclusive",  price: "$149/mo", credits: 4000, seconds: "1000s" },
+  ];
+
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">
-      {children}
-    </p>
-  );
-}
-
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-[12px] border border-white/[0.07] bg-[#111113] ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre className="mt-2 rounded-[8px] bg-[#0D0D0F] border border-white/[0.05] px-4 py-3 text-[12px] font-mono text-[#A3FF12] overflow-x-auto whitespace-pre-wrap break-all">
-      {children}
-    </pre>
-  );
-}
-
-function Step({ n, children }: { n: number; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-3">
-      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#A3FF12]/10 border border-[#A3FF12]/20 flex items-center justify-center mt-0.5">
-        <span className="text-[11px] font-bold text-[#A3FF12]">{n}</span>
+    <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[700px]">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-[28px] sm:text-[32px] font-semibold text-white tracking-tight mb-2">
+          Download Plugin
+        </h1>
+        <p className="text-[14px] text-[#6B7280]">
+          Get the Prysmor CEP extension for Adobe Premiere Pro.
+        </p>
       </div>
-      <div className="flex-1 text-[13px] text-[#9CA3AF] leading-relaxed">{children}</div>
-    </div>
-  );
-}
 
-function FeatureRow({ children }: { children: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/70 flex-shrink-0" />
-      <p className="text-[11px] text-[#4B5563]">{children}</p>
-    </div>
-  );
-}
-
-// ─── Accordion ────────────────────────────────────────────────────────────────
-
-function Accordion({
-  title, icon: Icon, badge, children, defaultOpen = false,
-}: {
-  title: string; icon: React.ElementType; badge?: string;
-  children: React.ReactNode; defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="border border-white/[0.07] rounded-[10px] overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-[#111113] hover:bg-white/[0.02] transition-colors text-left"
-      >
-        <div className="flex items-center gap-2.5">
-          <Icon className="w-4 h-4 text-[#6B7280] flex-shrink-0" />
-          <span className="text-[13px] font-medium text-[#D1D5DB]">{title}</span>
-          {badge && (
-            <span className="px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.07] text-[10px] text-[#6B7280]">
-              {badge}
-            </span>
-          )}
+      {/* Lock card */}
+      <div className="rounded-[16px] border border-white/[0.08] bg-[#111113] p-8 mb-8 flex flex-col items-center text-center">
+        <div className="w-14 h-14 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center mb-5">
+          <Lock className="w-6 h-6 text-[#4B5563]" />
         </div>
-        <ChevronDown className={`w-4 h-4 text-[#4B5563] transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="px-4 pb-4 pt-1 bg-[#0D0D0F] border-t border-white/[0.05] space-y-3">
-          {children}
-        </div>
-      )}
+        <h2 className="text-[18px] font-semibold text-white mb-2">
+          Active plan required
+        </h2>
+        <p className="text-[13px] text-[#6B7280] max-w-[380px] leading-relaxed mb-6">
+          The Prysmor panel download is available to subscribers. Choose a plan below
+          to get instant access to the plugin, AI VFX generation, and Identity Lock.
+        </p>
+        <Link
+          href="/#pricing"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
+        >
+          <Zap className="w-4 h-4" />
+          View plans
+        </Link>
+      </div>
+
+      {/* Plan cards */}
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">
+        Choose a plan
+      </p>
+      <div className="grid sm:grid-cols-3 gap-3 mb-6">
+        {plans.map((p) => (
+          <Link
+            key={p.key}
+            href={`/checkout?plan=${p.key}&billing=monthly`}
+            className="group flex flex-col gap-2 p-4 rounded-[12px] border border-white/[0.07] bg-[#0E0E13] hover:border-[#A3FF12]/30 hover:bg-[#A3FF12]/[0.03] transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-semibold text-white">{p.label}</span>
+              <span className="text-[12px] font-bold text-[#A3FF12]">{p.price}</span>
+            </div>
+            <div className="text-[11px] text-[#4B5563] space-y-0.5">
+              <p>{p.credits.toLocaleString()} credits / mo</p>
+              <p>≈ {p.seconds} of AI VFX</p>
+            </div>
+            <div className="mt-1 flex items-center gap-1 text-[11px] text-[#A3FF12] group-hover:gap-2 transition-all">
+              Subscribe <ArrowRight className="w-3 h-3" />
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <p className="text-[11px] text-[#374151] text-center">
+        Already subscribed?{" "}
+        <Link href="/dashboard/billing" className="text-[#6B7280] hover:text-white transition-colors underline underline-offset-2">
+          Check your billing status
+        </Link>
+      </p>
     </div>
-  );
-}
-
-// ─── MacOS Icon ───────────────────────────────────────────────────────────────
-
-function MacIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-    </svg>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function DownloadsPage() {
-  return (
-    <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[820px]">
+export default async function DownloadsPage() {
+  const user = await currentUser();
+  if (!user) redirect("/sign-in");
 
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#A3FF12]/[0.08] border border-[#A3FF12]/20 text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">
-            <Zap className="w-3 h-3" />
-            v{PANEL_VERSION}
-          </span>
-        </div>
-        <h1 className="text-[28px] sm:text-[34px] font-semibold text-white tracking-tight leading-tight mb-1.5">
-          Download Premiere Panel
-        </h1>
-        <p className="text-[14px] text-[#6B7280] leading-relaxed max-w-[560px]">
-          Install the Prysmor CEP extension into Adobe Premiere Pro.
-          Includes the Identity Lock engine — AI-generated effects with your face preserved automatically.
-        </p>
-      </div>
+  const userDoc       = await getUser(user.id).catch(() => null);
+  const licenseStatus = userDoc?.licenseStatus ?? "inactive";
+  const plan          = userDoc?.plan ?? "starter";
+  const planName      = PLAN_LABELS[plan] ?? "Starter";
 
-      {/* ── WINDOWS INSTALLER ── */}
-      <SectionLabel>Windows Installer (.exe)</SectionLabel>
-      <Card className="p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-[10px] bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0">
-            <Package className="w-6 h-6 text-[#A3FF12]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-[15px] font-semibold text-white">Prysmor Panel for Windows</p>
-              <span className="px-2 py-0.5 rounded-full bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 text-[10px] font-bold text-[#A3FF12]">
-                v{PANEL_VERSION}
-              </span>
-            </div>
-            <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              One-click installer — sets up the CEP panel, installs the Identity Lock engine,
-              and registers it to start automatically with Windows. No configuration needed.
-            </p>
+  if (licenseStatus !== "active") {
+    return <PaywallGate planName={planName} />;
+  }
 
-            <a
-              href="/downloads/PrysmorPanelSetup.exe"
-              download="PrysmorPanelSetup.exe"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download for Windows
-            </a>
-
-            <p className="mt-3 text-[11px] text-[#4B5563] leading-relaxed">
-              After installing: restart Premiere Pro → Window → Extensions → Prysmor
-            </p>
-
-            <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
-              {[
-                "One-click setup — no manual steps required",
-                "CEP panel installed to correct Premiere Pro folder automatically",
-                "Identity Lock engine (prysmor-sidecar.exe) installed to C:\\Program Files\\Prysmor\\",
-                "Sidecar registered in Windows Startup — starts automatically on login",
-                "PlayerDebugMode set for CSXS.10, 11, 12, 13 automatically",
-                "CEP caches cleared — panel loads immediately on next Premiere launch",
-              ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
-          {["Windows 10 / 11", "Premiere Pro 2022–2025", "CEP 11, 12, 13", "No admin rights needed"].map((tag) => (
-            <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
-              <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
-              {tag}
-            </span>
-          ))}
-        </div>
-      </Card>
-
-      {/* ── MAC INSTALLER ── */}
-      <SectionLabel>macOS Installer (.command)</SectionLabel>
-      <Card className="p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-[10px] bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0">
-            <MacIcon className="w-6 h-6 text-[#A3FF12]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-[15px] font-semibold text-white">Prysmor Panel for macOS</p>
-              <span className="px-2 py-0.5 rounded-full bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 text-[10px] font-bold text-[#A3FF12]">
-                v{PANEL_VERSION}
-              </span>
-            </div>
-            <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              Standard macOS installer — double-click the{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>
-              {" "}file and follow the wizard. Everything installs automatically — no manual steps, no Terminal.
-            </p>
-
-            <a
-              href="/downloads/PrysmorPanelSetup.pkg"
-              download="PrysmorPanelSetup.pkg"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download for macOS
-            </a>
-
-            <p className="mt-3 text-[11px] text-[#4B5563] leading-relaxed">
-              After installing: restart Premiere Pro → Window → Extensions → Prysmor
-            </p>
-
-            <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
-              {[
-                "Standard .pkg installer — Next, Next, Install, Done",
-                "CEP panel installed automatically to correct Premiere Pro folder",
-                "Identity Lock engine installed and configured automatically",
-                "AI dependencies install silently in background (~5–10 min, first install only)",
-                "Login item created — Identity Lock starts automatically on every login",
-                "PlayerDebugMode set for CSXS.10, 11, 12, 13 — CEP caches cleared",
-              ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
-          {["macOS 10.15+", "Premiere Pro 2020–2025", "CEP 10, 11, 12", "Python 3 required (pre-installed on most Macs)"].map((tag) => (
-            <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
-              <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
-              {tag}
-            </span>
-          ))}
-        </div>
-      </Card>
-
-      {/* ── macOS Gatekeeper note ── */}
-      <div className="mb-8 rounded-[10px] border border-[#F59E0B]/20 bg-[#F59E0B]/[0.04] px-4 py-3.5">
-        <div className="flex gap-2.5">
-          <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-[12px] font-semibold text-[#D1D5DB] mb-1">macOS Gatekeeper — first run</p>
-            <p className="text-[11px] text-[#6B7280] leading-relaxed">
-              If macOS shows &quot;cannot be opened because it is from an unidentified developer&quot;:{" "}
-              <strong className="text-[#9CA3AF]">right-click the .pkg → Open</strong>, then click{" "}
-              <strong className="text-[#9CA3AF]">&quot;Open&quot;</strong> in the dialog.
-              Alternatively: <strong className="text-[#9CA3AF]">System Settings → Privacy &amp; Security → Open Anyway</strong>.
-              You only need to do this once.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Identity Lock info ── */}
-      <SectionLabel>Identity Lock Engine</SectionLabel>
-      <Card className="p-5 mb-8">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-[8px] bg-[#A3FF12]/[0.08] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Shield className="w-4 h-4 text-[#A3FF12]" />
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold text-white mb-1.5">
-              What is the Identity Lock engine?
-            </p>
-            <p className="text-[12px] text-[#6B7280] leading-relaxed mb-3">
-              A local AI process that runs on your machine alongside Premiere Pro.
-              After Runway generates the VFX output, Identity Lock compares the original
-              and generated faces using <strong className="text-[#9CA3AF]">InsightFace</strong> embeddings,
-              then composites the original face back if drift is detected — preserving your subject&apos;s identity exactly.
-            </p>
-            <div className="grid sm:grid-cols-3 gap-2">
-              {[
-                ["Face Analysis", "InsightFace buffalo_sc"],
-                ["Compositing", "Per-frame OpenCV blend"],
-                ["Runs on", "Your local machine"],
-              ].map(([k, v]) => (
-                <div key={k} className="rounded-[7px] bg-[#0D0D0F] border border-white/[0.05] px-3 py-2">
-                  <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>
-                  <p className="text-[12px] font-medium text-[#D1D5DB]">{v}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[11px] text-[#4B5563]">
-              The engine runs silently in the background. If unavailable, the panel falls back
-              to the raw Runway output — generation still works normally.
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* ── Troubleshooting ── */}
-      <SectionLabel>Troubleshooting</SectionLabel>
-      <div className="space-y-2.5 mb-8">
-
-        <Accordion title="Panel not visible in Window → Extensions" icon={AlertTriangle}>
-          <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
-            {[
-              <>Confirm <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">PlayerDebugMode = 1</code> is set for the correct CSXS version. Premiere 2022+ uses CSXS.11. The installer sets all versions automatically.</>,
-              <>The folder inside extensions must be named exactly <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">prysmor-panel</code>.</>,
-              <>Fully <strong className="text-[#D1D5DB]">quit and relaunch</strong> Premiere Pro after installation.</>,
-              <>Check that <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">CSXS/manifest.xml</code> is present inside the extension folder.</>,
-            ].map((s, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
-        </Accordion>
-
-        <Accordion title="Identity Lock not activating" icon={AlertTriangle}>
-          <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
-            {[
-              <>Windows: check that <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">C:\Program Files\Prysmor\prysmor-sidecar.exe</code> exists. Re-run the installer if missing.</>,
-              <>macOS: open Terminal and run <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">curl localhost:7788/health</code> — if no response, run the installer again to re-install the LaunchAgent.</>,
-              <>The panel shows a timer during Identity Lock (e.g. <em>Applying Identity Lock… 45s</em>). If this step is skipped, the engine is not running — but generation still completes with the raw Runway output.</>,
-              <>Check <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">/tmp/prysmor-sidecar.log</code> (macOS) for error details.</>,
-            ].map((s, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
-        </Accordion>
-
-        <Accordion title="macOS: pip3 install fails during setup" icon={AlertTriangle}>
-          <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
-            {[
-              <>Install Python 3 from <a href="https://python.org" className="text-[#A3FF12] underline" target="_blank">python.org</a> or via Homebrew: <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">brew install python</code></>,
-              <>Re-run the installer after Python is available — it will retry the pip install step.</>,
-              <>Panel works without Identity Lock — generation and Premiere insert still function normally.</>,
-            ].map((s, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
-        </Accordion>
-
-        <Accordion title="CEP version compatibility" icon={Info}>
-          <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr>
-                    <th className="text-[11px] font-semibold text-[#6B7280] pb-2 pr-6">Premiere Pro</th>
-                    <th className="text-[11px] font-semibold text-[#6B7280] pb-2 pr-6">CEP</th>
-                    <th className="text-[11px] font-semibold text-[#6B7280] pb-2">Key</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.04]">
-                  {[
-                    ["2020–2021 (v14–15)", "CEP 10", "CSXS.10"],
-                    ["2022–2024 (v22–24)", "CEP 11", "CSXS.11"],
-                    ["2025 (v25)", "CEP 12", "CSXS.12"],
-                  ].map(([v, cep, key]) => (
-                    <tr key={v}>
-                      <td className="py-2 pr-6 text-[#D1D5DB]">{v}</td>
-                      <td className="py-2 pr-6">{cep}</td>
-                      <td className="py-2 font-mono text-[#A3FF12]/80">{key}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Accordion>
-
-        <Accordion title="Windows: verify installation" icon={Terminal}>
-          <div className="space-y-3 pt-2">
-            <p className="text-[12px] text-[#9CA3AF]">
-              Run this PowerShell script to verify the extension folder, registry keys, and sidecar:
-            </p>
-            <CodeBlock>{"powershell -ExecutionPolicy Bypass -File installer\\windows\\verify.ps1"}</CodeBlock>
-          </div>
-        </Accordion>
-
-      </div>
-
-      {/* Footer links */}
-      <div className="flex flex-wrap gap-3">
-        <Link href="/dashboard/docs" className="flex items-center gap-1.5 text-[12px] text-[#6B7280] hover:text-[#D1D5DB] transition-colors">
-          <ExternalLink className="w-3.5 h-3.5" />
-          Full documentation
-        </Link>
-        <Link href="/docs/install-panel" className="flex items-center gap-1.5 text-[12px] text-[#6B7280] hover:text-[#D1D5DB] transition-colors">
-          <ExternalLink className="w-3.5 h-3.5" />
-          Public install guide
-        </Link>
-        <Link href="/dashboard" className="flex items-center gap-1.5 text-[12px] text-[#6B7280] hover:text-[#D1D5DB] transition-colors">
-          <RotateCcw className="w-3.5 h-3.5" />
-          Back to Overview
-        </Link>
-      </div>
-
-    </div>
-  );
+  return <DownloadsContent />;
 }

@@ -11,6 +11,13 @@ export interface DeviceDoc {
   name?: string;
 }
 
+export class DeviceLimitError extends Error {
+  code = "device_limit_reached";
+  constructor(public limit: number) {
+    super(`Device limit reached (${limit}). Sign out from the Prysmor panel on your current device first.`);
+  }
+}
+
 export async function registerDevice(
   userId: string,
   deviceId: string,
@@ -22,15 +29,26 @@ export async function registerDevice(
     cepVersion?: string;
   }
 ) {
-  const ref = db
-    .collection("users")
-    .doc(userId)
-    .collection("devices")
-    .doc(deviceId);
+  const userRef   = db.collection("users").doc(userId);
+  const deviceRef = userRef.collection("devices").doc(deviceId);
 
-  const existing = await ref.get();
+  const [existing, devicesSnap, userSnap] = await Promise.all([
+    deviceRef.get(),
+    userRef.collection("devices").get(),
+    userRef.get(),
+  ]);
 
-  await ref.set(
+  // Enforce limit only for brand-new devices (not heartbeat/reconnect)
+  if (!existing.exists) {
+    const limit: number = userSnap.exists
+      ? (userSnap.data()?.deviceLimit ?? 1)
+      : 1;
+    if (devicesSnap.size >= limit) {
+      throw new DeviceLimitError(limit);
+    }
+  }
+
+  await deviceRef.set(
     {
       platform,
       name: name ?? deviceId,

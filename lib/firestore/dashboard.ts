@@ -120,33 +120,30 @@ export async function getDashboardData(
     getUser(userId),
     getDevices(userId),
     db
-      .collection("motionforge_jobs")
-      .where("userId", "==", userId)
+      .collection("users")
+      .doc(userId)
+      .collection("jobs")
+      .orderBy("createdAt", "desc")
       .limit(200)
       .get(),
   ]);
 
+  // Already ordered by createdAt desc from the query
+  const sortedJobs = jobsSnap.docs;
   const cycleStartMs = cycleStart().getTime();
-  const sortedJobs = [...jobsSnap.docs].sort(
-    (a, b) => tsToDate(b.data().createdAt).getTime() - tsToDate(a.data().createdAt).getTime()
-  );
   const thisMonthJobs = sortedJobs.filter(
     (d) => tsToDate(d.data().createdAt).getTime() >= cycleStartMs
   );
 
   // ── License ────────────────────────────────────────────────────────────────
-  const plan = userDoc?.plan ?? "starter";
-  const planLabel = PLAN_LABELS[plan] ?? plan;
-  const licenseStatus = userDoc?.licenseStatus ?? "active";
+  const plan          = userDoc?.plan          ?? "starter";
+  const planLabel     = PLAN_LABELS[plan]      ?? plan;
+  // IMPORTANT: default must be "inactive" — never grant free access to users
+  // whose Firestore doc hasn't been created yet (e.g. Clerk webhook delay).
+  const licenseStatus = userDoc?.licenseStatus ?? "inactive";
 
-  // Renewal date: stored in Firestore or derived as end of current month
-  let renewalDate = userDoc?.renewalDate ?? "";
-  if (!renewalDate) {
-    const endOfMonth = new Date();
-    endOfMonth.setMonth(endOfMonth.getMonth() + 1, 1);
-    endOfMonth.setDate(0);
-    renewalDate = formatDate(endOfMonth);
-  }
+  // Only show a renewal date if there's an active subscription
+  const renewalDate = userDoc?.renewalDate ?? "";
 
   const license: DashboardLicense = {
     planName: planLabel,
@@ -203,9 +200,9 @@ export async function getDashboardData(
   }
 
   // ── Usage / Limits ─────────────────────────────────────────────────────────
-  const planCap      = PLAN_CREDITS[plan] ?? 1000;
-  const credits      = typeof userDoc?.credits      === "number" ? userDoc.credits      : planCap;
-  const creditsTotal = typeof userDoc?.creditsTotal === "number" ? userDoc.creditsTotal : planCap;
+  // Default to 0 — never show phantom credits to users without an active plan.
+  const credits      = typeof userDoc?.credits      === "number" ? userDoc.credits      : 0;
+  const creditsTotal = typeof userDoc?.creditsTotal === "number" ? userDoc.creditsTotal : 0;
 
   const resetAt = new Date();
   resetAt.setMonth(resetAt.getMonth() + 1, 1);
@@ -215,7 +212,7 @@ export async function getDashboardData(
     credits,
     creditsTotal,
     devicesUsed: devices.length,
-    deviceLimit: userDoc?.deviceLimit ?? 2,
+    deviceLimit: userDoc?.deviceLimit ?? 1,
     resetDate: formatDate(resetAt),
   };
 

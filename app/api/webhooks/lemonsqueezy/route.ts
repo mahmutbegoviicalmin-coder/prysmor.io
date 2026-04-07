@@ -1,8 +1,8 @@
 import crypto                        from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
-import { VARIANT_TO_PLAN }           from '@/lib/lemonsqueezy';
-import { topUpCredits }              from '@/lib/firestore/users';
+import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
+import { topUpCredits, addCredits }  from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
@@ -18,28 +18,50 @@ function verifySignature(rawBody: string, signature: string, secret: string): bo
   }
 }
 
+/** Format an ISO date string from LS into "Month Day, Year" for display.
+ *  LemonSqueezy sends .NET-style 7-digit fractional seconds (e.g. .0000000Z).
+ *  We normalize to 3-digit millis before parsing. */
+function formatLsDate(iso: string | undefined): string | undefined {
+  if (!iso) return undefined;
+  try {
+    // Normalize .NET 7-digit fractional seconds → 3-digit millis
+    const normalized = iso.replace(/\.(\d{7})Z$/, (_, frac) => `.${frac.slice(0, 3)}Z`);
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 async function setUserPlan(
   userId: string,
   plan: string,
-  status: 'active' | 'inactive' | 'cancelled',
+  status: 'active' | 'inactive',
   subscriptionId?: string,
   renewalDate?: string,
+  extra?: Record<string, unknown>,
 ) {
   const ref = db.collection('users').doc(userId);
   const doc = await ref.get();
 
   const data: Record<string, unknown> = {
     plan,
-    licenseStatus: status,
-    updatedAt:     new Date(),
+    licenseStatus:  status,
+    deviceLimit:    1,        // enforce 1 device seat on every plan activation
+    updatedAt:      new Date(),
+    ...extra,
   };
   if (subscriptionId) data.lsSubscriptionId = subscriptionId;
-  if (renewalDate)    data.renewalDate = renewalDate;
+  // Store as human-readable string, not raw ISO
+  if (renewalDate) data.renewalDate = formatLsDate(renewalDate) ?? renewalDate;
 
   if (doc.exists) {
     await ref.update(data);
   } else {
-    await ref.set({ ...data, deviceLimit: 2, createdAt: new Date() });
+    await ref.set({ ...data, createdAt: new Date() });
   }
 
   console.log(`[ls-webhook] userId=${userId} → plan=${plan} status=${status}`);
@@ -82,10 +104,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const variantId      = String((attrs?.first_subscription_item as Record<string, unknown>)?.variant_id ?? '');
+  // Subscription events: variant_id lives directly on attrs (first_subscription_item has price_id, not variant_id)
+  // Order events: variant_id is on first_order_item or order_items[0]
+  const subItem        = attrs?.first_subscription_item as Record<string, unknown> | undefined;
+  const orderItem      = (attrs?.first_order_item as Record<string, unknown> | undefined)
+                      ?? ((attrs?.order_items as unknown[])?.[0] as Record<string, unknown> | undefined);
+  const variantId      = String(
+    attrs?.variant_id         // subscription_created / subscription_payment_success (direct on attrs)
+    ?? subItem?.variant_id    // fallback
+    ?? orderItem?.variant_id  // order events
+    ?? ''
+  );
   const subscriptionId = String(data?.id ?? '');
   const plan           = VARIANT_TO_PLAN[variantId] ?? 'starter';
   const renewsAt       = attrs?.renews_at as string | undefined;
+
+  // Log variant ID to help debug plan mapping issues
+  console.log(`[ls-webhook] variantId="${variantId}" → plan="${plan}" (mapped=${variantId in VARIANT_TO_PLAN})`);
 
   try {
     switch (eventName) {
@@ -116,23 +151,56 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'subscription_cancelled':
-        // Still active until end of billing period — keep credits, mark cancelled
-        await db.collection('users').doc(userId).update({
-          licenseStatus: 'inactive',
-          lsCancelledAt: new Date(),
-          updatedAt:     new Date(),
-        });
+        // User cancelled but keeps access until end of billing period.
+        // Do NOT revoke here — subscription_expired fires when access truly ends.
+        // Use set+merge so this is safe even if the user doc doesn't exist yet.
+        await db.collection('users').doc(userId).set({
+          lsCancelledAt:    new Date(),
+          lsCancellationAt: renewsAt ?? null,
+          updatedAt:        new Date(),
+        }, { merge: true });
+        console.log(`[ls-webhook] subscription cancelled, access valid until: ${renewsAt}`);
         break;
 
       case 'subscription_expired':
-        // Access fully ended — zero out credits, downgrade
-        await setUserPlan(userId, 'starter', 'inactive', subscriptionId);
-        await db.collection('users').doc(userId).update({
+        // Billing period ended — revoke access, zero credits, downgrade to free.
+        // All fields written atomically in one setUserPlan call via `extra`.
+        await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
           credits:      0,
           creditsTotal: 0,
-          updatedAt:    new Date(),
+          renewalDate:  null,
         });
+        console.log(`[ls-webhook] subscription expired, access revoked: userId=${userId}`);
         break;
+
+      case 'subscription_paused':
+        // Plan is paused (e.g. payment failure grace period ended)
+        await db.collection('users').doc(userId).set({
+          licenseStatus: 'inactive',
+          lsPausedAt:    new Date(),
+          updatedAt:     new Date(),
+        }, { merge: true });
+        console.log(`[ls-webhook] subscription paused: userId=${userId}`);
+        break;
+
+      case 'order_created': {
+        // One-time credit top-up purchase
+        const orderStatus = attrs?.status as string | undefined;
+        if (orderStatus !== 'paid') {
+          console.log(`[ls-webhook] order_created skipped — status=${orderStatus}`);
+          break;
+        }
+        // pack_id is embedded in custom_data when the checkout URL was built
+        const packId       = customData?.pack_id;
+        const creditsToAdd = packId ? CREDIT_PACK_ID_TO_CREDITS[packId] : undefined;
+        if (!creditsToAdd) {
+          console.warn(`[ls-webhook] order_created — unknown pack_id "${packId}", no credits added`);
+          break;
+        }
+        await addCredits(userId, creditsToAdd);
+        console.log(`[ls-webhook] +${creditsToAdd} credits added: userId=${userId} pack=${packId}`);
+        break;
+      }
 
       default:
         console.log(`[ls-webhook] Unhandled event: ${eventName}`);

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs";
 import { db } from "@/lib/firebaseAdmin";
-import { getUser, PLAN_LABELS } from "@/lib/firestore/users";
-import { registerDevice } from "@/lib/firestore/devices";
+import { getUser, PLAN_LABELS, syncUserProfile } from "@/lib/firestore/users";
+import { registerDevice, DeviceLimitError } from "@/lib/firestore/devices";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -41,8 +41,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Code expired" }, { status: 410 });
   }
 
-  // Fetch user plan
+  // Sync Clerk profile → Firestore (name, email) — fire-and-forget
+  syncUserProfile(user.id, {
+    email:     user.primaryEmailAddress?.emailAddress,
+    firstName: user.firstName ?? undefined,
+    lastName:  user.lastName  ?? undefined,
+  }).catch(() => {});
+
+  // Fetch user plan + verify active subscription
   const userDoc = await getUser(user.id);
+  const licenseStatus = userDoc?.licenseStatus ?? "inactive";
+
+  if (licenseStatus !== "active") {
+    return NextResponse.json(
+      {
+        error:   "subscription_required",
+        message: "An active Prysmor subscription is required to connect the panel. Visit prysmor.io/dashboard/billing to subscribe.",
+      },
+      { status: 403 }
+    );
+  }
+
   const plan = userDoc?.plan ?? "starter";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
@@ -72,11 +91,25 @@ export async function POST(req: NextRequest) {
 
   // Device ID already computed above for session storage
 
-  await registerDevice(user.id, deviceId, platform, deviceName, {
-    hostApp,
-    hostAppVersion,
-    cepVersion,
-  });
+  try {
+    await registerDevice(user.id, deviceId, platform, deviceName, {
+      hostApp,
+      hostAppVersion,
+      cepVersion,
+    });
+  } catch (err) {
+    if (err instanceof DeviceLimitError) {
+      return NextResponse.json(
+        {
+          error:   "device_limit_reached",
+          message: err.message,
+          limit:   err.limit,
+        },
+        { status: 403 }
+      );
+    }
+    throw err;
+  }
 
   // Mark code as authorized
   await codeRef.update({

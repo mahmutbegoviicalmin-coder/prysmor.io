@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle2, WifiOff, Wifi, ShieldCheck, ShieldAlert,
-  ChevronRight, Clock, Download,
+  ChevronRight, Clock, Zap, Lock,
 } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";
 
@@ -85,29 +85,31 @@ export default async function DashboardOverviewPage() {
         </p>
       </div>
 
-      {/* ── Download Panel Banner ── */}
-      <Link
-        href="/dashboard/downloads"
-        className="group mb-8 flex items-center justify-between rounded-[12px] border border-[#A3FF12]/15 bg-[#A3FF12]/[0.04] px-5 py-4 hover:border-[#A3FF12]/25 hover:bg-[#A3FF12]/[0.06] transition-all"
-      >
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 w-8 h-8 rounded-[8px] bg-[#A3FF12]/10 border border-[#A3FF12]/20 flex items-center justify-center flex-shrink-0">
-            <Download className="w-4 h-4 text-[#A3FF12]" />
+      {/* ── No plan banner ── */}
+      {license.status !== "active" && (
+        <div className="mb-8 rounded-[14px] border border-[#A3FF12]/20 bg-gradient-to-r from-[#A3FF12]/[0.06] to-transparent p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-[10px] bg-[#A3FF12]/10 border border-[#A3FF12]/20 flex items-center justify-center flex-shrink-0">
+              <Lock className="w-5 h-5 text-[#A3FF12]" />
+            </div>
+            <div>
+              <p className="text-[15px] font-semibold text-white mb-0.5">
+                Activate your plan to get started
+              </p>
+              <p className="text-[13px] text-[#6B7280] max-w-[420px] leading-relaxed">
+                Subscribe to unlock the Prysmor Premiere panel, AI VFX generation, and Identity Lock. No device connected until you have an active plan.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-[14px] font-semibold text-white mb-0.5">
-              Premiere Pro Panel — Demo Ready
-            </p>
-            <p className="text-[12px] text-[#6B7280]">
-              Download the CEP extension for Windows or macOS and test locally. No API key required.
-            </p>
-          </div>
+          <Link
+            href="/#pricing"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors whitespace-nowrap"
+          >
+            <Zap className="w-4 h-4" />
+            Buy a plan
+          </Link>
         </div>
-        <div className="flex-shrink-0 ml-4 flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] bg-[#A3FF12] text-[#050505] text-[12px] font-bold group-hover:bg-[#B6FF3C] transition-colors whitespace-nowrap">
-          Download Panel
-          <ChevronRight className="w-3.5 h-3.5" />
-        </div>
-      </Link>
+      )}
 
       {/* ── Primary row ── */}
       <SectionLabel>Status</SectionLabel>
@@ -160,9 +162,9 @@ export default async function DashboardOverviewPage() {
             <DataRow label="First connected" value={panel.firstConnectedAt} />
             <DataRow label="Last active"  value={panel.lastActiveAt} />
           </div>
-          <Link href="/dashboard/plugin"
+          <Link href="/dashboard/downloads"
             className="mt-4 inline-flex items-center justify-center w-full gap-2 px-4 py-2 rounded-[8px] bg-[#A3FF12] text-[#050505] text-[12px] font-semibold hover:bg-[#B6FF3C] transition-colors">
-            {panel.connected ? "Manage Panel" : "Install Panel"}
+            {panel.connected ? "Manage Panel" : "Download Plugin"}
           </Link>
         </Card>
 
@@ -302,8 +304,7 @@ export default async function DashboardOverviewPage() {
       <SectionLabel>Quick access</SectionLabel>
       <div className="flex flex-wrap gap-2">
         {[
-          { label: "Download Panel",    href: "/dashboard/downloads" },
-          { label: "Install Panel",     href: "/dashboard/plugin" },
+          { label: "Download Plugin",   href: "/dashboard/downloads" },
           { label: "Connected Devices", href: "/dashboard/devices" },
           { label: "Billing",           href: "/dashboard/billing" },
           { label: "Documentation",     href: "/dashboard/docs" },

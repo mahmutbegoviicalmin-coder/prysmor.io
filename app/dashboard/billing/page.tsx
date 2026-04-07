@@ -1,8 +1,10 @@
 import { auth }        from '@clerk/nextjs/server';
-import { CreditCard }  from 'lucide-react';
+import { CreditCard, CheckCircle2, AlertTriangle, XCircle }  from 'lucide-react';
 import Link            from 'next/link';
 import { db }          from '@/lib/firebaseAdmin';
 import { PLAN_LABELS, PLAN_CREDITS } from '@/lib/firestore/users';
+import { getCustomerPortalUrl } from '@/lib/lemonsqueezy';
+import { TopUpButton } from './TopUpButton';
 
 export const metadata = { title: 'Billing — Dashboard' };
 
@@ -46,7 +48,11 @@ function CreditsBar({ credits, total }: { credits: number; total: number }) {
   );
 }
 
-export default async function BillingPage() {
+interface PageProps {
+  searchParams: { upgraded?: string; error?: string; topup?: string };
+}
+
+export default async function BillingPage({ searchParams }: PageProps) {
   const { userId } = await auth();
   const userDoc = userId ? await getUserDoc(userId).catch(() => null) : null;
 
@@ -57,8 +63,18 @@ export default async function BillingPage() {
   const renewalDate   = userDoc?.renewalDate;
   const isActive      = licenseStatus === 'active';
 
-  const credits      = typeof userDoc?.credits      === 'number' ? userDoc.credits      : planCap;
-  const creditsTotal = typeof userDoc?.creditsTotal === 'number' ? userDoc.creditsTotal : planCap;
+  // Default to 0 — never show phantom credits to unsubscribed users
+  const credits      = typeof userDoc?.credits      === 'number' ? userDoc.credits      : 0;
+  const creditsTotal = typeof userDoc?.creditsTotal === 'number' ? userDoc.creditsTotal : 0;
+
+  // Resolve Lemon Squeezy customer portal URL
+  const portalUrl = userDoc?.lsSubscriptionId
+    ? await getCustomerPortalUrl(userDoc.lsSubscriptionId).catch(() => null)
+    : null;
+
+  const showUpgraded = searchParams.upgraded === 'true';
+  const showTopUp    = searchParams.topup    === 'true';
+  const showError    = searchParams.error;
 
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[800px]">
@@ -66,6 +82,61 @@ export default async function BillingPage() {
         <h1 className="text-[28px] font-semibold text-white tracking-tight mb-1.5">Billing</h1>
         <p className="text-[14px] text-[#6B7280]">Plan details, credits, and usage.</p>
       </div>
+
+      {/* ── Success banner (plan upgrade) ── */}
+      {showUpgraded && (
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#A3FF12]/20 bg-[#A3FF12]/[0.06] px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-[#A3FF12] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-semibold text-[#A3FF12]">Payment received — thank you!</p>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">
+              Your plan is being activated. If it doesn&apos;t appear as active within 30 seconds,{' '}
+              <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
+                refresh this page
+              </a>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Success banner (credit top-up) ── */}
+      {showTopUp && (
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#A3FF12]/20 bg-[#A3FF12]/[0.06] px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-[#A3FF12] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-semibold text-[#A3FF12]">Credits added — thank you!</p>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">
+              Your credits are being added. If your balance doesn&apos;t update within 30 seconds,{' '}
+              <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
+                refresh this page
+              </a>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Error banner ── */}
+      {showError === 'checkout_failed' && (
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#F87171]/20 bg-[#F87171]/[0.06] px-4 py-3">
+          <XCircle className="w-4 h-4 text-[#F87171] flex-shrink-0 mt-0.5" />
+          <p className="text-[13px] text-[#F87171]">
+            Checkout failed. Please try again or contact support.
+          </p>
+        </div>
+      )}
+
+      {/* ── Inactive subscription warning ── */}
+      {!isActive && (
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#F59E0B]/20 bg-[#F59E0B]/[0.06] px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-semibold text-[#F59E0B]">Subscription inactive</p>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">
+              VFX generation is disabled. Renew your plan to restore access.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Current plan */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Current plan</p>
@@ -91,15 +162,22 @@ export default async function BillingPage() {
           </span>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {isActive && userDoc?.lsSubscriptionId ? (
+          {portalUrl ? (
             <a
-              href="https://app.lemonsqueezy.com/my-orders"
+              href={portalUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="px-3.5 py-2 rounded-[8px] text-[12px] font-medium border border-white/[0.08] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
             >
               Manage subscription ↗
             </a>
+          ) : !isActive ? (
+            <Link
+              href="/#pricing"
+              className="px-3.5 py-2 rounded-[8px] text-[12px] font-semibold bg-[#A3FF12] text-[#050505] hover:bg-[#B6FF3C] transition-colors"
+            >
+              Subscribe now →
+            </Link>
           ) : null}
           <Link
             href="/#pricing"
@@ -111,7 +189,10 @@ export default async function BillingPage() {
       </div>
 
       {/* Credits */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3 mt-8">Credits</p>
+      <div className="flex items-center justify-between mt-8 mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151]">Credits</p>
+        {isActive && <TopUpButton />}
+      </div>
       <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-4">
         <CreditsBar credits={credits} total={creditsTotal} />
         <div className="mt-4 pt-4 border-t border-white/[0.05] text-[12px] text-[#4B5563]">
@@ -119,8 +200,8 @@ export default async function BillingPage() {
         </div>
       </div>
 
-      {/* Upgrade CTAs */}
-      {plan !== 'exclusive' && (
+      {/* Upgrade CTAs — only for active subscribers not yet on Exclusive */}
+      {isActive && plan !== 'exclusive' && (
         <>
           <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3 mt-8">Upgrade for more credits</p>
           <div className="grid sm:grid-cols-2 gap-3">
@@ -174,12 +255,16 @@ export default async function BillingPage() {
                 <td className="px-4 py-3 text-[#9CA3AF]">{row.seconds}</td>
                 <td className="px-4 py-3 text-[#D1D5DB]">{row.price}</td>
                 <td className="px-4 py-3 text-right">
-                  {plan !== row.planKey && (
+                  {(!isActive || plan !== row.planKey) && (
                     <Link
                       href={`/checkout?plan=${row.planKey}&billing=monthly`}
                       className="text-[11px] text-[#A3FF12] hover:underline underline-offset-2"
                     >
-                      {PLAN_CREDITS[row.planKey] > planCap ? 'Upgrade' : 'Switch'}
+                      {!isActive
+                        ? 'Subscribe'
+                        : PLAN_CREDITS[row.planKey] > planCap
+                        ? 'Upgrade'
+                        : 'Switch'}
                     </Link>
                   )}
                 </td>
@@ -199,9 +284,9 @@ export default async function BillingPage() {
               {isActive ? 'Managed by Lemon Squeezy' : 'No active subscription'}
             </span>
           </div>
-          {isActive && (
+          {portalUrl && (
             <a
-              href="https://app.lemonsqueezy.com/my-orders"
+              href={portalUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[12px] text-[#A3FF12] hover:underline underline-offset-2"

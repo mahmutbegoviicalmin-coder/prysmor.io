@@ -2,8 +2,27 @@ import { SignIn } from "@clerk/nextjs";
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center pt-[64px] px-4"
-      style={{ background: "radial-gradient(ellipse 55% 50% at 50% 40%,rgba(163,255,18,0.06) 0%,transparent 65%)" }}>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 gap-6"
+      style={{
+        background:
+          "radial-gradient(ellipse 60% 45% at 50% 30%, rgba(163,255,18,0.07) 0%, transparent 65%), #05050A",
+      }}
+    >
+      {/* Logo above the card */}
+      <div className="flex flex-col items-center gap-2 mb-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo/logo-icon.png"
+          alt="Prysmor"
+          className="w-9 h-9 object-contain"
+          draggable={false}
+        />
+        <span className="text-[13px] text-[#4B5563] tracking-wide">
+          prysmor.io
+        </span>
+      </div>
+
       <SignIn />
     </div>
   );

@@ -10,7 +10,7 @@ export default authMiddleware({
     "/docs/install",
     "/sign-in(.*)",
     "/sign-up(.*)",
-    "/api/webhooks(.*)",
+    "/api/webhooks(.*)",   // covers /api/webhooks/clerk and /api/webhooks/lemonsqueezy
     "/api/firebase/test",
     // MotionForge panel API — authenticated via X-Panel-Key header, not Clerk session
     "/api/v1/motionforge(.*)",

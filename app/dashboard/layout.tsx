@@ -4,28 +4,55 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
 import {
-  LayoutDashboard, PanelLeft, Monitor, CreditCard,
-  BookOpen, Settings, Download,
+  LayoutDashboard, Monitor, CreditCard,
+  BookOpen, Settings, Download, Lock, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
+
 const navItems = [
-  { label: "Overview",  href: "/dashboard",           icon: LayoutDashboard },
-  { label: "Plugin",    href: "/dashboard/plugin",    icon: PanelLeft },
-  { label: "Downloads", href: "/dashboard/downloads", icon: Download },
-  { label: "Devices",   href: "/dashboard/devices",   icon: Monitor },
-  { label: "Billing",   href: "/dashboard/billing",   icon: CreditCard },
-  { label: "Docs",      href: "/dashboard/docs",      icon: BookOpen },
-  { label: "Settings",  href: "/dashboard/settings",  icon: Settings },
+  { label: "Overview",        href: "/dashboard",           icon: LayoutDashboard, requiresPlan: false },
+  { label: "Download Plugin", href: "/dashboard/downloads", icon: Download,        requiresPlan: true  },
+  { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: false },
+  { label: "Billing",         href: "/dashboard/billing",   icon: CreditCard,      requiresPlan: false },
+  { label: "Docs",            href: "/dashboard/docs",      icon: BookOpen,        requiresPlan: false },
+  { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: false },
 ];
 
-function NavLink({ item, pathname }: { item: typeof navItems[0]; pathname: string }) {
+function NavLink({
+  item,
+  pathname,
+  isActive: isSubscribed,
+}: {
+  item: typeof navItems[0];
+  pathname: string;
+  isActive: boolean;
+}) {
   const Icon = item.icon;
   const active =
     item.href === "/dashboard"
       ? pathname === "/dashboard"
       : pathname.startsWith(item.href);
+
+  const locked = item.requiresPlan && !isSubscribed;
+
+  if (locked) {
+    return (
+      <Link
+        href="/dashboard/billing"
+        title="Requires an active plan"
+        className="relative flex items-center gap-3 px-3 py-2 rounded-[8px] text-[13px] font-medium transition-colors text-[#374151] cursor-pointer hover:bg-white/[0.02] group"
+      >
+        <Icon className="w-[15px] h-[15px] flex-shrink-0 text-[#2D2D35]" />
+        <span className="flex-1">{item.label}</span>
+        <Lock className="w-3 h-3 text-[#2D2D35] group-hover:text-[#4B5563] transition-colors flex-shrink-0" />
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={item.href}
@@ -46,13 +73,35 @@ function NavLink({ item, pathname }: { item: typeof navItems[0]; pathname: strin
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { user } = useUser();
+  const pathname  = usePathname();
+  const { user }  = useUser();
   const firstName = user?.firstName ?? "";
 
-  const currentLabel = navItems.find((n) =>
-    n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
-  )?.label ?? "Dashboard";
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [planLabel, setPlanLabel]       = useState("Free");
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => {
+        setIsSubscribed(d.licenseStatus === "active");
+        setPlanLabel(
+          d.licenseStatus === "active"
+            ? (d.plan === "pro" ? "Pro" : d.plan === "exclusive" ? "Exclusive" : "Starter")
+            : "No Plan"
+        );
+      })
+      .catch(() => {});
+
+    // Fire-and-forget — saves country from IP once per user (idempotent server-side)
+    fetch("/api/sync-location", { method: "POST" }).catch(() => {});
+  }, []);
+
+  const currentLabel = pathname.startsWith("/dashboard/admin")
+    ? "Admin"
+    : navItems.find((n) =>
+        n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
+      )?.label ?? "Dashboard";
 
   return (
     <div className="flex min-h-screen" style={{ background: "#09090B" }}>
@@ -70,8 +119,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Portal
           </p>
           {navItems.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} />
+            <NavLink key={item.href} item={item} pathname={pathname} isActive={isSubscribed} />
           ))}
+
+          {/* Admin link — only for admin email */}
+          {user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL && (
+            <div className="pt-3 mt-2 border-t border-white/[0.04]">
+              <Link
+                href="/dashboard/admin"
+                className={cn(
+                  "relative flex items-center gap-3 px-3 py-2 rounded-[8px] text-[13px] font-medium transition-all",
+                  pathname.startsWith("/dashboard/admin")
+                    ? "text-[#F59E0B] bg-[#F59E0B]/[0.10]"
+                    : "text-[#78716C] hover:text-[#F59E0B] hover:bg-[#F59E0B]/[0.06]"
+                )}
+              >
+                {pathname.startsWith("/dashboard/admin") && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r-full bg-[#F59E0B]" />
+                )}
+                <ShieldCheck className={cn(
+                  "w-[15px] h-[15px] flex-shrink-0",
+                  pathname.startsWith("/dashboard/admin") ? "text-[#F59E0B]" : "text-[#57534E]"
+                )} />
+                Admin
+                <span className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/20">
+                  STAFF
+                </span>
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* User */}
@@ -80,7 +156,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <UserButton afterSignOutUrl="/" />
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-[#D1D5DB] truncate">{firstName}</p>
-              <p className="text-[11px] text-[#4B5563]">Creator Suite</p>
+              <p className="text-[11px] text-[#4B5563]">{planLabel}</p>
             </div>
           </div>
         </div>
@@ -96,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="text-[14px] font-semibold text-white">Prysmor</span>
           </div>
 
-          {/* Breadcrumb (desktop) */}
+          {/* Breadcrumb */}
           <div className="hidden lg:flex items-center gap-2">
             <span className="text-[13px] text-[#374151]">Portal</span>
             <span className="text-[13px] text-[#1F2937]">/</span>
@@ -105,9 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="ml-auto flex items-center gap-3">
             {firstName && (
-              <span className="hidden sm:block text-[13px] text-[#6B7280]">
-                {firstName}
-              </span>
+              <span className="hidden sm:block text-[13px] text-[#6B7280]">{firstName}</span>
             )}
             <UserButton afterSignOutUrl="/" />
           </div>
@@ -116,22 +190,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile nav */}
         <nav className="lg:hidden flex items-center gap-1 px-3 py-2 border-b border-white/[0.05] overflow-x-auto" style={{ background: "#09090B" }}>
           {navItems.map((item) => {
-            const Icon = item.icon;
+            const Icon  = item.icon;
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
                 : pathname.startsWith(item.href);
+            const locked = item.requiresPlan && !isSubscribed;
             return (
-              <Link key={item.href} href={item.href}
+              <Link
+                key={item.href}
+                href={locked ? "/dashboard/billing" : item.href}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-colors flex-shrink-0",
-                  active ? "bg-white/[0.06] text-white" : "text-[#6B7280] hover:text-[#D1D5DB]"
-                )}>
+                  locked
+                    ? "text-[#2D2D35]"
+                    : active
+                    ? "bg-white/[0.06] text-white"
+                    : "text-[#6B7280] hover:text-[#D1D5DB]"
+                )}
+              >
                 <Icon className="w-3.5 h-3.5" />
                 {item.label}
+                {locked && <Lock className="w-3 h-3 ml-0.5" />}
               </Link>
             );
           })}
+          {/* Admin mobile link */}
+          {user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL && (
+            <Link
+              href="/dashboard/admin"
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-colors flex-shrink-0 border",
+                pathname.startsWith("/dashboard/admin")
+                  ? "bg-[#F59E0B]/[0.12] text-[#F59E0B] border-[#F59E0B]/20"
+                  : "text-[#78716C] hover:text-[#F59E0B] border-[#F59E0B]/10 hover:border-[#F59E0B]/20"
+              )}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Admin
+            </Link>
+          )}
         </nav>
 
         {/* Content */}

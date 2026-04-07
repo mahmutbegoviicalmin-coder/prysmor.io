@@ -2,7 +2,7 @@ export const runtime    = 'nodejs';
 export const maxDuration = 120;
 
 import { NextRequest, NextResponse }  from 'next/server';
-import { getJob, updateJob }           from '@/lib/motionforge/jobs';
+import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import {
   uploadToRunway,
   uploadImageToRunway,
@@ -70,7 +70,9 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const job = await getJob(params.id);
+  const job = session
+    ? await getJob(session.userId, params.id)
+    : await getJobAny(params.id);
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
   if (job.status !== 'uploading') {
     return NextResponse.json(
@@ -79,9 +81,11 @@ export async function POST(
     );
   }
 
+  const userId = session?.userId ?? job.userId;
+
   const assetUrl = job.assetUrl as string | undefined;
   if (!assetUrl) {
-    await updateJob(params.id, { status: 'failed', error: 'No asset URL — call /upload first' });
+    await updateJob(userId, params.id, { status: 'failed', error: 'No asset URL — call /upload first' });
     return NextResponse.json({ error: 'No asset — call /upload first' }, { status: 400 });
   }
 
@@ -130,7 +134,7 @@ export async function POST(
     } else {
       // Local dev path — file is on disk, upload it now
       if (!fs.existsSync(assetUrl)) {
-        await updateJob(params.id, { status: 'failed', error: 'Trimmed file not found' });
+        await updateJob(userId, params.id, { status: 'failed', error: 'Trimmed file not found' });
         return NextResponse.json({ error: 'Trimmed file missing — call /upload first' }, { status: 400 });
       }
       localVideoPath = assetUrl;
@@ -174,7 +178,7 @@ export async function POST(
       const task = await createVideoToVideoTask(runwayUri, prompt, refUri, effectType);
       log(TAG, `Runway task started: ${task.id}`);
 
-      await updateJob(params.id, {
+      await updateJob(userId, params.id, {
         status:                  'generating',
         prompt,
         effectType,
@@ -196,7 +200,7 @@ export async function POST(
     const task = await createVideoToVideoTask(runwayUri, prompt, undefined, effectType);
     log(TAG, `Runway task started: ${task.id}`);
 
-    await updateJob(params.id, {
+    await updateJob(userId, params.id, {
       status:       'generating',
       prompt,
       effectType,
@@ -210,7 +214,7 @@ export async function POST(
     const msg = err instanceof Error ? err.message : 'Generation failed';
     logError(TAG, `Generation failed for job ${params.id}`, err);
     try { if (fs.existsSync(preservedVideoPath)) fs.unlinkSync(preservedVideoPath); } catch (_) {}
-    await updateJob(params.id, { status: 'failed', error: msg }).catch(() => {});
+    await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
     return NextResponse.json({ error: msg }, { status: 502 });
 
   } finally {

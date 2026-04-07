@@ -117,3 +117,92 @@ body::after {
   80%  { opacity: 1; }
   100% { opacity: 0; transform: translateX(160%) skewX(-25deg); }
 }
+
+/* ── Clerk sign-in overrides ───────────────────────────────────────────────── */
+
+/* ── Clerk sign-in overrides ───────────────────────────────────────────────── */
+
+/* Social buttons: white background so Apple (black SVG), Facebook (blue), Google (color) all show correctly */
+.cl-socialButtonsBlockButton {
+  background: #ffffff !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  border-radius: 9px !important;
+  height: 44px !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease !important;
+}
+.cl-socialButtonsBlockButton:hover {
+  background: #f0f0f0 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+}
+.cl-socialButtonsBlockButtonText {
+  color: #111111 !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+}
+
+/* Modal backdrop blur */
+.cl-modalBackdrop {
+  backdrop-filter: blur(10px) !important;
+  background: rgba(0, 0, 0, 0.72) !important;
+}
+
+/* Card background */
+.cl-card {
+  background: #09090F !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 18px !important;
+}
+
+/* OTP code inputs */
+.cl-otpCodeFieldInput {
+  background: #111118 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+.cl-otpCodeFieldInput:focus {
+  border-color: rgba(163, 255, 18, 0.5) !important;
+  outline: none !important;
+}
+
+/* Alert / error */
+.cl-alert {
+  background: rgba(248, 113, 113, 0.08) !important;
+  border-color: rgba(248, 113, 113, 0.25) !important;
+}
+.cl-alertText { color: #F87171 !important; }
+
+/* Modal backdrop */
+.cl-modalBackdrop {
+  backdrop-filter: blur(8px) !important;
+  background: rgba(0, 0, 0, 0.70) !important;
+}
+
+/* Remove default white card background that bleeds through */
+.cl-card {
+  background: #09090F !important;
+}
+
+/* Internal navbar / tabs */
+.cl-navbar,
+.cl-navbarMobileMenuButton {
+  background: #09090F !important;
+}
+
+/* OTP / code input boxes */
+.cl-otpCodeFieldInput {
+  background: #111118 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+.cl-otpCodeFieldInput:focus {
+  border-color: rgba(163, 255, 18, 0.5) !important;
+}
+
+/* Alert / error banner */
+.cl-alert {
+  background: rgba(248, 113, 113, 0.08) !important;
+  border-color: rgba(248, 113, 113, 0.25) !important;
+}
+.cl-alertText {
+  color: #F87171 !important;
+}

@@ -2,7 +2,7 @@ export const runtime    = 'nodejs';
 export const maxDuration = 120;
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getJob, updateJob }         from '@/lib/motionforge/jobs';
+import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { validatePanelToken, validatePanelKey } from '@/lib/motionforge/auth';
 import * as os   from 'os';
 import * as path from 'path';
@@ -26,7 +26,9 @@ export async function POST(
 
   let job;
   try {
-    job = await getJob(params.id);
+    job = session
+      ? await getJob(session.userId, params.id)
+      : await getJobAny(params.id);
   } catch (e) {
     console.error('[upload] getJob failed:', e);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -37,7 +39,9 @@ export async function POST(
     return NextResponse.json({ error: `Job already in status "${job.status}"` }, { status: 409 });
   }
 
-  await updateJob(params.id, { status: 'uploading' });
+  const userId = session?.userId ?? job.userId;
+
+  await updateJob(userId, params.id, { status: 'uploading' });
 
   const inputTmp = tmpPath(`mf-${params.id}-in.mp4`);
 
@@ -48,11 +52,11 @@ export async function POST(
     console.log(`[upload] Received ${buffer.byteLength} bytes for job ${params.id}`);
 
     if (buffer.byteLength === 0) {
-      await updateJob(params.id, { status: 'failed', error: 'Empty file body' });
+      await updateJob(userId, params.id, { status: 'failed', error: 'Empty file body' });
       return NextResponse.json({ error: 'Empty file body received' }, { status: 400 });
     }
     if (buffer.byteLength > MAX_FILE_BYTES) {
-      await updateJob(params.id, { status: 'failed', error: 'File too large' });
+      await updateJob(userId, params.id, { status: 'failed', error: 'File too large' });
       return NextResponse.json({ error: 'File exceeds 500 MB limit' }, { status: 413 });
     }
 
@@ -68,7 +72,7 @@ export async function POST(
     const runwayUri = await uploadToRunway(inputTmp);
     console.log(`[upload] Runway URI: ${runwayUri}`);
 
-    await updateJob(params.id, {
+    await updateJob(userId, params.id, {
       assetUrl:  runwayUri,
       mediaInSec,
       clipDurSec,
@@ -79,7 +83,7 @@ export async function POST(
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[upload] Error:', msg);
-    await updateJob(params.id, { status: 'failed', error: msg }).catch(() => {});
+    await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
     return NextResponse.json({ error: msg }, { status: 500 });
   } finally {
     try { if (fs.existsSync(inputTmp)) fs.unlinkSync(inputTmp); } catch (_) {}

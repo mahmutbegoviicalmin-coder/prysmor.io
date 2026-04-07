@@ -109,12 +109,23 @@ export interface MotionForgeJob {
 
 // ─── Firestore helpers ────────────────────────────────────────────────────────
 
-const COLLECTION = 'motionforge_jobs';
+/** Returns the jobs subcollection ref for a given user. */
+function jobsCol(userId: string) {
+  return db.collection('users').doc(userId).collection('jobs');
+}
 
-export async function createJob(userId: string, creditCost?: number): Promise<string> {
-  const ref = db.collection(COLLECTION).doc();
+export async function createJob(
+  userId: string,
+  creditCost?: number,
+  userSnapshot?: { email?: string; displayName?: string },
+): Promise<string> {
+  const ref = jobsCol(userId).doc();
   await ref.set({
     userId,
+    jobId: ref.id,  // stored as field so collection-group lookups work
+    // Denormalized user info — visible directly in Firestore console
+    ...(userSnapshot?.email       && { userEmail:       userSnapshot.email }),
+    ...(userSnapshot?.displayName && { userDisplayName: userSnapshot.displayName }),
     status:    'created' as JobStatus,
     ...(creditCost !== undefined && { creditCost }),
     createdAt: new Date(),
@@ -123,18 +134,31 @@ export async function createJob(userId: string, creditCost?: number): Promise<st
   return ref.id;
 }
 
-export async function getJob(jobId: string): Promise<MotionForgeJob | null> {
-  const doc = await db.collection(COLLECTION).doc(jobId).get();
+/** Fast lookup when userId is known (always prefer this). */
+export async function getJob(userId: string, jobId: string): Promise<MotionForgeJob | null> {
+  const doc = await jobsCol(userId).doc(jobId).get();
   if (!doc.exists) return null;
   return { id: doc.id, ...doc.data() } as MotionForgeJob;
 }
 
+/**
+ * Collection-Group fallback lookup — used only by panel-key auth paths
+ * where the userId is not available from the session.
+ */
+export async function getJobAny(jobId: string): Promise<MotionForgeJob | null> {
+  const snap = await db.collectionGroup('jobs')
+    .where('jobId', '==', jobId)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { id: doc.id, ...doc.data() } as MotionForgeJob;
+}
+
 export async function updateJob(
+  userId: string,
   jobId: string,
   data: Partial<Omit<MotionForgeJob, 'id' | 'createdAt'>>,
 ): Promise<void> {
-  await db
-    .collection(COLLECTION)
-    .doc(jobId)
-    .update({ ...data, updatedAt: new Date() });
+  await jobsCol(userId).doc(jobId).update({ ...data, updatedAt: new Date() });
 }
