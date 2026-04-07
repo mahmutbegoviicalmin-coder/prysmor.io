@@ -356,67 +356,85 @@ function enterPanel() {
 }
 
 /**
- * Checks if the sidecar is already running on localhost:7788.
- * Respects the Face Identity toggle — if the user has turned it OFF, this is a no-op.
- * Completely non-blocking — panel works fine without it.
+ * CEP-compatible fetch with timeout (AbortSignal.timeout not available in old Chromium).
+ * @param {string} url
+ * @param {number} ms
+ */
+function _fetchWithTimeout(url, ms) {
+  var ctrl  = new AbortController();
+  var timer = setTimeout(function () { ctrl.abort(); }, ms);
+  return fetch(url, { signal: ctrl.signal }).then(function (r) {
+    clearTimeout(timer); return r;
+  }, function (e) {
+    clearTimeout(timer); throw e;
+  });
+}
+
+/**
+ * On panel open: if Face Identity is ON, launch the sidecar in a visible terminal.
+ * If sidecar is already running, just update the status dot.
  */
 async function ensureSidecarRunning() {
-  // Respect user preference — default ON if never set
   var fiPref = localStorage.getItem(LS_FACE_IDENTITY);
   if (fiPref === 'off') {
     console.log('[Prysmor] Face Identity is OFF — skipping sidecar');
     return;
   }
 
+  // Already running? Just update UI.
   try {
-    var res = await fetch(SIDECAR_URL + '/health', {
-      signal: AbortSignal.timeout(2000),
-    });
+    var res = await _fetchWithTimeout(SIDECAR_URL + '/health', 2000);
     if (res.ok) {
-      console.log('[Prysmor] Sidecar already running ✓');
-      return;
-    }
-  } catch (_) {
-    // Not running — try to launch it
-  }
-
-  // Auto-start silently (background) on boot — user can use the toggle for visible terminal
-  console.log('[Prysmor] Sidecar not detected — attempting silent auto-start…');
-  cs.evalScript('startSidecar()', async function (result) {
-    console.log('[Prysmor] startSidecar result:', result);
-    if (result && result.indexOf('error') === 0) {
-      console.warn('[Prysmor] Could not start sidecar:', result,
-        '— Identity Lock will be skipped (panel still functional)');
-      return;
-    }
-    await new Promise(function (r) { setTimeout(r, SIDECAR_START_WAIT); });
-    try {
-      var health = await fetch(SIDECAR_URL + '/health', {
-        signal: AbortSignal.timeout(3000),
-      });
-      if (health.ok) {
-        console.log('[Prysmor] Sidecar started and healthy ✓');
-        _setFiStatus('running', 'Running');
-      } else {
-        console.warn('[Prysmor] Sidecar started but not ready yet — will retry on generation');
+      var data = await res.json();
+      if (data && data.status === 'ok') {
+        console.log('[Prysmor] Sidecar already running ✓');
+        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
+          .filter(Boolean).join(' + ') || 'fallback mode';
+        _setFiStatus('running', 'Running \u2014 ' + models);
+        return;
       }
-    } catch (_) {
-      console.warn('[Prysmor] Sidecar still warming up — Identity Lock will activate once ready');
     }
-  });
+  } catch (_) { /* not running */ }
+
+  // Not running — open visible terminal so user sees the logs
+  console.log('[Prysmor] Sidecar not running — launching terminal…');
+  _launchSidecarVisible();
 }
+
+// ── Auto-stop sidecar when panel is closed ────────────────────────────────────
+// synchronous XHR in unload is the only reliable way to fire before page teardown.
+window.addEventListener('unload', function () {
+  var fiPref = localStorage.getItem(LS_FACE_IDENTITY);
+  if (fiPref === 'off') return;
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', SIDECAR_URL + '/shutdown', false); // synchronous
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send('{}');
+  } catch (_) {}
+});
 
 function logout() {
   stopMfPolling();
   stopAuthPolling();
   stopHeartbeat();
+
+  // Revoke device + session on server so re-login never hits device_limit_reached.
+  // Fire-and-forget — clear local state regardless of response.
+  var tok = state.auth.token;
+  if (tok) {
+    fetch(API_BASE + '/api/panel/auth/logout', {
+      method:  'POST',
+      headers: apiHeaders(),
+    }).catch(function () {});
+  }
+
   clearSession();
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
     pollTimer: null, pollStart: 0, outputUrl: null, rawOutputUrl: null,
     outputPath: null, tempDir: '', generating: false,
   };
-  // Reset login button
   var btn = el('btn-continue');
   if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
   setLoginStatus('', false);
@@ -1027,12 +1045,14 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
   // Runway output URLs are public S3/CDN presigned URLs — do NOT send auth headers
   // (extra Authorization header invalidates S3 presigned signatures)
   const isOwnApi  = outputUrl.startsWith(API_BASE) || outputUrl.startsWith('/api/');
+  var _dlCtrl  = new AbortController();
+  var _dlTimer = setTimeout(function () { _dlCtrl.abort(); }, 120000);
   const fetchOpts = isOwnApi
-    ? { headers: apiHeaders(), signal: AbortSignal.timeout(120_000) }
-    : { signal: AbortSignal.timeout(120_000) };  // 2-min download timeout
+    ? { headers: apiHeaders(), signal: _dlCtrl.signal }
+    : { signal: _dlCtrl.signal };
 
   console.log('[Prysmor] fetch start (isOwnApi=' + isOwnApi + ')');
-  const res = await fetch(outputUrl, fetchOpts);
+  const res = await fetch(outputUrl, fetchOpts).finally(function () { clearTimeout(_dlTimer); });
   console.log('[Prysmor] fetch response HTTP', res.status, res.ok ? 'OK' : 'FAIL');
   if (!res.ok) throw new Error('Download HTTP ' + res.status);
 
@@ -1321,11 +1341,13 @@ function populateDiagnostics() {
   const bkEl = el('diag-backend');
   bkEl.textContent = 'Checking…';
   bkEl.className   = 'diag-status';
+  var _diagCtrl = new AbortController();
+  setTimeout(function () { _diagCtrl.abort(); }, 4000);
   fetch(API_BASE + '/api/v1/motionforge/jobs', {
     method: 'POST',
     headers: apiHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ userId: 'diag-ping' }),
-    signal: AbortSignal.timeout(4000),
+    signal: _diagCtrl.signal,
   }).then(function (r) {
     bkEl.textContent = r.ok || r.status === 201 ? '✓ Online' : '✕ HTTP ' + r.status;
     bkEl.className   = 'diag-status ' + (r.status === 201 ? 'ok' : 'err');
@@ -1642,34 +1664,34 @@ function bindFaceIdentityToggle() {
 
 /** Launches sidecar in a visible terminal window, then polls health until ready. */
 function _launchSidecarVisible() {
-  _setFiStatus('starting', 'Starting…');
-  cs.evalScript('startSidecarVisible()', async function (result) {
-    if (result && result.indexOf('error') === 0) {
-      _setFiStatus('error', result.replace('error: ', ''));
+  _setFiStatus('starting', 'Starting\u2026');
+  cs.evalScript('startSidecarVisible()', function (result) {
+    if (!result || result.indexOf('error') === 0) {
+      _setFiStatus('error', (result || 'Launch failed').replace('error: ', ''));
       console.warn('[FaceIdentity] startSidecarVisible error:', result);
       return;
     }
     console.log('[FaceIdentity] Terminal launched:', result);
-    _setFiStatus('starting', 'Loading models… (may take ~15s)');
-    // Poll health until sidecar is up (up to 60s)
+    _setFiStatus('starting', 'Loading models\u2026 (~15s)');
+
     var deadline = Date.now() + 60000;
-    async function poll() {
-      try {
-        var res = await fetch(SIDECAR_URL + '/health', { signal: AbortSignal.timeout(2000) });
-        if (res.ok) {
-          var data = await res.json();
-          if (data.status === 'ok') {
-            var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace'].filter(Boolean).join(' + ') || 'fallback mode';
-            _setFiStatus('running', 'Running — ' + models);
-            return;
-          }
+    function poll() {
+      _fetchWithTimeout(SIDECAR_URL + '/health', 2000).then(function (res) {
+        return res.ok ? res.json() : Promise.reject('not ok');
+      }).then(function (data) {
+        if (data && data.status === 'ok') {
+          var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
+            .filter(Boolean).join(' + ') || 'fallback mode';
+          _setFiStatus('running', 'Running \u2014 ' + models);
+        } else if (Date.now() < deadline) {
+          setTimeout(poll, 2000);
+        } else {
+          _setFiStatus('error', 'Did not start — check the terminal');
         }
-      } catch (_) { /* keep polling */ }
-      if (Date.now() < deadline) {
-        setTimeout(poll, 2000);
-      } else {
-        _setFiStatus('error', 'Did not start in time — check the terminal');
-      }
+      }).catch(function () {
+        if (Date.now() < deadline) setTimeout(poll, 2000);
+        else _setFiStatus('error', 'Did not start — check the terminal');
+      });
     }
     setTimeout(poll, 4000);
   });
@@ -1684,19 +1706,20 @@ function _doStopSidecar() {
 }
 
 /** Quick health check — updates dot without launching anything. */
-async function _checkSidecarHealth() {
-  try {
-    var res = await fetch(SIDECAR_URL + '/health', { signal: AbortSignal.timeout(2000) });
-    if (res.ok) {
-      var data = await res.json();
-      if (data.status === 'ok') {
-        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace'].filter(Boolean).join(' + ') || 'fallback mode';
-        _setFiStatus('running', 'Running — ' + models);
-        return;
-      }
+function _checkSidecarHealth() {
+  _fetchWithTimeout(SIDECAR_URL + '/health', 2000).then(function (res) {
+    return res.ok ? res.json() : Promise.reject('not ok');
+  }).then(function (data) {
+    if (data && data.status === 'ok') {
+      var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
+        .filter(Boolean).join(' + ') || 'fallback mode';
+      _setFiStatus('running', 'Running \u2014 ' + models);
+    } else {
+      _setFiStatus('off', 'Not running');
     }
-  } catch (_) { /* not running */ }
-  _setFiStatus('off', 'Not running — toggle to start');
+  }).catch(function () {
+    _setFiStatus('off', 'Not running');
+  });
 }
 
 /**

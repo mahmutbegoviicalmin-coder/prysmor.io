@@ -70,7 +70,9 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const sessionExpiry = new Date(now.getTime() + SESSION_TTL_MS);
 
-  const deviceId = `panel-${user.id.slice(-8)}-${code.toUpperCase()}`;
+  // Stable per-user deviceId — same slot on every login so re-auth never
+  // hits the device limit when the previous session wasn't explicitly logged out.
+  const deviceId = `panel-${user.id}`;
 
   await db.collection("panel_sessions").doc(token).set({
     userId: user.id,
