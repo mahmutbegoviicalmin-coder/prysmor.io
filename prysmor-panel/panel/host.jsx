@@ -17,16 +17,26 @@ function findProjectItemByName(parent, name) {
   return null;
 }
 
+// Normalise a file path for cross-platform comparison.
+// On macOS, /var/folders/... is a symlink for /private/var/folders/...
+// Premiere Pro stores the /private/... canonical form, so we strip it here.
+function normalisePath(p) {
+  if (!p) return '';
+  var s = p.replace(/\\/g, '/');
+  if (s.indexOf('/private/') === 0) s = s.slice(8); // /private/var → /var
+  return s;
+}
+
 // Finds a project item by its media file path (more reliable than name alone).
 // Falls back to name search if path matching fails.
 function findProjectItemByPath(parent, targetPath) {
   if (!parent || !parent.children) return null;
-  var normalized = targetPath.replace(/\\/g, '/');
+  var normalized = normalisePath(targetPath);
   for (var i = 0; i < parent.children.numItems; i++) {
     var child = parent.children[i];
     var childPath = '';
     try {
-      if (child.getMediaPath) childPath = child.getMediaPath().replace(/\\/g, '/');
+      if (child.getMediaPath) childPath = normalisePath(child.getMediaPath());
     } catch (_) {}
     if (childPath && childPath === normalized) return child;
     var found = findProjectItemByPath(child, targetPath);
@@ -355,80 +365,47 @@ function startSidecar() {
 
 // ─── startSidecarVisible ──────────────────────────────────────────────────────
 /**
- * Launches the Identity Lock sidecar in a VISIBLE terminal window so the user
- * can monitor model loading and embedding logs.
- *
- * macOS  → opens Terminal.app with the python command
- * Windows → opens a CMD window titled "Prysmor Identity Lock"
- *
- * Returns 'started:<path>' or 'error:<reason>'.
+ * Launches the Identity Lock sidecar in a VISIBLE terminal window.
+ * macOS  → Terminal.app   Windows → new CMD window "Prysmor Identity Lock"
+ * Uses $.getenv() for reliable env-var resolution (avoids Folder.userData issues).
+ * Writes a temp .bat on Windows to eliminate all command-quoting problems.
+ * Returns 'ok:<path>' or 'error:<reason>'.
  */
 function startSidecarVisible() {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
 
-    var isMac = ($.os && $.os.toLowerCase().indexOf('mac') !== -1);
+    var isMac = ($.os && $.os.indexOf('Mac') >= 0);
 
     if (isMac) {
-      var homeDir = Folder.userData.fsName;
-      homeDir = homeDir.replace(/\/Library\/Application Support$/, '');
-
-      var pyScript = homeDir + '/Library/Prysmor/face_embedding_server.py';
-      var pyFile   = new File(pyScript);
-
-      if (pyFile.exists) {
-        // Open Terminal.app with the command — user sees logs in real time
-        var osa = 'osascript -e \'tell application "Terminal" to do script "python3 \\"' + pyScript + '\\" "\'';
-        app.system.callSystem(osa);
-        return 'started:' + pyScript;
-      }
-
-      // Fallback: try pre-built binary
-      var macBinLocations = [
-        '/Applications/Prysmor/prysmor-sidecar',
-        homeDir + '/Library/Prysmor/prysmor-sidecar',
-      ];
-      for (var m = 0; m < macBinLocations.length; m++) {
-        var mf2 = new File(macBinLocations[m]);
-        if (mf2.exists) {
-          var osa2 = 'osascript -e \'tell application "Terminal" to do script "\\"' + macBinLocations[m] + '\\" "\'';
-          app.system.callSystem(osa2);
-          return 'started:' + macBinLocations[m];
-        }
-      }
-      return 'error: face_embedding_server.py not found — run the macOS installer first.';
+      // ── macOS ────────────────────────────────────────────────────────────────
+      var home = $.getenv('HOME');
+      if (!home) return 'error: HOME environment variable not set.';
+      var macPy = home + '/Library/Prysmor/face_embedding_server.py';
+      if (!new File(macPy).exists) return 'error: not found: ' + macPy;
+      app.system.callSystem(
+        'osascript -e \'tell application "Terminal" to do script "python3 \\"' + macPy + '\\""\'');
+      return 'ok:' + macPy;
 
     } else {
-      // Windows: look for the exe or the .py script
-      var winExeLocations = [
-        'C:\\Program Files\\Prysmor\\prysmor-sidecar.exe',
-        Folder.userData.fsName + '\\Prysmor\\prysmor-sidecar.exe',
-        File($.fileName).parent.parent.fsName + '\\prysmor-sidecar.exe',
-      ];
+      // ── Windows ──────────────────────────────────────────────────────────────
+      var appdata = $.getenv('APPDATA');
+      if (!appdata) return 'error: APPDATA environment variable not set.';
+      var winPy = appdata + '\\Prysmor\\face_embedding_server.py';
+      if (!new File(winPy).exists) return 'error: not found: ' + winPy;
 
-      for (var w2 = 0; w2 < winExeLocations.length; w2++) {
-        var wf2 = new File(winExeLocations[w2]);
-        if (wf2.exists) {
-          // start "" opens a new CMD window with a title
-          app.system.callSystem('cmd.exe /c start "Prysmor Identity Lock" "' + winExeLocations[w2] + '"');
-          return 'started:' + winExeLocations[w2];
-        }
-      }
+      // Resolve temp dir via env vars (most reliable)
+      var tmp = $.getenv('TEMP') || $.getenv('TMP') || (appdata + '\\..\\Local\\Temp');
+      var batPath = tmp + '\\prysmor-launch.bat';
 
-      // Fallback: try running the .py script directly via python
-      var winPyLocations = [
-        Folder.userData.fsName + '\\Prysmor\\face_embedding_server.py',
-        File($.fileName).parent.parent.fsName + '\\face_embedding_server.py',
-      ];
-      for (var p = 0; p < winPyLocations.length; p++) {
-        var pf = new File(winPyLocations[p]);
-        if (pf.exists) {
-          app.system.callSystem('cmd.exe /c start "Prysmor Identity Lock" cmd.exe /k "python \\"' + winPyLocations[p] + '\\""');
-          return 'started:' + winPyLocations[p];
-        }
-      }
+      // Write batch file using write() + explicit \r\n to avoid writeln issues
+      var bat = new File(batPath);
+      if (!bat.open('w')) return 'error: cannot write to ' + batPath;
+      bat.write('@echo off\r\ntitle Prysmor Identity Lock\r\necho Starting Prysmor Face Identity...\r\npython "' + winPy + '"\r\necho.\r\necho Stopped. Press any key to close.\r\npause > nul\r\n');
+      bat.close();
 
-      return 'error: prysmor-sidecar.exe not found — run the Windows installer first.';
+      app.system.callSystem('cmd.exe /c start "Prysmor Identity Lock" "' + batPath + '"');
+      return 'ok:' + winPy;
     }
 
   } catch (e) {

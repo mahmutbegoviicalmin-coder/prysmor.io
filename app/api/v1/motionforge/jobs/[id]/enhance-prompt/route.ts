@@ -44,6 +44,13 @@ export async function POST(
     : await getJobAny(params.id);
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 
+  // ── Parse body first (userIntent needed for fallback path too) ───────────
+  let body: { intent?: string };
+  try { body = await req.json(); }
+  catch { body = {}; }
+
+  const userIntent = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
+
   // Prefer the preserved original (survives generate), fall back to upload copy
   const preservedPath = path.join(os.tmpdir(), `orig-${params.id}.mp4`);
   const videoPath =
@@ -54,7 +61,7 @@ export async function POST(
       : null);
 
   if (!videoPath) {
-    // No video on disk — fall back to text-only compile
+    // No video on disk (Vercel /tmp is ephemeral) — fall back to text-only compile
     warn(TAG, `No video found for job ${params.id} — falling back to text compile`);
     const { compileVfxPrompt } = await import('@/lib/motionforge/promptCompiler');
     const result = await compileVfxPrompt(userIntent).catch(() => ({
@@ -69,14 +76,6 @@ export async function POST(
       method:        'fallback',
     });
   }
-
-  // ── Parse body ────────────────────────────────────────────────────────────
-  let body: { intent?: string };
-  try { body = await req.json(); }
-  catch { body = {}; }
-
-  const userIntent = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
-  log(TAG, `Enhance-prompt request for job ${params.id}`, { userIntent });
 
   // ── Extract representative frame ──────────────────────────────────────────
   let framePath: string | null = null;

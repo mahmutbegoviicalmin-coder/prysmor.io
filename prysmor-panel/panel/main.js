@@ -1281,14 +1281,20 @@ function readFileBase64(absPath) {
     if (!window.cep || !window.cep.fs) {
       return reject(new Error('cep.fs not available — run inside Premiere'));
     }
-    const r = window.cep.fs.readFile(absPath, window.cep.encoding.Base64);
+    // window.cep.encoding.Base64 may be undefined on some CEP builds — fall back to string literal
+    var enc = 'Base64';
+    try { if (window.cep.encoding && window.cep.encoding.Base64) enc = window.cep.encoding.Base64; } catch (_) {}
+    const r = window.cep.fs.readFile(absPath, enc);
     if (r.err !== 0) return reject(new Error('Read error ' + r.err + ' for: ' + absPath));
     resolve(r.data);
   });
 }
 
 function base64ToBlob(b64, mime) {
-  const bin  = atob(b64);
+  // cep.fs.readFile may wrap base64 in \r\n every 76 chars (MIME style).
+  // atob() in older Chromium (CEP) rejects any non-base64 character including whitespace.
+  var cleanB64 = (b64 || '').replace(/[^A-Za-z0-9+/=]/g, '');
+  const bin  = atob(cleanB64);
   const arr  = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
@@ -1623,8 +1629,8 @@ function bindEvents() {
 /**
  * Wires the Face Identity ON/OFF toggle in the settings menu.
  * Persists state in localStorage (LS_FACE_IDENTITY).
- * ON  → calls startSidecarVisible() via ExtendScript (opens terminal window)
- * OFF → calls stopSidecar() via ExtendScript and clears status UI
+ * ON  → opens a visible CMD/Terminal window running face_embedding_server.py
+ * OFF → sends /shutdown to sidecar and clears status UI
  */
 function bindFaceIdentityToggle() {
   var toggle   = el('fi-toggle-input');
@@ -1637,7 +1643,6 @@ function bindFaceIdentityToggle() {
   toggle.checked = isOn;
 
   if (isOn) {
-    // Check if already running on boot
     _checkSidecarHealth();
   } else {
     _setFiDot('off');
@@ -1662,47 +1667,193 @@ function bindFaceIdentityToggle() {
   }
 }
 
-/** Launches sidecar in a visible terminal window, then polls health until ready. */
+/**
+ * Launches the sidecar in a visible CMD (Windows) or Terminal (Mac) window.
+ *
+ * Strategy (avoids host.jsx caching issues):
+ *  1. Inline evalScript to read APPDATA + TEMP env vars (fresh eval, no cached fn)
+ *  2. cep.fs.writeFile() to write a .bat file on Windows  (proven reliable in CEP)
+ *  3. Inline evalScript: app.system.callSystem to open the .bat in a new CMD window
+ */
 function _launchSidecarVisible() {
   _setFiStatus('starting', 'Starting\u2026');
-  cs.evalScript('startSidecarVisible()', function (result) {
-    if (!result || result.indexOf('error') === 0) {
-      _setFiStatus('error', (result || 'Launch failed').replace('error: ', ''));
-      console.warn('[FaceIdentity] startSidecarVisible error:', result);
-      return;
-    }
-    console.log('[FaceIdentity] Terminal launched:', result);
-    _setFiStatus('starting', 'Loading models\u2026 (~15s)');
 
-    var deadline = Date.now() + 60000;
-    function poll() {
-      _fetchWithTimeout(SIDECAR_URL + '/health', 2000).then(function (res) {
-        return res.ok ? res.json() : Promise.reject('not ok');
-      }).then(function (data) {
-        if (data && data.status === 'ok') {
-          var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
-            .filter(Boolean).join(' + ') || 'fallback mode';
-          _setFiStatus('running', 'Running \u2014 ' + models);
-        } else if (Date.now() < deadline) {
-          setTimeout(poll, 2000);
+  var isMac = navigator.platform.toLowerCase().indexOf('mac') !== -1;
+
+  if (isMac) {
+    // ── macOS: find script in standard locations, open Terminal.app ───────────
+    var macScript = '(function(){' +
+      'var h=$.getenv("HOME");' +
+      'if(!h)return "error:HOME not set";' +
+      // Check locations in priority order:
+      // 1. ~/Library/Application Support/Prysmor/ (standard Mac app support dir)
+      // 2. ~/Library/Prysmor/ (legacy)
+      // 3. Next to the extension root
+      'var candidates=[' +
+        'h+"/Library/Application Support/Prysmor/face_embedding_server.py",' +
+        'h+"/Library/Prysmor/face_embedding_server.py"' +
+      '];' +
+      'var py="";' +
+      'for(var i=0;i<candidates.length;i++){if(new File(candidates[i]).exists){py=candidates[i];break;}}' +
+      'if(!py)return "error:not found in: "+candidates.join(", ");' +
+      'app.system.callSystem("osascript -e \'tell application \\"Terminal\\" to do script \\"python3 \\\\\\""+ py +"\\\\\\"\\"\'");' +
+      'return "ok:"+py;' +
+      '})()';
+    cs.evalScript(macScript, function (r) { _sidecarLaunchResult(r); });
+
+  } else {
+    // ── Windows: find Python path → write .bat → start visible CMD ────────────
+    // Step 1: get APPDATA and TEMP only — no where.exe (that was causing EvalScript error)
+    var findPathsScript =
+      '(function(){' +
+      '  var a = $.getenv("APPDATA") || "";' +
+      '  var t = $.getenv("TEMP") || $.getenv("TMP") || "";' +
+      '  return a + "|" + t;' +
+      '})()';
+
+    cs.evalScript(findPathsScript, function (paths) {
+      // Validate: must look like a real Windows path (contains colon + backslash)
+      if (!paths || paths.indexOf('EvalScript') !== -1 || !paths.split('|')[0] ||
+          paths.split('|')[0].indexOf(':') === -1) {
+        _setFiStatus('error', 'Cannot read APPDATA (got: ' + paths + ')');
+        console.error('[FaceIdentity] findPathsScript returned bad value:', paths);
+        return;
+      }
+
+      var parts      = paths.split('|');
+      var appdata    = parts[0].replace(/\//g, '\\');
+      var tmp        = (parts[1] || appdata).replace(/\//g, '\\');
+      var scriptPath = appdata + '\\Prysmor\\face_embedding_server.py';
+      var batPath    = tmp + '\\prysmor-sidecar.bat';
+      console.log('[FaceIdentity] appdata:', appdata, '| tmp:', tmp);
+
+      // Step 2: write .bat — bat files launched via File.execute() use the USER's
+      // full system PATH, so 'python' will be found even if Premiere's env lacks it.
+      var batContent = '@echo off\r\npython "' + scriptPath + '"\r\npause\r\n';
+      try {
+        window.cep.fs.writeFile(batPath, btoa(batContent), window.cep.encoding.Base64);
+        console.log('[FaceIdentity] bat written:', batPath);
+      } catch (fsErr) {
+        console.warn('[FaceIdentity] writeFile failed:', fsErr);
+      }
+
+      // Step 3: launch the .bat — 'start "title" "batfile"' opens a new visible CMD window
+      var launched = false;
+      try {
+        var _req = (window.cep_node && window.cep_node.require)
+          ? window.cep_node.require
+          : (typeof __webpack_require__ === 'undefined' ? require : null);
+        if (_req) {
+          var _cp  = _req('child_process');
+          var _cmd = 'start "Prysmor Sidecar" "' + batPath + '"';
+          console.log('[FaceIdentity] exec:', _cmd);
+          _cp.exec(_cmd, { windowsHide: false }, function (e) {
+            if (e) console.warn('[FaceIdentity] exec err:', e.message);
+          });
+          launched = true;
+          console.log('[FaceIdentity] launched via Node.js exec + bat');
         } else {
-          _setFiStatus('error', 'Did not start — check the terminal');
+          console.warn('[FaceIdentity] Node.js require not available');
         }
-      }).catch(function () {
-        if (Date.now() < deadline) setTimeout(poll, 2000);
-        else _setFiStatus('error', 'Did not start — check the terminal');
-      });
-    }
-    setTimeout(poll, 4000);
-  });
+      } catch (nodeErr) {
+        console.warn('[FaceIdentity] Node.js failed:', nodeErr.message);
+      }
+
+      // Step 4: ExtendScript fallback — File.execute() opens .bat like double-clicking
+      if (!launched) {
+        var escBat = batPath.replace(/\\/g, '\\\\');
+        var fbScript = [
+          '(function(){',
+          '  try {',
+          '    var f = new File("' + escBat + '");',
+          '    if (!f.exists) return "error:bat not found: ' + escBat + '";',
+          '    var ok = f.execute();',
+          '    return ok ? "ok:file.execute" : "error:execute returned false";',
+          '  } catch(ex) {',
+          '    return "error:" + ex.message;',
+          '  }',
+          '})()'
+        ].join('');
+        cs.evalScript(fbScript, function (r) {
+          console.log('[FaceIdentity] File.execute result:', r);
+        });
+        launched = true;
+      }
+
+      if (launched) _sidecarLaunchResult('ok:' + scriptPath);
+    });
+  }
 }
 
-/** Stops the sidecar and updates UI. */
+/** Shared result handler after sidecar launch attempt. */
+function _sidecarLaunchResult(result) {
+  if (!result || result.indexOf('error') === 0) {
+    _setFiStatus('error', (result || 'Launch failed').replace('error: ', ''));
+    console.warn('[FaceIdentity] launch failed:', result);
+    return;
+  }
+  console.log('[FaceIdentity] launched:', result);
+  _setFiStatus('starting', 'Loading models\u2026');
+
+  // Poll up to 3 minutes — AdaFace download attempt can add 30-60 s to startup
+  var deadline = Date.now() + 180000;
+  var attempt  = 0;
+
+  function poll() {
+    attempt++;
+    _fetchWithTimeout(SIDECAR_URL + '/health', 3000).then(function (res) {
+      return res.ok ? res.json() : Promise.reject('not ok');
+    }).then(function (data) {
+      if (data && data.status === 'ok') {
+        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
+          .filter(Boolean).join(' + ') || 'CPU mode';
+        _setFiStatus('running', 'Running \u2014 ' + models);
+      } else {
+        scheduleNextPoll();
+      }
+    }).catch(function () {
+      scheduleNextPoll();
+    });
+  }
+
+  function scheduleNextPoll() {
+    if (Date.now() < deadline) {
+      // Update status text with elapsed time so user sees progress
+      var elapsed = Math.round((180000 - (deadline - Date.now())) / 1000);
+      _setFiStatus('starting', 'Loading models\u2026 (' + elapsed + 's)');
+      setTimeout(poll, 2000);
+    } else {
+      // Deadline passed — keep checking silently every 5s forever
+      // (server might still be loading heavy models)
+      _setFiStatus('starting', 'Still loading\u2026 check terminal');
+      setTimeout(function keepAlive() {
+        _fetchWithTimeout(SIDECAR_URL + '/health', 3000).then(function (res) {
+          return res.ok ? res.json() : Promise.reject();
+        }).then(function (data) {
+          if (data && data.status === 'ok') {
+            var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
+              .filter(Boolean).join(' + ') || 'CPU mode';
+            _setFiStatus('running', 'Running \u2014 ' + models);
+          } else {
+            setTimeout(keepAlive, 5000);
+          }
+        }).catch(function () { setTimeout(keepAlive, 5000); });
+      }, 5000);
+    }
+  }
+
+  // Start first poll immediately (no delay)
+  poll();
+}
+
+/** Stops the sidecar via HTTP /shutdown then kills the process. */
 function _doStopSidecar() {
   _setFiStatus('off', '');
-  cs.evalScript('stopSidecar()', function (result) {
-    console.log('[FaceIdentity] stopSidecar:', result);
-  });
+  fetch(SIDECAR_URL + '/shutdown', { method: 'POST' }).catch(function () {});
+  var killScript = navigator.platform.toLowerCase().indexOf('mac') !== -1
+    ? 'app.system.callSystem("pkill -f face_embedding_server.py 2>/dev/null");"done"'
+    : 'app.system.callSystem("taskkill /F /FI \\"WINDOWTITLE eq Prysmor Identity Lock\\" /T 2>nul");"done"';
+  cs.evalScript(killScript, function () {});
 }
 
 /** Quick health check — updates dot without launching anything. */

@@ -32,6 +32,8 @@
             <Parameter>--disable-application-cache</Parameter>
             <Parameter>--disable-cache</Parameter>
             <Parameter>--disk-cache-size=0</Parameter>
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
           </CEFCommandLine>
         </Resources>
         <Lifecycle>

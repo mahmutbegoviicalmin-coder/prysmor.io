@@ -611,6 +611,18 @@ def quality(req: QualityRequest) -> dict:  # type: ignore[return]
     return {"type": q_type, "score": q_score}
 
 
+@app.post("/shutdown")
+def shutdown() -> dict:
+    """Called by the panel on unload — cleanly exits the sidecar process."""
+    import threading
+    def _exit():
+        import time
+        time.sleep(0.2)
+        os._exit(0)
+    threading.Thread(target=_exit, daemon=True).start()
+    return {"ok": True}
+
+
 # ─── Video trim + upload endpoint ─────────────────────────────────────────────
 
 class TrimUploadRequest(BaseModel):
@@ -622,21 +634,26 @@ class TrimUploadRequest(BaseModel):
 
 
 def _find_ffmpeg() -> str:
-    """Return path to ffmpeg — prefers the bundled npm binary."""
-    # Check common relative paths first (works when CWD is project root)
+    """Return path to ffmpeg — checks next to script, bundled npm, then system PATH."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(os.path.dirname(__file__), "node_modules", "@ffmpeg-installer", "win32-x64", "ffmpeg.exe"),
-        os.path.join(os.path.dirname(__file__), "node_modules", "@ffmpeg-installer", "linux-x64", "ffmpeg"),
-        os.path.join(os.path.dirname(__file__), "node_modules", "@ffmpeg-installer", "darwin-x64", "ffmpeg"),
+        # 1. ffmpeg.exe/ffmpeg placed directly next to face_embedding_server.py
+        os.path.join(script_dir, "ffmpeg.exe"),
+        os.path.join(script_dir, "ffmpeg"),
+        # 2. Bundled via npm @ffmpeg-installer (when running from project root)
+        os.path.join(script_dir, "node_modules", "@ffmpeg-installer", "win32-x64", "ffmpeg.exe"),
+        os.path.join(script_dir, "node_modules", "@ffmpeg-installer", "linux-x64", "ffmpeg"),
+        os.path.join(script_dir, "node_modules", "@ffmpeg-installer", "darwin-x64", "ffmpeg"),
+        os.path.join(script_dir, "node_modules", "@ffmpeg-installer", "darwin-arm64", "ffmpeg"),
     ]
     for c in candidates:
         if os.path.isfile(c):
             return c
-    # Fall back to system ffmpeg
+    # 3. Fall back to system ffmpeg in PATH
     found = shutil.which("ffmpeg")
     if found:
         return found
-    raise RuntimeError("ffmpeg not found — install it or run from project root")
+    raise RuntimeError("ffmpeg not found — place ffmpeg.exe next to face_embedding_server.py or install system ffmpeg")
 
 
 @app.post("/trim-upload")
@@ -667,7 +684,7 @@ def trim_upload(req: TrimUploadRequest) -> dict:
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-crf", "28",                    # ~3-8 MB for 4-8s clip
-            "-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+            "-vf", "scale=min(1920\\,iw):min(1080\\,ih):force_original_aspect_ratio=decrease",
             "-movflags", "+faststart",
             "-pix_fmt", "yuv420p",
             tmp_out,
