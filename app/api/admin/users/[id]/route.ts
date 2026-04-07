@@ -22,12 +22,14 @@ export async function PATCH(
   }
 
   let body: {
-    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'refresh_location';
+    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'refresh_location' | 'set_device_limit';
     plan?:         string;
     status?:       string;
     credits?:      number;
     delta?:        number;
     resetCredits?: boolean;
+    deviceLimit?:  number;
+    clearDevices?: boolean;
   };
 
   try { body = await req.json(); }
@@ -151,6 +153,22 @@ export async function PATCH(
         }
 
         return NextResponse.json({ ok: true, data: { country, countryCode } });
+      }
+
+      case 'set_device_limit': {
+        const limit = typeof body.deviceLimit === 'number' ? body.deviceLimit : 1;
+        await ref.update({ deviceLimit: Math.max(0, limit), updatedAt: new Date() });
+
+        if (body.clearDevices) {
+          const devicesSnap = await ref.collection('devices').get();
+          if (!devicesSnap.empty) {
+            const batch = db.batch();
+            devicesSnap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            console.log(`[admin] Cleared ${devicesSnap.size} device(s) for user ${params.id}`);
+          }
+        }
+        break;
       }
 
       default:

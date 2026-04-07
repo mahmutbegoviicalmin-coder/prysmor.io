@@ -552,7 +552,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 // ─── Action Menu ──────────────────────────────────────────────────────────────
 
-function ActionMenu({ user, onPlan, onCredits, onDetail, onToggleStatus, onDelete, onRefreshLocation, loading }: {
+function ActionMenu({ user, onPlan, onCredits, onDetail, onToggleStatus, onDelete, onRefreshLocation, onRevokeDevices, loading }: {
   user: AdminUser;
   onPlan:              () => void;
   onCredits:           () => void;
@@ -560,6 +560,7 @@ function ActionMenu({ user, onPlan, onCredits, onDetail, onToggleStatus, onDelet
   onToggleStatus:      () => void;
   onDelete:            () => void;
   onRefreshLocation:   () => void;
+  onRevokeDevices:     () => void;
   loading:             boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -578,17 +579,23 @@ function ActionMenu({ user, onPlan, onCredits, onDetail, onToggleStatus, onDelet
     { icon: CreditCard,  label: 'Adjust credits',      action: () => { onCredits();           setOpen(false); } },
     { icon: MapPin,      label: 'Refresh location',    action: () => { onRefreshLocation();   setOpen(false); } },
     {
+      icon:    Activity,
+      label:   'Revoke devices (0/1)',
+      action:  () => { onRevokeDevices(); setOpen(false); },
+      divider: true,
+    },
+    {
       icon: user.licenseStatus === 'active' ? ShieldOff : ShieldCheck,
       label: user.licenseStatus === 'active' ? 'Suspend user' : 'Activate user',
       action: () => { onToggleStatus(); setOpen(false); },
       danger: user.licenseStatus === 'active',
-      divider: true,
     },
     {
       icon:   Trash2,
       label:  'Delete user',
       action: () => { onDelete(); setOpen(false); },
-      danger: true,
+      danger:  true,
+      divider: true,
     },
   ];
 
@@ -906,6 +913,17 @@ export function AdminPanel() {
           updateUser({ ...user, country: data.country, countryCode: data.countryCode ?? user.countryCode });
         }
       }
+    } finally { setActionLoading(null); }
+  }
+
+  async function revokeDevices(user: AdminUser) {
+    setActionLoading(user.id);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_device_limit', deviceLimit: 1, clearDevices: true }),
+      });
+      if (res.ok) updateUser({ ...user, deviceLimit: 1 });
     } finally { setActionLoading(null); }
   }
 
@@ -1229,6 +1247,7 @@ export function AdminPanel() {
                         onDelete={()           => setModal({ type: 'delete',  user })}
                         onToggleStatus={()     => toggleStatus(user)}
                         onRefreshLocation={()  => refreshLocation(user)}
+                        onRevokeDevices={()    => revokeDevices(user)}
                       />
                     </td>
                   </tr>
