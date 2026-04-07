@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";
 
+export const dynamic  = 'force-dynamic';
 export const metadata = { title: "Overview — Dashboard" };
 
 /* ─── primitives ─── */

@@ -135,12 +135,15 @@ export async function createCheckout(variantId: string, userId: string, override
 export function createTopUpCheckout(pack: CreditPack, userId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor-io.vercel.app';
   const base   = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${pack.checkoutUuid}`;
-  const params = new URLSearchParams({
-    'checkout[custom][user_id]':   userId,
-    'checkout[custom][pack_id]':   pack.id,
-    'checkout[redirect_url]':      `${appUrl}/dashboard/billing?topup=true`,
-  });
-  return `${base}?${params.toString()}`;
+  // Build query string manually — URLSearchParams encodes brackets (%5B%5D) which
+  // LemonSqueezy does not recognise. We need literal brackets for custom_data to
+  // be forwarded correctly in the webhook payload.
+  const query = [
+    `checkout[custom][user_id]=${encodeURIComponent(userId)}`,
+    `checkout[custom][pack_id]=${encodeURIComponent(pack.id)}`,
+    `checkout[redirect_url]=${encodeURIComponent(`${appUrl}/dashboard/billing?topup=true`)}`,
+  ].join('&');
+  return `${base}?${query}`;
 }
 
 /**

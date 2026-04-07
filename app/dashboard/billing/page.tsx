@@ -6,7 +6,24 @@ import { PLAN_LABELS, PLAN_CREDITS } from '@/lib/firestore/users';
 import { getCustomerPortalUrl } from '@/lib/lemonsqueezy';
 import { TopUpButton } from './TopUpButton';
 
+export const dynamic  = 'force-dynamic';
 export const metadata = { title: 'Billing — Dashboard' };
+
+/** Formats any date value: ISO string, Firestore .NET-style, or already-formatted string. */
+function formatDateDisplay(value: string | undefined | null): string | null {
+  if (!value) return null;
+  // Already human-readable (e.g. "May 7, 2026") — contains no 'T' ISO separator
+  if (!value.includes('T') && !value.match(/^\d{4}-\d{2}-\d{2}$/)) return value;
+  try {
+    // Normalize .NET 7-digit fractional seconds
+    const normalized = value.replace(/\.(\d{7})Z$/, (_, f) => `.${f.slice(0, 3)}Z`);
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return value;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch {
+    return value;
+  }
+}
 
 interface UserDoc {
   plan:              string;
@@ -60,7 +77,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const planName      = PLAN_LABELS[plan]      ?? 'Starter';
   const planCap       = PLAN_CREDITS[plan]     ?? 1000;
   const licenseStatus = userDoc?.licenseStatus ?? 'inactive';
-  const renewalDate   = userDoc?.renewalDate;
+  const renewalDate   = formatDateDisplay(userDoc?.renewalDate);
   const isActive      = licenseStatus === 'active';
 
   // Default to 0 — never show phantom credits to unsubscribed users
