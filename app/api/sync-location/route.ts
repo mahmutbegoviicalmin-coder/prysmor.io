@@ -4,17 +4,28 @@ import { updateUserCountry } from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
+const PRIVATE_PREFIXES = ['127.', '10.', '192.168.', '172.16.', '172.17.',
+  '172.18.', '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
+  '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.'];
+
+function isPrivateIp(ip: string): boolean {
+  return ip === '::1' || ip === 'localhost' || PRIVATE_PREFIXES.some(p => ip.startsWith(p));
+}
+
 function extractIp(req: NextRequest): string | null {
-  // In production (Vercel / behind proxy), the real IP is in x-forwarded-for
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0].trim();
-    if (first && first !== '::1' && !first.startsWith('127.') && !first.startsWith('10.') && !first.startsWith('192.168.')) {
-      return first;
-    }
+  // Try all common proxy/CDN headers (Vercel uses x-forwarded-for + x-vercel-forwarded-for)
+  const candidates = [
+    req.headers.get('x-vercel-forwarded-for'),  // Vercel-specific
+    req.headers.get('x-forwarded-for'),          // Standard proxy header
+    req.headers.get('x-real-ip'),                // nginx
+    req.headers.get('cf-connecting-ip'),         // Cloudflare
+  ];
+
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const ip = raw.split(',')[0].trim();
+    if (ip && !isPrivateIp(ip)) return ip;
   }
-  const realIp = req.headers.get('x-real-ip');
-  if (realIp && realIp !== '::1') return realIp;
   return null;
 }
 

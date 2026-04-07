@@ -74,11 +74,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const userDoc = userId ? await getUserDoc(userId).catch(() => null) : null;
 
   const plan          = userDoc?.plan          ?? 'starter';
-  const planName      = PLAN_LABELS[plan]      ?? 'Starter';
   const planCap       = PLAN_CREDITS[plan]     ?? 1000;
   const licenseStatus = userDoc?.licenseStatus ?? 'inactive';
   const renewalDate   = formatDateDisplay(userDoc?.renewalDate);
   const isActive      = licenseStatus === 'active';
+  // Show "No Plan" until user actually purchases — stored plan is "starter" by default
+  const planName      = isActive ? (PLAN_LABELS[plan] ?? 'Starter') : 'No Plan';
 
   // Default to 0 — never show phantom credits to unsubscribed users
   const credits      = typeof userDoc?.credits      === 'number' ? userDoc.credits      : 0;

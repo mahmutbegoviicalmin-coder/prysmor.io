@@ -166,7 +166,7 @@ export async function refundCredits(
 
 /**
  * Saves the user's country (from IP geolocation) to Firestore.
- * Only writes if country is not already set (idempotent).
+ * Always updates so admin "Refresh location" works correctly.
  */
 export async function updateUserCountry(
   userId:      string,
@@ -176,9 +176,6 @@ export async function updateUserCountry(
   const ref = db.collection("users").doc(userId);
   const doc = await ref.get();
   if (!doc.exists) return;
-  const existing = doc.data()?.country;
-  // Don't overwrite an existing value
-  if (existing) return;
   await ref.update({ country, countryCode, updatedAt: new Date() });
 }
 

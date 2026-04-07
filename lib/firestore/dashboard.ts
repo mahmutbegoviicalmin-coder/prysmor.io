@@ -150,11 +150,14 @@ export async function getDashboardData(
   );
 
   // ── License ────────────────────────────────────────────────────────────────
-  const plan          = userDoc?.plan          ?? "starter";
-  const planLabel     = PLAN_LABELS[plan]      ?? plan;
+  const plan          = userDoc?.plan ?? "starter";
   // IMPORTANT: default must be "inactive" — never grant free access to users
   // whose Firestore doc hasn't been created yet (e.g. Clerk webhook delay).
   const licenseStatus = userDoc?.licenseStatus ?? "inactive";
+  // Show "No Plan" for inactive users — plan label is only meaningful after purchase.
+  const planLabel = licenseStatus === "active"
+    ? (PLAN_LABELS[plan] ?? plan)
+    : "No Plan";
 
   // Format renewal date — Firestore may contain raw ISO from old webhook calls
   const renewalDate = formatRenewalDate(userDoc?.renewalDate);
