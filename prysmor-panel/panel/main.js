@@ -30,11 +30,12 @@ const SIDECAR_URL        = 'http://127.0.0.1:7788';
 const SIDECAR_START_WAIT = 12000;  // ms to wait after launch before re-checking health
 
 // LocalStorage keys
-const LS_TOKEN     = 'prysmor_token';
-const LS_USER_ID   = 'prysmor_user_id';
-const LS_PLAN      = 'prysmor_plan';
-const LS_PLAN_LABEL = 'prysmor_plan_label';
-const LS_TOKEN_EXP = 'prysmor_token_exp';
+const LS_TOKEN          = 'prysmor_token';
+const LS_USER_ID        = 'prysmor_user_id';
+const LS_PLAN           = 'prysmor_plan';
+const LS_PLAN_LABEL     = 'prysmor_plan_label';
+const LS_TOKEN_EXP      = 'prysmor_token_exp';
+const LS_FACE_IDENTITY  = 'prysmor_face_identity'; // 'on' | 'off'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -356,10 +357,17 @@ function enterPanel() {
 
 /**
  * Checks if the sidecar is already running on localhost:7788.
- * If not, asks ExtendScript to launch prysmor-sidecar.exe.
+ * Respects the Face Identity toggle — if the user has turned it OFF, this is a no-op.
  * Completely non-blocking — panel works fine without it.
  */
 async function ensureSidecarRunning() {
+  // Respect user preference — default ON if never set
+  var fiPref = localStorage.getItem(LS_FACE_IDENTITY);
+  if (fiPref === 'off') {
+    console.log('[Prysmor] Face Identity is OFF — skipping sidecar');
+    return;
+  }
+
   try {
     var res = await fetch(SIDECAR_URL + '/health', {
       signal: AbortSignal.timeout(2000),
@@ -372,7 +380,8 @@ async function ensureSidecarRunning() {
     // Not running — try to launch it
   }
 
-  console.log('[Prysmor] Sidecar not detected — attempting auto-start…');
+  // Auto-start silently (background) on boot — user can use the toggle for visible terminal
+  console.log('[Prysmor] Sidecar not detected — attempting silent auto-start…');
   cs.evalScript('startSidecar()', async function (result) {
     console.log('[Prysmor] startSidecar result:', result);
     if (result && result.indexOf('error') === 0) {
@@ -380,7 +389,6 @@ async function ensureSidecarRunning() {
         '— Identity Lock will be skipped (panel still functional)');
       return;
     }
-    // Give it time to load models (InsightFace takes ~10s)
     await new Promise(function (r) { setTimeout(r, SIDECAR_START_WAIT); });
     try {
       var health = await fetch(SIDECAR_URL + '/health', {
@@ -388,6 +396,7 @@ async function ensureSidecarRunning() {
       });
       if (health.ok) {
         console.log('[Prysmor] Sidecar started and healthy ✓');
+        _setFiStatus('running', 'Running');
       } else {
         console.warn('[Prysmor] Sidecar started but not ready yet — will retry on generation');
       }
@@ -890,10 +899,10 @@ function startPolling(jobId) {
     console.log('[Prysmor] handleJobComplete — outputUrl:', job.outputUrl);
 
     // ── Try local Identity Lock via sidecar ───────────────────────────────────
-    // If the sidecar is running and we know the original source path,
-    // run compositing locally instead of inserting the raw Runway output.
+    // Skip if user has turned off Face Identity.
+    var fiEnabled = localStorage.getItem(LS_FACE_IDENTITY) !== 'off';
     var sel = state.mf.selInfo;
-    if (sel && sel.sourcePath) {
+    if (fiEnabled && sel && sel.sourcePath) {
       var compAbort  = new AbortController();
       var compTimer  = null;
       var compStart  = Date.now();
@@ -1559,6 +1568,9 @@ function bindEvents() {
   el('btn-copy-diag').addEventListener('click', copyDiagnostics);
   el('btn-logout').addEventListener('click', logout);
 
+  // Face Identity toggle
+  bindFaceIdentityToggle();
+
   el('btn-dashboard').addEventListener('click', function () {
     cs.openURLInDefaultBrowser(SITE_URL + '/dashboard');
   });
@@ -1582,6 +1594,138 @@ function bindEvents() {
     e.preventDefault();
     cs.openURLInDefaultBrowser(SITE_URL + '/terms');
   });
+}
+
+// ─── Face Identity Toggle ──────────────────────────────────────────────────────
+
+/**
+ * Wires the Face Identity ON/OFF toggle in the settings menu.
+ * Persists state in localStorage (LS_FACE_IDENTITY).
+ * ON  → calls startSidecarVisible() via ExtendScript (opens terminal window)
+ * OFF → calls stopSidecar() via ExtendScript and clears status UI
+ */
+function bindFaceIdentityToggle() {
+  var toggle   = el('fi-toggle-input');
+  var stopBtn  = el('fi-stop-btn');
+  if (!toggle) return;
+
+  // Restore saved preference (default ON)
+  var saved = localStorage.getItem(LS_FACE_IDENTITY);
+  var isOn  = (saved === null) ? true : (saved === 'on');
+  toggle.checked = isOn;
+
+  if (isOn) {
+    // Check if already running on boot
+    _checkSidecarHealth();
+  } else {
+    _setFiDot('off');
+  }
+
+  toggle.addEventListener('change', function () {
+    if (toggle.checked) {
+      localStorage.setItem(LS_FACE_IDENTITY, 'on');
+      _launchSidecarVisible();
+    } else {
+      localStorage.setItem(LS_FACE_IDENTITY, 'off');
+      _doStopSidecar();
+    }
+  });
+
+  if (stopBtn) {
+    stopBtn.addEventListener('click', function () {
+      toggle.checked = false;
+      localStorage.setItem(LS_FACE_IDENTITY, 'off');
+      _doStopSidecar();
+    });
+  }
+}
+
+/** Launches sidecar in a visible terminal window, then polls health until ready. */
+function _launchSidecarVisible() {
+  _setFiStatus('starting', 'Starting…');
+  cs.evalScript('startSidecarVisible()', async function (result) {
+    if (result && result.indexOf('error') === 0) {
+      _setFiStatus('error', result.replace('error: ', ''));
+      console.warn('[FaceIdentity] startSidecarVisible error:', result);
+      return;
+    }
+    console.log('[FaceIdentity] Terminal launched:', result);
+    _setFiStatus('starting', 'Loading models… (may take ~15s)');
+    // Poll health until sidecar is up (up to 60s)
+    var deadline = Date.now() + 60000;
+    async function poll() {
+      try {
+        var res = await fetch(SIDECAR_URL + '/health', { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          var data = await res.json();
+          if (data.status === 'ok') {
+            var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace'].filter(Boolean).join(' + ') || 'fallback mode';
+            _setFiStatus('running', 'Running — ' + models);
+            return;
+          }
+        }
+      } catch (_) { /* keep polling */ }
+      if (Date.now() < deadline) {
+        setTimeout(poll, 2000);
+      } else {
+        _setFiStatus('error', 'Did not start in time — check the terminal');
+      }
+    }
+    setTimeout(poll, 4000);
+  });
+}
+
+/** Stops the sidecar and updates UI. */
+function _doStopSidecar() {
+  _setFiStatus('off', '');
+  cs.evalScript('stopSidecar()', function (result) {
+    console.log('[FaceIdentity] stopSidecar:', result);
+  });
+}
+
+/** Quick health check — updates dot without launching anything. */
+async function _checkSidecarHealth() {
+  try {
+    var res = await fetch(SIDECAR_URL + '/health', { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      var data = await res.json();
+      if (data.status === 'ok') {
+        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace'].filter(Boolean).join(' + ') || 'fallback mode';
+        _setFiStatus('running', 'Running — ' + models);
+        return;
+      }
+    }
+  } catch (_) { /* not running */ }
+  _setFiStatus('off', 'Not running — toggle to start');
+}
+
+/**
+ * Updates the Face Identity status dot + text row.
+ * @param {'running'|'starting'|'error'|'off'} state
+ * @param {string} text
+ */
+function _setFiDot(dotState) {
+  var dot = el('fi-status-dot');
+  if (!dot) return;
+  dot.classList.remove('running', 'starting', 'error');
+  if (dotState !== 'off') dot.classList.add(dotState);
+}
+
+function _setFiStatus(dotState, text) {
+  _setFiDot(dotState);
+  var row     = el('fi-status-row');
+  var textEl  = el('fi-status-text');
+  var stopBtn = el('fi-stop-btn');
+  if (!row || !textEl) return;
+  if (text) {
+    textEl.textContent = text;
+    row.classList.remove('hidden');
+  } else {
+    row.classList.add('hidden');
+  }
+  if (stopBtn) {
+    stopBtn.style.display = (dotState === 'running') ? '' : 'none';
+  }
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
