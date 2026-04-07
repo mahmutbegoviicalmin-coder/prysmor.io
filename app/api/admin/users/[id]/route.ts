@@ -81,6 +81,18 @@ export async function PATCH(
       case 'set_status': {
         const status = body.status ?? 'inactive';
         await ref.update({ licenseStatus: status, updatedAt: new Date() });
+
+        // When suspending, immediately delete all registered devices so the
+        // panel loses access on its next request (no active device = no auth).
+        if (status === 'inactive') {
+          const devicesSnap = await ref.collection('devices').get();
+          if (!devicesSnap.empty) {
+            const batch = db.batch();
+            devicesSnap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            console.log(`[admin] Revoked ${devicesSnap.size} device(s) for suspended user ${params.id}`);
+          }
+        }
         break;
       }
 

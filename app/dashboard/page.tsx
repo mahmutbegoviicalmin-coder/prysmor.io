@@ -173,36 +173,57 @@ export default async function DashboardOverviewPage() {
         <Card>
           <div className="flex items-start justify-between mb-4">
             <p className="text-[13px] font-medium text-[#9CA3AF]">Credits</p>
-            <span className="text-[11px] text-[#6B7280]">This cycle</span>
-          </div>
-          <div className="mb-4">
-            <div className="flex items-end justify-between mb-2">
-              <p className="text-[28px] font-semibold text-white leading-none">
-                {limits.credits.toLocaleString()}
-                <span className="text-[16px] font-normal text-[#4B5563] ml-1">
-                  / {limits.creditsTotal.toLocaleString()}
+            {license.status === "active"
+              ? <span className="text-[11px] text-[#6B7280]">This cycle</span>
+              : <span className="inline-flex items-center gap-1 text-[11px] text-[#374151]">
+                  <Lock className="w-3 h-3" /> Inactive
                 </span>
-              </p>
-              <span className={`text-[12px] font-medium ${pct < 20 ? "text-orange-400" : "text-[#6B7280]"}`}>
-                {pct}%
-              </span>
-            </div>
-            <div className="h-[3px] w-full rounded-full bg-white/[0.07] overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${pct}%`, opacity: 0.9, background: pct < 20 ? "#fb923c" : "#A3FF12" }}
-              />
-            </div>
-            <p className="mt-1.5 text-[11px] text-[#4B5563]">≈ {creditSeconds}s of AI VFX remaining</p>
+            }
           </div>
+
+          {license.status !== "active" ? (
+            /* ── Locked state ── */
+            <div className="flex flex-col items-center justify-center py-5 gap-2 mb-4">
+              <div className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center mb-1">
+                <Lock className="w-4 h-4 text-[#374151]" />
+              </div>
+              <p className="text-[13px] font-medium text-[#374151]">Credits locked</p>
+              <p className="text-[11px] text-[#2D2D35] text-center">Requires an active plan</p>
+            </div>
+          ) : (
+            /* ── Active state ── */
+            <div className="mb-4">
+              <div className="flex items-end justify-between mb-2">
+                <p className="text-[28px] font-semibold text-white leading-none">
+                  {limits.credits.toLocaleString()}
+                  <span className="text-[16px] font-normal text-[#4B5563] ml-1">
+                    / {limits.creditsTotal.toLocaleString()}
+                  </span>
+                </p>
+                <span className={`text-[12px] font-medium ${pct < 20 ? "text-orange-400" : "text-[#6B7280]"}`}>
+                  {pct}%
+                </span>
+              </div>
+              <div className="h-[3px] w-full rounded-full bg-white/[0.07] overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${pct}%`, opacity: 0.9, background: pct < 20 ? "#fb923c" : "#A3FF12" }}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-[#4B5563]">≈ {creditSeconds}s of AI VFX remaining</p>
+            </div>
+          )}
+
           <div className="space-y-0">
             <DataRow label="Device seats" value={`${limits.devicesUsed} / ${limits.deviceLimit}`} />
             <DataRow label="Resets on"    value={limits.resetDate} />
           </div>
-          <Link href="/dashboard/billing"
-            className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#A3FF12] hover:underline underline-offset-2">
-            Manage credits <ChevronRight className="w-3 h-3" />
-          </Link>
+          {license.status === "active" && (
+            <Link href="/dashboard/billing"
+              className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#A3FF12] hover:underline underline-offset-2">
+              Manage credits <ChevronRight className="w-3 h-3" />
+            </Link>
+          )}
         </Card>
       </div>
 

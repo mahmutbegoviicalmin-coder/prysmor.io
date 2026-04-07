@@ -79,11 +79,28 @@ function fmtRelative(iso: string | null): string {
   return `${Math.floor(days / 365)}y ago`;
 }
 
-/** Converts ISO 3166-1 alpha-2 country code to emoji flag */
-function countryFlag(code: string | null): string {
-  if (!code || code.length !== 2) return '🌐';
-  return String.fromCodePoint(
-    ...code.toUpperCase().split('').map(c => 0x1F1E0 - 65 + c.charCodeAt(0)),
+/** Renders a country code as a styled badge (avoids Windows emoji rendering issues) */
+function CountryBadge({ code, name }: { code: string | null; name: string | null }) {
+  if (!code || !name) return <span className="text-[11px] text-[#2D2D35] italic">Pending…</span>;
+  const upper = code.toUpperCase().slice(0, 2);
+  // Simple deterministic color from code letters
+  const colors = [
+    'bg-blue-500/20 text-blue-300',
+    'bg-emerald-500/20 text-emerald-300',
+    'bg-amber-500/20 text-amber-300',
+    'bg-purple-500/20 text-purple-300',
+    'bg-rose-500/20 text-rose-300',
+    'bg-cyan-500/20 text-cyan-300',
+    'bg-orange-500/20 text-orange-300',
+  ];
+  const color = colors[(upper.charCodeAt(0) + upper.charCodeAt(1)) % colors.length];
+  return (
+    <span className="flex items-center gap-2">
+      <span className={`inline-flex items-center justify-center w-[26px] h-[18px] rounded-[4px] text-[10px] font-bold tracking-wide flex-shrink-0 ${color}`}>
+        {upper}
+      </span>
+      <span className="text-[12px] text-[#9CA3AF] truncate max-w-[110px]">{name}</span>
+    </span>
   );
 }
 
@@ -406,7 +423,7 @@ function DetailModal({ user, onClose }: { user: AdminUser; onClose: () => void }
     ['Email',         user.email || '—'],
     ['First name',    user.firstName || '—'],
     ['Last name',     user.lastName  || '—'],
-    ['Country',       user.country ? `${countryFlag(user.countryCode)} ${user.country}` : '—'],
+    ['Country',       user.country ? `${user.countryCode ? `[${user.countryCode}] ` : ''}${user.country}` : '—'],
     ['Plan',          user.planLabel],
     ['Status',        user.licenseStatus],
     ['Credits',       `${user.credits.toLocaleString()} / ${user.creditsTotal.toLocaleString()}`],
@@ -1093,7 +1110,7 @@ export function AdminPanel() {
               >
                 <option value="all">All countries</option>
                 {countries.map(([code, name]) => (
-                  <option key={code} value={code}>{countryFlag(code)} {name}</option>
+                  <option key={code} value={code}>[{code}] {name}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4B5563] pointer-events-none" />
@@ -1178,14 +1195,7 @@ export function AdminPanel() {
 
                     {/* Country */}
                     <td className="px-4 py-3">
-                      {user.country ? (
-                        <span className="flex items-center gap-1.5 text-[12px] text-[#9CA3AF]">
-                          <span className="text-[15px] leading-none">{countryFlag(user.countryCode)}</span>
-                          {user.country}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[#2D2D35] italic">Pending…</span>
-                      )}
+                      <CountryBadge code={user.countryCode} name={user.country} />
                     </td>
 
                     {/* Credits */}
