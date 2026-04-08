@@ -333,11 +333,12 @@ async function callClaude(userPrompt: string): Promise<string> {
 
 /**
  * Injected into background-effect prompts to anchor subject appearance.
- * Placed after the VFX instruction so Runway treats it as a hard constraint.
+ * Placed BEFORE the VFX instruction (right after ANTI_ARTIFACT_PREFIX) so that
+ * Runway's highest-weight instruction slot contains the identity constraint.
  * Uses positive language only — Runway responds to "maintain X" better than "do not change X".
  */
 const FACE_PRESERVE_SUFFIX =
-  ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
+  'All subjects maintain their exact facial features, skin tone, hair color and style,' +
   ' clothing, and body proportions from the source video, appearing identical throughout' +
   ' the transformation.';
 
@@ -361,13 +362,24 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
 
   log(TAG, 'Compile request', { promptLen: prompt.length, effectType });
 
-  try {
-    const raw    = await callClaude(prompt);
-    let compiled = normalizeCompiled(raw);
-
+  /**
+   * Builds the final compiled prompt.
+   * Structure:  [ANTI_ARTIFACT_PREFIX] [identity]. [VFX instruction].
+   * For background effects the identity sentence is injected BEFORE the VFX
+   * body so Runway's highest-weight early slots contain the preservation rule.
+   */
+  function assemble(vfxBody: string): string {
     if (effectType === 'background') {
-      compiled = sanitizeForRunway(compiled + FACE_PRESERVE_SUFFIX).slice(0, 1000);
+      return sanitizeForRunway(
+        normalizeCompiled(FACE_PRESERVE_SUFFIX + ' ' + vfxBody),
+      ).slice(0, 1000);
     }
+    return normalizeCompiled(vfxBody);
+  }
+
+  try {
+    const raw     = await callClaude(prompt);
+    const compiled = assemble(raw);
 
     const wordCount = compiled.split(/\s+/).length;
     if (wordCount < 8) {
@@ -384,11 +396,14 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
       err: (err as Error).message,
     });
 
-    let compiled = fallbackCompile(prompt);
-    if (effectType === 'background') {
-      compiled = sanitizeForRunway(compiled + FACE_PRESERVE_SUFFIX).slice(0, 1000);
-    }
+    const cleaned = prompt.trim();
+    const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    const stmt    = body.endsWith('.') ? body : body + '.';
+    const fallbackBody =
+      `Preserve the subject's identity, face, pose, and framing. ` +
+      `${stmt} Keep all other aspects of the shot unchanged.`;
 
+    const compiled = assemble(fallbackBody);
     log(TAG, 'Fallback compile used', { wordCount: compiled.split(/\s+/).length, effectType });
     return { compiledPrompt: compiled, method: 'fallback', effectType };
   }

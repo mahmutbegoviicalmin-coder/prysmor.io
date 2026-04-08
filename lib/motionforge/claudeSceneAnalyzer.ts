@@ -11,8 +11,9 @@ import {
 void ANTI_ARTIFACT_PREFIX;
 
 // Mirrors the unexported constant in promptCompiler — kept in sync intentionally.
+// Placed BEFORE the VFX instruction so Runway weights identity preservation most heavily.
 const FACE_PRESERVE_SUFFIX =
-  ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
+  'All subjects maintain their exact facial features, skin tone, hair color and style,' +
   ' clothing, and body proportions from the source video, appearing identical throughout' +
   ' the transformation.';
 
@@ -86,19 +87,20 @@ MANDATORY RULES (non-negotiable):
 
 Output ONLY the final Runway prompt following this EXACT structure:
 
-Line 1: Start with action verb - example: "Transform [space] into [effect],"
-Line 2: Describe the environment transformation in detail
-Line 3: "with [subject description - exact clothing color and type] maintaining identical appearance throughout."
+Line 1: "with [exact clothing color, garment type, and appearance details] maintaining identical appearance,"
+Line 2: Start with action verb - "Transform [space] into [effect],"
+Line 3: Describe the environment transformation in detail.
 
 CORRECT example:
-"Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air, with man in navy blue work coveralls and dark beard maintaining identical appearance throughout."
+"with man in navy blue work coveralls and dark beard maintaining identical appearance, Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air."
 
 WRONG - never start with these:
+- "Transform the scene..."
+- "Cover every surface..."
 - "The subject's exact..."
 - "preserve exact identity..."
-- "Maintaining the subject..."
 
-ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
+ALWAYS start with: "with [subject description] maintaining identical appearance,"`,
           },
         ],
       },
@@ -109,9 +111,11 @@ ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
 
   const effectType = classifyPromptEffect(rawPrompt);
 
+  // For background effects: prepend identity sentence BEFORE the VFX instruction
+  // so it lands right after the anti-artifact prefix — Runway weights early tokens most.
   let compiled = rawPrompt;
   if (effectType === 'background') {
-    compiled = compiled + FACE_PRESERVE_SUFFIX;
+    compiled = FACE_PRESERVE_SUFFIX + ' ' + compiled;
   }
 
   compiled = sanitizeForRunway(compiled);
@@ -179,19 +183,20 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
 
 Output ONLY the final Runway prompt following this EXACT structure:
 
-Line 1: Start with action verb - example: "Transform [space] into [effect],"
-Line 2: Describe the environment transformation in detail
-Line 3: "with [subject description - exact clothing color and type] maintaining identical appearance throughout."
+Line 1: "with [exact clothing color, garment type, and appearance details] maintaining identical appearance,"
+Line 2: Start with action verb - "Transform [space] into [effect],"
+Line 3: Describe the environment transformation in detail.
 
 CORRECT example:
-"Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air, with man in navy blue work coveralls and dark beard maintaining identical appearance throughout."
+"with man in navy blue work coveralls and dark beard maintaining identical appearance, Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air."
 
 WRONG - never start with these:
+- "Transform the scene..."
+- "Cover every surface..."
 - "The subject's exact..."
 - "preserve exact identity..."
-- "Maintaining the subject..."
 
-ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
+ALWAYS start with: "with [subject description] maintaining identical appearance,"`,
           },
         ],
       },
@@ -200,8 +205,9 @@ ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
 
   const raw = response.content[0].type === 'text' ? response.content[0].text : '';
   const effectType = classifyPromptEffect(raw);
+  // Prepend identity sentence BEFORE the VFX instruction — same ordering as promptCompiler.
   let compiled = raw;
-  if (effectType === 'background') compiled = compiled + FACE_PRESERVE_SUFFIX;
+  if (effectType === 'background') compiled = FACE_PRESERVE_SUFFIX + ' ' + compiled;
   compiled = sanitizeForRunway(compiled);
   compiled = normalizeCompiled(compiled);
 
