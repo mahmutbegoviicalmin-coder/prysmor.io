@@ -84,9 +84,21 @@ MANDATORY RULES (non-negotiable):
    User request: "${userPrompt || 'keep same environment'}"
    Apply environment change while keeping all subjects identical.
 
-Output structure: [Subject descriptions] [Action/effect] [Environment] [Atmosphere]
-Output ONLY the final Runway prompt, no explanation. Start with:
-"preserve exact identity and appearance of all subjects from source video,"`,
+Output ONLY the final Runway prompt following this EXACT structure:
+
+Line 1: Start with action verb - example: "Transform [space] into [effect],"
+Line 2: Describe the environment transformation in detail
+Line 3: "with [subject description - exact clothing color and type] maintaining identical appearance throughout."
+
+CORRECT example:
+"Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air, with man in navy blue work coveralls and dark beard maintaining identical appearance throughout."
+
+WRONG - never start with these:
+- "The subject's exact..."
+- "preserve exact identity..."
+- "Maintaining the subject..."
+
+ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
           },
         ],
       },
@@ -167,22 +179,19 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
 
 Output ONLY the final Runway prompt following this EXACT structure:
 
-FIRST: Start with a strong action verb describing the transformation.
-Examples: "Transform the space into...", "Cover all surfaces with...", "Fill the environment with...", "Coat every surface with..."
+Line 1: Start with action verb - example: "Transform [space] into [effect],"
+Line 2: Describe the environment transformation in detail
+Line 3: "with [subject description - exact clothing color and type] maintaining identical appearance throughout."
 
-SECOND: Describe the environment transformation in detail — surfaces, lighting, atmosphere, materials.
+CORRECT example:
+"Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air, with man in navy blue work coveralls and dark beard maintaining identical appearance throughout."
 
-THIRD: Describe the subject with exact clothing and appearance details,
-using the phrase "subject maintaining exact [clothing description] and appearance".
+WRONG - never start with these:
+- "The subject's exact..."
+- "preserve exact identity..."
+- "Maintaining the subject..."
 
-EXAMPLE OUTPUT:
-"Transform the industrial workshop into a frozen arctic realm, coating every surface with thick
-crystalline ice and frost formations, icicles hanging from ceiling beams. Subject maintaining
-exact blue work coveralls and dark beard appearance, breath visible as white vapor in the
-subzero atmosphere, cold blue lighting throughout."
-
-NEVER start with "The subject's" or "preserve exact identity" — always start with the transformation action verb.
-Output ONLY the final prompt, no explanation.`,
+ALWAYS start with: "Transform", "Cover", "Fill", "Replace", "Add", "Convert"`,
           },
         ],
       },
