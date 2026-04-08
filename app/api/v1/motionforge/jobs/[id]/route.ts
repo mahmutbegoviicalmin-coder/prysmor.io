@@ -430,6 +430,7 @@ async function runEnhancementAsync(
 ): Promise<void> {
   try {
     log(TAG, `Starting Replicate enhancement pipeline for job ${jobId}`);
+    console.log('[replicate] calling enhanceVideo - build timestamp:', new Date().toISOString());
     const finalUrl = await enhanceVideo(rawUrl);
     log(TAG, `Enhancement complete for job ${jobId}`, { finalUrl: finalUrl.slice(0, 100) });
 
