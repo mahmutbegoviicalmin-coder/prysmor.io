@@ -25,8 +25,8 @@ export async function restoreFaces(videoUrl: string): Promise<string> {
 }
 
 /**
- * Runs Topaz Labs Video Upscale (2K target).
- * Returns a new public URL pointing to the upscaled video.
+ * Runs Topaz Labs Video Upscale.
+ * target_resolution omitted — Topaz uses its own default upscale logic.
  * Note: topazlabs/video-upscale returns a FileOutput object — extract URL via .url().
  */
 export async function upscaleVideo(videoUrl: string): Promise<string> {
@@ -37,7 +37,6 @@ export async function upscaleVideo(videoUrl: string): Promise<string> {
     {
       input: {
         video: videoUrl,
-        target_resolution: '1080p',
       },
     },
   ) as { url: () => string } | string;
