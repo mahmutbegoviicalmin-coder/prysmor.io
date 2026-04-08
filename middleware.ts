@@ -12,8 +12,6 @@ export default authMiddleware({
     "/sign-up(.*)",
     "/api/webhooks(.*)",   // covers /api/webhooks/clerk and /api/webhooks/lemonsqueezy
     "/api/firebase/test",
-    // MotionForge panel API — authenticated via X-Panel-Key header, not Clerk session
-    "/api/v1/motionforge(.*)",
     // Panel-auth web page is public (user may not be logged in yet)
     "/panel-auth(.*)",
   ],
@@ -23,6 +21,8 @@ export default authMiddleware({
   ignoredRoutes: [
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
+    // MotionForge panel API — own auth via X-Panel-Key, Clerk must not interfere
+    "/api/v1/motionforge(.*)",
   ],
 });
 

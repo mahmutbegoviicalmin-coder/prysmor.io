@@ -254,15 +254,6 @@
             <div id="gs-line-2"></div>
           </div>
 
-          <!-- Skip Identity Lock button (shown only during compositing) -->
-          <div style="text-align:center; margin-top:8px; display:none" id="btn-skip-identity-lock-wrap">
-            <button
-              id="btn-skip-identity-lock"
-              style="display:none; background:transparent; border:1px solid #555; color:#aaa;
-                     font-size:11px; padding:4px 12px; border-radius:4px; cursor:pointer;"
-              title="Skip Identity Lock and use raw Runway output"
-            >Skip Identity Lock</button>
-          </div>
 
         </div>
 
@@ -326,22 +317,6 @@
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
             Check for Updates
           </button>
-          <!-- Face Identity toggle -->
-          <div class="sm-item sm-toggle-row" id="fi-toggle-row">
-            <div class="sm-toggle-left">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-              <span>Face Identity</span>
-              <span class="fi-status-dot" id="fi-status-dot"></span>
-            </div>
-            <label class="sm-switch">
-              <input type="checkbox" id="fi-toggle-input"/>
-              <span class="sm-slider"></span>
-            </label>
-          </div>
-          <div class="fi-status-row hidden" id="fi-status-row">
-            <span class="fi-status-text" id="fi-status-text">Starting…</span>
-            <button class="ghost-lnk" id="fi-stop-btn" style="display:none">Stop</button>
-          </div>
 
           <button class="sm-item" id="btn-diagnostics">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>

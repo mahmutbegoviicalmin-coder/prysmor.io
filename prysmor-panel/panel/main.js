@@ -25,9 +25,6 @@ const GEN_STATUS_LABELS = [
   { after: 300, text: 'Almost there, processing your effect…'      },
 ];
 
-// Sidecar auto-start
-const SIDECAR_URL        = 'http://127.0.0.1:7788';
-const SIDECAR_START_WAIT = 12000;  // ms to wait after launch before re-checking health
 
 // LocalStorage keys
 const LS_TOKEN          = 'prysmor_token';
@@ -35,7 +32,6 @@ const LS_USER_ID        = 'prysmor_user_id';
 const LS_PLAN           = 'prysmor_plan';
 const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
-const LS_FACE_IDENTITY  = 'prysmor_face_identity'; // 'on' | 'off'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -351,68 +347,10 @@ function enterPanel() {
   // Try to auto-load whatever is selected in Premiere right now
   refreshClip(true);
 
-  // Ensure the Identity Lock sidecar is running (non-blocking)
-  ensureSidecarRunning();
 }
 
-/**
- * CEP-compatible fetch with timeout (AbortSignal.timeout not available in old Chromium).
- * @param {string} url
- * @param {number} ms
- */
-function _fetchWithTimeout(url, ms) {
-  var ctrl  = new AbortController();
-  var timer = setTimeout(function () { ctrl.abort(); }, ms);
-  return fetch(url, { signal: ctrl.signal }).then(function (r) {
-    clearTimeout(timer); return r;
-  }, function (e) {
-    clearTimeout(timer); throw e;
-  });
-}
 
-/**
- * On panel open: if Face Identity is ON, launch the sidecar in a visible terminal.
- * If sidecar is already running, just update the status dot.
- */
-async function ensureSidecarRunning() {
-  var fiPref = localStorage.getItem(LS_FACE_IDENTITY);
-  if (fiPref === 'off') {
-    console.log('[Prysmor] Face Identity is OFF — skipping sidecar');
-    return;
-  }
 
-  // Already running? Just update UI.
-  try {
-    var res = await _fetchWithTimeout(SIDECAR_URL + '/health', 2000);
-    if (res.ok) {
-      var data = await res.json();
-      if (data && data.status === 'ok') {
-        console.log('[Prysmor] Sidecar already running ✓');
-        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
-          .filter(Boolean).join(' + ') || 'fallback mode';
-        _setFiStatus('running', 'Running \u2014 ' + models);
-        return;
-      }
-    }
-  } catch (_) { /* not running */ }
-
-  // Not running — open visible terminal so user sees the logs
-  console.log('[Prysmor] Sidecar not running — launching terminal…');
-  _launchSidecarVisible();
-}
-
-// ── Auto-stop sidecar when panel is closed ────────────────────────────────────
-// synchronous XHR in unload is the only reliable way to fire before page teardown.
-window.addEventListener('unload', function () {
-  var fiPref = localStorage.getItem(LS_FACE_IDENTITY);
-  if (fiPref === 'off') return;
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', SIDECAR_URL + '/shutdown', false); // synchronous
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send('{}');
-  } catch (_) {}
-});
 
 function logout() {
   stopMfPolling();
@@ -662,6 +600,55 @@ async function compilePrompt() {
   }
 }
 
+// ─── Reference Frame Extraction ──────────────────────────────────────────────
+// Captures the middle frame of a base64-encoded MP4 as a small JPEG.
+// Uses the CEP browser's native <video> + <canvas> APIs — no ffmpeg needed.
+// Returns null silently on any error so generation always proceeds.
+
+function captureReferenceFrame(videoBase64) {
+  return new Promise(function (resolve) {
+    try {
+      var blob  = base64ToBlob(videoBase64, 'video/mp4');
+      var url   = URL.createObjectURL(blob);
+      var video = document.createElement('video');
+      video.muted   = true;
+      video.preload = 'metadata';
+
+      video.onloadedmetadata = function () {
+        // Seek to the midpoint for a representative identity frame
+        video.currentTime = Math.max(0, Math.min(video.duration / 2, video.duration - 0.1));
+      };
+
+      video.onseeked = function () {
+        try {
+          var W      = 320;
+          var H      = Math.round(W * video.videoHeight / Math.max(video.videoWidth, 1));
+          var canvas = document.createElement('canvas');
+          canvas.width  = W;
+          canvas.height = H || W; // fallback square if height is 0
+          canvas.getContext('2d').drawImage(video, 0, 0, W, canvas.height);
+          URL.revokeObjectURL(url);
+          // Strip the data URI prefix — backend expects raw base64
+          var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : null);
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }
+      };
+
+      video.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+
+      // Timeout safety — if video never loads, don't stall the pipeline
+      setTimeout(function () { URL.revokeObjectURL(url); resolve(null); }, 8000);
+
+      video.src = url;
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
 // ─── Main Generate Pipeline ───────────────────────────────────────────────────
 
 async function mfGenerate() {
@@ -730,34 +717,7 @@ async function mfGenerate() {
     return fail('Upload init failed: ' + err.message);
   }
 
-  // ── Step 3: Trim + upload via local sidecar (fast, no full-file read) ────
-  //   Sidecar uses ffmpeg to cut the exact clip, then uploads directly to S3.
-  //   Falls back to browser-side upload if sidecar is unavailable.
-  setStatus('Trimming clip…', 18);
-  var sidecarOk = false;
-  try {
-    var scRes = await fetch('http://127.0.0.1:7788/trim-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        file_path:    sourcePath,
-        media_in_sec: mediaInSec,
-        clip_dur_sec: clipDurSec,
-        upload_url:   uploadSlot.uploadUrl,
-        fields:       uploadSlot.fields || {},
-      }),
-    });
-    if (scRes.ok) {
-      sidecarOk = true;
-    } else {
-      var scErr = await scRes.json().catch(function () { return {}; });
-      console.warn('[sidecar] /trim-upload failed:', scErr.detail || scRes.status, '— falling back');
-    }
-  } catch (scEx) {
-    console.warn('[sidecar] unreachable:', scEx.message, '— falling back to browser upload');
-  }
 
-  if (!sidecarOk) {
     // Fallback: read full file in browser and upload to S3 directly
     setStatus('Reading clip…', 20);
     var fileBase64;
@@ -766,6 +726,10 @@ async function mfGenerate() {
     } catch (err) {
       return fail('Cannot read clip: ' + err.message);
     }
+
+    // Extract a reference frame for identity conditioning while upload runs.
+    // Runs concurrently with the S3 upload — failure is silent (returns null).
+    var referenceFramePromise = captureReferenceFrame(fileBase64);
 
     setStatus('Uploading clip…', 28);
     try {
@@ -783,7 +747,6 @@ async function mfGenerate() {
     } catch (err) {
       return fail('Upload failed: ' + err.message);
     }
-  }
 
   // ── Step 4: Notify server that upload is complete ─────────────────────────
   setStatus('Uploading clip…', 36);
@@ -803,11 +766,15 @@ async function mfGenerate() {
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
   setStatus('Starting effect generation…', 38);
+  // Await the reference frame (likely already done — started during S3 upload)
+  var referenceFrameBase64 = await referenceFramePromise.catch(function () { return null; });
   try {
+    var genBody = { prompt: prompt };
+    if (referenceFrameBase64) genBody.referenceFrameBase64 = referenceFrameBase64;
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/generate', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body:    JSON.stringify({ prompt }),
+      body:    JSON.stringify(genBody),
     });
   } catch (err) {
     return fail('Generation failed to start: ' + err.message);
@@ -916,89 +883,7 @@ function startPolling(jobId) {
     state.mf.rawOutputUrl = job.rawOutputUrl || null;
     console.log('[Prysmor] handleJobComplete — outputUrl:', job.outputUrl);
 
-    // ── Try local Identity Lock via sidecar ───────────────────────────────────
-    // Skip if user has turned off Face Identity.
-    var fiEnabled = localStorage.getItem(LS_FACE_IDENTITY) !== 'off';
     var sel = state.mf.selInfo;
-    if (fiEnabled && sel && sel.sourcePath) {
-      var compAbort  = new AbortController();
-      var compTimer  = null;
-      var compStart  = Date.now();
-
-      // Show skip button so user can bypass Identity Lock at any time
-      showSkipIdentityLock(function () {
-        compAbort.abort('user-skipped');
-      });
-
-      // Tick every second: update status with elapsed time
-      compTimer = setInterval(function () {
-        var elapsed = Math.round((Date.now() - compStart) / 1000);
-        var mins    = Math.floor(elapsed / 60);
-        var secs    = String(elapsed % 60).padStart(2, '0');
-        var timeStr = mins > 0 ? mins + 'm ' + secs + 's' : elapsed + 's';
-        setStatus('Applying Identity Lock\u2026', 96, timeStr);
-      }, 1000);
-
-      try {
-        setStatus('Applying Identity Lock\u2026', 96);
-        console.log('[Prysmor] Calling sidecar /composite…');
-
-        var compRes = await fetch('http://127.0.0.1:7788/composite', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orig_path:     sel.sourcePath,
-            media_in_sec:  parseFloat((sel.mediaInSec  || 0).toFixed(6)),
-            clip_dur_sec:  parseFloat((Math.min(sel.durationSec || 8, 8)).toFixed(6)),
-            generated_url: job.outputUrl,
-            job_id:        jobId || state.mf.jobId || '',
-          }),
-          signal: compAbort.signal,
-        });
-
-        clearInterval(compTimer);
-        hideSkipIdentityLock();
-
-        if (compRes.ok) {
-          var compData = await compRes.json();
-          console.log('[Prysmor] Identity Lock done — mode:', compData.mode_used,
-            'similarity:', compData.avg_similarity,
-            'ms:', compData.duration_ms);
-
-          setStatus(
-            compData.mode_used === 'RAW_ACCEPT'
-              ? 'Inserting into timeline\u2026'
-              : 'Identity Lock applied \u2014 inserting\u2026',
-            99,
-          );
-
-          await insertFromLocalPath(
-            compData.output_path,
-            sel.startTimeSec,
-            state.mf.replaceMode,
-            compData.mode_used,
-          );
-          fetchCredits();
-          setGenerating(false);
-          return;
-        }
-
-        var compErr = await compRes.json().catch(function () { return {}; });
-        console.warn('[Prysmor] /composite HTTP', compRes.status,
-          compErr.detail || compErr.error || '— falling back to direct insert');
-
-      } catch (scEx) {
-        clearInterval(compTimer);
-        hideSkipIdentityLock();
-        if (scEx.message === 'user-skipped' || (scEx.name === 'AbortError')) {
-          console.log('[Prysmor] Identity Lock skipped by user — using raw Runway output');
-          showToast('Identity Lock skipped \u2014 using raw output', 'info');
-        } else {
-          console.warn('[Prysmor] /composite failed:', scEx.message,
-            '— falling back to direct download+insert');
-        }
-      }
-    }
 
     // ── Fallback: download from URL and insert ────────────────────────────────
     setStatus('Downloading result\u2026', 98);
@@ -1126,63 +1011,6 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
   showResult(blobUrl || ('file:///' + outPath.replace(/\\/g, '/').replace(/^\//, '')));
 }
 
-// ─── Identity Lock skip button ────────────────────────────────────────────────
-
-function showSkipIdentityLock(onSkip) {
-  var btn  = el('btn-skip-identity-lock');
-  var wrap = el('btn-skip-identity-lock-wrap');
-  if (!btn) return;
-  btn.style.display  = '';
-  if (wrap) wrap.style.display = '';
-  btn.onclick = onSkip;
-}
-
-function hideSkipIdentityLock() {
-  var btn  = el('btn-skip-identity-lock');
-  var wrap = el('btn-skip-identity-lock-wrap');
-  if (btn)  btn.style.display  = 'none';
-  if (wrap) wrap.style.display = 'none';
-}
-
-// ─── Insert from local sidecar output path ────────────────────────────────────
-// Used after /composite returns a local file path.
-// No download needed — sidecar already wrote the file on the same machine.
-
-async function insertFromLocalPath(localPath, startTimeSec, replaceMode, modeUsed) {
-  console.log('[Prysmor] insertFromLocalPath:', localPath);
-
-  // Normalise path separators for ExtendScript
-  var esc = localPath.replace(/\\/g, '/').replace(/"/g, '\\"');
-
-  // Show in-panel preview using file:// URL
-  var fileUrl = 'file:///' + esc.replace(/^\//, '');
-  try { showResult(fileUrl); } catch (_) {}
-
-  await new Promise(function (resolve) {
-    var fn = replaceMode
-      ? 'replaceSelection("' + esc + '")'
-      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
-
-    cs.evalScript(fn, function (r) {
-      console.log('[Prysmor] insertFromLocalPath evalScript result:', r);
-      if (r && r.indexOf('error') === 0) {
-        showToast(r.replace('error: ', ''), 'error');
-      } else {
-        var lockLabel = (modeUsed && modeUsed !== 'RAW_ACCEPT')
-          ? ' \u2014 Identity Lock applied!'
-          : '';
-        showToast(replaceMode
-          ? 'Original replaced with AI result!' + lockLabel
-          : 'AI clip inserted on V2' + lockLabel, 'success');
-      }
-      resolve();
-    });
-  });
-
-  state.mf.outputPath = localPath;
-  setStatus('Done!', 100);
-  console.log('[Prysmor] insertFromLocalPath done');
-}
 
 // ─── UI State Helpers ─────────────────────────────────────────────────────────
 
@@ -1596,8 +1424,6 @@ function bindEvents() {
   el('btn-copy-diag').addEventListener('click', copyDiagnostics);
   el('btn-logout').addEventListener('click', logout);
 
-  // Face Identity toggle
-  bindFaceIdentityToggle();
 
   el('btn-dashboard').addEventListener('click', function () {
     cs.openURLInDefaultBrowser(SITE_URL + '/dashboard');
@@ -1624,283 +1450,6 @@ function bindEvents() {
   });
 }
 
-// ─── Face Identity Toggle ──────────────────────────────────────────────────────
-
-/**
- * Wires the Face Identity ON/OFF toggle in the settings menu.
- * Persists state in localStorage (LS_FACE_IDENTITY).
- * ON  → opens a visible CMD/Terminal window running face_embedding_server.py
- * OFF → sends /shutdown to sidecar and clears status UI
- */
-function bindFaceIdentityToggle() {
-  var toggle   = el('fi-toggle-input');
-  var stopBtn  = el('fi-stop-btn');
-  if (!toggle) return;
-
-  // Restore saved preference (default ON)
-  var saved = localStorage.getItem(LS_FACE_IDENTITY);
-  var isOn  = (saved === null) ? true : (saved === 'on');
-  toggle.checked = isOn;
-
-  if (isOn) {
-    _checkSidecarHealth();
-  } else {
-    _setFiDot('off');
-  }
-
-  toggle.addEventListener('change', function () {
-    if (toggle.checked) {
-      localStorage.setItem(LS_FACE_IDENTITY, 'on');
-      _launchSidecarVisible();
-    } else {
-      localStorage.setItem(LS_FACE_IDENTITY, 'off');
-      _doStopSidecar();
-    }
-  });
-
-  if (stopBtn) {
-    stopBtn.addEventListener('click', function () {
-      toggle.checked = false;
-      localStorage.setItem(LS_FACE_IDENTITY, 'off');
-      _doStopSidecar();
-    });
-  }
-}
-
-/**
- * Launches the sidecar in a visible CMD (Windows) or Terminal (Mac) window.
- *
- * Strategy (avoids host.jsx caching issues):
- *  1. Inline evalScript to read APPDATA + TEMP env vars (fresh eval, no cached fn)
- *  2. cep.fs.writeFile() to write a .bat file on Windows  (proven reliable in CEP)
- *  3. Inline evalScript: app.system.callSystem to open the .bat in a new CMD window
- */
-function _launchSidecarVisible() {
-  _setFiStatus('starting', 'Starting\u2026');
-
-  var isMac = navigator.platform.toLowerCase().indexOf('mac') !== -1;
-
-  if (isMac) {
-    // ── macOS: find script in standard locations, open Terminal.app ───────────
-    var macScript = '(function(){' +
-      'var h=$.getenv("HOME");' +
-      'if(!h)return "error:HOME not set";' +
-      // Check locations in priority order:
-      // 1. ~/Library/Application Support/Prysmor/ (standard Mac app support dir)
-      // 2. ~/Library/Prysmor/ (legacy)
-      // 3. Next to the extension root
-      'var candidates=[' +
-        'h+"/Library/Application Support/Prysmor/face_embedding_server.py",' +
-        'h+"/Library/Prysmor/face_embedding_server.py"' +
-      '];' +
-      'var py="";' +
-      'for(var i=0;i<candidates.length;i++){if(new File(candidates[i]).exists){py=candidates[i];break;}}' +
-      'if(!py)return "error:not found in: "+candidates.join(", ");' +
-      'app.system.callSystem("osascript -e \'tell application \\"Terminal\\" to do script \\"python3 \\\\\\""+ py +"\\\\\\"\\"\'");' +
-      'return "ok:"+py;' +
-      '})()';
-    cs.evalScript(macScript, function (r) { _sidecarLaunchResult(r); });
-
-  } else {
-    // ── Windows: find Python path → write .bat → start visible CMD ────────────
-    // Step 1: get APPDATA and TEMP only — no where.exe (that was causing EvalScript error)
-    var findPathsScript =
-      '(function(){' +
-      '  var a = $.getenv("APPDATA") || "";' +
-      '  var t = $.getenv("TEMP") || $.getenv("TMP") || "";' +
-      '  return a + "|" + t;' +
-      '})()';
-
-    cs.evalScript(findPathsScript, function (paths) {
-      // Validate: must look like a real Windows path (contains colon + backslash)
-      if (!paths || paths.indexOf('EvalScript') !== -1 || !paths.split('|')[0] ||
-          paths.split('|')[0].indexOf(':') === -1) {
-        _setFiStatus('error', 'Cannot read APPDATA (got: ' + paths + ')');
-        console.error('[FaceIdentity] findPathsScript returned bad value:', paths);
-        return;
-      }
-
-      var parts      = paths.split('|');
-      var appdata    = parts[0].replace(/\//g, '\\');
-      var tmp        = (parts[1] || appdata).replace(/\//g, '\\');
-      var scriptPath = appdata + '\\Prysmor\\face_embedding_server.py';
-      var batPath    = tmp + '\\prysmor-sidecar.bat';
-      console.log('[FaceIdentity] appdata:', appdata, '| tmp:', tmp);
-
-      // Step 2: write .bat — bat files launched via File.execute() use the USER's
-      // full system PATH, so 'python' will be found even if Premiere's env lacks it.
-      var batContent = '@echo off\r\npython "' + scriptPath + '"\r\npause\r\n';
-      try {
-        window.cep.fs.writeFile(batPath, btoa(batContent), window.cep.encoding.Base64);
-        console.log('[FaceIdentity] bat written:', batPath);
-      } catch (fsErr) {
-        console.warn('[FaceIdentity] writeFile failed:', fsErr);
-      }
-
-      // Step 3: launch the .bat — 'start "title" "batfile"' opens a new visible CMD window
-      var launched = false;
-      try {
-        var _req = (window.cep_node && window.cep_node.require)
-          ? window.cep_node.require
-          : (typeof __webpack_require__ === 'undefined' ? require : null);
-        if (_req) {
-          var _cp  = _req('child_process');
-          var _cmd = 'start "Prysmor Sidecar" "' + batPath + '"';
-          console.log('[FaceIdentity] exec:', _cmd);
-          _cp.exec(_cmd, { windowsHide: false }, function (e) {
-            if (e) console.warn('[FaceIdentity] exec err:', e.message);
-          });
-          launched = true;
-          console.log('[FaceIdentity] launched via Node.js exec + bat');
-        } else {
-          console.warn('[FaceIdentity] Node.js require not available');
-        }
-      } catch (nodeErr) {
-        console.warn('[FaceIdentity] Node.js failed:', nodeErr.message);
-      }
-
-      // Step 4: ExtendScript fallback — File.execute() opens .bat like double-clicking
-      if (!launched) {
-        var escBat = batPath.replace(/\\/g, '\\\\');
-        var fbScript = [
-          '(function(){',
-          '  try {',
-          '    var f = new File("' + escBat + '");',
-          '    if (!f.exists) return "error:bat not found: ' + escBat + '";',
-          '    var ok = f.execute();',
-          '    return ok ? "ok:file.execute" : "error:execute returned false";',
-          '  } catch(ex) {',
-          '    return "error:" + ex.message;',
-          '  }',
-          '})()'
-        ].join('');
-        cs.evalScript(fbScript, function (r) {
-          console.log('[FaceIdentity] File.execute result:', r);
-        });
-        launched = true;
-      }
-
-      if (launched) _sidecarLaunchResult('ok:' + scriptPath);
-    });
-  }
-}
-
-/** Shared result handler after sidecar launch attempt. */
-function _sidecarLaunchResult(result) {
-  if (!result || result.indexOf('error') === 0) {
-    _setFiStatus('error', (result || 'Launch failed').replace('error: ', ''));
-    console.warn('[FaceIdentity] launch failed:', result);
-    return;
-  }
-  console.log('[FaceIdentity] launched:', result);
-  _setFiStatus('starting', 'Loading models\u2026');
-
-  // Poll up to 3 minutes — AdaFace download attempt can add 30-60 s to startup
-  var deadline = Date.now() + 180000;
-  var attempt  = 0;
-
-  function poll() {
-    attempt++;
-    _fetchWithTimeout(SIDECAR_URL + '/health', 3000).then(function (res) {
-      return res.ok ? res.json() : Promise.reject('not ok');
-    }).then(function (data) {
-      if (data && data.status === 'ok') {
-        var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
-          .filter(Boolean).join(' + ') || 'CPU mode';
-        _setFiStatus('running', 'Running \u2014 ' + models);
-      } else {
-        scheduleNextPoll();
-      }
-    }).catch(function () {
-      scheduleNextPoll();
-    });
-  }
-
-  function scheduleNextPoll() {
-    if (Date.now() < deadline) {
-      // Update status text with elapsed time so user sees progress
-      var elapsed = Math.round((180000 - (deadline - Date.now())) / 1000);
-      _setFiStatus('starting', 'Loading models\u2026 (' + elapsed + 's)');
-      setTimeout(poll, 2000);
-    } else {
-      // Deadline passed — keep checking silently every 5s forever
-      // (server might still be loading heavy models)
-      _setFiStatus('starting', 'Still loading\u2026 check terminal');
-      setTimeout(function keepAlive() {
-        _fetchWithTimeout(SIDECAR_URL + '/health', 3000).then(function (res) {
-          return res.ok ? res.json() : Promise.reject();
-        }).then(function (data) {
-          if (data && data.status === 'ok') {
-            var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
-              .filter(Boolean).join(' + ') || 'CPU mode';
-            _setFiStatus('running', 'Running \u2014 ' + models);
-          } else {
-            setTimeout(keepAlive, 5000);
-          }
-        }).catch(function () { setTimeout(keepAlive, 5000); });
-      }, 5000);
-    }
-  }
-
-  // Start first poll immediately (no delay)
-  poll();
-}
-
-/** Stops the sidecar via HTTP /shutdown then kills the process. */
-function _doStopSidecar() {
-  _setFiStatus('off', '');
-  fetch(SIDECAR_URL + '/shutdown', { method: 'POST' }).catch(function () {});
-  var killScript = navigator.platform.toLowerCase().indexOf('mac') !== -1
-    ? 'app.system.callSystem("pkill -f face_embedding_server.py 2>/dev/null");"done"'
-    : 'app.system.callSystem("taskkill /F /FI \\"WINDOWTITLE eq Prysmor Identity Lock\\" /T 2>nul");"done"';
-  cs.evalScript(killScript, function () {});
-}
-
-/** Quick health check — updates dot without launching anything. */
-function _checkSidecarHealth() {
-  _fetchWithTimeout(SIDECAR_URL + '/health', 2000).then(function (res) {
-    return res.ok ? res.json() : Promise.reject('not ok');
-  }).then(function (data) {
-    if (data && data.status === 'ok') {
-      var models = [data.insightface && 'InsightFace', data.adaface && 'AdaFace']
-        .filter(Boolean).join(' + ') || 'fallback mode';
-      _setFiStatus('running', 'Running \u2014 ' + models);
-    } else {
-      _setFiStatus('off', 'Not running');
-    }
-  }).catch(function () {
-    _setFiStatus('off', 'Not running');
-  });
-}
-
-/**
- * Updates the Face Identity status dot + text row.
- * @param {'running'|'starting'|'error'|'off'} state
- * @param {string} text
- */
-function _setFiDot(dotState) {
-  var dot = el('fi-status-dot');
-  if (!dot) return;
-  dot.classList.remove('running', 'starting', 'error');
-  if (dotState !== 'off') dot.classList.add(dotState);
-}
-
-function _setFiStatus(dotState, text) {
-  _setFiDot(dotState);
-  var row     = el('fi-status-row');
-  var textEl  = el('fi-status-text');
-  var stopBtn = el('fi-stop-btn');
-  if (!row || !textEl) return;
-  if (text) {
-    textEl.textContent = text;
-    row.classList.remove('hidden');
-  } else {
-    row.classList.add('hidden');
-  }
-  if (stopBtn) {
-    stopBtn.style.display = (dotState === 'running') ? '' : 'none';
-  }
-}
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 

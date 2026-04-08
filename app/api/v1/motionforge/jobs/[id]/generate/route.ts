@@ -89,7 +89,7 @@ export async function POST(
     return NextResponse.json({ error: 'No asset — call /upload first' }, { status: 400 });
   }
 
-  let body: { prompt?: string };
+  let body: { prompt?: string; referenceFrameBase64?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
 
@@ -192,12 +192,27 @@ export async function POST(
       return NextResponse.json({ success: true, taskId: task.id });
     }
 
-    // ── Vercel / pre-uploaded path — no local file, no ffmpeg ─────────────
-    // Reference frame extraction is skipped because ffmpeg is unavailable.
-    // Runway will generate without identity conditioning.
-    log(TAG, 'Sending pre-uploaded video directly to Runway (no local ffmpeg)');
+    // ── Vercel / pre-uploaded path — no local ffmpeg ──────────────────────
+    // If the panel sent a reference frame (base64 JPEG), upload it to Runway
+    // and pass it as the identity-conditioning reference image.
+    log(TAG, 'Sending pre-uploaded video to Runway (Vercel path)');
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, undefined, effectType);
+    let refUri: string | undefined;
+    const frameB64 = (body.referenceFrameBase64 ?? '').trim();
+    if (frameB64) {
+      const frameTmpPath = tmpPath(`ref-frame-${params.id}.jpg`);
+      try {
+        fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
+        refUri = await uploadImageToRunway(frameTmpPath);
+        log(TAG, `Reference frame uploaded for identity conditioning: ${refUri}`);
+      } catch (e) {
+        warn(TAG, 'Reference frame upload failed — proceeding without', { err: (e as Error).message });
+      } finally {
+        try { fs.unlinkSync(frameTmpPath); } catch (_) {}
+      }
+    }
+
+    const task = await createVideoToVideoTask(runwayUri, prompt, refUri, effectType);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {

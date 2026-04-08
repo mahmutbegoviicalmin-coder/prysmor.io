@@ -1,72 +1,36 @@
 /**
- * MotionForge Identity Lock v3 — Enhanced Face Detection
+ * MotionForge Identity Lock — Face Detection
  *
  * Detection stack (tried in order):
- *   1. UltraFace ONNX (version-RFB-320, ~1.2 MB) — primary detector
- *      - Dark frames: CLAHE-enhanced via sidecar /enhance, threshold lowered to 0.45
- *      - Multi-scale: also runs on 1.5× upscaled face-crop region; best box kept
- *   2. RetinaFace (via Python sidecar /detect) — secondary when UltraFace conf < 0.65
- *   3. Temporal tracking — when detection fails, predict position from velocity vector
- *   4. Skin-heuristic zone — last resort
+ *   1. RetinaFace via Python sidecar /detect
+ *   2. Temporal tracking — predict position from velocity vector
+ *   3. Skin-heuristic zone — last resort
  *
- * Identity comparison (legacy, still used as fallback when sidecar unavailable):
- *   32×32 grid-descriptor cosine similarity (unchanged from v2).
- *
- * Temporal tracking:
- *   TrackerState stores the last confirmed box + velocity (dx,dy,dw,dh per frame).
- *   Predicted box is accepted when IoU > IOU_CONFIRM_THRESHOLD (0.3) against new detection.
- *
- * Fallback order:
- *   1. UltraFace ONNX (multi-scale, dark-enhanced)
- *   2. RetinaFace via sidecar
- *   3. Temporal tracking prediction
- *   4. Skin-heuristic zone
- *   5. None
+ * Identity comparison:
+ *   32×32 grid-descriptor cosine similarity.
  */
 
-import * as fs   from 'fs';
-import * as path from 'path';
-import * as os   from 'os';
-import sharp      from 'sharp';
+import * as fs from 'fs';
+import sharp    from 'sharp';
 import { log, warn } from './logger';
 import { sidecarManager } from './sidecar';
 
 const TAG = 'face';
 
-// ─── Model constants ──────────────────────────────────────────────────────────
-
-const MODEL_CACHE_DIR  = path.join(os.homedir(), '.cache', 'prysmor', 'models');
-const MODEL_DEST       = path.join(MODEL_CACHE_DIR, 'ultraface-rfb-320.onnx');
-
-/**
- * Primary download URL.
- * Override via MF_ULTRAFACE_MODEL_URL env var if this moves or you have
- * a faster internal mirror.
- */
-const MODEL_URL =
-  process.env.MF_ULTRAFACE_MODEL_URL ??
-  'https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB/raw/master/models/onnx/version-RFB-320.onnx';
-
-/** UltraFace-RFB-320 expected input size. */
-const UF_W = 320;
-const UF_H = 240;
+// ─── Detection constants ──────────────────────────────────────────────────────
 
 const SCORE_THRESHOLD      = 0.65;
-const SCORE_THRESHOLD_DARK = 0.45;  // lowered threshold for dark frames
+const SCORE_THRESHOLD_DARK = 0.45;
 const NMS_IOU              = 0.45;
 
 // RetinaFace fallback: trigger when UltraFace top confidence below this
 const RETINAFACE_FALLBACK_CONF = 0.65;
 
-// Temporal tracking: predicted box confirmed when IoU with new detection > this
-const IOU_CONFIRM_THRESHOLD    = 0.30;
 
 // Skin-heuristic confidence cap (raised for dark-frame tolerance)
 const SKIN_CONF_CAP_NORMAL     = 0.48;
 const SKIN_CONF_CAP_DARK       = 0.65;
 
-// Multi-scale: upscale factor for the second detection pass
-const MULTISCALE_FACTOR        = 1.5;
 
 /** Side length of the normalized descriptor grid (32×32 = 1024 dims). */
 const DESCRIPTOR_SIDE = 32;
@@ -159,54 +123,10 @@ export interface FaceDescriptor {
   method: 'grid-descriptor';
 }
 
-// ─── ONNX session singleton ───────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OrtSession = any;
-
-let _session: OrtSession | null = null;
-let _initAttempted = false;
-
-async function downloadModel(): Promise<void> {
-  fs.mkdirSync(MODEL_CACHE_DIR, { recursive: true });
-  log(TAG, `Downloading UltraFace model → ${MODEL_DEST}`);
-
-  const response = await fetch(MODEL_URL);
-  if (!response.ok) {
-    throw new Error(`Model download failed: ${response.status} ${response.statusText}`);
-  }
-
-  const buf = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(MODEL_DEST, buf);
-  log(TAG, `Model downloaded (${(buf.length / 1024).toFixed(0)} KB)`);
-}
-
-async function getSession(): Promise<OrtSession | null> {
-  if (_initAttempted) return _session;
-  _initAttempted = true;
-
-  try {
-    if (!fs.existsSync(MODEL_DEST)) {
-      await downloadModel();
-    }
-
-    // Dynamic require avoids build-time errors on envs without native binding
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ort = require('onnxruntime-node');
-    _session = await ort.InferenceSession.create(MODEL_DEST, {
-      executionProviders: ['cpu'],
-      logSeverityLevel:   3, // errors only
-    });
-
-    log(TAG, 'UltraFace ONNX session ready', { detector: 'ultraface-rfb-320' });
-    return _session;
-  } catch (err) {
-    warn(TAG, 'UltraFace ONNX init failed — heuristic fallback active', {
-      err: (err as Error).message,
-    });
-    return null;
-  }
-}
+// ─── ONNX removed ────────────────────────────────────────────────────────────
+// onnxruntime-node has been removed. UltraFace ONNX detection is disabled;
+// detection falls through directly to RetinaFace sidecar → temporal tracking
+// → skin-heuristic.
 
 // ─── NMS ─────────────────────────────────────────────────────────────────────
 
@@ -237,147 +157,18 @@ function applyNMS(boxes: FaceBox[], iouThreshold: number): FaceBox[] {
   return kept;
 }
 
-// ─── Detection: UltraFace ONNX ────────────────────────────────────────────────
+// ─── ONNX detection stub (disabled) ──────────────────────────────────────────
 
-async function detectWithONNX(
-  imagePath:      string,
-  imageW:         number,
-  imageH:         number,
-  scoreThreshold: number = SCORE_THRESHOLD,
-): Promise<FaceBox[] | null> {
-  const session = await getSession();
-  if (!session) return null;
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ort = require('onnxruntime-node');
-
-    // Preprocess: resize to UF_W × UF_H, normalise to [-1, 1] CHW
-    const { data: raw } = await sharp(imagePath)
-      .resize(UF_W, UF_H, { fit: 'fill' })
-      .removeAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-
-    const floatData = new Float32Array(3 * UF_H * UF_W);
-    for (let h = 0; h < UF_H; h++) {
-      for (let w = 0; w < UF_W; w++) {
-        const src = (h * UF_W + w) * 3;
-        const dst =  h * UF_W + w;
-        floatData[0 * UF_H * UF_W + dst] = (raw[src]     - 127) / 128;
-        floatData[1 * UF_H * UF_W + dst] = (raw[src + 1] - 127) / 128;
-        floatData[2 * UF_H * UF_W + dst] = (raw[src + 2] - 127) / 128;
-      }
-    }
-
-    // Use the session's actual input name (defensive — avoid hard-coding)
-    const inputName   = session.inputNames[0] as string;
-    const inputTensor = new ort.Tensor('float32', floatData, [1, 3, UF_H, UF_W]);
-    const output      = await session.run({ [inputName]: inputTensor });
-
-    const outNames  = Object.keys(output) as string[];
-    const scoresKey = outNames.find(k => k.toLowerCase().includes('score')) ?? outNames[0];
-    const boxesKey  = outNames.find(k => k.toLowerCase().includes('box'))  ?? outNames[1];
-
-    const scoreData = output[scoresKey].data as Float32Array;
-    const boxData   = output[boxesKey].data  as Float32Array;
-    const nAnchors  = scoreData.length / 2;
-
-    const raw2: FaceBox[] = [];
-    for (let i = 0; i < nAnchors; i++) {
-      const score = scoreData[i * 2 + 1]; // index 1 = face class
-      if (score < scoreThreshold) continue;
-
-      const x1 = Math.max(0, boxData[i * 4 + 0]);
-      const y1 = Math.max(0, boxData[i * 4 + 1]);
-      const x2 = Math.min(1, boxData[i * 4 + 2]);
-      const y2 = Math.min(1, boxData[i * 4 + 3]);
-      if (x2 <= x1 || y2 <= y1) continue;
-
-      raw2.push({ x: x1, y: y1, width: x2 - x1, height: y2 - y1, confidence: score });
-    }
-
-    const results = applyNMS(raw2, NMS_IOU);
-    log(TAG, `ONNX detection: ${results.length} face(s) found`, {
-      imageW, imageH, topScore: results[0]?.confidence.toFixed(3) ?? 'n/a',
-      threshold: scoreThreshold,
-    });
-    return results;
-
-  } catch (err) {
-    warn(TAG, 'ONNX detection inference failed', { err: (err as Error).message });
-    return null;
-  }
-}
-
-// ─── Multi-scale ONNX detection ───────────────────────────────────────────────
-
-/**
- * Runs UltraFace at the original image AND on a 1.5× upscaled crop of the
- * face region found in the first pass. Merges and de-duplicates with NMS.
- * Returns the best result; falls back to single-scale if upscale pass fails.
- */
+// Always returns null — detection falls through to RetinaFace sidecar or
+// skin-heuristic.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function detectWithONNXMultiScale(
-  imagePath:      string,
-  imageW:         number,
-  imageH:         number,
-  scoreThreshold: number,
+  _imagePath:      string,
+  _imageW:         number,
+  _imageH:         number,
+  _scoreThreshold: number,
 ): Promise<FaceBox[] | null> {
-  // ── Pass 1: full image ──────────────────────────────────────────────────
-  const pass1 = await detectWithONNX(imagePath, imageW, imageH, scoreThreshold);
-  if (!pass1) return null;
-
-  // ── Pass 2: upscaled crop around best detection ─────────────────────────
-  if (pass1.length > 0) {
-    const best = pass1[0];
-    try {
-      // Expand box by 15%, scale up by MULTISCALE_FACTOR, clamp to image bounds
-      const margin = 0.15;
-      const cx1 = Math.max(0, best.x - best.width  * margin);
-      const cy1 = Math.max(0, best.y - best.height * margin);
-      const cx2 = Math.min(1, best.x + best.width  * (1 + margin));
-      const cy2 = Math.min(1, best.y + best.height * (1 + margin));
-
-      const cropW = Math.max(1, Math.round((cx2 - cx1) * imageW));
-      const cropH = Math.max(1, Math.round((cy2 - cy1) * imageH));
-      const scaleW = Math.round(cropW * MULTISCALE_FACTOR);
-      const scaleH = Math.round(cropH * MULTISCALE_FACTOR);
-
-      const tmpPath = path.join(os.tmpdir(), `uf-scale2-${Date.now()}.jpg`);
-      await sharp(imagePath)
-        .extract({
-          left:   Math.round(cx1 * imageW),
-          top:    Math.round(cy1 * imageH),
-          width:  cropW,
-          height: cropH,
-        })
-        .resize(scaleW, scaleH, { fit: 'fill' })
-        .jpeg({ quality: 95 })
-        .toFile(tmpPath);
-
-      const pass2Raw = await detectWithONNX(tmpPath, scaleW, scaleH, scoreThreshold);
-      fs.unlink(tmpPath, () => {});
-
-      if (pass2Raw && pass2Raw.length > 0) {
-        // Re-map pass2 boxes back to full-image coordinates
-        const remapped = pass2Raw.map(b => ({
-          x:          cx1 + b.x      * (cx2 - cx1),
-          y:          cy1 + b.y      * (cy2 - cy1),
-          width:      b.width        * (cx2 - cx1),
-          height:     b.height       * (cy2 - cy1),
-          confidence: b.confidence,
-        }));
-        // Merge both passes and apply NMS
-        return applyNMS([...pass1, ...remapped], NMS_IOU);
-      }
-    } catch (err) {
-      warn(TAG, 'Multi-scale pass 2 failed — using single-scale result', {
-        err: (err as Error).message,
-      });
-    }
-  }
-
-  return pass1;
+  return null;
 }
 
 // ─── RetinaFace via sidecar ───────────────────────────────────────────────────
