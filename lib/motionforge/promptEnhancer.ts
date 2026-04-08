@@ -11,7 +11,7 @@
  *   Activated only when Claude is unavailable.
  *
  * Output: plain text, 40–90 words, sentence-based.
- *   Always begins with the identity-preservation statement.
+ *   Always begins with an action verb (Transform, Cover, Fill, Replace, Add, Convert).
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -39,7 +39,13 @@ const SYSTEM_PROMPT = `You are a cinematic prompt enhancement engine for MotionF
 Your job is to rewrite short user prompts into clear, realistic, identity-safe prompts for Runway video-to-video generation.
 
 Rules:
-• Always begin with: "The subject's exact facial features, skin tone, hair color and style, clothing, and body proportions from the source video are maintained throughout the transformation."
+• ALWAYS begin with an action verb: "Transform", "Cover", "Fill", "Replace", "Add", or "Convert".
+  Example: "Transform the space into...", "Cover every surface with...", "Fill the environment with..."
+• NEVER begin with: "The subject's", "preserve exact identity", "Maintaining the subject", or any subject-first phrase.
+• Follow this EXACT 3-part structure:
+  Line 1: Action verb opening — "Transform [space] into [effect],"
+  Line 2: Describe the environment transformation in detail (surfaces, lighting, atmosphere, materials)
+  Line 3: "with [subject description — exact clothing color and type] maintaining identical appearance throughout."
 • Prefer environment, background, atmosphere, and lighting modifications.
 • Expand the user's idea cinematically but keep it grounded and photorealistic.
 • Avoid surreal, fantasy-heavy, cartoonish, or abstract wording unless explicitly requested.
@@ -113,11 +119,10 @@ export function fallbackEnhance(userPrompt: string): string {
   const body = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 
   return (
-    'The subject\'s exact facial features, skin tone, hair color and style, clothing, and body proportions' +
-    ' from the source video are maintained throughout the transformation. ' +
-    body +
-    (body.endsWith('.') ? '' : '.') +
-    ' Photorealistic, cinematic quality throughout.'
+    'Transform the scene into ' +
+    body.charAt(0).toLowerCase() + body.slice(1) +
+    (body.endsWith('.') ? '' : ',') +
+    ' with all subjects maintaining identical appearance throughout. Photorealistic, cinematic quality.'
   );
 }
 
