@@ -37,7 +37,7 @@ export async function upscaleVideo(videoUrl: string): Promise<string> {
     {
       input: {
         video: videoUrl,
-        target_resolution: '2k',
+        target_resolution: '1080p',
       },
     },
   ) as { url: () => string } | string;
