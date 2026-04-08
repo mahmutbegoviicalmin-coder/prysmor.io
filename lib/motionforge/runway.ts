@@ -265,21 +265,3 @@ export async function getRunwayTaskStatus(
   return res.json() as Promise<RunwayTaskStatus>;
 }
 
-/**
- * Starts a Runway upscale task on a completed generation output.
- * Returns a task ID that can be polled via getRunwayTaskStatus.
- */
-export async function createUpscaleTask(videoUri: string): Promise<RunwayTaskCreated> {
-  const res = await fetch(`${RUNWAY_API_BASE}/v1/upscale`, {
-    method:  'POST',
-    headers: runwayHeaders(),
-    body:    JSON.stringify({ videoUri, model: 'upscale_v1' }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Runway upscale error ${res.status}: ${body}`);
-  }
-
-  return res.json() as Promise<RunwayTaskCreated>;
-}

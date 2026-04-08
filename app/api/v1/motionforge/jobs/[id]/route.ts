@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
-import { getRunwayTaskStatus, createUpscaleTask } from '@/lib/motionforge/runway';
+import { getRunwayTaskStatus } from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { refundCredits }              from '@/lib/firestore/users';
@@ -84,60 +84,6 @@ export async function GET(
     }
 
     return NextResponse.json({ status: 'compositing', progress: job.progress ?? 95 });
-  }
-
-  // ── Poll Runway upscale task ────────────────────────────────────────────────
-  if (job.status === 'upscaling' && (job as any).upscaleTaskId) {
-    const upscaleTaskId = (job as any).upscaleTaskId as string;
-    try {
-      const task       = await getRunwayTaskStatus(upscaleTaskId);
-      const taskStatus = (task.status ?? '').toUpperCase();
-
-      log(TAG, `Upscale task ${upscaleTaskId} → ${taskStatus} ${Math.round((task.progress ?? 0) * 100)}%`);
-
-      if (taskStatus === 'PENDING' || taskStatus === 'RUNNING') {
-        const progress = 85 + Math.round((task.progress ?? 0) * 10); // 85–95%
-        return NextResponse.json({ status: 'upscaling', progress });
-      }
-
-      if (taskStatus === 'SUCCEEDED' && task.output && task.output.length > 0) {
-        const rawItem = task.output[0] as unknown;
-        const upscaledUrl = typeof rawItem === 'string'
-          ? rawItem
-          : (rawItem as Record<string, unknown>).url as string ?? (rawItem as Record<string, unknown>).uri as string;
-
-        if (!upscaledUrl) {
-          warn(TAG, `Upscale SUCCEEDED but output shape unrecognised — falling back to raw`);
-          await updateJob(userId, params.id, { status: 'completed', outputUrl: job.rawOutputUrl, progress: 100 });
-          return NextResponse.json({ status: 'completed', progress: 100, outputUrl: job.rawOutputUrl });
-        }
-
-        log(TAG, `Upscale complete for job ${params.id} — upscaled URL set`);
-        await updateJob(userId, params.id, { status: 'completed', outputUrl: upscaledUrl, progress: 100 });
-        return NextResponse.json({ status: 'completed', progress: 100, outputUrl: upscaledUrl });
-      }
-
-      if (taskStatus === 'FAILED' || taskStatus === 'CANCELLED') {
-        warn(TAG, `Upscale task ${upscaleTaskId} ${taskStatus} — falling back to raw Runway output`);
-        const fallback = job.rawOutputUrl ?? job.outputUrl;
-        await updateJob(userId, params.id, {
-          status:    'completed',
-          outputUrl: fallback,
-          progress:  100,
-          warnings:  ['upscale-failed-used-raw-output'],
-        });
-        return NextResponse.json({ status: 'completed', progress: 100, outputUrl: fallback });
-      }
-
-      // Unexpected upscale status — keep polling
-      return NextResponse.json({ status: 'upscaling', progress: job.progress ?? 88 });
-
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Upscale polling error';
-      warn(TAG, `Upscale polling threw for job ${params.id}: ${msg}`);
-      // Don't fail — return current status and retry next poll
-      return NextResponse.json({ status: 'upscaling', progress: job.progress ?? 85 });
-    }
   }
 
   // ── Poll Runway for generation status ──────────────────────────────────────
@@ -258,40 +204,20 @@ export async function GET(
         await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: 100 } as any);
 
         if (!hasOrig) {
-          log(TAG, 'No original clip on disk — launching upscale before completing');
-          // Store raw URL first, then try to launch upscale
-          await updateJob(userId, params.id, { rawOutputUrl: rawUrl } as any);
-
+          log(TAG, 'No original clip on disk — skipping compositing, returning raw Runway output');
           try {
-            const upscaleTask = await createUpscaleTask(rawUrl);
-            log(TAG, `Upscale task started: ${upscaleTask.id}`);
             await updateJob(userId, params.id, {
-              status:        'upscaling',
-              rawOutputUrl:  rawUrl,
-              upscaleTaskId: upscaleTask.id,
-              progress:      85,
-            } as any);
-            return NextResponse.json({ status: 'upscaling', progress: 85 });
-          } catch (upscaleErr) {
-            // Upscale API unavailable or failed — fall back to raw output
-            warn(TAG, 'Upscale launch failed — completing with raw Runway output', {
-              err: (upscaleErr as Error).message,
+              status:      'completed',
+              outputUrl:   rawUrl,
+              rawOutputUrl: rawUrl,
+              progress:    100,
             });
-            try {
-              await updateJob(userId, params.id, {
-                status:      'completed',
-                outputUrl:   rawUrl,
-                rawOutputUrl: rawUrl,
-                progress:    100,
-                warnings:    ['upscale-unavailable-used-raw-output'],
-              });
-            } catch (updateErr) {
-              logError(TAG, `Firestore write failed when marking job ${params.id} completed`, updateErr);
-              return NextResponse.json({ status: 'failed', error: 'Database write failed after Runway succeeded — retry generation' });
-            }
-            log(TAG, `Job ${params.id} marked completed (no upscale), outputUrl set`);
-            return NextResponse.json({ status: 'completed', progress: 100, outputUrl: rawUrl });
+          } catch (updateErr) {
+            logError(TAG, `Firestore write failed when marking job ${params.id} completed`, updateErr);
+            return NextResponse.json({ status: 'failed', error: 'Database write failed after Runway succeeded — retry generation' });
           }
+          log(TAG, `Job ${params.id} marked completed, outputUrl set`);
+          return NextResponse.json({ status: 'completed', progress: 100, outputUrl: rawUrl });
         }
 
         // Transition to compositing — original clip is on disk (local dev only)
