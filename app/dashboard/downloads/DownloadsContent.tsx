@@ -5,10 +5,10 @@ import { useState } from "react";
 import {
   Download, Monitor, ChevronDown, CheckCircle2,
   AlertTriangle, Terminal, Info,
-  ExternalLink, RotateCcw, Package, Zap, Shield,
+  ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "2.1.0";
+const PANEL_VERSION = "2.2.0";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -120,7 +120,7 @@ export default function DownloadsContent() {
         </h1>
         <p className="text-[14px] text-[#6B7280] leading-relaxed max-w-[560px]">
           Install the Prysmor CEP extension into Adobe Premiere Pro.
-          Includes the Identity Lock engine — AI-generated effects with your face preserved automatically.
+          AI-powered VFX with Claude vision for intelligent prompt enhancement and automatic video optimisation — no configuration needed.
         </p>
       </div>
 
@@ -139,8 +139,8 @@ export default function DownloadsContent() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              One-click installer — sets up the CEP panel, installs the Identity Lock engine,
-              and registers it to start automatically with Windows. No configuration needed.
+              One-click installer — sets up the CEP panel with bundled ffmpeg for automatic
+              video preprocessing. No Python, no sidecar, no configuration needed.
             </p>
 
             <a
@@ -158,12 +158,12 @@ export default function DownloadsContent() {
 
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
               {[
-                "One-click setup — no manual steps required",
-                "CEP panel installed to correct Premiere Pro folder automatically",
-                "Identity Lock engine (prysmor-sidecar.exe) installed to C:\\Program Files\\Prysmor\\",
-                "Sidecar registered in Windows Startup — starts automatically on login",
+                "CEP panel installed automatically to correct Premiere Pro folder",
+                "ffmpeg bundled — auto-crops and scales wide videos before AI processing",
+                "Claude AI vision for intelligent scene analysis and prompt enhancement",
                 "PlayerDebugMode set for CSXS.10, 11, 12, 13 automatically",
                 "CEP caches cleared — panel loads immediately on next Premiere launch",
+                "One-click setup — no configuration, no admin rights needed",
               ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
             </div>
           </div>
@@ -194,14 +194,14 @@ export default function DownloadsContent() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              Standard macOS installer — double-click the{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>
-              {" "}file and follow the wizard. Everything installs automatically — no manual steps, no Terminal.
+              Extract the ZIP and double-click{" "}
+              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">Install Prysmor Panel.command</code>
+              {" "}— everything installs automatically in Terminal. No manual steps needed.
             </p>
 
             <a
-              href="/downloads/PrysmorPanelSetup.pkg"
-              download="PrysmorPanelSetup.pkg"
+              href="/downloads/PrysmorPanel-mac.zip"
+              download="PrysmorPanel-mac.zip"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -214,19 +214,19 @@ export default function DownloadsContent() {
 
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
               {[
-                "Standard .pkg installer — Next, Next, Install, Done",
                 "CEP panel installed automatically to correct Premiere Pro folder",
-                "Identity Lock engine installed and configured automatically",
-                "AI dependencies install silently in background (~5–10 min, first install only)",
-                "Login item created — Identity Lock starts automatically on every login",
+                "Claude AI vision for intelligent scene analysis and prompt enhancement",
+                "Auto video preprocessing — ffmpeg crops and scales wide videos to 720p",
                 "PlayerDebugMode set for CSXS.10, 11, 12, 13 — CEP caches cleared",
+                "Old conflicting panel versions removed automatically on install",
+                "No Python, no background processes, no login items",
               ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
             </div>
           </div>
         </div>
 
         <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
-          {["macOS 10.15+", "Premiere Pro 2020–2025", "CEP 10, 11, 12", "Python 3 required (pre-installed on most Macs)"].map((tag) => (
+          {["macOS 10.15+", "Premiere Pro 2020–2025", "CEP 10, 11, 12, 13", "No admin rights needed"].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
               <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
               {tag}
@@ -240,10 +240,11 @@ export default function DownloadsContent() {
         <div className="flex gap-2.5">
           <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[12px] font-semibold text-[#D1D5DB] mb-1">macOS Gatekeeper — first run</p>
+            <p className="text-[12px] font-semibold text-[#D1D5DB] mb-1">macOS — first run</p>
             <p className="text-[11px] text-[#6B7280] leading-relaxed">
-              If macOS shows &quot;cannot be opened because it is from an unidentified developer&quot;:{" "}
-              <strong className="text-[#9CA3AF]">right-click the .pkg → Open</strong>, then click{" "}
+              If macOS blocks the{" "}
+              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[10px]">.command</code>{" "}
+              file: <strong className="text-[#9CA3AF]">right-click → Open</strong>, then click{" "}
               <strong className="text-[#9CA3AF]">&quot;Open&quot;</strong> in the dialog.
               Alternatively: <strong className="text-[#9CA3AF]">System Settings → Privacy &amp; Security → Open Anyway</strong>.
               You only need to do this once.
@@ -252,28 +253,27 @@ export default function DownloadsContent() {
         </div>
       </div>
 
-      {/* ── Identity Lock info ── */}
-      <SectionLabel>Identity Lock Engine</SectionLabel>
+      {/* ── What's included ── */}
+      <SectionLabel>What&apos;s included</SectionLabel>
       <Card className="p-5 mb-8">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-[8px] bg-[#A3FF12]/[0.08] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Shield className="w-4 h-4 text-[#A3FF12]" />
+            <Cpu className="w-4 h-4 text-[#A3FF12]" />
           </div>
           <div>
             <p className="text-[13px] font-semibold text-white mb-1.5">
-              What is the Identity Lock engine?
+              AI-powered VFX directly in Adobe Premiere Pro
             </p>
             <p className="text-[12px] text-[#6B7280] leading-relaxed mb-3">
-              A local AI process that runs on your machine alongside Premiere Pro.
-              After Runway generates the VFX output, Identity Lock compares the original
-              and generated faces using <strong className="text-[#9CA3AF]">InsightFace</strong> embeddings,
-              then composites the original face back if drift is detected — preserving your subject&apos;s identity exactly.
+              The panel connects to Claude AI for intelligent prompt enhancement and Runway Gen-4 for
+              video-to-video AI generation — all from inside Premiere Pro. No extra software running
+              in the background, no startup services.
             </p>
             <div className="grid sm:grid-cols-3 gap-2">
               {[
-                ["Face Analysis", "InsightFace buffalo_sc"],
-                ["Compositing", "Per-frame OpenCV blend"],
-                ["Runs on", "Your local machine"],
+                ["Claude Vision", "Scene analysis & prompt enhancement"],
+                ["Auto Preprocessing", "ffmpeg crops wide video to 720p"],
+                ["Runway Gen-4", "Video-to-video AI generation"],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-[7px] bg-[#0D0D0F] border border-white/[0.05] px-3 py-2">
                   <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>
@@ -281,10 +281,6 @@ export default function DownloadsContent() {
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[11px] text-[#4B5563]">
-              The engine runs silently in the background. If unavailable, the panel falls back
-              to the raw Runway output — generation still works normally.
-            </p>
           </div>
         </div>
       </Card>
@@ -297,7 +293,7 @@ export default function DownloadsContent() {
           <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
             {[
               <>Confirm <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">PlayerDebugMode = 1</code> is set for the correct CSXS version. Premiere 2022+ uses CSXS.11. The installer sets all versions automatically.</>,
-              <>The folder inside extensions must be named exactly <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">prysmor-panel</code>.</>,
+              <>The extension folder must be named exactly <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">com.prysmor.panel</code> inside the CEP extensions directory. Remove any older <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">prysmor-panel</code> folder if present — two folders with the same bundle ID cause conflicts.</>,
               <>Fully <strong className="text-[#D1D5DB]">quit and relaunch</strong> Premiere Pro after installation.</>,
               <>Check that <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">CSXS/manifest.xml</code> is present inside the extension folder.</>,
             ].map((s, i) => (
@@ -309,28 +305,12 @@ export default function DownloadsContent() {
           </div>
         </Accordion>
 
-        <Accordion title="Identity Lock not activating" icon={AlertTriangle}>
+        <Accordion title="Video too wide — generation blocked" icon={AlertTriangle}>
           <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
             {[
-              <>Windows: check that <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">C:\Program Files\Prysmor\prysmor-sidecar.exe</code> exists. Re-run the installer if missing.</>,
-              <>macOS: open Terminal and run <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">curl localhost:7788/health</code> — if no response, run the installer again to re-install the LaunchAgent.</>,
-              <>The panel shows a timer during Identity Lock (e.g. <em>Applying Identity Lock… 45s</em>). If this step is skipped, the engine is not running — but generation still completes with the raw Runway output.</>,
-              <>Check <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">/tmp/prysmor-sidecar.log</code> (macOS) for error details.</>,
-            ].map((s, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
-        </Accordion>
-
-        <Accordion title="macOS: pip3 install fails during setup" icon={AlertTriangle}>
-          <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
-            {[
-              <>Install Python 3 from <a href="https://python.org" className="text-[#A3FF12] underline" target="_blank">python.org</a> or via Homebrew: <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">brew install python</code></>,
-              <>Re-run the installer after Python is available — it will retry the pip install step.</>,
-              <>Panel works without Identity Lock — generation and Premiere insert still function normally.</>,
+              <>Runway Gen-4 requires a video width/height ratio of at most <strong className="text-[#D1D5DB]">2.358:1</strong>. The panel automatically detects and crops wide videos using bundled ffmpeg.</>,
+              <>If ffmpeg is not found (macOS without system ffmpeg), the panel will show an error. Install ffmpeg via Homebrew: <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">brew install ffmpeg</code></>,
+              <>If the source clip is still blocked, export your Premiere sequence as a 1920×1080 H.264 file and generate from that file instead.</>,
             ].map((s, i) => (
               <div key={i} className="flex gap-2">
                 <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
@@ -356,6 +336,7 @@ export default function DownloadsContent() {
                     ["2020–2021 (v14–15)", "CEP 10", "CSXS.10"],
                     ["2022–2024 (v22–24)", "CEP 11", "CSXS.11"],
                     ["2025 (v25)", "CEP 12", "CSXS.12"],
+                    ["2025+ (v25.x)", "CEP 13", "CSXS.13"],
                   ].map(([v, cep, key]) => (
                     <tr key={v}>
                       <td className="py-2 pr-6 text-[#D1D5DB]">{v}</td>
@@ -372,7 +353,7 @@ export default function DownloadsContent() {
         <Accordion title="Windows: verify installation" icon={Terminal}>
           <div className="space-y-3 pt-2">
             <p className="text-[12px] text-[#9CA3AF]">
-              Run this PowerShell script to verify the extension folder, registry keys, and sidecar:
+              Run this PowerShell script to verify the extension folder and registry keys:
             </p>
             <CodeBlock>{"powershell -ExecutionPolicy Bypass -File installer\\windows\\verify.ps1"}</CodeBlock>
           </div>

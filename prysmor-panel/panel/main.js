@@ -396,6 +396,10 @@ function logout() {
  * @param {boolean} silent  — if true, don't show toast when nothing is selected
  */
 function refreshClip(silent) {
+  // Clear immediately so Generate is blocked while the async refresh is in progress.
+  storedReferenceFrame = null;
+  storedVideoInfo = null;
+
   el('btn-refresh-clip').disabled = true;
   el('btn-refresh-clip').classList.add('spinning');
 
@@ -639,15 +643,26 @@ function captureReferenceFrame(videoBase64) {
       };
 
       video.onseeked = function () {
+        var vw = video.videoWidth  || 0;
+        var vh = video.videoHeight || 0;
+
+        // If the browser couldn't read video dimensions, skip canvas drawing
+        // entirely (drawImage on a 0-width source throws a DOMException).
+        // Return fallback 320x180 so captureClipReferenceFrame still enters
+        // the dimension-checking path and sets storedVideoInfo correctly.
+        if (!vw || !vh) {
+          URL.revokeObjectURL(url);
+          resolve({ frameBase64: null, width: 320, height: 180 });
+          return;
+        }
+
         try {
-          var vw = video.videoWidth  || 0;
-          var vh = video.videoHeight || 0;
           var W  = 320;
-          var H  = Math.round(W * vh / Math.max(vw, 1));
+          var H  = Math.round(W * vh / Math.max(vw, 1)) || 180;
           var canvas = document.createElement('canvas');
           canvas.width  = W;
-          canvas.height = H || W; // fallback square if height is 0
-          canvas.getContext('2d').drawImage(video, 0, 0, W, canvas.height);
+          canvas.height = H;
+          canvas.getContext('2d').drawImage(video, 0, 0, W, H);
           URL.revokeObjectURL(url);
           // Strip the data URI prefix — backend expects raw base64
           var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
@@ -667,6 +682,17 @@ function captureReferenceFrame(videoBase64) {
       video.src = url;
     } catch (e) {
       resolve(empty);
+    }
+  });
+}
+
+// Wraps cs.evalScript in a Promise so async functions can await it.
+function evalScriptAsync(script) {
+  return new Promise(function (resolve) {
+    try {
+      cs.evalScript(script, function (result) { resolve(result || ''); });
+    } catch (_) {
+      resolve('');
     }
   });
 }
@@ -694,28 +720,73 @@ async function captureClipReferenceFrame(sourcePath) {
 
       // Prefer sequence dimensions: the export always matches the sequence,
       // not the raw source. A 2.66:1 source clip in a 16:9 sequence is fine.
-      var seqW = state.mf.selInfo && state.mf.selInfo.seqWidth;
-      var seqH = state.mf.selInfo && state.mf.selInfo.seqHeight;
-      if (seqW && seqH) {
-        var seqRatio = seqW / seqH;
-        console.log('[Prysmor:aspectRatio] sequence dimensions: ' +
-          seqW + 'x' + seqH + ' ratio=' + seqRatio.toFixed(4));
-        if (seqRatio <= 2.358) {
-          storedVideoInfo = { width: seqW, height: seqH };
-          console.log('[Prysmor:aspectRatio] using SEQUENCE dimensions for aspect ratio check');
+      // Call getSelectionInfo() FRESH here so we always have the current sequence
+      // frame size — never rely on a cached value from a previous evalScript call.
+      var seqW = 0, seqH = 0;
+      try {
+        var freshRaw  = await evalScriptAsync('getSelectionInfo()');
+        var freshInfo = null;
+        try { freshInfo = JSON.parse(freshRaw || '{}'); } catch (_) {}
+        if (freshInfo && !freshInfo.error) {
+          seqW = Number(freshInfo.seqWidth)  || 0;
+          seqH = Number(freshInfo.seqHeight) || 0;
+          // Log raw ExtendScript values so we can see exactly what Premiere returns
+          console.log('[Prysmor:aspectRatio] ExtendScript frameSizeHorizontal=' +
+            freshInfo.seqWidth + ' frameSizeVertical=' + freshInfo.seqHeight +
+            ' → parsed seqW=' + seqW + ' seqH=' + seqH);
+          // Keep state.mf.selInfo in sync
+          if (state.mf.selInfo) {
+            state.mf.selInfo.seqWidth  = seqW;
+            state.mf.selInfo.seqHeight = seqH;
+          }
         } else {
-          console.warn('[Prysmor:aspectRatio] sequence ratio ' + seqRatio.toFixed(4) +
-            ' also exceeds 2.358 — keeping source dimensions');
+          console.warn('[Prysmor:aspectRatio] getSelectionInfo returned error or null:', freshRaw);
         }
-      } else {
-        console.log('[Prysmor:aspectRatio] no sequence dimensions available — using source file dimensions');
+      } catch (evalErr) {
+        console.error('[Prysmor:aspectRatio] evalScriptAsync threw:', evalErr);
       }
 
-      var finalRatio = storedVideoInfo.width / storedVideoInfo.height;
-      console.log('[Prysmor:aspectRatio] final storedVideoInfo: ' +
-        storedVideoInfo.width + 'x' + storedVideoInfo.height +
-        ' ratio=' + finalRatio.toFixed(4) +
-        ' exceeds2.358=' + (finalRatio > 2.358));
+      var sourceRatio = result.width / result.height;
+      var sourceTooWide = sourceRatio > 2.358;
+
+      if (seqW > 0 && seqH > 0) {
+        // Confirmed sequence dimensions — use them for the ratio check
+        var seqRatio = seqW / seqH;
+        console.log('[Prysmor:aspectRatio] confirmed sequence dims: ' +
+          seqW + 'x' + seqH + ' ratio=' + seqRatio.toFixed(4));
+        if (seqRatio <= 2.358) {
+          // Sequence is fine but the RAW SOURCE FILE may still be too wide.
+          // The panel uploads the raw file to S3 — if the source is wider than
+          // 2.358 the AI service will reject it regardless of sequence settings.
+          // Flag this so mfGenerate can tell the user to export first.
+          storedVideoInfo = { width: seqW, height: seqH, sourceTooWide: sourceTooWide };
+          if (sourceTooWide) {
+            console.warn('[Prysmor:aspectRatio] sequence OK but SOURCE file is too wide ' +
+              '(' + sourceRatio.toFixed(4) + ') — will block with export hint');
+          } else {
+            console.log('[Prysmor:aspectRatio] using SEQUENCE dims — ratio OK');
+          }
+        } else {
+          // Sequence itself is too wide — keep source dims for the block
+          storedVideoInfo = { width: seqW, height: seqH, sourceTooWide: true };
+          console.warn('[Prysmor:aspectRatio] sequence ratio ' + seqRatio.toFixed(4) +
+            ' exceeds 2.358 — video truly too wide');
+        }
+      } else {
+        // Sequence dimensions unknown (Premiere returned 0 or evalScript failed).
+        // Do NOT block on source file dims alone — the sequence may well be 16:9.
+        // Store width=0/height=0 as "dimensions unknown, treat as valid".
+        storedVideoInfo = { width: 0, height: 0, sourceTooWide: false };
+        console.log('[Prysmor:aspectRatio] sequence dims unavailable (returned 0) — ' +
+          'treating as valid, skipping ratio block');
+      }
+
+      var fw = storedVideoInfo.width, fh = storedVideoInfo.height;
+      console.log('[Prysmor:aspectRatio] final storedVideoInfo: ' + fw + 'x' + fh +
+        ' sourceTooWide=' + storedVideoInfo.sourceTooWide +
+        (fw > 0 && fh > 0
+          ? ' ratio=' + (fw / fh).toFixed(4) + ' willBlock=' + (storedVideoInfo.sourceTooWide || fw / fh > 2.358)
+          : ' (unknown — will not block)'));
     } else {
       console.warn('[Prysmor:aspectRatio] captureReferenceFrame returned no dimensions — ' +
         'width=' + result.width + ' height=' + result.height);
@@ -746,15 +817,19 @@ async function mfGenerate() {
     return;
   }
 
-  // Guard: aspect ratio check — Runway Gen-4 rejects width/height > 2.358
-  console.log('[Prysmor:aspectRatio] mfGenerate guard check — storedVideoInfo:', JSON.stringify(storedVideoInfo));
+  // Guard: aspect ratio check — Runway Gen-4 rejects width/height > 2.358.
+  // The panel uploads the raw source file, so even if the sequence is 16:9
+  // the source file itself must be ≤ 2.358 or Runway will reject it.
+  console.log('[Prysmor:aspectRatio] mfGenerate guard — storedVideoInfo:', JSON.stringify(storedVideoInfo));
   if (!storedVideoInfo) {
     showToast('Please wait, clip is still loading…', 'error');
     return;
   }
-  if (storedVideoInfo.width && storedVideoInfo.height) {
+  // sourceTooWide: raw source file exceeds 2.358:1 but sequence may be fine.
+  // We don't block here — cropAndScaleVideo() will fix it before the upload.
+  if (storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
     var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
-    console.log('[Prysmor:aspectRatio] ratio=' + aspectRatio.toFixed(4) + ' blocked=' + (aspectRatio > 2.358));
+    console.log('[Prysmor:aspectRatio] confirmed dims — ratio=' + aspectRatio.toFixed(4) + ' block=' + (aspectRatio > 2.358));
     if (aspectRatio > 2.358) {
       showToast(
         'Video is too wide (' + aspectRatio.toFixed(2) + ':1). ' +
@@ -763,6 +838,8 @@ async function mfGenerate() {
       );
       return;
     }
+  } else {
+    console.log('[Prysmor:aspectRatio] dims unknown (0x0) — skipping ratio block, proceeding');
   }
 
   state.mf.replaceMode = replaceMode;
@@ -815,12 +892,39 @@ async function mfGenerate() {
   }
 
 
-    // Fallback: read full file in browser and upload to S3 directly
+    // Auto-crop: if the raw source is wider than 2.358:1, run ffmpeg to
+    // center-crop + scale to 1280×720 before uploading. Runs silently — user
+    // sees only the progress bar. On failure, fall back to a clear error.
+    var wasCropped = false;
+    var croppedTmpPath = null;
+    if (storedVideoInfo && storedVideoInfo.sourceTooWide) {
+      setStatus('Preparing video for AI processing…', 15);
+      try {
+        croppedTmpPath = await cropAndScaleVideo(sourcePath);
+        sourcePath     = croppedTmpPath;
+        wasCropped     = true;
+        console.log('[Prysmor] Auto-cropped to 1280x720:', croppedTmpPath);
+      } catch (cropErr) {
+        console.error('[Prysmor] ffmpeg crop failed:', cropErr);
+        return fail(
+          'Could not prepare video automatically (ffmpeg error). ' +
+          'Please export your Premiere sequence as 1920×1080 H.264 and generate from that file.'
+        );
+      }
+    }
+
+    // Read the (possibly cropped) file into memory
     setStatus('Reading clip…', 20);
     var fileBase64;
     try {
       fileBase64 = await readFileBase64(sourcePath);
+      // Temp crop file is fully in memory — safe to delete now
+      if (croppedTmpPath) {
+        try { window.cep.fs.deleteFile(croppedTmpPath); } catch (_) {}
+        croppedTmpPath = null;
+      }
     } catch (err) {
+      if (croppedTmpPath) try { window.cep.fs.deleteFile(croppedTmpPath); } catch (_) {}
       return fail('Cannot read clip: ' + err.message);
     }
 
@@ -870,9 +974,12 @@ async function mfGenerate() {
   try {
     var genBody = { prompt: prompt };
     if (referenceFrameBase64) genBody.referenceFrameBase64 = referenceFrameBase64;
-    // Send the effective dimensions used for aspect ratio checking (sequence dims
-    // when available, source file dims otherwise) so the server can validate too.
-    if (storedVideoInfo && storedVideoInfo.width && storedVideoInfo.height) {
+    // Send confirmed video dimensions for the server-side early ratio check.
+    // If auto-crop ran, the video is now exactly 1280×720.
+    if (wasCropped) {
+      genBody.videoWidth  = 1280;
+      genBody.videoHeight = 720;
+    } else if (storedVideoInfo && storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
       genBody.videoWidth  = storedVideoInfo.width;
       genBody.videoHeight = storedVideoInfo.height;
     }
@@ -1244,6 +1351,74 @@ function fileExistsSync(p) {
   try { return window.cep.fs.stat(p).err === 0; } catch (_) { return null; }
 }
 
+// ─── Video Preprocessing ──────────────────────────────────────────────────────
+// Crops and scales a video to 1280×720 using a bundled or system ffmpeg.
+// Center-crops the width to ≤2.358:1 then scales/pads to exactly 1280×720.
+// Bundled binary: panel/ffmpeg/win/ffmpeg.exe  (Windows)
+//                 panel/ffmpeg/mac/ffmpeg       (macOS)
+// Falls back to system `ffmpeg` if bundled binary is not found.
+// Returns a Promise<string> that resolves with the output temp-file path.
+function cropAndScaleVideo(sourcePath) {
+  return new Promise(function (resolve, reject) {
+    var cp;
+    try { cp = require('child_process'); }
+    catch (e) { return reject(new Error('Node child_process unavailable — cannot run ffmpeg')); }
+
+    var isWin      = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+    var bundledBin = state._extRoot + '/panel/ffmpeg/' + (isWin ? 'win/ffmpeg.exe' : 'mac/ffmpeg');
+    var ffmpegBin  = fileExistsSync(bundledBin) ? bundledBin : 'ffmpeg';
+
+    var tmpDir  = (state.mf.tempDir && state.mf.tempDir.length > 0)
+      ? state.mf.tempDir
+      : state._extRoot + '/panel/temp';
+    var outPath = tmpDir + '/prysmor-crop-' + Date.now() + '.mp4';
+
+    // Filter chain (no shell — pass raw filter string to ffmpeg):
+    //  1. Center-crop width to ≤2.358:1 (leaves height untouched)
+    //  2. Scale to 1280×720, keeping aspect ratio, no upscaling
+    //  3. Pad to exactly 1280×720 with black bars
+    // \, escapes commas inside min() so ffmpeg does not treat them as
+    // filter-chain separators.
+    var filter =
+      'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0,' +
+      'scale=1280:720:force_original_aspect_ratio=decrease,' +
+      'pad=1280:720:(ow-iw)/2:(oh-ih)/2';
+
+    var args = [
+      '-i',      sourcePath,
+      '-vf',     filter,
+      '-c:v',    'libx264',
+      '-preset', 'fast',
+      '-crf',    '18',
+      '-c:a',    'aac',
+      '-y',      outPath,
+    ];
+
+    console.log('[Prysmor:crop] ffmpeg binary:', ffmpegBin);
+    console.log('[Prysmor:crop] output path:', outPath);
+
+    var proc   = cp.spawn(ffmpegBin, args, { windowsHide: true });
+    var stderr = '';
+    if (proc.stderr) proc.stderr.on('data', function (d) { stderr += d.toString(); });
+
+    proc.on('close', function (code) {
+      if (code === 0 && fileExistsSync(outPath)) {
+        console.log('[Prysmor:crop] done →', outPath);
+        resolve(outPath);
+      } else {
+        console.error('[Prysmor:crop] ffmpeg exited with code', code,
+          stderr ? '\n' + stderr.slice(-600) : '');
+        reject(new Error('ffmpeg exited with code ' + code));
+      }
+    });
+
+    proc.on('error', function (err) {
+      console.error('[Prysmor:crop] spawn error:', err.message);
+      reject(err);
+    });
+  });
+}
+
 // ─── Diagnostics ──────────────────────────────────────────────────────────────
 
 function buildDiagJson() {
@@ -1444,7 +1619,13 @@ function bindEvents() {
   el('btn-continue').addEventListener('click', startLogin);
 
   // Clip
-  el('btn-refresh-clip').addEventListener('click', function () { refreshClip(false); });
+  el('btn-refresh-clip').addEventListener('click', function () {
+    // Clear stale state immediately so Generate stays blocked until the
+    // full refresh + frame capture cycle completes.
+    storedReferenceFrame = null;
+    storedVideoInfo = null;
+    refreshClip(false);
+  });
 
   // Prompt char count
   el('mf-prompt').addEventListener('input', function () {
