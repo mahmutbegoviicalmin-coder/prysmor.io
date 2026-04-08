@@ -509,8 +509,10 @@ function showClipInfo(info) {
 
 function apiHeaders(extra) {
   var headers = {};
-  if (state.auth.token) {
-    headers['Authorization'] = 'Bearer ' + state.auth.token;
+  var token = state.auth.token;
+  console.log('[auth] token being sent:', token ? 'YES length=' + token.length : 'NO TOKEN');
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
   }
   return Object.assign(headers, extra || {});
 }

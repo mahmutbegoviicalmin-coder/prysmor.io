@@ -20,7 +20,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { validatePanelKey }          from '@/lib/motionforge/auth';
+import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import {
   enhanceMotionForgePrompt,
@@ -30,7 +30,9 @@ import {
 const TAG = 'enhance-prompt';
 
 export async function POST(req: NextRequest) {
-  if (!validatePanelKey(req)) {
+  // Accept either a session Bearer token (panel after login) or a pre-shared panel key
+  const session = await validatePanelToken(req);
+  if (!session && !validatePanelKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
