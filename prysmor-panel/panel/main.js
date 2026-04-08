@@ -6,7 +6,7 @@ const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
-const POLL_MS         = 3500;
+const POLL_MS         = 2000;
 const POLL_MS_SLOW    = 10000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -32,6 +32,69 @@ const LS_USER_ID        = 'prysmor_user_id';
 const LS_PLAN           = 'prysmor_plan';
 const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
+
+// ─── Generation Progress State ────────────────────────────────────────────────
+var _genStartTime    = null;   // Date.now() when Generate was clicked
+var _elapsedTimer    = null;   // setInterval ID for the elapsed clock
+var _displayPct      = 0;      // last rendered % — never decrements
+var _progressHistory = [];     // [{t, pct}] ring-buffer for ETA estimation
+
+// ─── Auto-Select State ────────────────────────────────────────────────────────
+// Polls Premiere every 500 ms and reloads the clip when the selection changes.
+
+var _autoSelectTimer    = null;
+var _lastAutoSelectKey  = null;
+
+/**
+ * Builds a stable key from clip info.
+ * Rounds mediaInSec to the nearest 0.5 s so minor timeline nudges
+ * don't trigger a full re-capture of reference frames.
+ */
+function getClipKey(info) {
+  if (!info || info.error) return null;
+  var t = Math.round((info.mediaInSec  || 0) * 2) / 2;
+  var d = parseFloat((info.durationSec || 0).toFixed(1));
+  return (info.sourcePath || '') + '@' + t.toFixed(1) + ':' + d;
+}
+
+function startClipAutoSelect() {
+  stopClipAutoSelect();
+  _autoSelectTimer = setInterval(function () {
+    cs.evalScript('getSelectionInfo()', function (raw) {
+      var parsed = null;
+      try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
+
+      var key = getClipKey(parsed);
+
+      if (key === null) {
+        // Nothing selected
+        if (_lastAutoSelectKey !== null) {
+          _lastAutoSelectKey    = null;
+          state.mf.selInfo      = null;
+          storedReferenceFrame  = null;
+          storedReferenceFrames = [];
+          storedVideoInfo       = null;
+          showClipEmpty();
+          updateCostPreview();
+        }
+        return;
+      }
+
+      if (key === _lastAutoSelectKey) return; // same clip — nothing to do
+      _lastAutoSelectKey = key;
+
+      state.mf.selInfo = parsed;
+      showClipInfo(parsed);
+      updateCostPreview();
+      captureClipReferenceFrame(parsed.sourcePath);
+    });
+  }, 500);
+}
+
+function stopClipAutoSelect() {
+  if (_autoSelectTimer) { clearInterval(_autoSelectTimer); _autoSelectTimer = null; }
+  _lastAutoSelectKey = null;
+}
 
 // ─── Reference Frame Store ────────────────────────────────────────────────────
 // Up to 3 frames captured at different timecodes when a clip is loaded.
@@ -359,6 +422,8 @@ function enterPanel() {
   // Try to auto-load whatever is selected in Premiere right now
   refreshClip(true);
 
+  // Start 500 ms auto-detect polling — no Refresh button needed
+  startClipAutoSelect();
 }
 
 
@@ -368,6 +433,7 @@ function logout() {
   stopMfPolling();
   stopAuthPolling();
   stopHeartbeat();
+  stopClipAutoSelect();
 
   // Revoke device + session on server so re-login never hits device_limit_reached.
   // Fire-and-forget — clear local state regardless of response.
@@ -444,6 +510,7 @@ function refreshClip(silent) {
 function showClipEmpty() {
   el('clip-empty').classList.remove('hidden');
   el('clip-info').classList.add('hidden');
+  showClipThumbnail(null); // clear thumbnail
 }
 
 function calcCostPreview(durationSec) {
@@ -817,6 +884,7 @@ async function captureClipReferenceFrame(sourcePath) {
     if (frames.length > 0) {
       storedReferenceFrames = frames;
       storedReferenceFrame  = frames[0];
+      showClipThumbnail(frames[0]); // display first frame as thumbnail
       console.log('[Prysmor:frame] captureClipReferenceFrame: stored ' + frames.length +
         ' frames, primary length=' + frames[0].length);
     } else {
@@ -1108,6 +1176,52 @@ function getGenStatusLabel(elapsedSec) {
   return label;
 }
 
+// ─── Elapsed timer helpers ────────────────────────────────────────────────────
+
+function startElapsedTimer() {
+  stopElapsedTimer();
+  _genStartTime = Date.now();
+  updateElapsedDisplay();
+  _elapsedTimer = setInterval(updateElapsedDisplay, 1000);
+}
+
+function stopElapsedTimer() {
+  if (_elapsedTimer) { clearInterval(_elapsedTimer); _elapsedTimer = null; }
+}
+
+function updateElapsedDisplay() {
+  if (!_genStartTime) return;
+  var sec = Math.floor((Date.now() - _genStartTime) / 1000);
+  var m = Math.floor(sec / 60), s = sec % 60;
+  var txt = m + ':' + String(s).padStart(2, '0');
+  var elEl = el('gp-elapsed');
+  if (elEl) elEl.textContent = txt;
+}
+
+// ─── ETA estimation ───────────────────────────────────────────────────────────
+
+function updateETA(pct) {
+  var estEl = el('gp-estimate');
+  if (!estEl) return;
+  if (!_genStartTime || pct < 5 || pct > 97) { estEl.textContent = ''; return; }
+
+  var h = _progressHistory;
+  if (h.length < 2) { estEl.textContent = ''; return; }
+
+  var first = h[0], last = h[h.length - 1];
+  var dtMs = last.t - first.t, dpct = last.pct - first.pct;
+  if (dtMs < 3000 || dpct < 1) { estEl.textContent = ''; return; }
+
+  var remSec = Math.round(((100 - pct) / (dpct / dtMs)) / 1000);
+  if (remSec <= 5 || remSec > 900) { estEl.textContent = ''; return; }
+
+  var rm = Math.floor(remSec / 60), rs = remSec % 60;
+  var txt = rm > 0
+    ? 'Estimated ' + rm + ':' + String(rs).padStart(2, '0') + ' remaining'
+    : 'About ' + remSec + 's remaining';
+  estEl.textContent = txt;
+}
+
 function startPolling(jobId) {
   stopMfPolling();
   var pollErrors = 0;
@@ -1125,7 +1239,7 @@ function startPolling(jobId) {
 
     // Hard timeout: one final check then give up
     if (elapsedMs > MAX_POLL_MS) {
-      setStatus('Checking if generation finished\u2026', 99, elapsed);
+      setStatus('Checking if generation finished\u2026', 99);
       try {
         var finalJob = await apiFetch('/api/v1/motionforge/jobs/' + jobId);
         if (finalJob.status === 'completed' && finalJob.outputUrl) {
@@ -1147,7 +1261,7 @@ function startPolling(jobId) {
       pollErrors++;
       console.warn('[Prysmor] poll #' + pollErrors + ' threw:', err.message);
       var lastPct = state.mf.lastKnownPct || 42;
-      setStatus(getGenStatusLabel(elapsedSec), lastPct, elapsed);
+      setStatus(getGenStatusLabel(elapsedSec), lastPct);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
@@ -1156,20 +1270,26 @@ function startPolling(jobId) {
       var runwayPct = job.progress || 0;
       var pct, label;
       if (runwayPct > 0) {
-        pct   = 40 + Math.round(runwayPct * 0.56);
-        label = 'Generating\u2026 ' + runwayPct + '%';
+        pct   = 20 + Math.round(runwayPct * 0.6);
+        label = 'Generating with AI\u2026';
       } else {
-        pct   = 40 + Math.min(Math.round(elapsedSec * 0.08), 15);
-        label = getGenStatusLabel(elapsedSec);
+        pct   = 20 + Math.min(Math.round(elapsedSec * 0.06), 10);
+        label = elapsedSec < 15 ? 'Generating with AI\u2026' : getGenStatusLabel(elapsedSec);
       }
       state.mf.lastKnownPct = pct;
-      setStatus(label, pct, elapsed);
+      setStatus(label, pct);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
 
     if (job.status === 'compositing') {
-      setStatus('Applying final touches\u2026', 97, elapsed);
+      setStatus('Applying final touches\u2026', 97);
+      state.mf.pollTimer = setTimeout(doPoll, nextInterval);
+      return;
+    }
+
+    if (job.status === 'upscaling') {
+      setStatus('Enhancing video quality\u2026', job.progress || 85);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
       return;
     }
@@ -1328,25 +1448,66 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
 
 // ─── UI State Helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Displays (or clears) the video thumbnail in the clip card.
+ * @param {string|null} base64 - raw base64 JPEG string, or null to clear
+ */
+function showClipThumbnail(base64) {
+  var img         = el('clip-thumbnail');
+  var placeholder = el('clip-thumb-placeholder');
+  if (!img) return;
+  if (base64) {
+    // CEP uses old Chromium where CSS transitions on img load are unreliable.
+    // Drive opacity directly via JS instead of relying on the .loaded class.
+    img.style.opacity  = '0';
+    img.style.display  = 'block';
+    img.style.transition = 'opacity 0.25s ease';
+    img.src = 'data:image/jpeg;base64,' + base64;
+    if (placeholder) placeholder.style.display = 'none';
+    // Fade in — give the browser one tick to decode the data URL first
+    setTimeout(function () { img.style.opacity = '1'; }, 40);
+  } else {
+    img.style.opacity  = '0';
+    img.style.display  = 'none';
+    img.src            = '';
+    if (placeholder) placeholder.style.display = '';
+  }
+}
+
 function setGenerating(active) {
   state.mf.generating = active;
-  const btn = el('mf-btn-generate');
+  var btn = el('mf-btn-generate');
   if (btn) { btn.disabled = active; btn.style.display = active ? 'none' : ''; }
   var costBadge = el('gen-btn-cost');
   if (costBadge && active) costBadge.style.display = 'none';
-  const gs = el('mf-gen-state');
+
+  var gs = el('mf-gen-state');
   if (gs) gs.classList.toggle('hidden', !active);
-  const rs = el('mf-section-result');
+
+  // Hide result and error when starting
+  var rs = el('mf-section-result');
   if (rs && active) rs.classList.add('hidden');
+  var failEl = el('mf-gen-failed');
+  if (failEl && active) failEl.classList.add('hidden');
+
   if (active) {
-    const bar = el('mf-gen-bar');
-    if (bar) bar.style.width = '0%';
-    // Reset stage indicators
+    // Reset progress state
+    _displayPct      = 0;
+    _progressHistory = [];
+    var fill = el('gp-fill'); if (fill) fill.style.width = '0%';
+    var pct  = el('gp-pct');  if (pct)  pct.textContent  = '0%';
+    var est  = el('gp-estimate'); if (est) est.textContent = '';
+    var lbl  = el('gp-phase-label'); if (lbl) lbl.textContent = 'Starting\u2026';
+
+    startElapsedTimer();
+
+    // Compat shims: keep old hidden elements current
     setStage('upload');
-    var pctLbl = el('mf-gen-pct'); if (pctLbl) pctLbl.textContent = '0%';
-    var elapsed2 = el('mf-gen-elapsed'); if (elapsed2) elapsed2.classList.remove('visible');
+  } else {
+    stopElapsedTimer();
+    _genStartTime = null;
+    updateCostPreview();
   }
-  if (!active) updateCostPreview();
 }
 
 function setStage(stage) {
@@ -1367,29 +1528,68 @@ function setStage(stage) {
   if (line2) line2.classList.toggle('done', activeIdx > 1);
 }
 
-function setStatus(text, pct, elapsed) {
-  const t = el('mf-status-text'); if (t) t.textContent = text;
-  const b = el('mf-gen-bar');
-  const clamped = pct != null ? Math.min(Math.max(pct, 0), 100) : null;
-  if (b && clamped != null) b.style.width = clamped + '%';
-  const pctLbl = el('mf-gen-pct');
-  if (pctLbl && clamped != null) pctLbl.textContent = Math.round(clamped) + '%';
-  const elapsedEl = el('mf-gen-elapsed');
-  if (elapsedEl) {
-    if (elapsed) { elapsedEl.textContent = elapsed; elapsedEl.classList.add('visible'); }
-    else { elapsedEl.classList.remove('visible'); }
+function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
+  // Phase label
+  var lbl = el('gp-phase-label');
+  if (lbl) lbl.textContent = text;
+
+  // Progress bar — never goes backwards
+  if (pct != null) {
+    var clamped = Math.min(Math.max(pct, 0), 100);
+    if (clamped >= _displayPct) {
+      _displayPct = clamped;
+      var fill = el('gp-fill');
+      if (fill) fill.style.width = clamped + '%';
+      var pctLbl = el('gp-pct');
+      if (pctLbl) pctLbl.textContent = Math.round(clamped) + '%';
+
+      // Record progress sample for ETA estimation
+      _progressHistory.push({ t: Date.now(), pct: clamped });
+      if (_progressHistory.length > 8) _progressHistory.shift();
+      updateETA(clamped);
+    }
   }
-  // Auto-update stage based on %
-  if (clamped != null) {
-    if (clamped < 38)      setStage('upload');
-    else if (clamped < 97) setStage('generate');
-    else                   setStage('done');
+
+  // Stage-based dot color: uploading→amber, generating→green, upscaling→blue
+  var dot = document.querySelector('.gp-dot');
+  if (dot && pct != null) {
+    if (_displayPct < 40)       dot.style.background = '#FF9F0A';  // amber: uploading
+    else if (_displayPct < 82)  dot.style.background = 'var(--accent)';  // green: generating
+    else                        dot.style.background = '#0A84FF';  // blue: upscaling/finishing
+  }
+
+  // Compat shims: keep legacy hidden elements in sync
+  if (pct != null) {
+    var clamped2 = Math.min(Math.max(pct, 0), 100);
+    var oldBar = el('mf-gen-bar'); if (oldBar) oldBar.style.width = clamped2 + '%';
+    var oldPct = el('mf-gen-pct'); if (oldPct) oldPct.textContent = Math.round(clamped2) + '%';
+    var oldTxt = el('mf-status-text'); if (oldTxt) oldTxt.textContent = text;
+    if (clamped2 < 38)       setStage('upload');
+    else if (clamped2 < 97)  setStage('generate');
+    else                     setStage('done');
   }
 }
 
 function fail(msg) {
   stopMfPolling();
-  setGenerating(false);
+  stopElapsedTimer();
+  _genStartTime = null;
+  state.mf.generating = false;
+
+  // Hide generate button (restored on retry)
+  var btn = el('mf-btn-generate');
+  if (btn) { btn.disabled = false; btn.style.display = 'none'; }
+  // Hide progress bar
+  var gs = el('mf-gen-state');
+  if (gs) gs.classList.add('hidden');
+
+  // Show inline error card
+  var failEl  = el('mf-gen-failed');
+  var failMsg = el('gen-fail-msg');
+  if (failEl)  failEl.classList.remove('hidden');
+  if (failMsg) failMsg.textContent = msg || 'Generation failed.';
+
+  // Also surface as toast for immediate visibility
   showToast(msg, 'error');
 }
 
@@ -1764,12 +1964,12 @@ function renderUsage() {
   var secEl = el('usage-seconds');
   if (secEl) secEl.textContent = seconds > 0 ? '≈ ' + seconds + 's of AI VFX' : 'No time remaining';
 
-  // Topbar badge
+  // Topbar credits (left side of header — shows clean number only)
   var badge    = el('topbar-credits');
   var badgeVal = el('topbar-credits-val');
   if (badge && badgeVal) {
     badge.style.display  = '';
-    badgeVal.textContent = credits.toLocaleString() + ' cr';
+    badgeVal.textContent = credits.toLocaleString();
     badge.classList.toggle('low', isLow);
   }
 }
@@ -1864,6 +2064,19 @@ function bindEvents() {
   // Generate
   el('mf-btn-generate').addEventListener('click', mfGenerate);
 
+  // Retry after failure — hide error card and restore generate button
+  var retryBtn = el('gen-retry-btn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', function () {
+      var failEl = el('mf-gen-failed');
+      if (failEl) failEl.classList.add('hidden');
+      // Restore generate button
+      var genBtn = el('mf-btn-generate');
+      if (genBtn) { genBtn.disabled = false; genBtn.style.display = ''; }
+      updateCostPreview();
+    });
+  }
+
   // New generation
   el('mf-btn-new-gen').addEventListener('click', function () {
     el('mf-section-result').classList.add('hidden');
@@ -1907,8 +2120,8 @@ function bindEvents() {
 
   // Settings
   el('btn-scroll-settings').addEventListener('click', function () {
-    el('section-settings').scrollIntoView({ behavior: 'smooth' });
-    toggleSettings(true);
+    var overlay = el('section-settings');
+    if (overlay) overlay.classList.add('settings-visible');
   });
   el('settings-trigger').addEventListener('click', function () { toggleSettings(); });
   el('btn-diagnostics').addEventListener('click', toggleDiagnostics);

@@ -5,6 +5,7 @@ import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { refundCredits }              from '@/lib/firestore/users';
 import { getConfig }                  from '@/lib/motionforge/config';
+import { enhanceVideo }               from '@/lib/motionforge/replicateEnhance';
 // frameExtract and compositingPipeline import @ffmpeg-installer/ffmpeg at their top level,
 // which is excluded from the Vercel bundle. Never import them statically in this route —
 // use lazy await import() only inside the compositing path (local dev only).
@@ -84,6 +85,31 @@ export async function GET(
     }
 
     return NextResponse.json({ status: 'compositing', progress: job.progress ?? 95 });
+  }
+
+  // ── Handle stuck upscaling with timeout fallback ───────────────────────────
+  if (job.status === 'upscaling') {
+    const updatedAt  = toDate(job.updatedAt);
+    const elapsedMs  = Date.now() - updatedAt.getTime();
+    const timeoutMs  = 5 * 60 * 1000; // 5 min — Replicate models rarely exceed this
+
+    if (elapsedMs > timeoutMs) {
+      warn(TAG, `Upscaling timed out for job ${params.id} after ${Math.round(elapsedMs / 1000)}s — falling back to raw output`);
+      const fallbackUrl = job.rawOutputUrl;
+      if (fallbackUrl) {
+        await updateJob(userId, params.id, {
+          status:    'completed',
+          outputUrl: fallbackUrl,
+          progress:  100,
+          warnings:  ['upscaling-timeout-fallback-to-raw'],
+        });
+        return NextResponse.json({ status: 'completed', progress: 100, outputUrl: fallbackUrl });
+      }
+      await updateJob(userId, params.id, { status: 'failed', error: 'Upscaling timed out with no fallback URL' });
+      return NextResponse.json({ status: 'failed', error: 'Upscaling timed out' });
+    }
+
+    return NextResponse.json({ status: 'upscaling', progress: job.progress ?? 85 });
   }
 
   // ── Poll Runway for generation status ──────────────────────────────────────
@@ -204,19 +230,39 @@ export async function GET(
         await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: 100 } as any);
 
         if (!hasOrig) {
-          log(TAG, 'No original clip on disk — skipping compositing, returning raw Runway output');
+          log(TAG, 'No original clip on disk — skipping compositing');
+
+          // ── Replicate enhancement (background, non-blocking) ───────────────
+          if (process.env.REPLICATE_API_TOKEN) {
+            await updateJob(userId, params.id, {
+              status:       'upscaling',
+              rawOutputUrl: rawUrl,
+              progress:     82,
+            });
+
+            try {
+              after(() => runEnhancementAsync(userId, params.id, rawUrl));
+            } catch {
+              setImmediate(() => runEnhancementAsync(userId, params.id, rawUrl));
+            }
+
+            log(TAG, `Job ${params.id} → upscaling (Replicate pipeline started in background)`);
+            return NextResponse.json({ status: 'upscaling', progress: 82 });
+          }
+
+          // ── No Replicate token — skip enhancement, mark completed directly ─
           try {
             await updateJob(userId, params.id, {
-              status:      'completed',
-              outputUrl:   rawUrl,
+              status:       'completed',
+              outputUrl:    rawUrl,
               rawOutputUrl: rawUrl,
-              progress:    100,
+              progress:     100,
             });
           } catch (updateErr) {
             logError(TAG, `Firestore write failed when marking job ${params.id} completed`, updateErr);
             return NextResponse.json({ status: 'failed', error: 'Database write failed after Runway succeeded — retry generation' });
           }
-          log(TAG, `Job ${params.id} marked completed, outputUrl set`);
+          log(TAG, `Job ${params.id} marked completed (no enhancement), outputUrl set`);
           return NextResponse.json({ status: 'completed', progress: 100, outputUrl: rawUrl });
         }
 
@@ -372,6 +418,40 @@ async function runCompositingAsync(
     // Always clean up the original preserved clip and anchor frames
     safeUnlink(origPath);
     cleanupAnchorFrames(anchorPaths);
+  }
+}
+
+// ─── Async enhancement runner (Replicate) ─────────────────────────────────────
+
+async function runEnhancementAsync(
+  userId: string,
+  jobId:  string,
+  rawUrl: string,
+): Promise<void> {
+  try {
+    log(TAG, `Starting Replicate enhancement pipeline for job ${jobId}`);
+    const finalUrl = await enhanceVideo(rawUrl);
+    log(TAG, `Enhancement complete for job ${jobId}`, { finalUrl: finalUrl.slice(0, 100) });
+
+    await updateJob(userId, jobId, {
+      status:    'completed',
+      outputUrl: finalUrl,
+      progress:  100,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Enhancement error';
+    warn(TAG, `Replicate enhancement failed for job ${jobId} — falling back to raw Runway output`, { msg });
+
+    try {
+      await updateJob(userId, jobId, {
+        status:    'completed',
+        outputUrl: rawUrl,
+        progress:  100,
+        warnings:  [msg, 'replicate-enhancement-failed-used-raw-output'],
+      });
+    } catch (updateErr) {
+      logError(TAG, `Failed to update job ${jobId} after enhancement failure`, updateErr);
+    }
   }
 }
 

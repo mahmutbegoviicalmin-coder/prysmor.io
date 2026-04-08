@@ -8,16 +8,599 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="styles.css?v=18"/>
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       APPLE-INSPIRED DESIGN TOKENS
+    ═══════════════════════════════════════════════════════ */
+    :root {
+      --bg:             #080808;
+      --card:           rgba(255,255,255,0.04);
+      --card-hover:     rgba(255,255,255,0.07);
+      --card-elevated:  rgba(28,28,30,0.95);
+      --border:         rgba(255,255,255,0.08);
+      --border-strong:  rgba(255,255,255,0.12);
+      --accent:         #00E676;
+      --accent-glow:    rgba(0,230,118,0.15);
+      --accent-soft:    rgba(0,230,118,0.08);
+      --text-primary:   #F5F5F7;
+      --text-secondary: rgba(245,245,247,0.5);
+      --text-tertiary:  rgba(245,245,247,0.28);
+      --red:            #FF453A;
+      --radius:         12px;
+      --radius-lg:      16px;
+      --radius-sm:      8px;
+      --inset-glow:     0 1px 0 rgba(255,255,255,0.05) inset;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       RESET + BASE
+    ═══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, system-ui, 'SF Pro Text', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    .hidden        { display: none !important; }
+    .sr-only       { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+    .compat-hidden { display: none !important; }
+
+    /* ═══════════════════════════════════════════════════════
+       TOAST  — slides down from top, never overlaps content
+    ═══════════════════════════════════════════════════════ */
+    .toast {
+      position: fixed; top: 0; left: 0; right: 0;
+      transform: translateY(-100%);
+      opacity: 0;
+      background: #1c1c1e;
+      border-bottom: 1px solid var(--border-strong);
+      padding: 9px 16px;
+      font-size: 12px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+      z-index: 9999;
+      transition: transform .22s cubic-bezier(.32,0,.67,0), opacity .22s ease;
+      pointer-events: none;
+      min-height: 38px;
+    }
+    .toast.toast-visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      transition: transform .28s cubic-bezier(.33,1,.68,1), opacity .2s ease;
+    }
+    .toast-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    }
+    .toast.success .toast-dot { background: var(--accent); }
+    .toast.error   .toast-dot { background: var(--red); }
+    .toast.info    .toast-dot { background: #0A84FF; }
+    #toast-icon { display: none; } /* replaced by dot */
+    #toast-text { color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ═══════════════════════════════════════════════════════
+       VIEWS
+    ═══════════════════════════════════════════════════════ */
+    .view { position: absolute; inset: 0; overflow: hidden; }
+
+    /* ═══════════════════════════════════════════════════════
+       MAIN VIEW SHELL
+    ═══════════════════════════════════════════════════════ */
+    .main-view { display: flex; flex-direction: column; background: var(--bg); }
+
+    /* ═══════════════════════════════════════════════════════
+       STATUS BAR  (44px, no logo)
+    ═══════════════════════════════════════════════════════ */
+    .topbar {
+      height: 44px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 20;
+      border-bottom: 1px solid var(--border);
+    }
+    .tb-left  { display: flex; align-items: center; gap: 6px; }
+    .tb-right { display: flex; align-items: center; gap: 10px; }
+
+    /* Credits pill — clean with inner glow ring */
+    #topbar-credits {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(0,230,118,0.06);
+      border: 1px solid rgba(0,230,118,0.18);
+      border-radius: 22px;
+      padding: 5px 11px 5px 9px;
+      box-shadow: 0 0 12px rgba(0,230,118,0.08), inset 0 1px 0 rgba(0,230,118,0.1);
+    }
+    #topbar-credits svg { color: var(--accent); flex-shrink: 0; }
+    #topbar-credits-val {
+      font-size: 13px; font-weight: 700;
+      color: var(--accent); letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .tb-credits-label {
+      font-size: 10px; font-weight: 500;
+      color: rgba(0,230,118,0.45); letter-spacing: .2px; margin-left: 1px;
+    }
+    #topbar-credits.low {
+      background: rgba(255,159,10,0.06);
+      border-color: rgba(255,159,10,0.22);
+      box-shadow: 0 0 12px rgba(255,159,10,0.08), inset 0 1px 0 rgba(255,159,10,0.1);
+    }
+    #topbar-credits.low #topbar-credits-val { color: #FF9F0A; }
+    #topbar-credits.low svg { color: #FF9F0A; }
+    #topbar-credits.low .tb-credits-label { color: rgba(255,159,10,0.5); }
+
+    /* Plan badge — dark pill with shimmer border */
+    #topbar-plan {
+      font-size: 9px; font-weight: 700; letter-spacing: .8px;
+      text-transform: uppercase;
+      color: #F5F5F7;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 20px; padding: 4px 9px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    #topbar-plan::before {
+      content: "◆ ";
+      font-size: 7px;
+      color: var(--accent);
+      letter-spacing: 0;
+      vertical-align: middle;
+    }
+
+    /* Gear button */
+    .tb-gear {
+      background: none; border: none;
+      color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      transition: color .2s ease, background .2s ease;
+    }
+    .tb-gear:hover { color: var(--text-primary); background: var(--card); }
+    .tb-gear:active { transform: scale(0.92); }
+
+    /* ═══════════════════════════════════════════════════════
+       SCROLL AREA
+    ═══════════════════════════════════════════════════════ */
+    .panel-scroll {
+      flex: 1; overflow-y: auto;
+      padding: 12px 12px 24px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .panel-scroll::-webkit-scrollbar { width: 0px; }
+
+    /* ═══════════════════════════════════════════════════════
+       FROSTED GLASS CARD
+    ═══════════════════════════════════════════════════════ */
+    .card {
+      background: rgba(22,22,24,0.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--inset-glow), 0 2px 16px rgba(0,0,0,0.35);
+      transition: background .2s ease;
+      /* backdrop-filter intentionally removed — causes black frames in CEP's Chromium 73 */
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       CLIP CARD
+    ═══════════════════════════════════════════════════════ */
+
+    /* Empty state */
+    .clip-empty {
+      padding: 28px 20px 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      text-align: center;
+    }
+    .clip-empty-icon { color: var(--text-tertiary); margin-bottom: 6px; }
+    .clip-empty-t {
+      font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+    .clip-empty-s { font-size: 12px; color: var(--text-secondary); }
+    .clip-auto-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 500;
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid rgba(0,230,118,0.15);
+      border-radius: 20px; padding: 4px 10px;
+      margin-top: 8px;
+    }
+    .clip-auto-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
+
+    /* Thumbnail */
+    .clip-thumb-wrap {
+      position: relative; width: 100%;
+      aspect-ratio: 16/9; background: #000;
+      overflow: hidden;
+    }
+    .clip-thumb-img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+    .clip-thumb-img.loaded { opacity: 1; }
+    .clip-thumb-placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-tertiary);
+    }
+    .clip-thumb-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .clip-thumb-badges {
+      position: absolute; bottom: 10px; left: 10px;
+      display: flex; gap: 4px; align-items: center;
+    }
+    .clip-live-indicator {
+      position: absolute; top: 10px; right: 10px;
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(0,0,0,0.62);
+      border-radius: 20px; padding: 3px 7px;
+      font-size: 9px; font-weight: 600; letter-spacing: .4px;
+      color: var(--accent);
+    }
+    .clip-live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      animation: breathe 2s ease-in-out infinite;
+    }
+
+    /* Clip meta */
+    .clip-meta { padding: 10px 14px 12px; }
+    .clip-row-name {
+      font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+      color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: block; margin-bottom: 4px;
+    }
+    .clip-meta-row { display: flex; align-items: center; justify-content: space-between; }
+    .clip-meta-left { display: flex; align-items: center; gap: 6px; }
+
+    /* Chips / tags */
+    .chip {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 600; letter-spacing: .2px;
+      padding: 2px 7px; border-radius: 20px;
+    }
+    .chip-green { background: rgba(0,230,118,.12); color: var(--accent); }
+    .chip-gray  { background: rgba(255,255,255,.06); color: var(--text-secondary); }
+    .chip-amber { background: rgba(255,159,10,.1); color: #FF9F0A; }
+
+    .clip-warn { padding: 0 14px 12px; font-size: 11px; color: #FF9F0A; line-height: 1.45; }
+
+    /* ═══════════════════════════════════════════════════════
+       PROMPT CARD
+    ═══════════════════════════════════════════════════════ */
+    .prompt-card { display: flex; flex-direction: column; }
+    .prompt-card textarea {
+      width: 100%; background: transparent; border: none; outline: none;
+      color: var(--text-primary);
+      font-size: 13px; font-family: inherit;
+      resize: none; padding: 14px 14px 0;
+      line-height: 1.6; min-height: 88px;
+      caret-color: var(--accent);
+    }
+    .prompt-card textarea::placeholder { color: var(--text-tertiary); }
+    .prompt-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px 12px 14px;
+    }
+    .prompt-count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+    /* AI Enhance — the "brain" of the panel */
+    .ai-btn {
+      display: flex; align-items: center; gap: 6px;
+      /* subtle gradient: green tint on left, neutral on right */
+      background: linear-gradient(135deg, rgba(0,230,118,0.12) 0%, rgba(255,255,255,0.05) 100%);
+      border: 1px solid rgba(0,230,118,0.28);
+      color: var(--accent);
+      font-size: 11px; font-weight: 700; letter-spacing: .2px;
+      padding: 7px 13px; border-radius: 22px;
+      transition: all .22s ease;
+      box-shadow: 0 0 14px rgba(0,230,118,0.1), inset 0 1px 0 rgba(0,230,118,0.12);
+    }
+    .ai-btn:hover {
+      background: linear-gradient(135deg, rgba(0,230,118,0.2) 0%, rgba(0,230,118,0.06) 100%);
+      border-color: rgba(0,230,118,0.5);
+      box-shadow: 0 0 22px rgba(0,230,118,0.2), inset 0 1px 0 rgba(0,230,118,0.18);
+      color: #fff;
+    }
+    .ai-btn:active { transform: scale(0.97); }
+    .ai-btn:disabled { opacity: .35; cursor: wait; transform: none; box-shadow: none; }
+    .ai-btn-icon { flex-shrink: 0; display: flex; align-items: center; }
+
+    /* ═══════════════════════════════════════════════════════
+       GENERATE CARD
+    ═══════════════════════════════════════════════════════ */
+    .gen-card { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+    /* Output toggle — pill segmented control */
+    .output-row { display: flex; align-items: center; justify-content: space-between; }
+    .output-lbl { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+    .output-seg {
+      display: flex;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px; gap: 2px;
+    }
+    .seg-opt {
+      background: none; border: none;
+      color: var(--text-secondary);
+      font-size: 11px; font-weight: 600;
+      padding: 4px 13px; border-radius: 20px;
+      transition: all .2s ease;
+    }
+    .seg-opt.seg-active {
+      background: rgba(255,255,255,0.1);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3), var(--inset-glow);
+    }
+    .seg-opt:hover:not(.seg-active) { color: var(--text-primary); }
+    .output-hint { font-size: 11px; color: var(--text-tertiary); margin-top: -4px; }
+
+    /* Generate button */
+    .gen-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--accent); color: #000;
+      font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+      border: none; border-radius: var(--radius);
+      padding: 13px; cursor: pointer;
+      transition: all .2s ease;
+      box-shadow: 0 0 0 0 var(--accent-glow);
+    }
+    .gen-btn:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .gen-btn:active { transform: scale(0.98); }
+    .gen-btn:disabled { opacity: .3; cursor: not-allowed; transform: none; filter: none; box-shadow: none; }
+    .gen-cost-badge {
+      background: rgba(0,0,0,0.22);
+      border-radius: 20px; padding: 2px 8px;
+      font-size: 11px; font-weight: 700;
+    }
+
+    /* ── Generation progress ──────────────────────────────────────────── */
+    .gen-state { display: flex; flex-direction: column; gap: 7px; }
+
+    /* Pulsing dot — inherits color from state class */
+    .gp-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+      animation: breathe 1.4s ease-in-out infinite;
+    }
+    /* Header row: dot + label on left, elapsed on right */
+    .gp-hdr { display: flex; align-items: center; justify-content: space-between; }
+    .gp-hdr-left { display: flex; align-items: center; gap: 8px; }
+    .gp-label {
+      font-size: 12px; font-weight: 500;
+      color: var(--text-primary); letter-spacing: -0.01em;
+    }
+    .gp-elapsed {
+      font-size: 11px; color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+    /* 3px bar track */
+    .gp-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 99px; overflow: hidden;
+    }
+    .gp-fill {
+      height: 100%; border-radius: 99px;
+      background: var(--accent);
+      transition: width 0.4s ease;
+      box-shadow: 0 0 8px var(--accent-glow);
+      position: relative; overflow: hidden;
+    }
+    @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+    .gp-shimmer {
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
+      animation: shimmer 1.8s linear infinite;
+    }
+    /* Footer row: estimate on left, pct on right */
+    .gp-ftr { display: flex; align-items: center; justify-content: space-between; }
+    .gp-estimate {
+      font-size: 11px; color: var(--text-tertiary);
+      transition: opacity .3s ease;
+    }
+    .gp-pct {
+      font-size: 11px; font-weight: 600;
+      color: var(--accent); font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Inline failed state ──────────────────────────────────────────── */
+    .gen-failed {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,69,58,0.06);
+      border: 1px solid rgba(255,69,58,0.16);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .gen-fail-icon { color: var(--red); flex-shrink: 0; opacity: .8; }
+    .gen-fail-msg {
+      font-size: 12px; color: rgba(255,69,58,0.85);
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .gen-retry-btn {
+      flex-shrink: 0;
+      background: none; border: 1px solid rgba(255,69,58,0.3);
+      color: var(--red); font-size: 11px; font-weight: 600;
+      padding: 4px 11px; border-radius: 20px; cursor: pointer;
+      transition: background .18s ease, border-color .18s ease;
+    }
+    .gen-retry-btn:hover { background: rgba(255,69,58,0.1); border-color: rgba(255,69,58,0.5); }
+    .gen-retry-btn:active { transform: scale(0.97); }
+
+    /* No credits */
+    .no-credits-bar {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,69,58,.06);
+      border: 1px solid rgba(255,69,58,.15);
+      border-radius: var(--radius-sm);
+      padding: 9px 12px;
+      font-size: 11px; color: #FF453A;
+    }
+    .no-credits-link {
+      color: var(--accent); text-decoration: none;
+      margin-left: auto; font-weight: 600; font-size: 11px;
+    }
+    .no-credits-link:hover { text-decoration: underline; }
+
+    /* ═══════════════════════════════════════════════════════
+       RESULT CARD
+    ═══════════════════════════════════════════════════════ */
+    .ghost-lnk {
+      background: none; border: none;
+      color: var(--text-secondary); font-size: 11px; font-weight: 500;
+      cursor: pointer; padding: 4px 6px; border-radius: 6px;
+      transition: color .2s, background .2s;
+    }
+    .ghost-lnk:hover { color: var(--text-primary); background: var(--card-hover); }
+    .result-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px 8px;
+    }
+    .result-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    .result-wrap { position: relative; }
+    #mf-result-video {
+      width: 100%; aspect-ratio: 16/9;
+      object-fit: cover; display: block; background: #000;
+    }
+    .result-tags { display: flex; gap: 5px; padding: 10px 14px 6px; }
+    .result-actions { display: flex; gap: 7px; padding: 4px 12px 12px; }
+    .r-btn {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px 10px; border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 600; letter-spacing: -0.01em;
+      transition: all .2s ease;
+    }
+    .r-btn:active { transform: scale(0.97); }
+    .r-btn-primary { background: var(--accent); color: #000; border: none; }
+    .r-btn-primary:hover { filter: brightness(1.08); }
+    .r-btn-ghost {
+      background: var(--card-hover); color: var(--text-primary);
+      border: 1px solid var(--border);
+      box-shadow: var(--inset-glow);
+    }
+    .r-btn-ghost:hover { border-color: var(--border-strong); background: rgba(255,255,255,0.09); }
+
+    /* ═══════════════════════════════════════════════════════
+       SETTINGS OVERLAY  (full-screen, slide-up sheet)
+    ═══════════════════════════════════════════════════════ */
+    #section-settings {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s ease;
+    }
+    #section-settings.settings-visible {
+      opacity: 1; pointer-events: auto;
+    }
+    .settings-sheet {
+      background: var(--card-elevated);
+      border: 1px solid var(--border-strong);
+      border-bottom: none;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 0 0 env(safe-area-inset-bottom,0);
+      box-shadow: 0 -20px 60px rgba(0,0,0,0.5), var(--inset-glow);
+      transform: translateY(20px);
+      transition: transform .25s cubic-bezier(.32,0,.67,0);
+    }
+    #section-settings.settings-visible .settings-sheet {
+      transform: translateY(0);
+      transition: transform .3s cubic-bezier(.33,1,.68,1);
+    }
+    .settings-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+    .settings-close {
+      background: rgba(255,255,255,0.08); border: none;
+      color: var(--text-secondary);
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; line-height: 1; font-weight: 600;
+      transition: background .2s;
+    }
+    .settings-close:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
+    /* Keep hidden settings-trigger/chevron/menu for JS compat but use new sheet items */
+    .settings-toggle { display: none; }
+    .settings-menu   { display: none; }
+    .sm-item {
+      display: flex; align-items: center; gap: 12px;
+      background: none; border: none;
+      color: var(--text-secondary); font-size: 13px; font-weight: 500;
+      padding: 13px 18px; width: 100%; text-align: left;
+      transition: color .15s, background .15s;
+      border-bottom: 1px solid var(--border);
+    }
+    .sm-item:last-child { border-bottom: none; }
+    .sm-item:hover { color: var(--text-primary); background: var(--card-hover); }
+    .sm-danger { }
+    .sm-danger:hover { color: var(--red); }
+    .sm-item-icon { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.07); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; }
+    /* Diag panel */
+    .diag-box {
+      background: rgba(255,255,255,0.03); border-top: 1px solid var(--border);
+      padding: 10px 18px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .diag-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; }
+    .diag-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .dk { color: var(--text-secondary); }
+    .dv { color: var(--text-primary); font-family: 'SF Mono', monospace; font-size: 10px; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diag-status.ok  { color: var(--accent); }
+    .diag-status.err { color: var(--red); }
+
+    /* ═══════════════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════════════ */
+    .panel-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 2px 2px 0;
+    }
+    .foot-v { font-size: 10px; color: var(--text-tertiary); }
+    .foot-links { display: flex; gap: 8px; font-size: 10px; color: var(--text-tertiary); }
+    .foot-links a { color: inherit; text-decoration: none; cursor: pointer; }
+    .foot-links a:hover { color: var(--text-secondary); }
+  </style>
 </head>
 <body>
 
   <div id="toast" class="toast hidden" role="alert" aria-live="polite">
+    <span class="toast-dot"></span>
     <span id="toast-icon"></span>
     <span id="toast-text"></span>
   </div>
 
   <!-- ══════════════════════════════════════
-       LOGIN VIEW
+       LOGIN VIEW  (unchanged)
   ══════════════════════════════════════ -->
   <div id="view-login" class="view login-view">
     <div class="lbg" aria-hidden="true">
@@ -72,48 +655,33 @@
       </div>
 
       <div class="lv-stats">
-        <div class="lv-stat">
-          <span class="lv-stat-label">Plan</span>
-          <span class="lv-stat-value">Not connected</span>
-        </div>
+        <div class="lv-stat"><span class="lv-stat-label">Plan</span><span class="lv-stat-value">Not connected</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat">
-          <span class="lv-stat-label">Credits</span>
-          <span class="lv-stat-value">—</span>
-        </div>
+        <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat">
-          <span class="lv-stat-label">Panel</span>
-          <span class="lv-stat-value">v1.1.0</span>
-        </div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value">v1.1.0</span></div>
       </div>
     </div>
   </div>
 
 
   <!-- ══════════════════════════════════════
-       MAIN PANEL VIEW
+       MAIN PANEL VIEW  (Apple redesign)
   ══════════════════════════════════════ -->
   <div id="view-main" class="view main-view hidden">
 
-    <div class="amb" aria-hidden="true">
-      <div class="amb-1"></div><div class="amb-2"></div>
-    </div>
-
-    <!-- ── TOPBAR ───────────────────────── -->
+    <!-- ── STATUS BAR ─────────────────────────────── -->
     <header class="topbar">
-      <div class="tb-brand">
-        <img src="assets/vecilogo.png" class="tb-logo" alt=""/>
-        <span class="tb-name">Prysmor</span>
-        <span id="topbar-plan" class="tb-plan" style="display:none"></span>
+      <div class="tb-left">
+        <div id="topbar-credits" style="display:none">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span id="topbar-credits-val">—</span>
+          <span class="tb-credits-label">cr</span>
+        </div>
       </div>
       <div class="tb-right">
-        <div class="tb-credits-pill" id="topbar-credits" style="display:none">
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span id="topbar-credits-val">–</span>
-        </div>
-        <div class="tb-dot"></div>
-        <button class="tb-settings-btn" id="btn-scroll-settings" title="Settings">
+        <span id="topbar-plan" class="tb-plan" style="display:none"></span>
+        <button class="tb-gear" id="btn-scroll-settings" title="Settings" aria-label="Settings">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
@@ -121,78 +689,90 @@
 
     <div class="panel-scroll">
 
-      <!-- ── CREDITS BAR (top, always visible) ─── -->
-      <div class="top-credits" id="credits-card">
-        <div class="top-credits-left">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span class="top-credits-nums">
-            <b id="usage-used">–</b><span class="top-credits-sep">/</span><span id="usage-limit">1000</span>
-          </span>
-          <span class="top-credits-label">credits</span>
-        </div>
-        <span id="usage-seconds" class="top-credits-time">–</span>
+      <!-- HIDDEN COMPAT: credits bar elements (JS still updates these) -->
+      <div id="credits-card" class="compat-hidden">
+        <b id="usage-used">—</b>/<span id="usage-limit">1000</span>
+        <span id="usage-seconds"></span>
       </div>
-      <div class="top-credits-bar"><div class="top-credits-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="compat-hidden"><div id="progress-fill" style="width:0%"></div></div>
 
-      <!-- ── CLIP ──────────────────────── -->
+      <!-- ── CLIP CARD ──────────────────────────────── -->
       <div class="card">
-        <div class="card-head">
-          <div class="card-head-left">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-            <span class="card-label">Clip</span>
-          </div>
-          <button class="chip-btn" id="btn-refresh-clip">
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-            Refresh
-          </button>
-        </div>
 
+        <!-- Empty state -->
         <div id="clip-empty" class="clip-empty">
           <div class="clip-empty-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2.5"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="3"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           </div>
           <p class="clip-empty-t">No clip selected</p>
-          <p class="clip-empty-s">Click a clip in the timeline, then tap Refresh</p>
+          <p class="clip-empty-s">Select a clip in your timeline</p>
+          <div class="clip-auto-badge">
+            <span class="clip-auto-dot"></span>
+            Watching timeline
+          </div>
         </div>
 
-        <div id="clip-info" class="clip-row hidden">
-          <div class="clip-row-icon">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-          </div>
-          <div class="clip-row-info">
-            <span class="clip-row-name" id="clip-name">clip.mp4</span>
-            <div class="clip-row-meta">
-              <span class="tag tag-lime" id="clip-dur-badge">—</span>
-              <span class="tag tag-dim"  id="clip-start-badge">—</span>
-              <span class="tag tag-warn" id="clip-trim-badge" style="display:none">Trimmed to 8s</span>
+        <!-- Clip selected state -->
+        <div id="clip-info" class="hidden">
+          <!-- 16:9 thumbnail -->
+          <div class="clip-thumb-wrap">
+            <img id="clip-thumbnail" class="clip-thumb-img" src="" alt="">
+            <div class="clip-thumb-placeholder" id="clip-thumb-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            </div>
+            <div class="clip-thumb-overlay"></div>
+            <!-- Duration + trim badges (bottom-left) -->
+            <div class="clip-thumb-badges">
+              <span class="chip chip-green" id="clip-dur-badge">—</span>
+              <span class="chip chip-amber" id="clip-trim-badge" style="display:none">Trimmed to 8s</span>
+            </div>
+            <!-- Live indicator (top-right) -->
+            <div class="clip-live-indicator">
+              <span class="clip-live-dot"></span>
+              LIVE
             </div>
           </div>
-          <div class="clip-live"></div>
+
+          <!-- Clip meta below thumbnail -->
+          <div class="clip-meta">
+            <span class="clip-row-name" id="clip-name">clip.mp4</span>
+            <div class="clip-meta-row">
+              <div class="clip-meta-left">
+                <span class="chip chip-gray" id="clip-start-badge">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Compat (hidden) -->
+          <div style="display:none"><div class="clip-live"></div></div>
         </div>
+
+        <!-- Compat: hidden refresh button -->
+        <button id="btn-refresh-clip" style="display:none"></button>
 
         <p id="clip-trim-warning" class="clip-warn" style="display:none"></p>
       </div>
 
-      <!-- ── PROMPT ─────────────────────── -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-head-left">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-            <span class="card-label">Prompt</span>
-          </div>
+      <!-- ── PROMPT CARD ────────────────────────────── -->
+      <div class="card prompt-card">
+        <textarea id="mf-prompt" rows="4" maxlength="1000"
+          placeholder="Transform the scene into… add cinematic fire… frozen arctic…"></textarea>
+        <div class="prompt-footer">
+          <span class="prompt-count"><span id="mf-char-count">0</span> / 1000</span>
           <button class="ai-btn" id="btn-compile-prompt">
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-            <span id="compile-label">AI Enhance</span>
+            <span class="ai-btn-icon">
+              <!-- Neural/AI sparkle icon -->
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 2C10 2 10.8 5.2 12.5 6.5C14.2 7.8 17.5 8 17.5 8C17.5 8 14.2 8.2 12.5 9.5C10.8 10.8 10 14 10 14C10 14 9.2 10.8 7.5 9.5C5.8 8.2 2.5 8 2.5 8C2.5 8 5.8 7.8 7.5 6.5C9.2 5.2 10 2 10 2Z" fill="currentColor"/>
+                <path d="M15.5 13.5C15.5 13.5 15.9 14.9 16.6 15.4C17.3 15.9 18.5 16 18.5 16C18.5 16 17.3 16.1 16.6 16.6C15.9 17.1 15.5 18.5 15.5 18.5C15.5 18.5 15.1 17.1 14.4 16.6C13.7 16.1 12.5 16 12.5 16C12.5 16 13.7 15.9 14.4 15.4C15.1 14.9 15.5 13.5 15.5 13.5Z" fill="currentColor" opacity="0.7"/>
+              </svg>
+            </span>
+            <span id="compile-label">Enhance</span>
           </button>
-        </div>
-        <div class="prompt-wrap">
-          <textarea id="mf-prompt" rows="4" maxlength="1000"
-            placeholder="make the scene frozen… add cinematic fire… neon rain cyberpunk…"></textarea>
-          <span class="prompt-count"><span id="mf-char-count">0</span>/1000</span>
         </div>
       </div>
 
-      <!-- ── GENERATE ───────────────────── -->
+      <!-- ── GENERATE CARD ──────────────────────────── -->
       <div class="card gen-card">
 
         <!-- Output mode -->
@@ -200,88 +780,84 @@
           <span class="output-lbl">Output</span>
           <div class="output-seg">
             <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
-            <button class="seg-opt seg-active" id="out-btn-v2"      type="button">New track</button>
-            <button class="seg-opt"            id="out-btn-replace"  type="button">Replace</button>
+            <button class="seg-opt seg-active" id="out-btn-v2"     type="button">New track</button>
+            <button class="seg-opt"            id="out-btn-replace" type="button">Replace</button>
           </div>
         </div>
         <p class="output-hint" id="output-hint">Added on V2 — original clip untouched</p>
 
-        <!-- Generate button with cost badge -->
+        <!-- Generate button -->
         <button id="mf-btn-generate" class="gen-btn">
-          <span class="gen-btn-left">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Generate Effect
-          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Generate Effect
           <span class="gen-cost-badge" id="gen-btn-cost" style="display:none">
-            <span id="gen-btn-cost-val">–</span> cr
+            <span id="gen-btn-cost-val">—</span> cr
           </span>
         </button>
 
-        <!-- Progress (shown during generation) -->
+        <!-- Progress ─────────────────────────────────── -->
         <div id="mf-gen-state" class="gen-state hidden">
-
-          <!-- Top row: status pulse + label left / elapsed right -->
-          <div class="gen-top-row">
-            <div class="gen-status-left">
-              <div class="gen-pulse"></div>
-              <span id="mf-status-text" class="gen-status-txt">Starting…</span>
+          <!-- Row 1: phase label + elapsed timer -->
+          <div class="gp-hdr">
+            <div class="gp-hdr-left">
+              <div class="gp-dot"></div>
+              <span id="gp-phase-label" class="gp-label">Starting…</span>
             </div>
-            <span class="gen-elapsed" id="mf-gen-elapsed"></span>
+            <span id="gp-elapsed" class="gp-elapsed">0:00</span>
           </div>
-
-          <!-- Progress bar -->
-          <div class="gen-bar-track">
-            <div class="gen-bar-fill" id="mf-gen-bar" style="width:0%">
-              <span class="gen-shimmer"></span>
+          <!-- Row 2: progress bar -->
+          <div class="gp-track">
+            <div class="gp-fill" id="gp-fill" style="width:0%">
+              <span class="gp-shimmer"></span>
             </div>
           </div>
-
-          <!-- Bottom row: step labels left / big pct right -->
-          <div class="gen-bottom-row">
-            <div class="gen-steps">
-              <span class="gen-step" id="gs-upload">Upload</span>
-              <span class="gen-step-sep">›</span>
-              <span class="gen-step" id="gs-generate">Generate</span>
-              <span class="gen-step-sep">›</span>
-              <span class="gen-step" id="gs-done">Done</span>
-            </div>
-            <span class="gen-pct-label" id="mf-gen-pct">0%</span>
+          <!-- Row 3: ETA + percentage -->
+          <div class="gp-ftr">
+            <span id="gp-estimate" class="gp-estimate"></span>
+            <span id="gp-pct" class="gp-pct">0%</span>
           </div>
-
-          <!-- Hidden compat elements (JS still references these) -->
+          <!-- JS compat shims (invisible, referenced by legacy setStage calls) -->
           <div style="display:none">
-            <div id="gs-line-1"></div>
-            <div id="gs-line-2"></div>
+            <div id="mf-gen-bar"></div>
+            <span id="mf-status-text"></span>
+            <span id="mf-gen-pct"></span>
+            <span id="mf-gen-elapsed"></span>
+            <span id="gs-upload"></span><span id="gs-generate"></span><span id="gs-done"></span>
+            <span id="gs-line-1"></span><span id="gs-line-2"></span>
           </div>
-
-
         </div>
 
-        <!-- No credits warning (inside gen card) -->
+        <!-- Failed state ──────────────────────────────── -->
+        <div id="mf-gen-failed" class="gen-failed hidden">
+          <span class="gen-fail-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <span id="gen-fail-msg" class="gen-fail-msg">Something went wrong.</span>
+          <button id="gen-retry-btn" class="gen-retry-btn">Retry</button>
+        </div>
+
+        <!-- No credits -->
         <div id="no-credits-banner" class="no-credits-bar hidden">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span>No credits remaining.</span>
-          <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade plan ↗</a>
+          <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
         </div>
 
-        <!-- hidden cost preview (kept for JS compat) -->
+        <!-- Compat -->
         <div id="gen-cost-preview" style="display:none"></div>
       </div>
 
-      <!-- ── RESULT ─────────────────────── -->
+      <!-- ── RESULT CARD ────────────────────────────── -->
       <div class="card hidden" id="mf-section-result">
-        <div class="card-head">
-          <div class="card-head-left">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <span class="card-label">Result</span>
-          </div>
+        <div class="result-card-head">
+          <span class="result-label">Result</span>
           <button class="ghost-lnk" id="mf-btn-new-gen">↺ New generation</button>
         </div>
         <div class="result-wrap">
           <video id="mf-result-video" src="" muted loop playsinline controls></video>
           <div class="result-tags">
-            <span class="rtag rtag-lime">AI Generated</span>
-            <span class="rtag rtag-blue" id="mf-insert-chip">V2</span>
+            <span class="chip chip-green">AI Generated</span>
+            <span class="chip chip-gray" id="mf-insert-chip">V2</span>
           </div>
         </div>
         <div class="result-actions">
@@ -293,51 +869,7 @@
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             Open in Browser
           </button>
-          <button id="mf-btn-raw-output" class="r-btn r-btn-ghost" style="display:none">View Raw Output</button>
-        </div>
-      </div>
-
-      <!-- ── SETTINGS ───────────────────── -->
-      <div class="settings-wrap" id="section-settings">
-        <button class="settings-toggle" id="settings-trigger">
-          <span class="st-left">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-            Settings
-          </span>
-          <span class="st-chev" id="settings-chevron">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </span>
-        </button>
-        <div class="settings-menu hidden" id="settings-menu">
-          <button class="sm-item" id="btn-dashboard">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Open Dashboard
-          </button>
-          <button class="sm-item" id="btn-updates">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-            Check for Updates
-          </button>
-
-          <button class="sm-item" id="btn-diagnostics">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <span id="btn-diagnostics-label">Diagnostics</span>
-          </button>
-          <div class="diag-box hidden" id="diag-panel">
-            <div class="diag-top">
-              <span class="diag-ttl">Environment</span>
-              <button class="ghost-lnk" id="btn-copy-diag">Copy JSON</button>
-            </div>
-            <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
-            <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
-            <div class="diag-row"><span class="dk">CEP</span><span class="dv" id="diag-cep">…</span></div>
-            <div class="diag-row"><span class="dk">cep.fs</span><span class="dv" id="diag-cepfs">…</span></div>
-            <div class="diag-row"><span class="dk">Backend</span><span class="dv" id="diag-backend">…</span></div>
-            <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
-          </div>
-          <button class="sm-item sm-danger" id="btn-logout">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Sign Out
-          </button>
+          <button id="mf-btn-raw-output" class="r-btn r-btn-ghost" style="display:none">Raw</button>
         </div>
       </div>
 
@@ -347,24 +879,103 @@
       </footer>
 
     </div><!-- /panel-scroll -->
+
+    <!-- ── SETTINGS OVERLAY (gear-activated) ──────── -->
+    <!-- NOTE: position:fixed so it overlays the whole panel -->
+    <div id="section-settings">
+      <div class="settings-sheet">
+        <div class="settings-handle">
+          <span class="settings-title">Settings</span>
+          <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
+        </div>
+
+        <!-- JS-compat hidden elements -->
+        <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
+        <div class="settings-menu" id="settings-menu" style="display:none"></div>
+        <span class="st-chev" id="settings-chevron" style="display:none"></span>
+
+        <!-- Actual visible items -->
+        <button class="sm-item" id="btn-dashboard">
+          <span class="sm-item-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          Open Dashboard
+        </button>
+        <button class="sm-item" id="btn-updates">
+          <span class="sm-item-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          </span>
+          Check for Updates
+        </button>
+        <button class="sm-item" id="btn-diagnostics">
+          <span class="sm-item-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          <span id="btn-diagnostics-label">Diagnostics</span>
+        </button>
+        <div class="diag-box hidden" id="diag-panel">
+          <div class="diag-top">
+            <span class="diag-ttl">Environment</span>
+            <button class="ghost-lnk" id="btn-copy-diag">Copy JSON</button>
+          </div>
+          <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
+          <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
+          <div class="diag-row"><span class="dk">CEP</span><span class="dv" id="diag-cep">…</span></div>
+          <div class="diag-row"><span class="dk">cep.fs</span><span class="dv" id="diag-cepfs">…</span></div>
+          <div class="diag-row"><span class="dk">Backend</span><span class="dv" id="diag-backend">…</span></div>
+          <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
+        </div>
+        <button class="sm-item sm-danger" id="btn-logout">
+          <span class="sm-item-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </span>
+          Sign Out
+        </button>
+      </div>
+    </div>
+
   </div><!-- /view-main -->
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=28"></script>
+  <script src="main.js?v=30"></script>
   <script>
+    /* Grain canvas for login view */
     (function(){
-      const c=document.getElementById('grain');
+      var c=document.getElementById('grain');
       if(!c)return;
-      const ctx=c.getContext('2d');
+      var ctx=c.getContext('2d');
       function draw(){
         c.width=c.offsetWidth;c.height=c.offsetHeight;
-        const img=ctx.createImageData(c.width,c.height);
-        const d=img.data;
-        for(let i=0;i<d.length;i+=4){const v=Math.random()*22|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=16;}
+        var img=ctx.createImageData(c.width,c.height);
+        var d=img.data;
+        for(var i=0;i<d.length;i+=4){var v=Math.random()*22|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=16;}
         ctx.putImageData(img,0,0);setTimeout(draw,80);
       }
       draw();
     })();
+
+    /* Thumbnail fade-in on load */
+    document.addEventListener('DOMContentLoaded', function() {
+      var img = document.getElementById('clip-thumbnail');
+      if (img) {
+        img.addEventListener('load', function() { img.classList.add('loaded'); });
+      }
+    });
+
+    /* Settings close button */
+    document.addEventListener('DOMContentLoaded', function() {
+      var closeBtn = document.getElementById('settings-close-btn');
+      var overlay  = document.getElementById('section-settings');
+      if (closeBtn && overlay) {
+        closeBtn.addEventListener('click', function() {
+          overlay.classList.remove('settings-visible');
+        });
+        /* Tap backdrop to close */
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) overlay.classList.remove('settings-visible');
+        });
+      }
+    });
   </script>
 </body>
 </html>
