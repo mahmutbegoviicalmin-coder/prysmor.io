@@ -74,7 +74,7 @@ export async function POST(
     }
   }
 
-  // ── Text-only fallback: compileVfxPrompt (OpenAI) ───────────────────────────
+  // ── Text-only fallback: compileVfxPrompt (Claude Haiku) ─────────────────────
   try {
     const { compileVfxPrompt } = await import('@/lib/motionforge/promptCompiler');
     const result = await compileVfxPrompt(userIntent).catch(() => ({

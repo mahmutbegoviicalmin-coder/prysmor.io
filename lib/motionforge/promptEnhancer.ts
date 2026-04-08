@@ -4,26 +4,28 @@
  * Transforms short user prompts into identity-safe, cinematic prompts
  * optimised for Runway Gen-4 video-to-video generation.
  *
- * Primary path: OpenAI API (gpt-4o-mini) — dynamic, no hardcoded templates.
- *   Supports optional scene frames (vision) for scene-aware enhancement.
+ * Primary path: Claude Haiku (text-only) or Claude Opus with vision (when frames provided).
  *
  * Fallback path: lightweight rule-based enhancement that prepends the
  *   identity-preservation header and strips transformation verbs.
- *   Activated only when OpenAI is unavailable.
+ *   Activated only when Claude is unavailable.
  *
  * Output: plain text, 40–90 words, sentence-based.
  *   Always begins with the identity-preservation statement.
  */
 
+import Anthropic from '@anthropic-ai/sdk';
 import { log, warn } from './logger';
 
 const TAG = 'promptEnhancer';
 
-// ─── OpenAI config ────────────────────────────────────────────────────────────
+// ─── Claude config ────────────────────────────────────────────────────────────
 
-const MODEL       = 'gpt-4o-mini';
-const TEMPERATURE = 0.25;   // low = consistent, deterministic output
-const MAX_TOKENS  = 220;    // generous headroom for 40–90 word output
+const MODEL_TEXT   = 'claude-haiku-4-5-20251001';  // fast + cheap for text-only
+const MODEL_VISION = 'claude-opus-4-5';             // vision-capable for frame analysis
+const MAX_TOKENS   = 220;
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -68,13 +70,9 @@ Runway's moderation will block any prompt containing them. Describe the visual a
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TextPart  = { type: 'text';      text: string };
-type ImagePart = { type: 'image_url'; image_url: { url: string; detail: 'low' } };
-type MessagePart = TextPart | ImagePart;
-
 export interface EnhancementResult {
   enhancedPrompt: string;
-  method: 'openai' | 'openai-vision' | 'fallback';
+  method: 'claude' | 'claude-vision' | 'fallback';
   sceneAnalysed: boolean;
 }
 
@@ -91,7 +89,7 @@ export function validatePrompt(raw: string): string {
   return trimmed;
 }
 
-// ─── Fallback enhancement (no OpenAI) ────────────────────────────────────────
+// ─── Fallback enhancement (no Claude) ────────────────────────────────────────
 
 const TRANSFORMATION_VERBS = /\b(replace|change|make it|turn into|convert|transform|apply|set in|put in|move to|switch to)\b/gi;
 
@@ -102,7 +100,7 @@ const TRANSFORMATION_VERBS = /\b(replace|change|make it|turn into|convert|transf
  * This is NOT a template database — it applies simple grammar cleanup
  * only and relies on the user's own words for the creative content.
  *
- * Activated only when OpenAI is unavailable. Always marked method='fallback'.
+ * Activated only when Claude is unavailable. Always marked method='fallback'.
  */
 export function fallbackEnhance(userPrompt: string): string {
   const cleaned = userPrompt
@@ -122,40 +120,41 @@ export function fallbackEnhance(userPrompt: string): string {
   );
 }
 
-// ─── OpenAI call ─────────────────────────────────────────────────────────────
+// ─── Claude call ──────────────────────────────────────────────────────────────
 
 /**
- * Calls the OpenAI Chat Completions API with the system prompt and optional
- * scene frames (vision mode). Returns the raw completion string.
+ * Calls Claude with the system prompt and optional scene frames (vision mode).
+ * Uses Haiku for text-only, Opus for vision. Returns the raw completion string.
  *
  * Throws on API error so the caller can decide whether to fallback.
  */
-async function callOpenAI(
+async function callClaude(
   userPrompt: string,
   sceneFrames: string[],
 ): Promise<string> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY not configured');
-
   const hasFrames = sceneFrames.length > 0;
+  const model     = hasFrames ? MODEL_VISION : MODEL_TEXT;
 
-  // Build user message content
-  let userContent: string | MessagePart[];
+  type ContentBlock =
+    | { type: 'text'; text: string }
+    | { type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } };
+
+  let userContent: string | ContentBlock[];
 
   if (hasFrames) {
-    const parts: MessagePart[] = [
+    const parts: ContentBlock[] = [
       {
         type: 'text',
         text:
-          `You have ${sceneFrames.length} frames from the actual video clip (evenly sampled). ` +
+          `You have ${sceneFrames.length} frame(s) from the actual video clip. ` +
           `Analyse the scene lighting, environment, and atmosphere, then write the best possible ` +
           `MotionForge prompt for: "${userPrompt}"`,
       },
     ];
     for (const frame of sceneFrames) {
       parts.push({
-        type:      'image_url',
-        image_url: { url: `data:image/jpeg;base64,${frame}`, detail: 'low' },
+        type:   'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: frame },
       });
     }
     userContent = parts;
@@ -163,39 +162,16 @@ async function callOpenAI(
     userContent = `Write the best possible MotionForge prompt for: "${userPrompt}"`;
   }
 
-  const body = JSON.stringify({
-    model:       MODEL,
-    temperature: TEMPERATURE,
-    max_tokens:  MAX_TOKENS,
-    n:           1,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user',   content: userContent },
-    ],
+  const response = await client.messages.create({
+    model,
+    max_tokens: MAX_TOKENS,
+    system:     SYSTEM_PROMPT,
+    messages:   [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
   });
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization:  `Bearer ${key}`,
-    },
-    body,
-  });
+  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+  if (!raw) throw new Error('Claude returned empty completion');
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`OpenAI API ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const json = await res.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const raw = (json.choices?.[0]?.message?.content ?? '').trim();
-  if (!raw) throw new Error('OpenAI returned empty completion');
-
-  // Strip surrounding quotes if the model wrapped the output
   return raw.replace(/^["']|["']$/g, '').trim();
 }
 
@@ -223,23 +199,22 @@ export async function enhanceMotionForgePrompt(
   log(TAG, `Enhancing prompt (frames=${frames.length})`, { promptLen: prompt.length });
 
   try {
-    const enhanced = await callOpenAI(prompt, frames);
+    const enhanced = await callClaude(prompt, frames);
 
-    // Guard: if output is suspiciously short, log a warning but still return it
     const wordCount = enhanced.split(/\s+/).length;
     if (wordCount < 15) {
-      warn(TAG, `Unusually short OpenAI output (${wordCount} words) — may be degraded`, {
+      warn(TAG, `Unusually short Claude output (${wordCount} words) — may be degraded`, {
         output: enhanced.slice(0, 100),
       });
     }
 
-    const method: EnhancementResult['method'] = hasFrames ? 'openai-vision' : 'openai';
+    const method: EnhancementResult['method'] = hasFrames ? 'claude-vision' : 'claude';
     log(TAG, `Enhancement complete via ${method}`, { wordCount });
 
     return { enhancedPrompt: enhanced, method, sceneAnalysed: hasFrames };
 
   } catch (err) {
-    warn(TAG, 'OpenAI enhancement failed — using fallback', {
+    warn(TAG, 'Claude enhancement failed — using fallback', {
       err: (err as Error).message,
     });
 

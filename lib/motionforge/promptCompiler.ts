@@ -5,9 +5,9 @@
  * instruction that preserves subject identity and applies only the
  * requested effect to the existing clip.
  *
- * Primary path: OpenAI API (gpt-4o-mini) — strict VFX-only system prompt.
+ * Primary path: Claude Haiku (fast + cheap) — strict VFX-only system prompt.
  * Fallback path: lightweight template that wraps the user's own words with
- *   the identity-preservation header. Activated when OpenAI is unavailable.
+ *   the identity-preservation header. Activated when Claude is unavailable.
  *
  * Final prompt structure (enforced by normalizeCompiled):
  *   [ANTI_ARTIFACT_PREFIX] [identity sentence]. [VFX instruction].
@@ -18,16 +18,18 @@
  * first maximises its effect on the generated output.
  */
 
+import Anthropic from '@anthropic-ai/sdk';
 import { log, warn } from './logger';
 import { validatePrompt } from './promptEnhancer';
 
 const TAG = 'promptCompiler';
 
-// ─── OpenAI config ────────────────────────────────────────────────────────────
+// ─── Claude config ────────────────────────────────────────────────────────────
 
-const MODEL       = 'gpt-4o-mini';
-const TEMPERATURE = 0.2;  // very consistent — VFX instructions should be deterministic
-const MAX_TOKENS  = 160;  // GPT writes identity + VFX only; prefix is prepended by us
+const MODEL      = 'claude-haiku-4-5-20251001';
+const MAX_TOKENS = 160;  // identity + VFX only; prefix is prepended by us
+
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Anti-artifact prefix (hard rule, always first) ──────────────────────────
 
@@ -190,7 +192,7 @@ export function classifyPromptEffect(prompt: string): 'overlay' | 'background' {
 
 export interface CompileResult {
   compiledPrompt: string;
-  method: 'openai' | 'fallback';
+  method: 'claude' | 'fallback';
   effectType: 'overlay' | 'background';
 }
 
@@ -283,7 +285,7 @@ export function normalizeCompiled(raw: string): string {
   return `${ANTI_ARTIFACT_PREFIX} ${text}`;
 }
 
-// ─── Fallback compile (no OpenAI) ────────────────────────────────────────────
+// ─── Fallback compile (no Claude) ────────────────────────────────────────────
 
 /**
  * Minimal template-based fallback: produces an identity-preservation header
@@ -307,61 +309,26 @@ export function fallbackCompile(userPrompt: string): string {
   return normalizeCompiled(base);
 }
 
-// ─── OpenAI call ─────────────────────────────────────────────────────────────
+// ─── Claude call ──────────────────────────────────────────────────────────────
 
-async function callOpenAI(userPrompt: string): Promise<string> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY not configured');
-
-  const body = JSON.stringify({
-    model:       MODEL,
-    temperature: TEMPERATURE,
-    max_tokens:  MAX_TOKENS,
-    n:           1,
+async function callClaude(userPrompt: string): Promise<string> {
+  const response = await client.messages.create({
+    model:      MODEL,
+    max_tokens: MAX_TOKENS,
+    system:     SYSTEM_PROMPT,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user',   content: `Compile this VFX instruction: "${userPrompt}"` },
+      { role: 'user', content: `Compile this VFX instruction: "${userPrompt}"` },
     ],
   });
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method:  'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization:  `Bearer ${key}`,
-    },
-    body,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`OpenAI API ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const json = await res.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const raw = (json.choices?.[0]?.message?.content ?? '').trim();
-  if (!raw) throw new Error('OpenAI returned empty completion');
+  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+  if (!raw) throw new Error('Claude returned empty completion');
 
   return raw.replace(/^["']|["']$/g, '').trim();
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-/**
- * Compiles a user's VFX idea into a production-ready Runway transformation prompt.
- *
- * ANTI_ARTIFACT_PREFIX is always prepended via normalizeCompiled() so that
- * Runway's highest-weight instruction slot contains the clean-frame constraint.
- * This applies to both the OpenAI and fallback paths.
- *
- * @param userPrompt - Short user input ("frozen background", "add diamond chain", etc.)
- * @returns          - CompileResult with the compiled prompt and method used.
- *
- * Never throws: on any failure the fallback result is returned.
- */
 /**
  * Injected into background-effect prompts to ensure Runway does not alter
  * any person's face. Placed after the VFX instruction so it reads as a
@@ -371,6 +338,20 @@ const FACE_PRESERVE_SUFFIX =
   ' All human faces, skin, facial features, expressions, and body proportions' +
   ' must remain completely identical to the original. Do not alter any person.';
 
+/**
+ * Compiles a user's VFX idea into a production-ready Runway transformation prompt.
+ *
+ * Primary path: Claude Haiku (fast, cheap).
+ * Fallback path: lightweight template when Claude is unavailable.
+ *
+ * ANTI_ARTIFACT_PREFIX is always prepended via normalizeCompiled() so that
+ * Runway's highest-weight instruction slot contains the clean-frame constraint.
+ *
+ * @param userPrompt - Short user input ("frozen background", "add diamond chain", etc.)
+ * @returns          - CompileResult with the compiled prompt and method used.
+ *
+ * Never throws: on any failure the fallback result is returned.
+ */
 export async function compileVfxPrompt(userPrompt: string): Promise<CompileResult> {
   const prompt     = validatePrompt(userPrompt);
   const effectType = classifyPromptEffect(prompt);
@@ -378,11 +359,9 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
   log(TAG, 'Compile request', { promptLen: prompt.length, effectType });
 
   try {
-    const raw      = await callOpenAI(prompt);
-    let compiled   = normalizeCompiled(raw);
+    const raw    = await callClaude(prompt);
+    let compiled = normalizeCompiled(raw);
 
-    // For background/environment effects, append a hard face-preservation
-    // constraint so Runway doesn't alter any person in the scene.
     if (effectType === 'background') {
       compiled = sanitizeForRunway(compiled + FACE_PRESERVE_SUFFIX).slice(0, 1000);
     }
@@ -394,11 +373,11 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
       });
     }
 
-    log(TAG, 'Compile complete via openai', { wordCount, effectType });
-    return { compiledPrompt: compiled, method: 'openai', effectType };
+    log(TAG, 'Compile complete via claude', { wordCount, effectType });
+    return { compiledPrompt: compiled, method: 'claude', effectType };
 
   } catch (err) {
-    warn(TAG, 'OpenAI compile failed — using fallback', {
+    warn(TAG, 'Claude compile failed — using fallback', {
       err: (err as Error).message,
     });
 
