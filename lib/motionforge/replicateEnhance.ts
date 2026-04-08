@@ -50,25 +50,17 @@ export async function upscaleVideo(videoUrl: string): Promise<string> {
 }
 
 /**
- * Full enhancement pipeline: face restoration → 2× upscale.
- * Each step is attempted independently — if one fails the chain continues
- * with whichever URL was last successfully produced.
+ * Enhancement pipeline: upscale only.
+ * restoreFaces is kept for optional future use but not called here.
  */
 export async function enhanceVideo(videoUrl: string): Promise<string> {
   let url = videoUrl;
 
   try {
-    url = await restoreFaces(url);
-    console.log('[replicate] Face restoration done');
-  } catch (err) {
-    console.warn('[replicate] Face restoration failed, skipping:', (err as Error).message);
-  }
-
-  try {
     url = await upscaleVideo(url);
     console.log('[replicate] Upscale done');
   } catch (err) {
-    console.warn('[replicate] Upscale failed, using previous:', (err as Error).message);
+    console.warn('[replicate] Upscale failed, using raw output:', (err as Error).message);
   }
 
   return url;
