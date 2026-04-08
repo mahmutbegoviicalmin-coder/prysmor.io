@@ -165,13 +165,22 @@ function getSelectionInfo() {
       }
     } catch (_) {}
 
+    // Sequence output dimensions — the video is rendered at sequence resolution,
+    // not source-file resolution. Use these for aspect ratio validation so that
+    // a 16:9 sequence with a wider source file is not incorrectly blocked.
+    var seqW = 0, seqH = 0;
+    try { seqW = seq.frameSizeHorizontal || 0; } catch (_) {}
+    try { seqH = seq.frameSizeVertical   || 0; } catch (_) {}
+
     return JSON.stringify({
       startTimeSec: startSec,
       durationSec:  durSec,
       mediaInSec:   mediaInSec,
       debugTimes:   _debugTimes,
       sourcePath:   sourcePath,
-      clipName:     selectedClip.name || fileNameFromPath(sourcePath)
+      clipName:     selectedClip.name || fileNameFromPath(sourcePath),
+      seqWidth:     seqW,
+      seqHeight:    seqH,
     });
   } catch (e) {
     return JSON.stringify({ error: e.message });

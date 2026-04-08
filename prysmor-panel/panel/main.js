@@ -33,6 +33,13 @@ const LS_PLAN           = 'prysmor_plan';
 const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
 
+// ─── Reference Frame Store ────────────────────────────────────────────────────
+// Captured once when a clip is loaded; reused by Enhance and Generate.
+var storedReferenceFrame = null;
+// { width: number, height: number } — from the same video element, used for
+// aspect ratio validation before the S3 upload starts.
+var storedVideoInfo = null;
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const state = {
@@ -368,6 +375,8 @@ function logout() {
   }
 
   clearSession();
+  storedReferenceFrame = null;
+  storedVideoInfo = null;
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
     pollTimer: null, pollStart: 0, outputUrl: null, rawOutputUrl: null,
@@ -399,6 +408,8 @@ function refreshClip(silent) {
 
     if (!parsed || parsed.error) {
       state.mf.selInfo = null;
+      storedReferenceFrame = null;
+      storedVideoInfo = null;
       showClipEmpty();
       if (!silent) {
         showToast(parsed ? parsed.error : 'Could not read Premiere selection', 'error');
@@ -409,6 +420,8 @@ function refreshClip(silent) {
     state.mf.selInfo = parsed;
     showClipInfo(parsed);
     updateCostPreview();
+    // Silently capture a reference frame in background so Enhance has it ready.
+    captureClipReferenceFrame(parsed.sourcePath);
     if (!silent) {
       var dbg = parsed.debugTimes ? JSON.stringify(parsed.debugTimes) : 'n/a';
       showToast('Clip: ' + (parsed.clipName || 'clip') + ' | mediaIn=' + (parsed.mediaInSec || 0).toFixed(2) + 's | times=' + dbg, 'success');
@@ -526,10 +539,12 @@ async function compilePrompt() {
       // Use whatever the user typed as intent, or ask for one if empty
       var intent = raw || 'make it cinematic and dramatic';
 
+      var enhanceBody = { intent: intent };
+      if (storedReferenceFrame) enhanceBody.frameBase64 = storedReferenceFrame;
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
         method:  'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
-        body:    JSON.stringify({ intent: intent }),
+        body:    JSON.stringify(enhanceBody),
       });
       var json = await res.json().catch(function () { return {}; });
 
@@ -605,8 +620,12 @@ async function compilePrompt() {
 // Uses the CEP browser's native <video> + <canvas> APIs — no ffmpeg needed.
 // Returns null silently on any error so generation always proceeds.
 
+// Returns { frameBase64: string|null, width: number, height: number }
+// so callers can both get the JPEG frame AND know the video dimensions
+// without a second decode pass.
 function captureReferenceFrame(videoBase64) {
   return new Promise(function (resolve) {
+    var empty = { frameBase64: null, width: 0, height: 0 };
     try {
       var blob  = base64ToBlob(videoBase64, 'video/mp4');
       var url   = URL.createObjectURL(blob);
@@ -621,8 +640,10 @@ function captureReferenceFrame(videoBase64) {
 
       video.onseeked = function () {
         try {
-          var W      = 320;
-          var H      = Math.round(W * video.videoHeight / Math.max(video.videoWidth, 1));
+          var vw = video.videoWidth  || 0;
+          var vh = video.videoHeight || 0;
+          var W  = 320;
+          var H  = Math.round(W * vh / Math.max(vw, 1));
           var canvas = document.createElement('canvas');
           canvas.width  = W;
           canvas.height = H || W; // fallback square if height is 0
@@ -630,23 +651,80 @@ function captureReferenceFrame(videoBase64) {
           URL.revokeObjectURL(url);
           // Strip the data URI prefix — backend expects raw base64
           var dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          resolve(dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : null);
+          var frameBase64 = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : null;
+          resolve({ frameBase64: frameBase64, width: vw, height: vh });
         } catch (e) {
           URL.revokeObjectURL(url);
-          resolve(null);
+          resolve(empty);
         }
       };
 
-      video.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      video.onerror = function () { URL.revokeObjectURL(url); resolve(empty); };
 
       // Timeout safety — if video never loads, don't stall the pipeline
-      setTimeout(function () { URL.revokeObjectURL(url); resolve(null); }, 8000);
+      setTimeout(function () { URL.revokeObjectURL(url); resolve(empty); }, 8000);
 
       video.src = url;
     } catch (e) {
-      resolve(null);
+      resolve(empty);
     }
   });
+}
+
+// Reads the clip file and captures a reference frame + video dimensions,
+// storing them in storedReferenceFrame and storedVideoInfo.
+// Uses sequence dimensions (from state.mf.selInfo) for aspect ratio checking
+// when available — the sequence output resolution is what matters for Runway,
+// not the raw source file resolution.
+// Runs silently in the background — any error leaves both as null.
+async function captureClipReferenceFrame(sourcePath) {
+  storedReferenceFrame = null;
+  storedVideoInfo = null;
+  try {
+    var fileBase64 = await readFileBase64(sourcePath);
+    var result = await captureReferenceFrame(fileBase64);
+    storedReferenceFrame = result.frameBase64;
+
+    if (result.width && result.height) {
+      // Start with source-file dimensions as the baseline
+      storedVideoInfo = { width: result.width, height: result.height };
+      console.log('[Prysmor:aspectRatio] source file dimensions: ' +
+        result.width + 'x' + result.height +
+        ' ratio=' + (result.width / result.height).toFixed(4));
+
+      // Prefer sequence dimensions: the export always matches the sequence,
+      // not the raw source. A 2.66:1 source clip in a 16:9 sequence is fine.
+      var seqW = state.mf.selInfo && state.mf.selInfo.seqWidth;
+      var seqH = state.mf.selInfo && state.mf.selInfo.seqHeight;
+      if (seqW && seqH) {
+        var seqRatio = seqW / seqH;
+        console.log('[Prysmor:aspectRatio] sequence dimensions: ' +
+          seqW + 'x' + seqH + ' ratio=' + seqRatio.toFixed(4));
+        if (seqRatio <= 2.358) {
+          storedVideoInfo = { width: seqW, height: seqH };
+          console.log('[Prysmor:aspectRatio] using SEQUENCE dimensions for aspect ratio check');
+        } else {
+          console.warn('[Prysmor:aspectRatio] sequence ratio ' + seqRatio.toFixed(4) +
+            ' also exceeds 2.358 — keeping source dimensions');
+        }
+      } else {
+        console.log('[Prysmor:aspectRatio] no sequence dimensions available — using source file dimensions');
+      }
+
+      var finalRatio = storedVideoInfo.width / storedVideoInfo.height;
+      console.log('[Prysmor:aspectRatio] final storedVideoInfo: ' +
+        storedVideoInfo.width + 'x' + storedVideoInfo.height +
+        ' ratio=' + finalRatio.toFixed(4) +
+        ' exceeds2.358=' + (finalRatio > 2.358));
+    } else {
+      console.warn('[Prysmor:aspectRatio] captureReferenceFrame returned no dimensions — ' +
+        'width=' + result.width + ' height=' + result.height);
+    }
+  } catch (err) {
+    console.error('[Prysmor:aspectRatio] captureClipReferenceFrame threw:', err);
+    storedReferenceFrame = null;
+    storedVideoInfo = null;
+  }
 }
 
 // ─── Main Generate Pipeline ───────────────────────────────────────────────────
@@ -666,6 +744,25 @@ async function mfGenerate() {
     showToast('Enter a prompt to describe the transformation', 'error');
     el('mf-prompt').focus();
     return;
+  }
+
+  // Guard: aspect ratio check — Runway Gen-4 rejects width/height > 2.358
+  console.log('[Prysmor:aspectRatio] mfGenerate guard check — storedVideoInfo:', JSON.stringify(storedVideoInfo));
+  if (!storedVideoInfo) {
+    showToast('Please wait, clip is still loading…', 'error');
+    return;
+  }
+  if (storedVideoInfo.width && storedVideoInfo.height) {
+    var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
+    console.log('[Prysmor:aspectRatio] ratio=' + aspectRatio.toFixed(4) + ' blocked=' + (aspectRatio > 2.358));
+    if (aspectRatio > 2.358) {
+      showToast(
+        'Video is too wide (' + aspectRatio.toFixed(2) + ':1). ' +
+        'Please crop to 16:9 in Premiere first.',
+        'error'
+      );
+      return;
+    }
   }
 
   state.mf.replaceMode = replaceMode;
@@ -729,6 +826,7 @@ async function mfGenerate() {
 
     // Extract a reference frame for identity conditioning while upload runs.
     // Runs concurrently with the S3 upload — failure is silent (returns null).
+    // captureReferenceFrame now returns { frameBase64, width, height }.
     var referenceFramePromise = captureReferenceFrame(fileBase64);
 
     setStatus('Uploading clip…', 28);
@@ -767,10 +865,17 @@ async function mfGenerate() {
   // ── Step 4: Start AI generation ──────────────────────────────────────────
   setStatus('Starting effect generation…', 38);
   // Await the reference frame (likely already done — started during S3 upload)
-  var referenceFrameBase64 = await referenceFramePromise.catch(function () { return null; });
+  var frameResult = await referenceFramePromise.catch(function () { return { frameBase64: null, width: 0, height: 0 }; });
+  var referenceFrameBase64 = frameResult ? frameResult.frameBase64 : null;
   try {
     var genBody = { prompt: prompt };
     if (referenceFrameBase64) genBody.referenceFrameBase64 = referenceFrameBase64;
+    // Send the effective dimensions used for aspect ratio checking (sequence dims
+    // when available, source file dims otherwise) so the server can validate too.
+    if (storedVideoInfo && storedVideoInfo.width && storedVideoInfo.height) {
+      genBody.videoWidth  = storedVideoInfo.width;
+      genBody.videoHeight = storedVideoInfo.height;
+    }
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/generate', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),

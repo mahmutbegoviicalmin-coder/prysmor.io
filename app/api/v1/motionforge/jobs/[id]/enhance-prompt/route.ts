@@ -17,7 +17,7 @@ export const maxDuration = 30;
 import { NextRequest, NextResponse }             from 'next/server';
 import { getJob, getJobAny }                     from '@/lib/motionforge/jobs';
 import { validatePanelKey, validatePanelToken }  from '@/lib/motionforge/auth';
-import { analyzeSceneWithClaude }                from '@/lib/motionforge/claudeSceneAnalyzer';
+import { enhancePromptWithClaude }               from '@/lib/motionforge/claudeSceneAnalyzer';
 import { log, warn }                             from '@/lib/motionforge/logger';
 
 const TAG = 'enhance-prompt';
@@ -59,11 +59,11 @@ export async function POST(
   // ── Claude vision path (frame provided) ─────────────────────────────────────
   if (frameBase64) {
     try {
-      const prompt = await analyzeSceneWithClaude(frameBase64, userIntent);
-      log(TAG, 'Claude scene analysis complete');
+      const result = await enhancePromptWithClaude(frameBase64, userIntent);
+      log(TAG, 'Claude enhance-prompt complete', { effectType: result.effectType });
       return NextResponse.json({
-        prompt,
-        effectType:    'background',
+        prompt:        result.compiledPrompt,
+        effectType:    result.effectType,
         sceneAnalysis: null,
         method:        'claude-vision',
       });

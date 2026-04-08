@@ -98,3 +98,72 @@ Output ONLY the final Runway prompt, no explanation. Start with:
 
   return { compiledPrompt: compiled, method: 'claude-vision', effectType };
 }
+
+/**
+ * Prompt-enhancement variant of the Claude vision call.
+ *
+ * Called by the Enhance button flow — the user has typed an intent and wants
+ * to see a fully-formed Runway prompt BEFORE clicking Generate.  The system
+ * prompt is tuned for "what should I tell Runway to do to this clip" rather
+ * than the generate-time "describe every detail of this frame".
+ */
+export async function enhancePromptWithClaude(
+  frameBase64: string,
+  userPrompt: string,
+): Promise<ClaudeAnalyzeResult> {
+  const response = await client.messages.create({
+    model: 'claude-opus-4-5',
+    max_tokens: 1024,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/jpeg',
+              data: frameBase64,
+            },
+          },
+          {
+            type: 'text',
+            text: `You are an expert prompt engineer for Runway Gen-4 video-to-video AI generation.
+
+The user wants to transform this video with the following request: "${userPrompt}"
+
+Analyze this frame carefully and write the best possible Runway Gen-4 prompt that:
+
+1. IDENTITY PRESERVATION (non-negotiable):
+   - Describe every person's exact facial features, skin tone, hair
+   - Describe exact clothing: colors, style, fit
+   - Start with "preserve exact identity and appearance of all subjects from source video"
+
+2. VFX INSTRUCTION:
+   - Apply the user's requested transformation: "${userPrompt}"
+   - Be specific and visual (concrete terms, not vague labels)
+   - Max 3 sentences total
+
+3. MANDATORY RULES:
+   - Positive language only, never "no X" lists
+   - NEVER use: scanlines, banding, CRT, glitch, VHS, corrupted, static, distorted, artifacts, compression, interlacing
+   - NEVER use trademarked character names — describe visual appearance instead
+   - Output ONLY the final prompt, no explanation
+
+Output ONLY the final Runway prompt. Start with:
+"preserve exact identity and appearance of all subjects from source video,"`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+  const effectType = classifyPromptEffect(raw);
+  let compiled = raw;
+  if (effectType === 'background') compiled = compiled + FACE_PRESERVE_SUFFIX;
+  compiled = sanitizeForRunway(compiled);
+  compiled = normalizeCompiled(compiled);
+
+  return { compiledPrompt: compiled, method: 'claude-vision', effectType };
+}

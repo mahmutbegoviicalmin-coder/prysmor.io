@@ -209,6 +209,59 @@ export function extractAllFrames(
   });
 }
 
+// ─── Aspect ratio crop ────────────────────────────────────────────────────────
+
+/**
+ * Runway Gen-4 maximum allowed width/height ratio.
+ * Matches the hard limit enforced by the /v1/video_to_video endpoint.
+ */
+export const RUNWAY_MAX_ASPECT_RATIO = 2.358;
+
+/**
+ * Center-crops a video so its width/height ratio does not exceed `maxRatio`.
+ *
+ * Uses ffmpeg's crop filter with exact pixel values derived from the probed
+ * dimensions so the output is always codec-aligned (even pixel counts).
+ *
+ * Only the video stream is cropped; audio is copied untouched.
+ * Throws on ffmpeg error so the caller can decide whether to abort or fall back.
+ *
+ * @param inputPath  - Source video file path
+ * @param outputPath - Destination file path (will be overwritten)
+ * @param info       - VideoInfo from probeVideo() — avoids a second ffprobe call
+ * @param maxRatio   - Maximum allowed w/h ratio (default: RUNWAY_MAX_ASPECT_RATIO)
+ */
+export function cropVideoToMaxAspectRatio(
+  inputPath:  string,
+  outputPath: string,
+  info:       VideoInfo,
+  maxRatio    = RUNWAY_MAX_ASPECT_RATIO,
+): Promise<void> {
+  // newW must be even for H.264 codec alignment
+  const newW = Math.floor(info.height * maxRatio / 2) * 2;
+  const x    = Math.floor((info.width - newW) / 2);
+
+  log(TAG, `Cropping ${info.width}x${info.height} (ratio ${(info.width / info.height).toFixed(3)}) → ${newW}x${info.height}`);
+
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        `-vf crop=${newW}:${info.height}:${x}:0`,
+        '-c:v libx264',
+        '-preset fast',
+        '-crf 18',
+        '-c:a copy',
+      ])
+      .output(outputPath)
+      .on('end',   () => resolve())
+      .on('error', (e) => {
+        warn(TAG, 'cropVideoToMaxAspectRatio failed', { err: e.message });
+        reject(e);
+      })
+      .run();
+  });
+}
+
 // ─── Cleanup helper ───────────────────────────────────────────────────────────
 
 /** Silently deletes a file if it exists. */
