@@ -164,11 +164,27 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
      corrupted, static, distorted, artifacts, compression, interlacing
    - Trademarked character names are blocked — describe the visual appearance in generic terms instead
    - Write zero camera angle, camera movement, or shot-type language — Runway inherits camera from source
-   - Output structure: [Subject descriptions] [Effect/action] [Environment] [Atmosphere]
-   - Output ONLY the final Runway prompt, no explanation
 
-Output ONLY the final Runway prompt. Start with:
-"preserve exact identity and appearance of all subjects from source video,"`,
+4. REQUIRED OUTPUT STRUCTURE:
+   "[Action verb] [environment/transformation description]. [Subject with specific clothing and face
+   description] maintains exact appearance [in transformed environment]."
+
+   The prompt MUST start with an action verb describing the transformation:
+   - "Transform the space into..."
+   - "Cover all surfaces with..."
+   - "Fill the scene with..."
+   - "Replace the lighting with..."
+   - "Coat every surface with..."
+
+   GOOD example:
+   "Transform the industrial workshop into a frozen winter realm, coating all surfaces with thick
+   ice and frost. Man with dark beard wearing blue work coveralls maintains exact appearance
+   while breath vapor becomes visible in the subzero atmosphere."
+
+   BAD (identity-first) — avoid this structure:
+   "The subject's exact facial features are maintained in a frozen environment..."
+
+   Output ONLY the final Runway prompt, no explanation.`,
           },
         ],
       },
