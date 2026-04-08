@@ -773,6 +773,10 @@ async function captureClipReferenceFrame(sourcePath) {
   var mediaIn = (state.mf.selInfo && state.mf.selInfo.mediaInSec) || 0;
 
   // ── Reference frame via ffmpeg ──────────────────────────────────────────
+  console.log('[Prysmor:frame] extracting frame at timecode:', mediaIn, 'from:', sourcePath);
+  console.log('[Prysmor:frame] selInfo mediaInSec:', (state.mf.selInfo && state.mf.selInfo.mediaInSec) || 'n/a',
+    'startTimeSec:', (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 'n/a',
+    'durationSec:', (state.mf.selInfo && state.mf.selInfo.durationSec) || 'n/a');
   try {
     var frameB64 = await captureFrameViaFFmpeg(sourcePath, mediaIn);
     if (frameB64) {
