@@ -35,9 +35,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Parse body ──────────────────────────────────────────────────────────────
-  let body: { prompt?: string; frames?: unknown };
+  let body: { prompt?: string; frames?: unknown; frameBase64?: string };
   try {
-    body = await req.json() as { prompt?: string; frames?: unknown };
+    body = await req.json() as { prompt?: string; frames?: unknown; frameBase64?: string };
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -54,11 +54,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Validate frames (optional) ──────────────────────────────────────────────
+  // Accepts both frames[] array and single frameBase64 string for compatibility.
+  const singleFrame = typeof body.frameBase64 === 'string' && body.frameBase64.length > 0
+    ? [body.frameBase64]
+    : [];
   const frames = Array.isArray(body.frames)
     ? (body.frames as unknown[])
         .filter((f): f is string => typeof f === 'string' && f.length > 0)
         .slice(0, 5)
-    : [];
+    : singleFrame;
 
   log(TAG, `Enhance request — frames=${frames.length}`, { promptLen: cleanPrompt.length });
 

@@ -586,9 +586,10 @@ async function compilePrompt() {
     return;
   }
 
-  // No job yet — fall back to basic text-only compile
+  // No job yet — use the top-level enhance-prompt endpoint (no job ID required).
+  // Sends the stored reference frame if available so Claude uses vision.
   if (!raw) {
-    showToast('Select a clip or enter a prompt first', 'error');
+    showToast('Enter a prompt first', 'error');
     textarea.focus();
     return;
   }
@@ -597,10 +598,14 @@ async function compilePrompt() {
   lbl.textContent = 'Enhancing…';
 
   try {
-    var res2 = await fetch(API_BASE + '/api/v1/motionforge/compile-prompt', {
+    var enhanceBody2 = { prompt: raw };
+    if (storedReferenceFrame) enhanceBody2.frames = [storedReferenceFrame];
+    console.log('[Prysmor:enhance] no-job path — frame:', storedReferenceFrame ? 'YES' : 'NO');
+
+    var res2 = await fetch(API_BASE + '/api/v1/motionforge/enhance-prompt', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body:    JSON.stringify({ prompt: raw }),
+      body:    JSON.stringify(enhanceBody2),
     });
     var json2 = await res2.json().catch(function () { return {}; });
 
@@ -609,13 +614,15 @@ async function compilePrompt() {
       showToast('Session expired — please sign in again', 'error');
       return;
     }
-    if (!res2.ok || !json2.compiledPrompt) {
-      throw new Error(json2.error || 'Compile failed');
+    if (!res2.ok || (!json2.enhancedPrompt && !json2.enhanced)) {
+      throw new Error(json2.error || 'Enhance failed');
     }
 
-    textarea.value = json2.compiledPrompt;
-    el('mf-char-count').textContent = json2.compiledPrompt.length;
-    showToast('Prompt enhanced', 'success');
+    var enhanced = json2.enhancedPrompt || json2.enhanced;
+    textarea.value = enhanced;
+    el('mf-char-count').textContent = enhanced.length;
+    var msg2 = json2.sceneAnalysed ? '✦ Scene analysed — prompt tailored to your clip' : '✦ Prompt enhanced';
+    showToast(msg2, 'success');
     textarea.focus();
 
   } catch (err) {
