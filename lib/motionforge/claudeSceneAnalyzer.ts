@@ -186,27 +186,23 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
    - Trademarked character names are blocked — describe the visual appearance in generic terms instead
    - Write zero camera angle, camera movement, or shot-type language — Runway inherits camera from source
 
-Output ONLY the final Runway prompt following this EXACT structure:
+YOUR RESPONSE MUST START WITH THE WORD 'with' - this is mandatory.
 
-Line 1: "with [exact clothing color, garment type, and appearance details] maintaining identical appearance,"
-Line 2: Start with action verb - "Transform [space] into [effect],"
-Line 3: Describe the environment transformation in detail.
+Format: 'with [person description] maintaining identical appearance, [transformation]'
+
+FIRST WORD OF YOUR RESPONSE = 'with'
+NEVER start with: Transform, Cover, Fill, The, Cinematic, Preserve
 
 CRITICAL: Keep total prompt under 50 words.
 Environment description maximum 2 sentences.
 Subject description maximum 1 sentence.
 Brevity is essential - Runway performs better with shorter prompts.
 
-CORRECT example:
-"with man in navy blue work coveralls and dark beard maintaining identical appearance, Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air."
+Example of CORRECT response:
+'with man in dark blue zip-up hoodie maintaining identical appearance, transform cold storage into recording studio with dark acoustic panels and warm LED lighting.'
 
-WRONG - never start with these:
-- "Transform the scene..."
-- "Cover every surface..."
-- "The subject's exact..."
-- "preserve exact identity..."
-
-ALWAYS start with: "with [subject description] maintaining identical appearance,"`,
+Example of WRONG response (will be rejected):
+'Transform the cold storage...'`,
           },
         ],
       },
