@@ -74,7 +74,6 @@ MANDATORY RULES (non-negotiable):
      • Layering (what is worn over/under what)
      Incorrect clothing description will cause wrong outfit in output.
    - Describe body positions, poses, expressions
-   - Use phrase "preserve exact identity and appearance of all subjects from source video"
 
 2. SCENE:
    - Lighting quality, direction, color temperature
@@ -172,7 +171,6 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
      • Any distinguishing features (logos, patches, zippers, collars, buttons)
      • Layering (what is worn over/under what)
      Incorrect clothing description will cause wrong outfit in output.
-   - Start with "preserve exact identity and appearance of all subjects from source video"
 
 2. VFX INSTRUCTION:
    - Apply the user's requested transformation: "${userPrompt}"
