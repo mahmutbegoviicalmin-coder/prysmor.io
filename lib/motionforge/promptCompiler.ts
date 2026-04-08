@@ -94,9 +94,11 @@ TRADEMARK / COPYRIGHT RULE (critical):
 
 Transformation rules:
 • This is a TRANSFORMATION of an existing video clip — NOT a new scene generation.
-• Always preserve: the subject's identity, face, pose, body proportions, camera framing, and performance.
+• Always preserve: the subject's identity, face, pose, body proportions, and performance.
 • Only modify what the user explicitly requested: VFX effects, environment, atmosphere, lighting, wardrobe additions, accessories, or scene elements.
-• Do NOT add generic cinematic language such as "cinematic shot", "dramatic composition", "shallow depth of field", "camera push-in", "wide-angle lens", or "film grain" unless the user explicitly asked for it.
+• CAMERA — include zero camera angle, movement, or shot-type language (e.g. "cinematic shot",
+  "wide-angle lens", "camera push-in", "shallow depth of field"). Runway inherits camera position
+  from the source video automatically. Only include camera language if the user explicitly requested it.
 • Do NOT invent creative additions the user did not ask for.
 • Output must be 1 to 3 sentences maximum.
 • The output must read as a direct transformation instruction, not a description of a new scene.
@@ -330,13 +332,14 @@ async function callClaude(userPrompt: string): Promise<string> {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Injected into background-effect prompts to ensure Runway does not alter
- * any person's face. Placed after the VFX instruction so it reads as a
- * hard constraint on the transformation.
+ * Injected into background-effect prompts to anchor subject appearance.
+ * Placed after the VFX instruction so Runway treats it as a hard constraint.
+ * Uses positive language only — Runway responds to "maintain X" better than "do not change X".
  */
 const FACE_PRESERVE_SUFFIX =
-  ' All human faces, skin, facial features, expressions, and body proportions' +
-  ' must remain completely identical to the original. Do not alter any person.';
+  ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
+  ' clothing, and body proportions from the source video, appearing identical throughout' +
+  ' the transformation.';
 
 /**
  * Compiles a user's VFX idea into a production-ready Runway transformation prompt.

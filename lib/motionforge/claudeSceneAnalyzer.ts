@@ -12,8 +12,9 @@ void ANTI_ARTIFACT_PREFIX;
 
 // Mirrors the unexported constant in promptCompiler — kept in sync intentionally.
 const FACE_PRESERVE_SUFFIX =
-  ' All human faces, skin, facial features, expressions, and body proportions' +
-  ' must remain completely identical to the original. Do not alter any person.';
+  ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
+  ' clothing, and body proportions from the source video, appearing identical throughout' +
+  ' the transformation.';
 
 export interface ClaudeAnalyzeResult {
   compiledPrompt: string;
@@ -59,7 +60,9 @@ MANDATORY RULES (non-negotiable):
   Describe the visual appearance in generic terms instead
   (e.g. "Spider-Man suit" → "form-fitting bodysuit with geometric web texture pattern in black and red").
 • LENGTH — write a maximum of 3 sentences for the VFX instruction.
-• LANGUAGE — use only positive descriptive language. Never write "no X" negation lists.
+• LANGUAGE — use only positive descriptive language. Describe what SHOULD appear, never "no X" lists.
+• CAMERA — write zero camera angle, camera movement, or shot-type language. Runway inherits camera
+  position directly from the source video — any camera instruction in the prompt overrides it.
 
 1. IDENTITY PRESERVATION (most critical):
    - Describe every person's exact facial features, skin tone, hair color/style/length
@@ -69,13 +72,14 @@ MANDATORY RULES (non-negotiable):
 
 2. SCENE:
    - Lighting quality, direction, color temperature
-   - Camera angle and framing
-   - Color grading and mood
+   - Color grading and visual mood
+   - Atmosphere and visual tone
 
 3. ENVIRONMENT:
    User request: "${userPrompt || 'keep same environment'}"
    Apply environment change while keeping all subjects identical.
 
+Output structure: [Subject descriptions] [Action/effect] [Environment] [Atmosphere]
 Output ONLY the final Runway prompt, no explanation. Start with:
 "preserve exact identity and appearance of all subjects from source video,"`,
           },
@@ -145,10 +149,13 @@ Analyze this frame carefully and write the best possible Runway Gen-4 prompt tha
    - Max 3 sentences total
 
 3. MANDATORY RULES:
-   - Positive language only, never "no X" lists
-   - NEVER use: scanlines, banding, CRT, glitch, VHS, corrupted, static, distorted, artifacts, compression, interlacing
-   - NEVER use trademarked character names — describe visual appearance instead
-   - Output ONLY the final prompt, no explanation
+   - Positive descriptive language only — describe what SHOULD appear, never "no X" lists
+   - Forbidden output words (trigger Runway moderation): scanlines, banding, CRT, glitch, VHS,
+     corrupted, static, distorted, artifacts, compression, interlacing
+   - Trademarked character names are blocked — describe the visual appearance in generic terms instead
+   - Write zero camera angle, camera movement, or shot-type language — Runway inherits camera from source
+   - Output structure: [Subject descriptions] [Effect/action] [Environment] [Atmosphere]
+   - Output ONLY the final Runway prompt, no explanation
 
 Output ONLY the final Runway prompt. Start with:
 "preserve exact identity and appearance of all subjects from source video,"`,
