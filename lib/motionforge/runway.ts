@@ -160,9 +160,15 @@ export interface RunwayTaskStatus {
 export async function createVideoToVideoTask(
   inputVideoUrl: string,
   prompt: string,
-  referenceImageUri?: string,
+  referenceImageUris?: string | string[],
   effectType: 'overlay' | 'background' = 'background',
 ): Promise<RunwayTaskCreated> {
+
+  // Normalise single URI or array to a clean string[]
+  const refUris: string[] = referenceImageUris
+    ? (Array.isArray(referenceImageUris) ? referenceImageUris : [referenceImageUris])
+        .filter(u => typeof u === 'string' && u.length > 0)
+    : [];
 
   const body: Record<string, unknown> = {
     model:      'gen4_aleph',
@@ -174,15 +180,15 @@ export async function createVideoToVideoTask(
     },
   };
 
-  // CRITICAL: Only attach reference image for background/environment effects.
-  // For overlay effects (lighting, glow, fog, particles, god rays) the reference
-  // image tells Runway "keep output looking like this frame" — which directly
+  // CRITICAL: Only attach reference images for background/environment effects.
+  // For overlay effects (lighting, glow, fog, particles, god rays) reference
+  // images tell Runway "keep output looking like this frame" — which directly
   // prevents VFX from being applied. The VFX prompt alone is sufficient for overlays.
-  if (referenceImageUri && effectType === 'background') {
-    body.references = [{ type: 'image', uri: referenceImageUri }];
-    console.log(`[runway] Using reference image for identity conditioning (background effect)`);
-  } else if (referenceImageUri && effectType === 'overlay') {
-    console.log(`[runway] Skipping reference image for overlay effect — letting prompt drive VFX`);
+  if (refUris.length > 0 && effectType === 'background') {
+    body.references = refUris.map(uri => ({ type: 'image', uri }));
+    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning (background effect)`);
+  } else if (refUris.length > 0 && effectType === 'overlay') {
+    console.log(`[runway] Skipping ${refUris.length} reference image(s) for overlay effect — letting prompt drive VFX`);
   }
 
   const res = await fetch(`${RUNWAY_API_BASE}/v1/video_to_video`, {

@@ -123,7 +123,13 @@ export async function POST(
     return NextResponse.json({ error: 'No asset — call /upload first' }, { status: 400 });
   }
 
-  let body: { prompt?: string; referenceFrameBase64?: string; videoWidth?: number; videoHeight?: number };
+  let body: {
+    prompt?: string;
+    referenceFrameBase64?: string;
+    referenceFrames?: string[];
+    videoWidth?: number;
+    videoHeight?: number;
+  };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
 
@@ -131,7 +137,8 @@ export async function POST(
   if (!rawPrompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
 
   // Early aspect ratio guard — before any job mutation, upload, or credit deduction.
-  // Panel sends videoWidth/videoHeight from storedVideoInfo captured at clip-load time.
+  // Panel sends videoWidth/videoHeight: probed dimensions of the ffmpeg-prepared clip when
+  // extraction succeeded, otherwise stored sequence dimensions from clip-load time.
   const clientW = typeof body.videoWidth  === 'number' ? body.videoWidth  : 0;
   const clientH = typeof body.videoHeight === 'number' ? body.videoHeight : 0;
   if (clientW > 0 && clientH > 0) {
@@ -146,11 +153,12 @@ export async function POST(
   const effectType  = classifyPromptEffect(rawPrompt);
 
   const FACE_PRESERVE =
-    ' All human faces, skin, facial features, expressions, and body proportions' +
-    ' must remain completely identical to the original. Do not alter any person.';
+    ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
+    ' clothing, and body proportions from the source video, appearing identical throughout' +
+    ' the transformation.';
   const OVERLAY_ENFORCE =
-    ' Apply the requested effect prominently and visibly — the transformation' +
-    ' must be clearly noticeable in the output. Preserve camera framing and subject position.';
+    ' The requested effect appears prominently and visibly throughout the output.' +
+    ' Subject position, pose, and body proportions remain identical to the source video.';
 
   let normalized = normalizeCompiled(rawPrompt);
   normalized += effectType === 'overlay' ? OVERLAY_ENFORCE : FACE_PRESERVE;
@@ -250,7 +258,9 @@ export async function POST(
       ]);
       runwayUri = uri;
 
-      const task = await createVideoToVideoTask(runwayUri, prompt, refUri, effectType);
+      // Local dev: single anchor frame from ffmpeg identity extraction
+      const localRefUris: string[] = refUri ? [refUri] : [];
+      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, effectType);
       log(TAG, `Runway task started: ${task.id}`);
 
       await updateJob(userId, params.id, {
@@ -268,26 +278,45 @@ export async function POST(
     }
 
     // ── Vercel / pre-uploaded path — no local ffmpeg ──────────────────────
-    // If the panel sent a reference frame (base64 JPEG), upload it to Runway
-    // and pass it as the identity-conditioning reference image.
+    // Upload all reference frames sent by the panel (up to 3).
+    // Falls back to single referenceFrameBase64 for older panel versions.
     log(TAG, 'Sending pre-uploaded video to Runway (Vercel path)');
 
-    let refUri: string | undefined;
-    const frameB64 = (body.referenceFrameBase64 ?? '').trim();
-    if (frameB64) {
-      const frameTmpPath = tmpPath(`ref-frame-${params.id}.jpg`);
-      try {
-        fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
-        refUri = await uploadImageToRunway(frameTmpPath);
-        log(TAG, `Reference frame uploaded for identity conditioning: ${refUri}`);
-      } catch (e) {
-        warn(TAG, 'Reference frame upload failed — proceeding without', { err: (e as Error).message });
-      } finally {
-        try { fs.unlinkSync(frameTmpPath); } catch (_) {}
-      }
+    const refUris: string[] = [];
+
+    // Prefer the multi-frame array; fall back to single frame for compat
+    const rawFrames: string[] = Array.isArray(body.referenceFrames) && body.referenceFrames.length > 0
+      ? body.referenceFrames
+      : (body.referenceFrameBase64 ?? '').trim()
+        ? [body.referenceFrameBase64!.trim()]
+        : [];
+
+    const framesToUpload = rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 3);
+
+    if (framesToUpload.length > 0) {
+      log(TAG, `Uploading ${framesToUpload.length} reference frame(s) for identity conditioning`);
+      const uploadPromises = framesToUpload.map((frameB64, i) => {
+        const frameTmpPath = tmpPath(`ref-frame-${params.id}-${i}.jpg`);
+        return (async () => {
+          try {
+            fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
+            const uri = await uploadImageToRunway(frameTmpPath);
+            log(TAG, `Reference frame ${i + 1}/${framesToUpload.length} uploaded: ${uri}`);
+            return uri;
+          } catch (e) {
+            warn(TAG, `Reference frame ${i + 1} upload failed`, { err: (e as Error).message });
+            return null;
+          } finally {
+            try { fs.unlinkSync(frameTmpPath); } catch (_) {}
+          }
+        })();
+      });
+      const uploaded = await Promise.all(uploadPromises);
+      uploaded.forEach(uri => { if (uri) refUris.push(uri); });
+      log(TAG, `${refUris.length}/${framesToUpload.length} reference frames uploaded successfully`);
     }
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refUri, effectType);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refUris, effectType);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {

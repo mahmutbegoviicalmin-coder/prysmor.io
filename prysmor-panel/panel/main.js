@@ -34,8 +34,10 @@ const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
 
 // ─── Reference Frame Store ────────────────────────────────────────────────────
-// Captured once when a clip is loaded; reused by Enhance and Generate.
-var storedReferenceFrame = null;
+// Up to 3 frames captured at different timecodes when a clip is loaded.
+// storedReferenceFrame is always storedReferenceFrames[0] for backward compat.
+var storedReferenceFrames = [];   // primary — array of base64 JPEG strings
+var storedReferenceFrame  = null; // alias → storedReferenceFrames[0] || null
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -378,7 +380,8 @@ function logout() {
   }
 
   clearSession();
-  storedReferenceFrame = null;
+  storedReferenceFrame  = null;
+  storedReferenceFrames = [];
   storedVideoInfo = null;
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
@@ -400,7 +403,8 @@ function logout() {
  */
 function refreshClip(silent) {
   // Clear immediately so Generate is blocked while the async refresh is in progress.
-  storedReferenceFrame = null;
+  storedReferenceFrame  = null;
+  storedReferenceFrames = [];
   storedVideoInfo = null;
 
   el('btn-refresh-clip').disabled = true;
@@ -414,8 +418,9 @@ function refreshClip(silent) {
     try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
 
     if (!parsed || parsed.error) {
-      state.mf.selInfo = null;
-      storedReferenceFrame = null;
+      state.mf.selInfo      = null;
+      storedReferenceFrame  = null;
+      storedReferenceFrames = [];
       storedVideoInfo = null;
       showClipEmpty();
       if (!silent) {
@@ -534,8 +539,8 @@ async function apiFetch(path, options) {
 // ─── Compile Prompt ───────────────────────────────────────────────────────────
 
 async function compilePrompt() {
-  console.log('[Prysmor:enhance] ENHANCE CLICKED - storedReferenceFrame:',
-    storedReferenceFrame ? 'YES length=' + storedReferenceFrame.length : 'NO - will use fallback');
+  console.log('[Prysmor:enhance] ENHANCE CLICKED - storedReferenceFrames:', storedReferenceFrames.length,
+    'frames, primary:', storedReferenceFrame ? 'YES length=' + storedReferenceFrame.length : 'NO');
   var textarea = el('mf-prompt');
   var raw      = textarea.value.trim();
   var btn      = el('btn-compile-prompt');
@@ -550,10 +555,10 @@ async function compilePrompt() {
       // Use whatever the user typed as intent, or ask for one if empty
       var intent = raw || 'make it cinematic and dramatic';
 
-      console.log('[Prysmor:enhance] storedReferenceFrame available:',
-        storedReferenceFrame ? 'YES length=' + storedReferenceFrame.length : 'NO');
+      console.log('[Prysmor:enhance] storedReferenceFrames:', storedReferenceFrames.length, 'frames available');
       var enhanceBody = { intent: intent };
-      if (storedReferenceFrame) enhanceBody.frameBase64 = storedReferenceFrame;
+      if (storedReferenceFrame)          enhanceBody.frameBase64 = storedReferenceFrame;
+      if (storedReferenceFrames.length > 0) enhanceBody.frames = storedReferenceFrames;
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
         method:  'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
@@ -601,8 +606,9 @@ async function compilePrompt() {
 
   try {
     var enhanceBody2 = { prompt: raw };
-    if (storedReferenceFrame) enhanceBody2.frames = [storedReferenceFrame];
-    console.log('[Prysmor:enhance] no-job path — frame:', storedReferenceFrame ? 'YES' : 'NO');
+    if (storedReferenceFrames.length > 0) enhanceBody2.frames = storedReferenceFrames;
+    else if (storedReferenceFrame)        enhanceBody2.frames = [storedReferenceFrame];
+    console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0);
 
     var res2 = await fetch(API_BASE + '/api/v1/motionforge/enhance-prompt', {
       method:  'POST',
@@ -763,27 +769,58 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
   });
 }
 
+/**
+ * Captures 3 reference frames at different timecodes (start, middle, near-end)
+ * from a video file using FFmpeg.  Gives Runway more angles of the subject.
+ *
+ * The extracted clip is centre-cropped to ≤2.358:1 at native resolution (no scale),
+ * so timecodes are relative to the start of the extracted file (t=0 = clip in-point).
+ *
+ * @param {string} sourcePath  - full path to the video file
+ * @param {number} mediaInSec  - in-point offset within the file (seconds)
+ * @param {number} durationSec - clip duration (seconds)
+ * @returns {Promise<string[]>} array of base64 JPEG strings (may be 1-3 items)
+ */
+async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
+  var t1 = mediaInSec;
+  var t2 = mediaInSec + (durationSec * 0.5);
+  var t3 = mediaInSec + (durationSec * 0.85);
+
+  var results = await Promise.all([
+    captureFrameViaFFmpeg(sourcePath, t1).catch(function () { return null; }),
+    captureFrameViaFFmpeg(sourcePath, t2).catch(function () { return null; }),
+    captureFrameViaFFmpeg(sourcePath, t3).catch(function () { return null; }),
+  ]);
+
+  var frames = results.filter(function (f) { return f !== null; });
+  console.log('[Prysmor:multiframe] captured ' + frames.length + '/3 reference frames');
+  return frames;
+}
+
 // Captures a reference frame + sequence dimensions when a clip is loaded.
 // Uses ffmpeg (reliable) instead of canvas (fails on wide/unusual codecs).
 // Runs silently in the background — errors leave storedReferenceFrame null.
 async function captureClipReferenceFrame(sourcePath) {
-  storedReferenceFrame = null;
+  storedReferenceFrame  = null;
+  storedReferenceFrames = [];
   storedVideoInfo = null;
 
-  var mediaIn = (state.mf.selInfo && state.mf.selInfo.mediaInSec) || 0;
+  var mediaIn  = (state.mf.selInfo && state.mf.selInfo.mediaInSec)  || 0;
+  var duration = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
 
-  // ── Reference frame via ffmpeg ──────────────────────────────────────────
-  console.log('[Prysmor:frame] extracting frame at timecode:', mediaIn, 'from:', sourcePath);
-  console.log('[Prysmor:frame] selInfo mediaInSec:', (state.mf.selInfo && state.mf.selInfo.mediaInSec) || 'n/a',
-    'startTimeSec:', (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 'n/a',
-    'durationSec:', (state.mf.selInfo && state.mf.selInfo.durationSec) || 'n/a');
+  // ── Multi-frame capture via ffmpeg ──────────────────────────────────────
+  console.log('[Prysmor:frame] captureClipReferenceFrame: mediaInSec=' + mediaIn +
+    ' durationSec=' + duration + ' sourcePath=' + sourcePath);
+  console.log('[Prysmor:frame] selInfo startTimeSec:', (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 'n/a');
   try {
-    var frameB64 = await captureFrameViaFFmpeg(sourcePath, mediaIn);
-    if (frameB64) {
-      storedReferenceFrame = frameB64;
-      console.log('[Prysmor:frame] captureClipReferenceFrame: frame captured via ffmpeg, length=' + frameB64.length);
+    var frames = await captureMultipleFrames(sourcePath, mediaIn, duration);
+    if (frames.length > 0) {
+      storedReferenceFrames = frames;
+      storedReferenceFrame  = frames[0];
+      console.log('[Prysmor:frame] captureClipReferenceFrame: stored ' + frames.length +
+        ' frames, primary length=' + frames[0].length);
     } else {
-      console.warn('[Prysmor:frame] captureClipReferenceFrame: ffmpeg returned null (will retry at generate time)');
+      console.warn('[Prysmor:frame] captureClipReferenceFrame: all ffmpeg frames returned null');
     }
   } catch (frameErr) {
     console.error('[Prysmor:frame] captureClipReferenceFrame threw:', frameErr.message);
@@ -854,7 +891,7 @@ async function mfGenerate() {
     return;
   }
   // sourceTooWide: raw source file exceeds 2.358:1 but sequence may be fine.
-  // We don't block here — cropAndScaleVideo() will fix it before the upload.
+  // We don't block here — extractAndPrepareClip() centre-crops before the upload.
   if (storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
     var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
     console.log('[Prysmor:aspectRatio] confirmed dims — ratio=' + aspectRatio.toFixed(4) + ' block=' + (aspectRatio > 2.358));
@@ -928,21 +965,41 @@ async function mfGenerate() {
 
     // ── Extract + prepare clip ─────────────────────────────────────────────
     // Always: extract just the selected segment (mediaInSec → +clipDurSec)
-    // from the source file, centre-crop to ≤2.358:1, and scale to 1280×720
-    // — all in one ffmpeg pass. This fixes the bug where the full source file
+    // from the source file, centre-crop width to ≤2.358:1 at native resolution
+    // (no scale/pad). This fixes the bug where the full source file
     // was being uploaded instead of only the selected clip.
     // On failure: if source is too wide we must abort; otherwise fall back to
     // reading the full source file so non-wide clips still work.
     setStatus('Extracting clip…', 14);
     var extractionSucceeded = false;
     var preparedTmpPath     = null;
+    var preparedVideoWidth  = 0;
+    var preparedVideoHeight = 0;
     var fileBase64;
     try {
-      preparedTmpPath = await extractAndPrepareClip(sourcePath, mediaInSec, clipDurSec);
-      console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath);
+      var extractResult = await extractAndPrepareClip(sourcePath, mediaInSec, clipDurSec);
+      preparedTmpPath     = extractResult.path;
+      preparedVideoWidth  = extractResult.width  || 0;
+      preparedVideoHeight = extractResult.height || 0;
+      console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath +
+        '  dims=' + preparedVideoWidth + 'x' + preparedVideoHeight);
       setStatus('Reading clip…', 20);
-      fileBase64 = await readFileBase64(preparedTmpPath);
+      // Read file + capture 3 reference frames concurrently (file must exist for both)
+      var multiFrameResults = await Promise.all([
+        readFileBase64(preparedTmpPath),
+        captureMultipleFrames(preparedTmpPath, 0, clipDurSec),
+      ]);
+      fileBase64 = multiFrameResults[0];
+      var capturedFrames = multiFrameResults[1];
       extractionSucceeded = true;
+      // Update stored frames with clean extracted-clip frames (cropped native res)
+      if (capturedFrames && capturedFrames.length > 0) {
+        storedReferenceFrames = capturedFrames;
+        storedReferenceFrame  = capturedFrames[0];
+        console.log('[Prysmor:frame] captured ' + capturedFrames.length + ' reference frames from extracted clip');
+      } else {
+        console.log('[Prysmor:frame] captureMultipleFrames returned 0 frames — using storedReferenceFrames from clip load');
+      }
       try { require('fs').unlinkSync(preparedTmpPath); } catch (_) {
         try { window.cep.fs.deleteFile(preparedTmpPath); } catch (_) {}
       }
@@ -968,9 +1025,8 @@ async function mfGenerate() {
       }
     }
 
-    // Reference frame from the prepared clip (correct segment + correct dims).
-    // Starts concurrently with the S3 upload — failure is silent.
-    var referenceFramePromise = captureReferenceFrame(fileBase64);
+    // Reference frames were already captured above via captureMultipleFrames.
+    // (captureReferenceFrame / canvas-based capture is no longer needed here)
 
     setStatus('Uploading clip…', 28);
     try {
@@ -1007,24 +1063,24 @@ async function mfGenerate() {
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
   setStatus('Starting effect generation…', 38);
-  // Await the reference frame (likely already done — started during S3 upload)
-  var frameResult = await referenceFramePromise.catch(function () { return { frameBase64: null, width: 0, height: 0 }; });
-  var referenceFrameBase64 = frameResult ? frameResult.frameBase64 : null;
-  // Keep storedReferenceFrame in sync so Enhance uses the correct clean frame
-  if (referenceFrameBase64) {
-    storedReferenceFrame = referenceFrameBase64;
-    console.log('[Prysmor:frame] captured reference frame from extracted clip: YES, length=' + storedReferenceFrame.length);
-  } else {
-    console.log('[Prysmor:frame] captured reference frame from extracted clip: NO');
-  }
+  console.log('[Prysmor:frame] sending ' + storedReferenceFrames.length + ' reference frame(s) to generate endpoint');
   try {
     var genBody = { prompt: prompt };
-    if (referenceFrameBase64) genBody.referenceFrameBase64 = referenceFrameBase64;
-    // If ffmpeg extraction ran, the clip is exactly 1280×720.
-    // Otherwise send the stored sequence dimensions as a best-effort hint.
+    // Send all captured reference frames (primary + extras for identity conditioning)
+    if (storedReferenceFrames.length > 0) {
+      genBody.referenceFrameBase64 = storedReferenceFrames[0];      // primary (backward compat)
+      genBody.referenceFrames      = storedReferenceFrames;          // all frames
+    }
+    // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
+    // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
-      genBody.videoWidth  = 1280;
-      genBody.videoHeight = 720;
+      if (preparedVideoWidth > 0 && preparedVideoHeight > 0) {
+        genBody.videoWidth  = preparedVideoWidth;
+        genBody.videoHeight = preparedVideoHeight;
+      } else if (storedVideoInfo && storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
+        genBody.videoWidth  = storedVideoInfo.width;
+        genBody.videoHeight = storedVideoInfo.height;
+      }
     } else if (storedVideoInfo && storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
       genBody.videoWidth  = storedVideoInfo.width;
       genBody.videoHeight = storedVideoInfo.height;
@@ -1398,12 +1454,10 @@ function fileExistsSync(p) {
 }
 
 // ─── Video Preprocessing ──────────────────────────────────────────────────────
-// Crops and scales a video to 1280×720 using a bundled or system ffmpeg.
-// Center-crops the width to ≤2.358:1 then scales/pads to exactly 1280×720.
+// Centre-crops width to ≤2.358:1 at native resolution (no scale/pad) using ffmpeg.
 // Bundled binary: panel/ffmpeg/win/ffmpeg.exe  (Windows)
 //                 panel/ffmpeg/mac/ffmpeg       (macOS)
 // Falls back to system `ffmpeg` if bundled binary is not found.
-// Returns a Promise<string> that resolves with the output temp-file path.
 /**
  * Resolves the ffmpeg binary path: bundled extension copy first,
  * then system PATH as fallback.
@@ -1432,6 +1486,36 @@ function getFFmpegBin() {
   return 'ffmpeg';
 }
 
+/**
+ * Reads width×height from ffmpeg stderr (`ffmpeg -i file` — exits non-zero but prints stream info).
+ * @returns {Promise<{width:number,height:number}>}
+ */
+function probeVideoDimensionsFfmpeg(videoPath) {
+  return new Promise(function (resolve) {
+    try {
+      var cp = require('child_process');
+      var ffmpegBin = getFFmpegBin();
+      var proc = cp.spawn(ffmpegBin, ['-hide_banner', '-i', videoPath], { windowsHide: true });
+      var stderr = '';
+      if (proc.stderr) proc.stderr.on('data', function (d) { stderr += d.toString(); });
+      proc.on('close', function () {
+        var m = stderr.match(/Stream\s+#\d+:\d+(?:\([^)]*\))?:\s*Video:[^\n]*?(\d{2,})x(\d+)/);
+        if (!m) m = stderr.match(/Video:[^\n]*?,\s*(\d{2,})x(\d+)/);
+        if (m) {
+          return resolve({
+            width:  parseInt(m[1], 10),
+            height: parseInt(m[2], 10),
+          });
+        }
+        resolve({ width: 0, height: 0 });
+      });
+      proc.on('error', function () { resolve({ width: 0, height: 0 }); });
+    } catch (_) {
+      resolve({ width: 0, height: 0 });
+    }
+  });
+}
+
 function cropAndScaleVideo(sourcePath) {
   return new Promise(function (resolve, reject) {
     var cp;
@@ -1447,10 +1531,7 @@ function cropAndScaleVideo(sourcePath) {
       : (state._extRoot || '') + (isWin ? '\\panel\\temp' : '/panel/temp');
 
     var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-crop-' + Date.now() + '.mp4';
-    var filter  =
-      'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0,' +
-      'scale=1280:720:force_original_aspect_ratio=decrease,' +
-      'pad=1280:720:(ow-iw)/2:(oh-ih)/2';
+    var filter  = 'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0';
     var args = ['-i', sourcePath, '-vf', filter,
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-c:a', 'aac', '-y', outPath];
 
@@ -1476,15 +1557,13 @@ function cropAndScaleVideo(sourcePath) {
 }
 
 /**
- * Extracts the selected clip segment from the source file, centre-crops to
- * ≤2.358 aspect ratio, and scales to 1280×720 — all in one ffmpeg pass.
- * This ensures Runway always receives the exact selected segment, not the
- * full source file.
+ * Extracts the selected clip segment from the source file and centre-crops width
+ * to ≤2.358:1 at native resolution (no scale, no pad).
  *
  * @param {string} sourcePath  - full path to the source media file
  * @param {number} mediaInSec  - in-point in the source file (seconds)
  * @param {number} durationSec - segment duration to extract (seconds)
- * @returns {Promise<string>}  - temp .mp4 path of the prepared clip
+ * @returns {Promise<{path:string,width:number,height:number}>} prepared clip path + probed dims
  */
 function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
   return new Promise(function (resolve, reject) {
@@ -1502,11 +1581,7 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
 
     var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-clip-' + Date.now() + '.mp4';
 
-    // Center-crop to ≤2.358:1 then scale/pad to 1280×720.
-    var filter =
-      'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0,' +
-      'scale=1280:720:force_original_aspect_ratio=decrease,' +
-      'pad=1280:720:(ow-iw)/2:(oh-ih)/2';
+    var filter = 'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0';
 
     // -ss before -i = fast seek (stream copy to target point then decode).
     var args = [
@@ -1532,7 +1607,10 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
       var ok  = nfs ? nfs.existsSync(outPath) : fileExistsSync(outPath);
       if (code === 0 && ok) {
         console.log('[Prysmor:extract] done →', outPath);
-        resolve(outPath);
+        probeVideoDimensionsFfmpeg(outPath).then(function (dims) {
+          console.log('[Prysmor:extract] probed output:', dims.width + 'x' + dims.height);
+          resolve({ path: outPath, width: dims.width, height: dims.height });
+        });
       } else {
         console.error('[Prysmor:extract] ffmpeg exited', code, stderr.slice(-400));
         reject(new Error('ffmpeg extract failed (code ' + code + ')'));
@@ -1748,7 +1826,8 @@ function bindEvents() {
   el('btn-refresh-clip').addEventListener('click', function () {
     // Clear stale state immediately so Generate stays blocked until the
     // full refresh + frame capture cycle completes.
-    storedReferenceFrame = null;
+    storedReferenceFrame  = null;
+    storedReferenceFrames = [];
     storedVideoInfo = null;
     refreshClip(false);
   });
