@@ -129,6 +129,33 @@ ALWAYS start with: "with [subject description] maintaining identical appearance,
 }
 
 /**
+ * Ensures the compiled prompt starts with "with [subject] maintaining identical appearance,".
+ *
+ * If Claude correctly started with "with" → returns as-is.
+ * If Claude put the "with X maintaining..." clause at the END (old format) →
+ *   extracts it and moves it to the front so Runway reads identity first.
+ * Falls back to the original string if no pattern is found.
+ */
+function enforceWithFormat(raw: string): string {
+  const trimmed = raw.trim();
+
+  // Already correct — starts with "with "
+  if (/^with\s/i.test(trimmed)) return trimmed;
+
+  // Detect trailing "with X maintaining..." pattern (Claude's old format)
+  // e.g. "Transform scene..., with man in red jacket maintaining identical appearance."
+  const trailingWith = trimmed.match(/,?\s*(with\s+.+?maintaining[^.]*\.?)$/i);
+  if (trailingWith) {
+    const withClause  = trailingWith[1].trim().replace(/\.$/, '');
+    const vfxPart     = trimmed.slice(0, trimmed.length - trailingWith[0].length).trim().replace(/,\s*$/, '');
+    return `${withClause}, ${vfxPart}.`;
+  }
+
+  // No "with" found at all — return unchanged and let FACE_PRESERVE_SUFFIX cover it
+  return trimmed;
+}
+
+/**
  * Prompt-enhancement variant of the Claude vision call.
  *
  * Called by the Enhance button flow — the user has typed an intent and wants
@@ -157,50 +184,23 @@ export async function enhancePromptWithClaude(
           },
           {
             type: 'text',
-            text: `You are an expert prompt engineer for Runway Gen-4 video-to-video AI generation.
+            text: `You are a Runway Gen-4 prompt writer. Write a single short prompt under 50 words.
 
-The user wants to transform this video with the following request: "${userPrompt}"
+User request: "${userPrompt}"
 
-Analyze this frame carefully and write the best possible Runway Gen-4 prompt that:
+STRICT OUTPUT FORMAT — your response must match this exactly:
+"with [exact clothing color and garment type of each person] maintaining identical appearance, [environment transformation in 1-2 sentences]"
 
-1. IDENTITY PRESERVATION (non-negotiable):
-   - Describe every person's exact facial features, skin tone, hair color/style/length
-   - Describe exact clothing — pay extreme attention:
-     • Exact garment type (shirt, jacket, coveralls, uniform, hoodie, etc.)
-     • Exact color with precise shade (navy blue, light grey, olive green, etc.)
-     • Any distinguishing features (logos, patches, zippers, collars, buttons)
-     • Layering (what is worn over/under what)
-     Incorrect clothing description will cause wrong outfit in output.
+RULES:
+- First word MUST be "with" — no exceptions
+- Describe clothing precisely: color + garment type (e.g. "bright red zip-up jacket", "blue denim jacket")
+- For multiple people: "with man in red jacket and man in blue jacket maintaining identical appearance,"
+- After the comma: describe the transformation concisely
+- Forbidden words: scanlines, banding, CRT, glitch, VHS, corrupted, static, distorted, artifacts
+- No camera language, no trademarked names
 
-2. VFX INSTRUCTION:
-   - Apply the user's requested transformation: "${userPrompt}"
-   - Be specific and visual (concrete terms, not vague labels)
-   - Max 3 sentences total
-
-3. MANDATORY RULES:
-   - Positive descriptive language only — describe what SHOULD appear, never "no X" lists
-   - Forbidden output words (trigger Runway moderation): scanlines, banding, CRT, glitch, VHS,
-     corrupted, static, distorted, artifacts, compression, interlacing
-   - Trademarked character names are blocked — describe the visual appearance in generic terms instead
-   - Write zero camera angle, camera movement, or shot-type language — Runway inherits camera from source
-
-YOUR RESPONSE MUST START WITH THE WORD 'with' - this is mandatory.
-
-Format: 'with [person description] maintaining identical appearance, [transformation]'
-
-FIRST WORD OF YOUR RESPONSE = 'with'
-NEVER start with: Transform, Cover, Fill, The, Cinematic, Preserve
-
-CRITICAL: Keep total prompt under 50 words.
-Environment description maximum 2 sentences.
-Subject description maximum 1 sentence.
-Brevity is essential - Runway performs better with shorter prompts.
-
-Example of CORRECT response:
-'with man in dark blue zip-up hoodie maintaining identical appearance, transform cold storage into recording studio with dark acoustic panels and warm LED lighting.'
-
-Example of WRONG response (will be rejected):
-'Transform the cold storage...'`,
+CORRECT: "with man in red jacket maintaining identical appearance, transform the alley into a nighttime scene with fireworks bursting overhead and warm ambient light on brick walls."
+WRONG: "Transform the scene..." or "The subject maintains..."`,
           },
         ],
       },
@@ -209,11 +209,12 @@ Example of WRONG response (will be rejected):
 
   const raw = response.content[0].type === 'text' ? response.content[0].text : '';
   const effectType = classifyPromptEffect(raw);
+  // Programmatic enforcement: if Claude ignored the "with" rule, move the trailing
+  // "with X maintaining..." clause to the front where Runway weights it most heavily.
+  let normalized = enforceWithFormat(raw);
   // Prepend identity sentence BEFORE the VFX instruction — same ordering as promptCompiler.
-  let compiled = raw;
-  if (effectType === 'background') compiled = FACE_PRESERVE_SUFFIX + ' ' + compiled;
-  compiled = sanitizeForRunway(compiled);
-  compiled = normalizeCompiled(compiled);
+  if (effectType === 'background') normalized = FACE_PRESERVE_SUFFIX + ' ' + normalized;
+  const compiled = normalizeCompiled(sanitizeForRunway(normalized));
 
   return { compiledPrompt: compiled, method: 'claude-vision', effectType };
 }
