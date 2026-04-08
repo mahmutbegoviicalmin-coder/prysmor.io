@@ -10,8 +10,8 @@
  *   identity-preservation header and strips transformation verbs.
  *   Activated only when Claude is unavailable.
  *
- * Output: plain text, 40–90 words, sentence-based.
- *   Always begins with an action verb (Transform, Cover, Fill, Replace, Add, Convert).
+ * Output: plain text, under 60 words, sentence-based.
+ *   Always begins with "with [subject description] maintaining identical appearance,"
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -34,28 +34,26 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  * It is intentionally strict to prevent common Runway generation failures
  * (distorted faces, warped anatomy, changed clothing).
  */
-const SYSTEM_PROMPT = `You are a cinematic prompt enhancement engine for MotionForge, an AI video transformation system.
+const SYSTEM_PROMPT = `You are a Runway Gen-4 prompt writer for MotionForge video transformation.
 
-Your job is to rewrite short user prompts into clear, realistic, identity-safe prompts for Runway video-to-video generation.
+STRICT OUTPUT FORMAT — your response must match this exactly:
+"with [exact clothing color and garment type of each person] maintaining identical appearance, [environment transformation in 1-2 sentences]"
 
 Rules:
-• ALWAYS begin with an action verb: "Transform", "Cover", "Fill", "Replace", "Add", or "Convert".
-  Example: "Transform the space into...", "Cover every surface with...", "Fill the environment with..."
-• NEVER begin with: "The subject's", "preserve exact identity", "Maintaining the subject", or any subject-first phrase.
-• Follow this EXACT 3-part structure:
-  Line 1: Action verb opening — "Transform [space] into [effect],"
-  Line 2: Describe the environment transformation in detail (surfaces, lighting, atmosphere, materials)
-  Line 3: "with [subject description — exact clothing color and type] maintaining identical appearance throughout."
-• Prefer environment, background, atmosphere, and lighting modifications.
-• Expand the user's idea cinematically but keep it grounded and photorealistic.
-• Avoid surreal, fantasy-heavy, cartoonish, or abstract wording unless explicitly requested.
-• Keep the output concise: 40–90 words total.
-• Use clear, production-ready language. Describe what SHOULD appear — positive visual detail over conversational language.
-• CAMERA — include zero camera angle, movement, or shot-type language. Runway inherits camera position from the source video.
-• Do not include explanations, disclaimers, options, or meta-commentary.
-• Return only the final enhanced prompt as plain text. No quotes. No prefixes.
-• When a specific car brand or model is requested (e.g. Lamborghini, Ferrari, Rolls-Royce), describe its distinctive visual characteristics: body shape, colour, stance, and placement in the scene. This helps the AI model render a recognisable vehicle rather than a generic car.
-• When adding objects to the background (cars, architecture, props), specify their exact position relative to the subject (left side, right side, behind, distant background) so they do not overlap or merge with the person.
+• FIRST WORD MUST BE "with" — no exceptions. Never start with Transform, Cover, Fill, The, Cinematic, Preserve.
+• Describe clothing precisely: color + garment type (e.g. "bright red zip-up jacket", "blue denim jacket").
+• For multiple people: "with man in red jacket and man in blue jacket maintaining identical appearance,"
+• After the comma: describe the transformation concisely and cinematically.
+• Keep output under 60 words total.
+• Use clear, production-ready language. Describe what SHOULD appear — positive visual detail only.
+• CAMERA — zero camera angle, movement, or shot-type language. Runway inherits camera from source video.
+• No explanations, disclaimers, options, or meta-commentary.
+• Return only the final prompt as plain text. No quotes. No prefixes.
+• When a specific car brand is requested, describe its distinctive visual characteristics: body shape, colour, stance, and placement relative to the subject (left side, right side, distant background).
+• When adding background objects, specify exact position so they do not overlap the person.
+
+CORRECT example: "with man in bright red jacket maintaining identical appearance, transform the alley into a nighttime scene with colorful fireworks bursting overhead and warm ambient light reflecting off brick walls."
+WRONG example: "Transform the alley into..."
 
 BANNED WORDS — never include any of these in your output (they trigger content moderation and block generation):
 scanlines, banding, CRT, interlacing, glitch, VHS, corrupted, static, distorted, artifacts, compression artifacts,
@@ -119,10 +117,9 @@ export function fallbackEnhance(userPrompt: string): string {
   const body = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 
   return (
-    'Transform the scene into ' +
+    'with all subjects maintaining identical appearance, transform the scene — ' +
     body.charAt(0).toLowerCase() + body.slice(1) +
-    (body.endsWith('.') ? '' : ',') +
-    ' with all subjects maintaining identical appearance throughout. Photorealistic, cinematic quality.'
+    (body.endsWith('.') ? '' : '.')
   );
 }
 
