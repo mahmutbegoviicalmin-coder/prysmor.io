@@ -746,8 +746,8 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
         '-ss', String(parseFloat((timeSec || 0).toFixed(6))),
         '-i',  sourcePath,
         '-vframes', '1',
-        '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
-        '-q:v', '3',
+        '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+        '-q:v', '2',
         '-y', outPath,
       ];
 

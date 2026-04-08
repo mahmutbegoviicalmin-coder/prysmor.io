@@ -66,7 +66,12 @@ MANDATORY RULES (non-negotiable):
 
 1. IDENTITY PRESERVATION (most critical):
    - Describe every person's exact facial features, skin tone, hair color/style/length
-   - Describe exact clothing: colors, style, fit
+   - Describe exact clothing — pay extreme attention:
+     • Exact garment type (shirt, jacket, coveralls, uniform, hoodie, etc.)
+     • Exact color with precise shade (navy blue, light grey, olive green, etc.)
+     • Any distinguishing features (logos, patches, zippers, collars, buttons)
+     • Layering (what is worn over/under what)
+     Incorrect clothing description will cause wrong outfit in output.
    - Describe body positions, poses, expressions
    - Use phrase "preserve exact identity and appearance of all subjects from source video"
 
@@ -139,8 +144,13 @@ The user wants to transform this video with the following request: "${userPrompt
 Analyze this frame carefully and write the best possible Runway Gen-4 prompt that:
 
 1. IDENTITY PRESERVATION (non-negotiable):
-   - Describe every person's exact facial features, skin tone, hair
-   - Describe exact clothing: colors, style, fit
+   - Describe every person's exact facial features, skin tone, hair color/style/length
+   - Describe exact clothing — pay extreme attention:
+     • Exact garment type (shirt, jacket, coveralls, uniform, hoodie, etc.)
+     • Exact color with precise shade (navy blue, light grey, olive green, etc.)
+     • Any distinguishing features (logos, patches, zippers, collars, buttons)
+     • Layering (what is worn over/under what)
+     Incorrect clothing description will cause wrong outfit in output.
    - Start with "preserve exact identity and appearance of all subjects from source video"
 
 2. VFX INSTRUCTION:
