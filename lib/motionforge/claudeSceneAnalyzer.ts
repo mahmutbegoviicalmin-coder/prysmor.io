@@ -33,7 +33,7 @@ export async function analyzeSceneWithClaude(
 ): Promise<ClaudeAnalyzeResult> {
   const response = await client.messages.create({
     model: 'claude-opus-4-5',
-    max_tokens: 1024,
+    max_tokens: 300,
     messages: [
       {
         role: 'user',
@@ -91,6 +91,11 @@ Line 1: "with [exact clothing color, garment type, and appearance details] maint
 Line 2: Start with action verb - "Transform [space] into [effect],"
 Line 3: Describe the environment transformation in detail.
 
+CRITICAL: Keep total prompt under 50 words.
+Environment description maximum 2 sentences.
+Subject description maximum 1 sentence.
+Brevity is essential - Runway performs better with shorter prompts.
+
 CORRECT example:
 "with man in navy blue work coveralls and dark beard maintaining identical appearance, Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air."
 
@@ -138,7 +143,7 @@ export async function enhancePromptWithClaude(
 ): Promise<ClaudeAnalyzeResult> {
   const response = await client.messages.create({
     model: 'claude-opus-4-5',
-    max_tokens: 1024,
+    max_tokens: 300,
     messages: [
       {
         role: 'user',
@@ -186,6 +191,11 @@ Output ONLY the final Runway prompt following this EXACT structure:
 Line 1: "with [exact clothing color, garment type, and appearance details] maintaining identical appearance,"
 Line 2: Start with action verb - "Transform [space] into [effect],"
 Line 3: Describe the environment transformation in detail.
+
+CRITICAL: Keep total prompt under 50 words.
+Environment description maximum 2 sentences.
+Subject description maximum 1 sentence.
+Brevity is essential - Runway performs better with shorter prompts.
 
 CORRECT example:
 "with man in navy blue work coveralls and dark beard maintaining identical appearance, Transform the industrial garage workshop into a frozen arctic environment, thick crystalline ice coating every wall surface and ceiling beam, icicles hanging from exposed pipes, snow powder blanketing the conference table and chairs, cold blue-white lighting replacing warm tones, visible breath vapor in frigid air."
