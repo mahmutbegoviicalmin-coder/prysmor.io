@@ -364,15 +364,13 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
 
   /**
    * Builds the final compiled prompt.
-   * Structure:  [ANTI_ARTIFACT_PREFIX] [identity]. [VFX instruction].
-   * For background effects the identity sentence is injected BEFORE the VFX
-   * body so Runway's highest-weight early slots contain the preservation rule.
+   * Overlay effects: [ANTI_ARTIFACT_PREFIX] [VFX instruction].
+   * Background effects: just the VFX instruction — Runway Aleph sees the video
+   *   directly so no identity/clothing descriptions are needed.
    */
   function assemble(vfxBody: string): string {
     if (effectType === 'background') {
-      return sanitizeForRunway(
-        normalizeCompiled(FACE_PRESERVE_SUFFIX + ' ' + vfxBody),
-      ).slice(0, 1000);
+      return sanitizeForRunway(vfxBody.trim()).slice(0, 1000);
     }
     return normalizeCompiled(vfxBody);
   }
@@ -400,8 +398,8 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
     const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
     const stmt    = body.endsWith('.') ? body : body + '.';
     const fallbackBody =
-      `Preserve the subject's identity, face, pose, and framing. ` +
-      `${stmt} Keep all other aspects of the shot unchanged.`;
+      `Transform the scene — ${stmt} ` +
+      `Preserve all existing characters and objects. Leave all other elements unchanged.`;
 
     const compiled = assemble(fallbackBody);
     log(TAG, 'Fallback compile used', { wordCount: compiled.split(/\s+/).length, effectType });
