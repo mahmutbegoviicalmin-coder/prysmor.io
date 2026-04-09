@@ -189,6 +189,9 @@ export async function createVideoToVideoTask(
     console.log(`[runway] Skipping ${refUris.length} reference image(s) for overlay effect — letting prompt drive VFX`);
   }
 
+  console.log('[runway] references being sent to Runway:', body.references ? JSON.stringify(body.references) : 'NONE');
+  console.log('[runway] full request body (no video data):', JSON.stringify({ ...body, videoUri: '[redacted]' }));
+
   const res = await fetch(`${RUNWAY_API_BASE}/v1/video_to_video`, {
     method:  'POST',
     headers: runwayHeaders(),

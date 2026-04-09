@@ -270,13 +270,14 @@ export async function POST(
     }
 
     // ── Vercel / pre-uploaded path — no local ffmpeg ──────────────────────
-    // Upload all reference frames sent by the panel (up to 3).
-    // Falls back to single referenceFrameBase64 for older panel versions.
     log(TAG, 'Sending pre-uploaded video to Runway (Vercel path)');
 
-    // Reference frames are intentionally skipped on the production (Vercel) path.
-    // Runway Aleph already sees the full input video — reference images are not needed
-    // and can cause 400 content-moderation rejections when they contain public figures.
+    console.log('[runway] referenceFrames received:', body.referenceFrames?.length || 0);
+    console.log('[runway] refUris uploaded: 0 (skipped on Vercel path — content moderation)');
+    console.log('[runway] prompt being sent:', prompt);
+    console.log('[runway] effectType:', effectType);
+    console.log('[runway] videoUri:', runwayUri);
+
     const task = await createVideoToVideoTask(runwayUri, prompt, [], effectType);
     log(TAG, `Runway task started: ${task.id}`);
 
