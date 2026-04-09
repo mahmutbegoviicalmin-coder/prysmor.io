@@ -174,11 +174,9 @@ export async function createVideoToVideoTask(
     model:      'gen4_aleph',
     videoUri:   inputVideoUrl,
     promptText: prompt,
-    contentModeration: {
-      // "low" = less strict about recognising public figures (artists, celebrities)
-      publicFigureThreshold: 'low',
-    },
   };
+
+  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" videoUri="${inputVideoUrl}" effectType=${effectType}`);
 
   // CRITICAL: Only attach reference images for background/environment effects.
   // For overlay effects (lighting, glow, fog, particles, god rays) reference
@@ -198,9 +196,9 @@ export async function createVideoToVideoTask(
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    console.error(`[runway] video_to_video ${res.status}:`, body);
-    throw new Error(`Runway video_to_video error ${res.status}: ${body}`);
+    const errBody = await res.text();
+    console.error(`[runway] ❌ video_to_video FAILED ${res.status} — FULL ERROR BODY:`, errBody);
+    throw new Error(`Runway video_to_video error ${res.status}: ${errBody}`);
   }
 
   return res.json() as Promise<RunwayTaskCreated>;
