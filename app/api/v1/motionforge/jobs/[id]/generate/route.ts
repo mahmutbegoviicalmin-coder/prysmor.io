@@ -10,7 +10,7 @@ import {
 }                                      from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
-import { normalizeCompiled, sanitizeForRunway, classifyPromptEffect } from '@/lib/motionforge/promptCompiler';
+import { sanitizeForRunway, classifyPromptEffect } from '@/lib/motionforge/promptCompiler';
 import { getConfig }                   from '@/lib/motionforge/config';
 import * as fs   from 'fs';
 import * as os   from 'os';
@@ -150,19 +150,11 @@ export async function POST(
     }
   }
 
-  const effectType  = classifyPromptEffect(rawPrompt);
+  const effectType = classifyPromptEffect(rawPrompt);
 
-  const FACE_PRESERVE =
-    ' All subjects maintain their exact facial features, skin tone, hair color and style,' +
-    ' clothing, and body proportions from the source video, appearing identical throughout' +
-    ' the transformation.';
-  const OVERLAY_ENFORCE =
-    ' The requested effect appears prominently and visibly throughout the output.' +
-    ' Subject position, pose, and body proportions remain identical to the source video.';
-
-  let normalized = normalizeCompiled(rawPrompt);
-  normalized += effectType === 'overlay' ? OVERLAY_ENFORCE : FACE_PRESERVE;
-  const prompt = sanitizeForRunway(normalized).slice(0, 1000);
+  // Pass the prompt through as-is — Runway Aleph sees the video directly and
+  // does not need clothing/face descriptions. Just sanitize for moderation.
+  const prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
 
   log(TAG, `Effect type: ${effectType}`);
 
