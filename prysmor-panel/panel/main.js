@@ -592,13 +592,13 @@ function apiHeaders(extra) {
 async function apiFetch(path, options) {
   var res = await fetch(API_BASE + path,
     Object.assign({ headers: apiHeaders() }, options || {}));
-  var json = await res.json().catch(function () { return { error: 'Invalid JSON' }; });
-  // Session expired — force re-login
-  if (res.status === 401) {
+  // 401 or 403 = session expired / Vercel deployment invalidated session
+  if (res.status === 401 || res.status === 403) {
     clearSession();
     logout();
     throw new Error('Session expired — please sign in again.');
   }
+  var json = await res.json().catch(function () { return { error: 'HTTP ' + res.status }; });
   if (!res.ok) throw new Error(json.error || 'HTTP ' + res.status);
   return json;
 }
@@ -645,10 +645,7 @@ async function compilePrompt() {
       textarea.value = json.prompt;
       el('mf-char-count').textContent = json.prompt.length;
 
-      var methodMsg = json.method === 'vision'
-        ? '✦ Scene analysed — prompt tailored to your clip'
-        : '✦ Prompt enhanced';
-      showToast(methodMsg, 'success');
+      flashEnhanceSuccess();
       textarea.focus();
 
     } catch (err) {
@@ -696,8 +693,7 @@ async function compilePrompt() {
     var enhanced = json2.enhancedPrompt || json2.enhanced;
     textarea.value = enhanced;
     el('mf-char-count').textContent = enhanced.length;
-    var msg2 = json2.sceneAnalysed ? '✦ Scene analysed — prompt tailored to your clip' : '✦ Prompt enhanced';
-    showToast(msg2, 'success');
+    flashEnhanceSuccess();
     textarea.focus();
 
   } catch (err) {
@@ -813,7 +809,7 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
         '-ss', String(parseFloat((timeSec || 0).toFixed(6))),
         '-i',  sourcePath,
         '-vframes', '1',
-        '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+        '-vf', 'scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720',
         '-q:v', '2',
         '-y', outPath,
       ];
@@ -1260,6 +1256,14 @@ function startPolling(jobId) {
     } catch (err) {
       pollErrors++;
       console.warn('[Prysmor] poll #' + pollErrors + ' threw:', err.message);
+      // Session expired mid-generation — stop polling and show login prompt
+      if (err.message && err.message.indexOf('sign in') !== -1) {
+        return fail('Session expired during generation. Please sign in again and retry.');
+      }
+      // Transient network error — retry up to 5 times
+      if (pollErrors >= 5) {
+        return fail('Lost connection to server after ' + pollErrors + ' retries. Please retry.');
+      }
       var lastPct = state.mf.lastKnownPct || 42;
       setStatus(getGenStatusLabel(elapsedSec), lastPct);
       state.mf.pollTimer = setTimeout(doPoll, nextInterval);
@@ -1797,12 +1801,36 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
     console.log('[Prysmor:extract] mediaIn=' + mediaInSec + 's  dur=' + durationSec + 's');
     console.log('[Prysmor:extract] ffmpeg :', ffmpegBin);
     console.log('[Prysmor:extract] out    :', outPath);
+    console.log('[Prysmor:extract] filter :', filter);
+
+    // Log source dimensions before extraction so we can see if crop is needed
+    probeVideoDimensionsFfmpeg(sourcePath).then(function (srcDims) {
+      var videoWidth  = srcDims.width;
+      var videoHeight = srcDims.height;
+      console.log('[Prysmor:extract] source dimensions:', videoWidth, 'x', videoHeight);
+      if (videoHeight > 0) {
+        var ar = (videoWidth / videoHeight).toFixed(3);
+        console.log('[Prysmor:extract] source aspect ratio:', ar, '(Runway max: 2.358)');
+        if (videoWidth / videoHeight <= 2.358) {
+          console.log('[Prysmor:extract] NOTE: source is already within 2.358:1 — crop filter is a no-op');
+        } else {
+          console.log('[Prysmor:extract] source is wider than 2.358:1 — crop will trim', videoWidth - Math.round(videoHeight * 2.358), 'px from width');
+        }
+      }
+    }).catch(function () {});
 
     var proc   = cp.spawn(ffmpegBin, args, { windowsHide: true });
     var stderr = '';
     if (proc.stderr) proc.stderr.on('data', function (d) { stderr += d.toString(); });
 
     proc.on('close', function (code) {
+      // Parse source dimensions from ffmpeg stderr (Input stream line)
+      var srcMatch = stderr.match(/Input[^,]*,.*?(\d{2,})x(\d+)[^,]*(?:,|$)/);
+      if (!srcMatch) srcMatch = stderr.match(/Stream.*?Video:[^\n]*?(\d{2,})x(\d+)/);
+      if (srcMatch) {
+        console.log('[Prysmor:extract] ffmpeg stderr source dimensions:', srcMatch[1], 'x', srcMatch[2]);
+      }
+
       var nfs = null; try { nfs = require('fs'); } catch (_) {}
       var ok  = nfs ? nfs.existsSync(outPath) : fileExistsSync(outPath);
       if (code === 0 && ok) {
@@ -1812,7 +1840,7 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
           resolve({ path: outPath, width: dims.width, height: dims.height });
         });
       } else {
-        console.error('[Prysmor:extract] ffmpeg exited', code, stderr.slice(-400));
+        console.error('[Prysmor:extract] ffmpeg exited', code, stderr.slice(-600));
         reject(new Error('ffmpeg extract failed (code ' + code + ')'));
       }
     });
@@ -2000,6 +2028,33 @@ function toggleSettings(force) {
 }
 
 let _toastTimer;
+/**
+ * Brief green checkmark flash on the Enhance button.
+ * Used instead of a toast banner for enhance success — minimal and non-intrusive.
+ */
+function flashEnhanceSuccess() {
+  var btn  = el('btn-compile-prompt');
+  var lbl  = el('compile-label');
+  var icon = btn && btn.querySelector('.ai-btn-icon');
+  if (!btn) return;
+
+  var prevIcon = icon ? icon.innerHTML : '';
+  var prevLbl  = lbl  ? lbl.textContent : 'Enhance';
+
+  if (icon) icon.innerHTML =
+    '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+  if (lbl) lbl.textContent = 'Done';
+  btn.classList.add('ai-btn--done');
+
+  setTimeout(function () {
+    if (icon) icon.innerHTML = prevIcon;
+    if (lbl)  lbl.textContent = prevLbl;
+    btn.classList.remove('ai-btn--done');
+  }, 1600);
+}
+
 function showToast(msg, type) {
   try {
     const toast = el('toast');
