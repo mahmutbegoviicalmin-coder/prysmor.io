@@ -272,13 +272,46 @@ export async function POST(
     // ── Vercel / pre-uploaded path — no local ffmpeg ──────────────────────
     log(TAG, 'Sending pre-uploaded video to Runway (Vercel path)');
 
-    console.log('[runway] referenceFrames received:', body.referenceFrames?.length || 0);
-    console.log('[runway] refUris uploaded: 0 (skipped on Vercel path — content moderation)');
+    const refUris: string[] = [];
+
+    const rawFrames: string[] = Array.isArray(body.referenceFrames) && body.referenceFrames.length > 0
+      ? body.referenceFrames
+      : (body.referenceFrameBase64 ?? '').trim()
+        ? [body.referenceFrameBase64!.trim()]
+        : [];
+
+    const framesToUpload = rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 3);
+
+    console.log('[runway] referenceFrames received:', framesToUpload.length);
+
+    if (framesToUpload.length > 0) {
+      log(TAG, `Uploading ${framesToUpload.length} reference frame(s) for identity conditioning`);
+      const uploadPromises = framesToUpload.map((frameB64, i) => {
+        const frameTmpPath = tmpPath(`ref-frame-${params.id}-${i}.jpg`);
+        return (async () => {
+          try {
+            fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
+            const uri = await uploadImageToRunway(frameTmpPath);
+            log(TAG, `Reference frame ${i + 1}/${framesToUpload.length} uploaded: ${uri}`);
+            return uri;
+          } catch (e) {
+            warn(TAG, `Reference frame ${i + 1} upload failed`, { err: (e as Error).message });
+            return null;
+          } finally {
+            try { fs.unlinkSync(frameTmpPath); } catch (_) {}
+          }
+        })();
+      });
+      const uploaded = await Promise.all(uploadPromises);
+      uploaded.forEach(uri => { if (uri) refUris.push(uri); });
+    }
+
+    console.log('[runway] refUris uploaded:', refUris.length);
     console.log('[runway] prompt being sent:', prompt);
     console.log('[runway] effectType:', effectType);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, [], effectType);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refUris, effectType);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {
