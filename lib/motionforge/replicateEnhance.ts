@@ -116,16 +116,17 @@ export async function enhanceVideo(videoUrl: string): Promise<string> {
     url = await restoreFaces(url);
     console.log('[enhance] Face restoration done');
   } catch (err) {
-    console.warn('[enhance] Face restoration failed, skipping:', (err as Error).message);
+    console.warn('[enhance] Face restoration failed, returning original URL:', (err as Error).message);
+    return videoUrl;
   }
 
-  // Step 2 — upscale
-  try {
-    url = await upscaleVideo(url);
-    console.log('[enhance] Upscale done');
-  } catch (err) {
-    console.warn('[enhance] Upscale failed, using previous URL:', (err as Error).message);
-  }
+  // Step 2 — upscale (disabled for now)
+  // try {
+  //   url = await upscaleVideo(url);
+  //   console.log('[enhance] Upscale done');
+  // } catch (err) {
+  //   console.warn('[enhance] Upscale failed, using previous URL:', (err as Error).message);
+  // }
 
   return url;
 }
