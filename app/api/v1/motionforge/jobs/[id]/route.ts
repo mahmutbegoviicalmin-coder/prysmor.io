@@ -421,7 +421,7 @@ async function runCompositingAsync(
   }
 }
 
-// ─── Async enhancement runner (Replicate) ─────────────────────────────────────
+// ─── Async enhancement runner (GFPGAN + WaveSpeed) ───────────────────────────
 
 async function runEnhancementAsync(
   userId: string,
@@ -429,8 +429,8 @@ async function runEnhancementAsync(
   rawUrl: string,
 ): Promise<void> {
   try {
-    log(TAG, `Starting Replicate enhancement pipeline for job ${jobId}`);
-    console.log('[replicate] calling enhanceVideo - build timestamp:', new Date().toISOString());
+    log(TAG, `Starting enhancement pipeline (GFPGAN → WaveSpeed) for job ${jobId}`);
+    console.log('[enhance] calling enhanceVideo - build timestamp:', new Date().toISOString());
     const finalUrl = await enhanceVideo(rawUrl);
     log(TAG, `Enhancement complete for job ${jobId}`, { finalUrl: finalUrl.slice(0, 100) });
 
@@ -441,14 +441,14 @@ async function runEnhancementAsync(
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Enhancement error';
-    warn(TAG, `Replicate enhancement failed for job ${jobId} — falling back to raw Runway output`, { msg });
+    warn(TAG, `Enhancement failed for job ${jobId} — falling back to raw Runway output`, { msg });
 
     try {
       await updateJob(userId, jobId, {
         status:    'completed',
         outputUrl: rawUrl,
         progress:  100,
-        warnings:  [msg, 'replicate-enhancement-failed-used-raw-output'],
+        warnings:  [msg, 'enhancement-failed-used-raw-output'],
       });
     } catch (updateErr) {
       logError(TAG, `Failed to update job ${jobId} after enhancement failure`, updateErr);
