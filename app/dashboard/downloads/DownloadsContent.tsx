@@ -10,6 +10,12 @@ import {
 
 const PANEL_VERSION = "2.2.0";
 
+/** Permanent download URLs — GitHub Releases (not committed to `public/`) */
+const DOWNLOAD_WIN =
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmorPanelSetup.exe";
+const DOWNLOAD_MAC =
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmorPanel-mac.zip";
+
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -144,8 +150,10 @@ export default function DownloadsContent() {
             </p>
 
             <a
-              href="/downloads/PrysmorPanelSetup.exe"
+              href={DOWNLOAD_WIN}
               download="PrysmorPanelSetup.exe"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -180,7 +188,7 @@ export default function DownloadsContent() {
       </Card>
 
       {/* ── MAC INSTALLER ── */}
-      <SectionLabel>macOS Installer (.command)</SectionLabel>
+      <SectionLabel>macOS Installer</SectionLabel>
       <Card className="p-5 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-[10px] bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0">
@@ -194,14 +202,16 @@ export default function DownloadsContent() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              Extract the ZIP and double-click{" "}
+              One-click installer — download the ZIP, extract it, then double-click{" "}
               <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">Install Prysmor Panel.command</code>
-              {" "}— everything installs automatically in Terminal. No manual steps needed.
+              {" "}to set up the CEP panel with bundled ffmpeg. No configuration needed.
             </p>
 
             <a
-              href="/downloads/PrysmorPanel-mac.zip"
+              href={DOWNLOAD_MAC}
               download="PrysmorPanel-mac.zip"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -214,19 +224,18 @@ export default function DownloadsContent() {
 
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
               {[
-                "CEP panel installed automatically to correct Premiere Pro folder",
-                "Claude AI vision for intelligent scene analysis and prompt enhancement",
-                "Auto video preprocessing — ffmpeg crops and scales wide videos to 720p",
-                "PlayerDebugMode set for CSXS.10, 11, 12, 13 — CEP caches cleared",
-                "Old conflicting panel versions removed automatically on install",
-                "No Python, no background processes, no login items",
+                "CEP panel installed to ~/Library/Application Support/Adobe/CEP/extensions",
+                "ffmpeg bundled for automatic video preprocessing",
+                "No admin rights needed",
+                "macOS 12+ supported",
+                "Premiere Pro 2022–2025",
               ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
             </div>
           </div>
         </div>
 
         <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
-          {["macOS 10.15+", "Premiere Pro 2020–2025", "CEP 10, 11, 12, 13", "No admin rights needed"].map((tag) => (
+          {["macOS 12+", "Premiere Pro 2022–2025", "CEP 11, 12, 13", "No admin rights needed"].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
               <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
               {tag}
