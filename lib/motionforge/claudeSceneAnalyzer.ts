@@ -39,6 +39,8 @@ export async function analyzeSceneWithClaude(
   frameBase64: string,
   userPrompt?: string,
 ): Promise<ClaudeAnalyzeResult> {
+  console.log('[claude-vision] analyzeScene — frames sent: 1');
+
   const response = await client.messages.create({
     model: 'claude-opus-4-5',
     max_tokens: 120,
@@ -67,6 +69,10 @@ export async function analyzeSceneWithClaude(
   const effectType = classifyPromptEffect(raw);
   const compiled   = sanitizeForRunway(raw);
 
+  console.log('[claude-vision] Full response:', JSON.stringify(response, null, 2));
+  console.log('[claude-vision] What it sees:', raw);
+  console.log('[claude-vision] Final compiled prompt:', compiled);
+
   return { compiledPrompt: compiled, method: 'claude-vision', effectType };
 }
 
@@ -78,6 +84,8 @@ export async function enhancePromptWithClaude(
   frameBase64: string,
   userPrompt: string,
 ): Promise<ClaudeAnalyzeResult> {
+  console.log('[claude-vision] enhancePrompt — frames sent: 1, user prompt:', userPrompt);
+
   const response = await client.messages.create({
     model: 'claude-opus-4-5',
     max_tokens: 120,
@@ -105,6 +113,10 @@ export async function enhancePromptWithClaude(
   const raw        = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
   const effectType = classifyPromptEffect(raw);
   const compiled   = sanitizeForRunway(raw);
+
+  console.log('[claude-vision] Full response:', JSON.stringify(response, null, 2));
+  console.log('[claude-vision] What it sees:', raw);
+  console.log('[claude-vision] Final compiled prompt:', compiled);
 
   return { compiledPrompt: compiled, method: 'claude-vision', effectType };
 }

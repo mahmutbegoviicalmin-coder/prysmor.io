@@ -156,6 +156,8 @@ async function callClaude(
     userContent = `Write the best possible MotionForge prompt for: "${userPrompt}"`;
   }
 
+  console.log('[claude-vision] callClaude — model:', model, '— frames sent:', sceneFrames.length);
+
   const response = await client.messages.create({
     model,
     max_tokens: MAX_TOKENS,
@@ -166,7 +168,13 @@ async function callClaude(
   const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
   if (!raw) throw new Error('Claude returned empty completion');
 
-  return raw.replace(/^["']|["']$/g, '').trim();
+  const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+
+  console.log('[claude-vision] Full response:', JSON.stringify(response, null, 2));
+  console.log('[claude-vision] What it sees:', raw);
+  console.log('[claude-vision] Final compiled prompt:', cleaned);
+
+  return cleaned;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
