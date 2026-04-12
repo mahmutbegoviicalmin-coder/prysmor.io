@@ -14,7 +14,7 @@ const PANEL_VERSION = "2.2.0";
 const DOWNLOAD_WIN =
   "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmorPanel-mac.zip";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/Prysmor-2.2.0.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -202,14 +202,13 @@ export default function DownloadsContent() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              One-click installer — download the ZIP, extract it, then double-click{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">Install Prysmor Panel.command</code>
-              {" "}to set up the CEP panel with bundled ffmpeg. No configuration needed.
+              One-click installer — download the <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>, open it,
+              and follow the wizard. Sets up the CEP panel with bundled ffmpeg. No configuration needed.
             </p>
 
             <a
               href={DOWNLOAD_MAC}
-              download="PrysmorPanel-mac.zip"
+              download="Prysmor-2.2.0.pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
@@ -251,11 +250,8 @@ export default function DownloadsContent() {
           <div>
             <p className="text-[12px] font-semibold text-[#D1D5DB] mb-1">macOS — first run</p>
             <p className="text-[11px] text-[#6B7280] leading-relaxed">
-              If macOS blocks the{" "}
-              <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[10px]">.command</code>{" "}
-              file: <strong className="text-[#9CA3AF]">right-click → Open</strong>, then click{" "}
-              <strong className="text-[#9CA3AF]">&quot;Open&quot;</strong> in the dialog.
-              Alternatively: <strong className="text-[#9CA3AF]">System Settings → Privacy &amp; Security → Open Anyway</strong>.
+              If Gatekeeper blocks the installer: <strong className="text-[#9CA3AF]">right-click the .pkg → Open</strong>, then confirm.
+              Or <strong className="text-[#9CA3AF]">System Settings → Privacy &amp; Security → Open Anyway</strong>.
               You only need to do this once.
             </p>
           </div>
