@@ -1,0 +1,2 @@
+prysmor-panel/panel/ffmpeg/win/ffmpeg.exe filter=lfs diff=lfs merge=lfs -text
+prysmor-panel/panel/ffmpeg/mac/ffmpeg filter=lfs diff=lfs merge=lfs -text

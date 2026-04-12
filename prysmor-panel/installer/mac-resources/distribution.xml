@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+
+  <!-- ── Identity ──────────────────────────────────────────── -->
+  <title>Prysmor</title>
+  <organization>com.prysmor</organization>
+  <domains enable_localSystem="false" enable_currentUserHome="true"/>
+  <options customize="never" require-scripts="false" rootVolumeOnly="false"/>
+
+  <!-- ── Background ────────────────────────────────────────── -->
+  <background
+    file="background.png"
+    alignment="bottomleft"
+    scaling="none"
+    mime-type="image/png"/>
+
+  <!-- ── Pages ─────────────────────────────────────────────── -->
+  <welcome    file="welcome.html"    mime-type="text/html"/>
+  <license    file="license.html"    mime-type="text/html"/>
+  <conclusion file="conclusion.html" mime-type="text/html"/>
+
+  <!-- ── Choices ───────────────────────────────────────────── -->
+  <choice id="default" title="Prysmor CEP Panel" visible="false">
+    <pkg-ref id="com.prysmor.panel"/>
+  </choice>
+
+  <choices-outline>
+    <line choice="default"/>
+  </choices-outline>
+
+  <pkg-ref id="com.prysmor.panel"
+           version="1.4.0"
+           onConclusion="none">PrysmOrComponent.pkg</pkg-ref>
+
+</installer-gui-script>

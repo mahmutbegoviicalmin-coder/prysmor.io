@@ -1,0 +1,6 @@
+# Built installer outputs — not committed to git
+*.exe
+*.pkg
+*.dmg
+*-staging/
+*-scripts/
