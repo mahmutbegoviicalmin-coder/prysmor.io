@@ -2,10 +2,6 @@
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-// Set to true to save reference frames to desktop for inspection before upload.
-var DEBUG_FRAMES      = true;
-var DEBUG_FRAMES_DIR  = 'C:\\Users\\Almin\\Desktop\\prysmor-debug-frames';
-var _debugFrameIndex  = 0;
 
 const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
@@ -88,6 +84,7 @@ function startClipAutoSelect() {
       if (key === _lastAutoSelectKey) return; // same clip — nothing to do
       _lastAutoSelectKey = key;
 
+      parsed.sourcePath = normalisePath(parsed.sourcePath);
       state.mf.selInfo = parsed;
       showClipInfo(parsed);
       updateCostPreview();
@@ -501,6 +498,7 @@ function refreshClip(silent) {
     }
 
     state.mf.selInfo = parsed;
+    parsed.sourcePath = normalisePath(parsed.sourcePath);
     showClipInfo(parsed);
     updateCostPreview();
     // Silently capture a reference frame in background so Enhance has it ready.
@@ -827,20 +825,6 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
             var data = nfs.readFileSync(outPath);
             var b64  = data.toString('base64');
 
-            // Debug: copy frame to desktop folder before deleting
-            if (DEBUG_FRAMES) {
-              try {
-                if (!nfs.existsSync(DEBUG_FRAMES_DIR)) {
-                  nfs.mkdirSync(DEBUG_FRAMES_DIR, { recursive: true });
-                }
-                var idx      = _debugFrameIndex++;
-                var debugDst = DEBUG_FRAMES_DIR + '\\frame-' + Date.now() + '-' + idx + '.jpg';
-                nfs.copyFileSync(outPath, debugDst);
-                console.log('[Prysmor:debugFrame] saved:', debugDst);
-              } catch (dbgErr) {
-                console.warn('[Prysmor:debugFrame] save failed:', dbgErr.message);
-              }
-            }
 
             try { nfs.unlinkSync(outPath); } catch (_) {}
             return resolve(b64);
@@ -959,6 +943,9 @@ async function captureClipReferenceFrame(sourcePath) {
   storedReferenceFrames = [];
   storedVideoInfo = null;
 
+  // Normalise path early — handles macOS file:// URLs and %20 encoding
+  sourcePath = normalisePath(sourcePath);
+
   var mediaIn  = (state.mf.selInfo && state.mf.selInfo.mediaInSec)  || 0;
   var duration = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
 
@@ -1045,21 +1032,10 @@ async function mfGenerate() {
     showToast('Please wait, clip is still loading…', 'error');
     return;
   }
-  // sourceTooWide: raw source file exceeds 2.358:1 but sequence may be fine.
-  // We don't block here — extractAndPrepareClip() centre-crops before the upload.
+  // Any aspect ratio is allowed — extractAndPrepareClip always crops/scales to 1920x1080.
   if (storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
     var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
-    console.log('[Prysmor:aspectRatio] confirmed dims — ratio=' + aspectRatio.toFixed(4) + ' block=' + (aspectRatio > 2.358));
-    if (aspectRatio > 2.358) {
-      showToast(
-        'Video is too wide (' + aspectRatio.toFixed(2) + ':1). ' +
-        'Please crop to 16:9 in Premiere first.',
-        'error'
-      );
-      return;
-    }
-  } else {
-    console.log('[Prysmor:aspectRatio] dims unknown (0x0) — skipping ratio block, proceeding');
+    console.log('[Prysmor:aspectRatio] ratio=' + aspectRatio.toFixed(4) + ' — will be normalised to 16:9 by ffmpeg');
   }
 
   state.mf.replaceMode = replaceMode;
@@ -1100,12 +1076,13 @@ async function mfGenerate() {
 
   var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
   var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
-  var sourcePath = state.mf.selInfo.sourcePath;
+  var sourcePath = normalisePath(state.mf.selInfo.sourcePath);
 
   console.log('[Prysmor:selInfo] mediaInSec  :', mediaInSec);
   console.log('[Prysmor:selInfo] clipDurSec  :', clipDurSec);
   console.log('[Prysmor:selInfo] startTimeSec:', state.mf.selInfo.startTimeSec);
-  console.log('[Prysmor:selInfo] sourcePath  :', sourcePath);
+  console.log('[Prysmor:selInfo] sourcePath (raw) :', state.mf.selInfo.sourcePath);
+  console.log('[Prysmor:selInfo] sourcePath (norm):', sourcePath);
   console.log('[Prysmor:selInfo] full        :', JSON.stringify(state.mf.selInfo));
 
   // ── Step 2: Get Runway pre-signed upload URL ──────────────────────────────
@@ -1119,12 +1096,9 @@ async function mfGenerate() {
 
 
     // ── Extract + prepare clip ─────────────────────────────────────────────
-    // Always: extract just the selected segment (mediaInSec → +clipDurSec)
-    // from the source file, centre-crop width to ≤2.358:1 at native resolution
-    // (no scale/pad). This fixes the bug where the full source file
-    // was being uploaded instead of only the selected clip.
-    // On failure: if source is too wide we must abort; otherwise fall back to
-    // reading the full source file so non-wide clips still work.
+    // Extracts the selected segment, crops to 16:9 from centre, and scales
+    // to 1920×1080 — any input aspect ratio is handled automatically.
+    // On failure: falls back to reading the full source file unchanged.
     setStatus('Extracting clip…', 14);
     var extractionSucceeded = false;
     var preparedTmpPath     = null;
@@ -1164,12 +1138,6 @@ async function mfGenerate() {
       if (preparedTmpPath) {
         try { require('fs').unlinkSync(preparedTmpPath); } catch (_) {}
         preparedTmpPath = null;
-      }
-      if (storedVideoInfo && storedVideoInfo.sourceTooWide) {
-        return fail(
-          'Could not prepare video automatically (ffmpeg error). ' +
-          'Please export your Premiere sequence as 1920×1080 H.264 and generate from that file.'
-        );
       }
       console.warn('[Prysmor] Falling back to full source file');
       setStatus('Reading clip…', 20);
@@ -1504,12 +1472,80 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
   }
 
-  state.mf.outputPath = outPath;
-  const esc = outPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  // ── ffmpeg post-process: remove black bars, scale to original clip dimensions ─
+  var finalPath = outPath;
+  var vidInfo   = storedVideoInfo;
+
+  if (vidInfo && vidInfo.width > 0 && vidInfo.height > 0) {
+    var w          = vidInfo.width;
+    var h          = vidInfo.height;
+    var processedPath = tmpDir + '/mf-processed-' + Date.now() + '.mp4';
+    var ffmpegBin  = getFFmpegBin();
+
+    console.log('[Prysmor:postprocess] scaling ' + outPath + ' → ' + w + 'x' + h);
+    setStatus('Processing video\u2026', 98);
+
+    var postDone = await new Promise(function (resolve) {
+      try {
+        var spawn = require('child_process').spawn;
+        var vf    = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=decrease,' +
+                    'pad=' + w + ':' + h + ':(ow-iw)/2:(oh-ih)/2,' +
+                    'crop=' + w + ':' + h;
+        var args  = [
+          '-y',
+          '-i',  outPath,
+          '-vf', vf,
+          '-c:a', 'copy',
+          processedPath,
+        ];
+        console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
+        var proc = spawn(ffmpegBin, args);
+
+        var stderr = '';
+        proc.stderr.on('data', function (d) { stderr += d.toString(); });
+
+        proc.on('close', function (code) {
+          if (code === 0) {
+            var nfs = require('fs');
+            if (nfs.existsSync(processedPath)) {
+              console.log('[Prysmor:postprocess] done — using processed file');
+              try { nfs.unlinkSync(outPath); } catch (_) {}
+              resolve(processedPath);
+            } else {
+              console.warn('[Prysmor:postprocess] output file missing after ffmpeg exit 0');
+              resolve(null);
+            }
+          } else {
+            console.warn('[Prysmor:postprocess] ffmpeg exited', code, '— stderr:', stderr.slice(-400));
+            resolve(null);
+          }
+        });
+        proc.on('error', function (err) {
+          console.warn('[Prysmor:postprocess] spawn error:', err.message);
+          resolve(null);
+        });
+      } catch (spawnErr) {
+        console.warn('[Prysmor:postprocess] exception:', spawnErr.message);
+        resolve(null);
+      }
+    });
+
+    if (postDone) {
+      finalPath = postDone;
+      console.log('[Prysmor:postprocess] using processed path:', finalPath);
+    } else {
+      console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
+    }
+  } else {
+    console.log('[Prysmor:postprocess] no dimension info — skipping black bar removal');
+  }
+
+  state.mf.outputPath = finalPath;
+  const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
 
   setStatus(replaceMode ? 'Replacing original\u2026' : 'Inserting on V2\u2026', 98);
   console.log('[Prysmor] evalScript', replaceMode ? 'replaceSelection' : 'insertClipOnV2',
-    'path:', outPath, 'startTimeSec:', startTimeSec);
+    'path:', finalPath, 'startTimeSec:', startTimeSec);
 
   await new Promise(function (resolve) {
     const fn = replaceMode
@@ -1531,7 +1567,18 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
 
   setStatus('Done!', 100);
   console.log('[Prysmor] insert done, showing result');
-  showResult(blobUrl || ('file:///' + outPath.replace(/\\/g, '/').replace(/^\//, '')));
+  showResult(blobUrl || ('file:///' + finalPath.replace(/\\/g, '/').replace(/^\//, '')));
+
+  // Clean up processed temp file (outPath already deleted above if ffmpeg ran)
+  setTimeout(function () {
+    try {
+      var nfs = require('fs');
+      if (finalPath !== outPath && nfs.existsSync(finalPath)) {
+        nfs.unlinkSync(finalPath);
+        console.log('[Prysmor:postprocess] temp file cleaned up:', finalPath);
+      }
+    } catch (_) {}
+  }, 5000);
 }
 
 
@@ -1687,11 +1734,6 @@ function showResult(videoUrl) {
   sec.classList.remove('hidden');
   var vid = el('mf-result-video');
   if (vid) { vid.src = videoUrl; vid.load(); vid.play && vid.play().catch(function () {}); }
-  var chip = el('mf-insert-chip');
-  if (chip) chip.textContent = state.mf.replaceMode ? 'Replaced original' : 'Inserted on V2';
-  // Show/hide "View Raw Runway Output" button
-  var rawBtn = el('mf-btn-raw-output');
-  if (rawBtn) rawBtn.style.display = state.mf.rawOutputUrl ? '' : 'none';
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -1711,6 +1753,8 @@ function readFileBase64(absPath) {
     if (!window.cep || !window.cep.fs) {
       return reject(new Error('cep.fs not available — run inside Premiere'));
     }
+    // Normalise path before passing to cep.fs (handles macOS file:// and %20)
+    absPath = normalisePath(absPath);
     // window.cep.encoding.Base64 may be undefined on some CEP builds — fall back to string literal
     var enc = 'Base64';
     try { if (window.cep.encoding && window.cep.encoding.Base64) enc = window.cep.encoding.Base64; } catch (_) {}
@@ -1741,6 +1785,39 @@ function fileExistsSync(p) {
   try { return window.cep.fs.stat(p).err === 0; } catch (_) { return null; }
 }
 
+// ─── Path normalisation ───────────────────────────────────────────────────────
+/**
+ * Normalises a file path returned by Premiere Pro / ExtendScript on any OS.
+ *
+ * Premiere on macOS can return paths as:
+ *   file:///Volumes/...      → /Volumes/...
+ *   file://localhost/...     → /...
+ *   /path/with%20spaces/...  → /path/with spaces/...
+ *
+ * Windows paths are left unchanged except for stripping any accidental
+ * file:// prefix.
+ */
+function normalisePath(p) {
+  if (!p) return p;
+  // 1. URL-decode percent-encoded characters (%20 etc.)
+  try { p = decodeURIComponent(p); } catch (_) {}
+  // 2. Strip file://localhost (macOS Premiere sometimes uses this)
+  p = p.replace(/^file:\/\/localhost/i, '');
+  // 3. Strip file:// or file:\ prefix (any number of slashes)
+  p = p.replace(/^file:[\/\\]+/i, function (m) {
+    // On macOS the result is /absolute/path, on Windows it's C:\...
+    // Keep one leading slash for macOS absolute paths
+    var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+    return isWin ? '' : '/';
+  });
+  // 4. Normalise path separators via Node.js path (when available)
+  try {
+    var nodePath = require('path');
+    p = nodePath.normalize(p);
+  } catch (_) {}
+  return p;
+}
+
 // ─── Video Preprocessing ──────────────────────────────────────────────────────
 // Centre-crops width to ≤2.358:1 at native resolution (no scale/pad) using ffmpeg.
 // Bundled binary: panel/ffmpeg/win/ffmpeg.exe  (Windows)
@@ -1769,7 +1846,31 @@ function getFFmpegBin() {
   console.log('[Prysmor:ffmpeg] extRoot    :', extRoot);
   console.log('[Prysmor:ffmpeg] bundledBin :', bundledBin, '→ exists:', binExists(bundledBin));
 
-  if (binExists(bundledBin)) return bundledBin;
+  if (binExists(bundledBin)) {
+    console.log('[Prysmor:ffmpeg] using bundled binary:', bundledBin);
+    return bundledBin;
+  }
+
+  // On macOS, try `which ffmpeg` to locate system ffmpeg
+  if (!isWin) {
+    try {
+      var cp = require('child_process');
+      var which = cp.execSync('which ffmpeg 2>/dev/null', { timeout: 3000 }).toString().trim();
+      if (which && nodeFs && nodeFs.existsSync(which)) {
+        console.log('[Prysmor:ffmpeg] using system ffmpeg from which:', which);
+        return which;
+      }
+      // Also check Homebrew locations
+      var brewPaths = ['/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg', '/opt/local/bin/ffmpeg'];
+      for (var bi = 0; bi < brewPaths.length; bi++) {
+        if (nodeFs && nodeFs.existsSync(brewPaths[bi])) {
+          console.log('[Prysmor:ffmpeg] using Homebrew ffmpeg:', brewPaths[bi]);
+          return brewPaths[bi];
+        }
+      }
+    } catch (_) {}
+  }
+
   console.log('[Prysmor:ffmpeg] bundled not found — falling back to system PATH "ffmpeg"');
   return 'ffmpeg';
 }
@@ -1869,7 +1970,9 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
 
     var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-clip-' + Date.now() + '.mp4';
 
-    var filter = 'crop=min(iw\\,ih*2.358):ih:(iw-min(iw\\,ih*2.358))/2:0';
+    // Crop to 16:9 from centre, then scale to 1920×1080 for Runway.
+    // Works for any input: portrait, square, ultrawide, landscape.
+    var filter = 'crop=ih*16/9:ih:(iw-ih*16/9)/2:0,scale=1920:1080';
 
     // -ss before -i = fast seek (stream copy to target point then decode).
     var args = [
@@ -2223,38 +2326,6 @@ function bindEvents() {
     state.mf.outputUrl   = null;
     state.mf.rawOutputUrl = null;
     el('mf-prompt').focus();
-  });
-
-  // Insert on V2 (manual re-insert from result)
-  el('mf-btn-insert-v2').addEventListener('click', function () {
-    if (!state.mf.outputPath && !state.mf.outputUrl) return;
-    if (state.mf.outputPath) {
-      const esc = state.mf.outputPath.replace(/"/g, '\\"');
-      cs.evalScript(
-        'insertClipOnV2("' + esc + '", ' + (state.mf.selInfo ? state.mf.selInfo.startTimeSec : 0) + ')',
-        function (r) {
-          showToast(r && r.indexOf('error') === 0 ? r.replace('error: ', '') : 'Inserted on V2!', r && r.indexOf('error') === 0 ? 'error' : 'success');
-        }
-      );
-    } else {
-      cs.openURLInDefaultBrowser(state.mf.outputUrl);
-    }
-  });
-
-  // Open in browser
-  el('mf-btn-open-output').addEventListener('click', function () {
-    var url = state.mf.outputUrl || '';
-    if (url) cs.openURLInDefaultBrowser(url);
-  });
-
-  // View raw Runway output (before Identity Lock compositing)
-  el('mf-btn-raw-output').addEventListener('click', function () {
-    var rawUrl = state.mf.rawOutputUrl || '';
-    if (rawUrl) {
-      cs.openURLInDefaultBrowser(rawUrl);
-    } else {
-      showToast('Raw output not available for this generation', 'info');
-    }
   });
 
   // Settings
