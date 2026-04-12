@@ -25,7 +25,7 @@ const SCENE_INSTRUCTION = (userRequest: string) =>
 User wants: "${userRequest}"
 
 Format your response exactly as:
-"Transform [specific element the user asked about] into [transformation], while preserving all existing characters and objects in the scene. Leave all other elements unchanged."
+"Transform [specific element the user asked about] into [transformation]. Keep all people unchanged."
 
 Rules:
 - Maximum 30 words total

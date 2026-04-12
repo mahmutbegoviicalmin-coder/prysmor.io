@@ -40,7 +40,7 @@ Runway already sees the video — do NOT describe clothing, faces, or people.
 Just describe what should change in the scene/environment.
 
 STRICT OUTPUT FORMAT — maximum 30 words:
-"Transform [specific element] into [transformation], while preserving all existing characters and objects in the scene. Leave all other elements unchanged."
+"Transform [specific element] into [transformation]. Keep all people unchanged."
 
 Rules:
 • Start with "Transform" — describe only what changes in the environment or scene
@@ -52,7 +52,7 @@ Rules:
 • Return only the final prompt as plain text. No quotes. No prefixes
 • When adding background objects (cars, props), specify position relative to frame (left, right, background)
 
-CORRECT: "Transform the industrial office into an opulent luxury villa living room with floor-to-ceiling windows, while preserving all existing characters and objects in the scene. Leave all other elements unchanged."
+CORRECT: "Transform the industrial office into an opulent luxury villa living room with floor-to-ceiling windows. Keep all people unchanged."
 WRONG: "with man in blue hoodie maintaining identical appearance, transform..."
 
 BANNED WORDS — never include any of these:
