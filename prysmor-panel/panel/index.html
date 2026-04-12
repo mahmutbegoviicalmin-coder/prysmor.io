@@ -323,6 +323,14 @@
     .ai-btn:active { transform: scale(0.97); }
     .ai-btn:disabled { opacity: .35; cursor: wait; transform: none; box-shadow: none; }
     .ai-btn-icon { flex-shrink: 0; display: flex; align-items: center; }
+    /* Success flash — brief green confirmation, no toast */
+    .ai-btn.ai-btn--done {
+      background: rgba(0,230,118,0.18);
+      border-color: rgba(0,230,118,0.7);
+      box-shadow: 0 0 18px rgba(0,230,118,0.28), inset 0 1px 0 rgba(0,230,118,0.25);
+      color: #fff;
+      pointer-events: none;
+    }
 
     /* ═══════════════════════════════════════════════════════
        GENERATE CARD

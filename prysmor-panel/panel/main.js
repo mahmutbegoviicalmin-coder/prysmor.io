@@ -2,6 +2,11 @@
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+// Set to true to save reference frames to desktop for inspection before upload.
+var DEBUG_FRAMES      = true;
+var DEBUG_FRAMES_DIR  = 'C:\\Users\\Almin\\Desktop\\prysmor-debug-frames';
+var _debugFrameIndex  = 0;
+
 const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
@@ -819,8 +824,24 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
         try {
           var nfs = require('fs');
           if (code === 0 && nfs.existsSync(outPath)) {
-            var data   = nfs.readFileSync(outPath);
-            var b64    = data.toString('base64');
+            var data = nfs.readFileSync(outPath);
+            var b64  = data.toString('base64');
+
+            // Debug: copy frame to desktop folder before deleting
+            if (DEBUG_FRAMES) {
+              try {
+                if (!nfs.existsSync(DEBUG_FRAMES_DIR)) {
+                  nfs.mkdirSync(DEBUG_FRAMES_DIR, { recursive: true });
+                }
+                var idx      = _debugFrameIndex++;
+                var debugDst = DEBUG_FRAMES_DIR + '\\frame-' + Date.now() + '-' + idx + '.jpg';
+                nfs.copyFileSync(outPath, debugDst);
+                console.log('[Prysmor:debugFrame] saved:', debugDst);
+              } catch (dbgErr) {
+                console.warn('[Prysmor:debugFrame] save failed:', dbgErr.message);
+              }
+            }
+
             try { nfs.unlinkSync(outPath); } catch (_) {}
             return resolve(b64);
           }
@@ -833,31 +854,101 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
 }
 
 /**
- * Captures 3 reference frames at different timecodes (start, middle, near-end)
- * from a video file using FFmpeg.  Gives Runway more angles of the subject.
+ * Computes a sharpness score for a base64 JPEG using Canvas pixel variance.
+ * Higher variance = more detail/edges = sharper frame.
+ * Downsamples to 25% before analysis for speed.
+ */
+function computeFrameSharpness(base64Jpeg) {
+  return new Promise(function (resolve) {
+    try {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var scale  = 0.25;
+          var canvas = document.createElement('canvas');
+          canvas.width  = Math.max(1, Math.round(img.width  * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          var sum = 0, sumSq = 0, n = 0;
+          for (var i = 0; i < pixels.length; i += 4) {
+            var gray = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+            sum   += gray;
+            sumSq += gray * gray;
+            n++;
+          }
+          var mean     = sum / n;
+          var variance = (sumSq / n) - (mean * mean);
+          resolve(variance);
+        } catch (_) { resolve(0); }
+      };
+      img.onerror = function () { resolve(0); };
+      img.src = 'data:image/jpeg;base64,' + base64Jpeg;
+    } catch (_) { resolve(0); }
+  });
+}
+
+/**
+ * Captures 10 frames evenly distributed across the middle 70% of a clip,
+ * scores each for sharpness, and returns the 5 sharpest.
  *
- * The extracted clip is centre-cropped to ≤2.358:1 at native resolution (no scale),
- * so timecodes are relative to the start of the extracted file (t=0 = clip in-point).
+ * - Skips first 15% and last 15% of clip (avoid fades/cuts)
+ * - Uses Canvas pixel variance as sharpness proxy
+ * - Captures in parallel for speed
  *
  * @param {string} sourcePath  - full path to the video file
  * @param {number} mediaInSec  - in-point offset within the file (seconds)
  * @param {number} durationSec - clip duration (seconds)
- * @returns {Promise<string[]>} array of base64 JPEG strings (may be 1-3 items)
+ * @returns {Promise<string[]>} up to 5 base64 JPEG strings, sharpest first
  */
 async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
-  var t1 = mediaInSec;
-  var t2 = mediaInSec + (durationSec * 0.5);
-  var t3 = mediaInSec + (durationSec * 0.85);
+  var SAMPLE_COUNT  = 10;
+  var KEEP_COUNT    = 5;
+  var SKIP_START    = 0.15;
+  var SKIP_END      = 0.15;
 
-  var results = await Promise.all([
-    captureFrameViaFFmpeg(sourcePath, t1).catch(function () { return null; }),
-    captureFrameViaFFmpeg(sourcePath, t2).catch(function () { return null; }),
-    captureFrameViaFFmpeg(sourcePath, t3).catch(function () { return null; }),
-  ]);
+  // Build evenly spaced timestamps within [15%, 85%] of clip
+  var usable    = durationSec * (1 - SKIP_START - SKIP_END);
+  var startOff  = durationSec * SKIP_START;
+  var timestamps = [];
+  for (var i = 0; i < SAMPLE_COUNT; i++) {
+    var frac = SAMPLE_COUNT > 1 ? i / (SAMPLE_COUNT - 1) : 0.5;
+    timestamps.push(mediaInSec + startOff + frac * usable);
+  }
 
-  var frames = results.filter(function (f) { return f !== null; });
-  console.log('[Prysmor:multiframe] captured ' + frames.length + '/3 reference frames');
-  return frames;
+  console.log('[Prysmor:multiframe] capturing ' + SAMPLE_COUNT + ' candidate frames across middle 70% of clip');
+
+  // Capture all frames in parallel
+  var captured = await Promise.all(
+    timestamps.map(function (t, idx) {
+      return captureFrameViaFFmpeg(sourcePath, t)
+        .catch(function () { return null; })
+        .then(function (b64) { return b64 ? { b64: b64, idx: idx, t: t } : null; });
+    })
+  );
+
+  var valid = captured.filter(function (f) { return f !== null; });
+  console.log('[Prysmor:multiframe] ' + valid.length + '/' + SAMPLE_COUNT + ' frames captured, scoring sharpness…');
+
+  // Score sharpness for each frame
+  var scored = await Promise.all(
+    valid.map(function (f) {
+      return computeFrameSharpness(f.b64).then(function (score) {
+        console.log('[Prysmor:multiframe] frame idx=' + f.idx + ' t=' + f.t.toFixed(2) + 's sharpness=' + score.toFixed(1));
+        return { b64: f.b64, score: score };
+      });
+    })
+  );
+
+  // Sort descending by sharpness, keep top N
+  scored.sort(function (a, b) { return b.score - a.score; });
+  var top = scored.slice(0, KEEP_COUNT);
+
+  console.log('[Prysmor:multiframe] top ' + top.length + ' sharpest frames selected (scores: ' +
+    top.map(function (f) { return f.score.toFixed(0); }).join(', ') + ')');
+
+  return top.map(function (f) { return f.b64; });
 }
 
 // Captures a reference frame + sequence dimensions when a clip is loaded.
@@ -1292,12 +1383,6 @@ function startPolling(jobId) {
       return;
     }
 
-    if (job.status === 'upscaling') {
-      setStatus('Enhancing video quality\u2026', job.progress || 85);
-      state.mf.pollTimer = setTimeout(doPoll, nextInterval);
-      return;
-    }
-
     if (job.status === 'failed') {
       return fail(job.error || 'Generation failed.');
     }
@@ -1554,12 +1639,11 @@ function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
     }
   }
 
-  // Stage-based dot color: uploading→amber, generating→green, upscaling→blue
+  // Stage-based dot color: uploading→amber, generating/completing→green
   var dot = document.querySelector('.gp-dot');
   if (dot && pct != null) {
-    if (_displayPct < 40)       dot.style.background = '#FF9F0A';  // amber: uploading
-    else if (_displayPct < 82)  dot.style.background = 'var(--accent)';  // green: generating
-    else                        dot.style.background = '#0A84FF';  // blue: upscaling/finishing
+    if (_displayPct < 40)  dot.style.background = '#FF9F0A';       // amber: uploading
+    else                   dot.style.background = 'var(--accent)'; // green: generating/completing
   }
 
   // Compat shims: keep legacy hidden elements in sync
