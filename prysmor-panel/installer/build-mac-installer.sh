@@ -21,7 +21,7 @@ VERSION="1.4.0"
 BUNDLE_ID="com.prysmor.panel"
 INSTALL_LOCATION="$HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
 STAGING="$REPO_ROOT/dist/mac-staging"
-COMPONENT_PKG="$REPO_ROOT/dist/PrysmOrComponent.pkg"
+COMPONENT_PKG="$REPO_ROOT/dist/PrysmorPanel.pkg"
 FINAL_PKG="$REPO_ROOT/dist/Prysmor-${VERSION}.pkg"
 
 echo "╔══════════════════════════════════════════════════════╗"

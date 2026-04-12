@@ -7,12 +7,7 @@
   <domains enable_localSystem="false" enable_currentUserHome="true"/>
   <options customize="never" require-scripts="false" rootVolumeOnly="false"/>
 
-  <!-- ── Background ────────────────────────────────────────── -->
-  <background
-    file="background.png"
-    alignment="bottomleft"
-    scaling="none"
-    mime-type="image/png"/>
+  <!-- Background omitted — add background.png to mac-resources/ to enable -->
 
   <!-- ── Pages ─────────────────────────────────────────────── -->
   <welcome    file="welcome.html"    mime-type="text/html"/>
@@ -29,7 +24,7 @@
   </choices-outline>
 
   <pkg-ref id="com.prysmor.panel"
-           version="1.4.0"
-           onConclusion="none">PrysmOrComponent.pkg</pkg-ref>
+           version="2.2.0"
+           onConclusion="none">PrysmorPanel.pkg</pkg-ref>
 
 </installer-gui-script>
