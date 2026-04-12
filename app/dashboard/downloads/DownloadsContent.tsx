@@ -12,7 +12,7 @@ const PANEL_VERSION = "2.2.0";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmorPanelSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
   "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.2.0/PrysmorPanel-mac.zip";
 
@@ -151,7 +151,7 @@ export default function DownloadsContent() {
 
             <a
               href={DOWNLOAD_WIN}
-              download="PrysmorPanelSetup.exe"
+              download="PrysmrSetup.exe"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
