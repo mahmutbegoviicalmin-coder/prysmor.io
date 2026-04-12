@@ -16,6 +16,7 @@ export default authMiddleware({
     // Panel API — own auth, must not require Clerk session
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
+    "/api/panel/version",
     "/api/v1/motionforge(.*)",
   ],
   // ignoredRoutes bypass ALL Clerk processing (incl. bot detection).
@@ -24,6 +25,7 @@ export default authMiddleware({
   ignoredRoutes: [
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
+    "/api/panel/version",
     "/api/v1/motionforge(.*)",
   ],
 });

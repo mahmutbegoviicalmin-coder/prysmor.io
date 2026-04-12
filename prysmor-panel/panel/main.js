@@ -160,12 +160,14 @@ window.addEventListener('DOMContentLoaded', function () {
   initCS();
   try {
     const raw = cs.getSystemPath(SystemPath.EXTENSION) || '';
-    state._extRoot = raw
-      .replace(/^file:[\/\\]+/, '')   // strip file:/// or file:\ prefix
-      .replace(/\\/g, '/')            // normalise to forward slashes
-      .replace(/\/$/, '');            // strip trailing slash
+    // Use normalisePath so macOS file:/// paths get a leading slash
+    state._extRoot = normalisePath(raw)
+      .replace(/\\/g, '/')   // normalise to forward slashes
+      .replace(/\/$/, '');   // strip trailing slash
   } catch (_) {}
   bindEvents();
+  // Check for OTA panel update in background — does not block login flow
+  checkForUpdates();
   // Try to restore saved session — validate against server before showing main view
   if (restoreSession()) {
     validateSessionThenEnter();
@@ -1783,6 +1785,158 @@ function uint8ToBase64(u8) {
 function fileExistsSync(p) {
   if (!p || !window.cep || !window.cep.fs) return null;
   try { return window.cep.fs.stat(p).err === 0; } catch (_) { return null; }
+}
+
+// ─── Auto-Update ──────────────────────────────────────────────────────────────
+
+var VERSION_API = 'https://prysmor-io.vercel.app/api/panel/version';
+
+/**
+ * Returns the extension root directory (absolute path, no trailing slash).
+ * Handles the macOS case where _extRoot may be missing the leading `/`.
+ */
+function getUpdateRoot() {
+  var root = state._extRoot || '';
+  var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+  if (!isWin && root && root[0] !== '/') root = '/' + root;
+  return root;
+}
+
+/**
+ * Reads version.txt from the panel folder.
+ * Falls back to '1.1.0' for panels installed before the auto-update feature.
+ */
+function readLocalVersion() {
+  try {
+    var nodeFs   = require('fs');
+    var nodePath = require('path');
+    var f = nodePath.join(getUpdateRoot(), 'panel', 'version.txt');
+    if (nodeFs.existsSync(f)) return nodeFs.readFileSync(f, 'utf8').trim();
+  } catch (_) {}
+  return '1.1.0';
+}
+
+/**
+ * Compares two semver strings. Returns true if `remote` is strictly newer.
+ */
+function isNewerVersion(remote, local) {
+  var r = (remote || '0.0.0').split('.').map(Number);
+  var l = (local  || '0.0.0').split('.').map(Number);
+  for (var i = 0; i < 3; i++) {
+    var rv = r[i] || 0, lv = l[i] || 0;
+    if (rv > lv) return true;
+    if (rv < lv) return false;
+  }
+  return false;
+}
+
+/**
+ * Downloads new main.js (and optionally styles.css) and writes them to disk.
+ * Shows a restart-Premiere banner when done.
+ */
+function applyUpdate(data) {
+  console.log('[Prysmor:update] Downloading update', data.version, '…');
+  var root     = getUpdateRoot();
+  var nodeFs   = require('fs');
+  var nodePath = require('path');
+
+  var jobs = [
+    { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')   },
+    { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
+  ].filter(function (j) { return !!j.url; });
+
+  var pending = jobs.length;
+  if (pending === 0) return;
+
+  jobs.forEach(function (job) {
+    fetch(job.url)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function (code) {
+        nodeFs.writeFileSync(job.dest, code, 'utf8');
+        console.log('[Prysmor:update] Written:', job.dest);
+        pending--;
+        if (pending === 0) {
+          // All files written — update version.txt and notify
+          try {
+            var vf = nodePath.join(root, 'panel', 'version.txt');
+            nodeFs.writeFileSync(vf, data.version, 'utf8');
+          } catch (_) {}
+          showUpdateBanner(data.version);
+        }
+      })
+      .catch(function (e) {
+        console.warn('[Prysmor:update] Download failed for', job.url, ':', e.message);
+      });
+  });
+}
+
+/**
+ * Displays a non-intrusive banner at the top of the panel asking the user
+ * to restart Premiere Pro to apply the update.
+ */
+function showUpdateBanner(version) {
+  try {
+    var existing = document.getElementById('prysmor-update-banner');
+    if (existing) existing.remove();
+
+    var banner = document.createElement('div');
+    banner.id = 'prysmor-update-banner';
+    banner.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
+      'background:#1a2e1a', 'border-bottom:1px solid rgba(0,230,118,0.3)',
+      'padding:10px 16px', 'display:flex', 'align-items:center',
+      'justify-content:space-between', 'gap:12px',
+    ].join(';');
+
+    var msg = document.createElement('span');
+    msg.style.cssText = 'font-size:12px;color:#00E676;font-weight:500;letter-spacing:-0.01em;';
+    msg.textContent = 'Panel updated to v' + version + ' — restart Premiere to apply.';
+
+    var close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = [
+      'background:none', 'border:none', 'color:rgba(245,245,247,0.5)',
+      'cursor:pointer', 'font-size:12px', 'padding:0', 'line-height:1',
+    ].join(';');
+    close.onclick = function () { banner.remove(); };
+
+    banner.appendChild(msg);
+    banner.appendChild(close);
+    document.body.appendChild(banner);
+  } catch (e) {
+    console.log('[Prysmor:update] Updated to', version, '— please restart Premiere.');
+  }
+}
+
+/**
+ * Checks for a newer panel version and silently downloads + applies it.
+ * Called once on DOMContentLoaded — never blocks the login/main flow.
+ */
+function checkForUpdates() {
+  try { require('fs'); } catch (_) {
+    // Node.js not available (mock env) — skip
+    return;
+  }
+  var localVersion = readLocalVersion();
+  console.log('[Prysmor:update] Local version:', localVersion);
+
+  fetch(VERSION_API)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.version) return;
+      console.log('[Prysmor:update] Remote version:', data.version);
+      if (isNewerVersion(data.version, localVersion)) {
+        applyUpdate(data);
+      } else {
+        console.log('[Prysmor:update] Already up to date.');
+      }
+    })
+    .catch(function (e) {
+      console.log('[Prysmor:update] Version check failed (offline?):', e.message);
+    });
 }
 
 // ─── Path normalisation ───────────────────────────────────────────────────────
