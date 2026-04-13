@@ -36,7 +36,10 @@ RES_DIR="$SCRIPT_DIR/mac-resources"
 
 VERSION="2.2.0"
 BUNDLE_ID="com.prysmor.panel"
-INSTALL_LOCATION="$HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+# Neutral staging location — postinstall relocates to the real user's $HOME.
+# Using $HOME here would bake the build-machine username into the package, which
+# would install to the wrong directory on every other Mac.
+INSTALL_LOCATION="/private/tmp/com.prysmor.panel-stage"
 
 WORKDIR="$REPO_ROOT/dist/mac-pkg-work"
 ROOT="$WORKDIR/com.prysmor.panel"
@@ -62,6 +65,8 @@ mkdir -p "$ROOT"
 cp -R "$PANEL_SRC/CSXS" "$ROOT/"
 mkdir -p "$ROOT/panel"
 cp "$PANEL_SRC/panel/index.html" "$PANEL_SRC/panel/main.js" "$PANEL_SRC/panel/styles.css" "$PANEL_SRC/panel/host.jsx" "$ROOT/panel/"
+# version.txt enables the auto-update check to know the installed version
+[[ -f "$PANEL_SRC/panel/version.txt" ]] && cp "$PANEL_SRC/panel/version.txt" "$ROOT/panel/"
 cp -R "$PANEL_SRC/panel/assets" "$ROOT/panel/"
 cp -R "$PANEL_SRC/panel/lib"    "$ROOT/panel/"
 mkdir -p "$ROOT/panel/ffmpeg/mac"
@@ -74,9 +79,42 @@ SCRIPTS_DIR="$WORKDIR/scripts"
 mkdir -p "$SCRIPTS_DIR"
 cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
 #!/usr/bin/env bash
+# ── Resolve the real logged-in user (not root) ──────────────────────────────
+# $HOME and $USER are both /var/root when a .pkg runs as root during install.
+# stat /dev/console returns the username of whoever is at the console.
+LOGGED_IN_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+
+if [[ -z "$LOGGED_IN_USER" || "$LOGGED_IN_USER" == "root" ]]; then
+  # Fallback: try logname or the first non-root user in /Users
+  LOGGED_IN_USER=$(logname 2>/dev/null || ls /Users | grep -v Shared | head -1)
+fi
+
+if [[ -z "$LOGGED_IN_USER" ]]; then
+  echo "postinstall: could not determine logged-in user — aborting" >&2
+  exit 1
+fi
+
+USER_HOME=$(eval echo ~"$LOGGED_IN_USER")
+DEST="$USER_HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+STAGE="/private/tmp/com.prysmor.panel-stage"
+
+echo "postinstall: installing for user '$LOGGED_IN_USER' → $DEST"
+
+# ── Move staged files to the real user's CEP extensions folder ──────────────
+mkdir -p "$DEST"
+if [[ -d "$STAGE" ]]; then
+  cp -R "$STAGE/." "$DEST/"
+  rm -rf "$STAGE"
+fi
+
+# Ensure the user owns the installed files
+chown -R "$LOGGED_IN_USER" "$DEST"
+
+# ── Write Adobe CSXS PlayerDebugMode for the real user ──────────────────────
 for v in 9 10 11 12 13; do
-  defaults write "com.adobe.CSXS.${v}" PlayerDebugMode 1 2>/dev/null || true
+  sudo -u "$LOGGED_IN_USER" defaults write "com.adobe.CSXS.${v}" PlayerDebugMode 1 2>/dev/null || true
 done
+
 exit 0
 POSTINSTALL
 chmod +x "$SCRIPTS_DIR/postinstall"
