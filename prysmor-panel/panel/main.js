@@ -810,11 +810,15 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
 
       var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-frame-' + Date.now() + '.jpg';
 
+      // Scale to 1920x1080 (fit inside, no crop) — consistent 1080p for Runway reference images.
+      // force_original_aspect_ratio=decrease ensures content is never cropped;
+      // pad fills any gap (only visible for non-16:9 clips) so output is always exactly 1920x1080.
       var args = [
         '-ss', String(parseFloat((timeSec || 0).toFixed(6))),
         '-i',  sourcePath,
         '-vframes', '1',
-        '-q:v', '2',   // maximum quality — no downscale, native resolution
+        '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+        '-q:v', '2',
         '-y', outPath,
       ];
 
@@ -1525,9 +1529,10 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        // scale to FILL (increase) then centre-crop — no black bars ever
-        var vf    = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=increase,' +
-                    'crop=' + w + ':' + h;
+        // Direct scale to target dimensions — Runway output is always 16:9 (same as
+        // our 1920x1080 input), so direct scale never crops or pads. A sub-pixel
+        // ratio difference causes imperceptible stretch, far preferable to cropping.
+        var vf    = 'scale=' + w + ':' + h;
         var args  = [
           '-y',
           '-i',  outPath,
