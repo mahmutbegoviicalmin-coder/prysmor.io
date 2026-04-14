@@ -37,9 +37,9 @@ RES_DIR="$SCRIPT_DIR/mac-resources"
 VERSION="2.2.0"
 BUNDLE_ID="com.prysmor.panel"
 # Neutral staging location — postinstall relocates to the real user's $HOME.
-# Using $HOME here would bake the build-machine username into the package, which
-# would install to the wrong directory on every other Mac.
-INSTALL_LOCATION="/private/tmp/com.prysmor.panel-stage"
+# /private/var/tmp persists across the install session (unlike /private/tmp
+# which can be cleaned mid-session on some macOS versions).
+INSTALL_LOCATION="/private/var/tmp/com.prysmor.panel-stage"
 
 WORKDIR="$REPO_ROOT/dist/mac-pkg-work"
 ROOT="$WORKDIR/com.prysmor.panel"
@@ -79,45 +79,97 @@ SCRIPTS_DIR="$WORKDIR/scripts"
 mkdir -p "$SCRIPTS_DIR"
 cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
 #!/usr/bin/env bash
-# ── Resolve the real logged-in user (not root) ──────────────────────────────
-# $HOME and $USER are both /var/root when a .pkg runs as root during install.
-# stat /dev/console returns the username of whoever is at the console.
-LOGGED_IN_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+# All output goes to system log (visible in Console.app → search "prysmor")
+log() { echo "[prysmor-postinstall] $*"; logger -t "prysmor-postinstall" "$*" 2>/dev/null || true; }
 
-if [[ -z "$LOGGED_IN_USER" || "$LOGGED_IN_USER" == "root" ]]; then
-  # Fallback: try logname or the first non-root user in /Users
-  LOGGED_IN_USER=$(logname 2>/dev/null || ls /Users | grep -v Shared | head -1)
-fi
+log "=== Prysmor CEP Panel postinstall START ==="
 
-if [[ -z "$LOGGED_IN_USER" ]]; then
-  echo "postinstall: could not determine logged-in user — aborting" >&2
+SOURCE="/private/var/tmp/com.prysmor.panel-stage"
+
+# ── Verify the staged payload is present ────────────────────────────────────
+log "Checking source: $SOURCE"
+if [ ! -d "$SOURCE" ]; then
+  log "ERROR: Stage folder not found: $SOURCE"
+  log "Contents of /private/var/tmp:"
+  ls -la /private/var/tmp/ 2>&1 | while IFS= read -r line; do log "  $line"; done
   exit 1
 fi
 
-USER_HOME=$(eval echo ~"$LOGGED_IN_USER")
-DEST="$USER_HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
-STAGE="/private/tmp/com.prysmor.panel-stage"
+log "Source exists. Contents:"
+ls -laR "$SOURCE" 2>&1 | while IFS= read -r line; do log "  $line"; done
 
-echo "postinstall: installing for user '$LOGGED_IN_USER' → $DEST"
+# ── Resolve the real logged-in user (not root) ──────────────────────────────
+# $HOME and $USER are /var/root when the .pkg runs as root during install.
+LOGGED_IN_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+log "stat /dev/console → '$LOGGED_IN_USER'"
 
-# ── Move staged files to the real user's CEP extensions folder ──────────────
-mkdir -p "$DEST"
-if [[ -d "$STAGE" ]]; then
-  cp -R "$STAGE/." "$DEST/"
-  rm -rf "$STAGE"
+if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
+  LOGGED_IN_USER=$(logname 2>/dev/null || echo "")
+  log "logname fallback → '$LOGGED_IN_USER'"
 fi
 
-# Ensure the user owns the installed files
+if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
+  # Last resort: first non-Shared directory under /Users
+  LOGGED_IN_USER=$(ls /Users 2>/dev/null | grep -v Shared | grep -v Guest | head -1 || echo "")
+  log "/Users scan fallback → '$LOGGED_IN_USER'"
+fi
+
+if [ -z "$LOGGED_IN_USER" ]; then
+  log "ERROR: Could not determine logged-in user. Aborting."
+  exit 1
+fi
+
+USER_HOME="/Users/$LOGGED_IN_USER"
+DEST="$USER_HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+
+log "Installing for user: '$LOGGED_IN_USER'"
+log "User home:           '$USER_HOME'"
+log "Destination:         '$DEST'"
+
+# ── Create destination and copy files ───────────────────────────────────────
+mkdir -p "$DEST"
+if [ $? -ne 0 ]; then
+  log "ERROR: Could not create destination directory: $DEST"
+  exit 1
+fi
+
+log "Copying from $SOURCE to $DEST ..."
+cp -R "$SOURCE/." "$DEST/"
+if [ $? -ne 0 ]; then
+  log "ERROR: cp failed"
+  exit 1
+fi
+log "Copy complete. Destination contents:"
+ls -la "$DEST" 2>&1 | while IFS= read -r line; do log "  $line"; done
+
+# Fix ownership so the user (not root) owns all files
 chown -R "$LOGGED_IN_USER" "$DEST"
+log "Ownership set to $LOGGED_IN_USER"
+
+# Clean up staging area
+rm -rf "$SOURCE"
+log "Staging area removed."
 
 # ── Write Adobe CSXS PlayerDebugMode for the real user ──────────────────────
+log "Writing CSXS PlayerDebugMode for user $LOGGED_IN_USER ..."
 for v in 9 10 11 12 13; do
   sudo -u "$LOGGED_IN_USER" defaults write "com.adobe.CSXS.${v}" PlayerDebugMode 1 2>/dev/null || true
 done
+log "PlayerDebugMode written."
 
+log "=== Prysmor CEP Panel postinstall DONE ==="
 exit 0
 POSTINSTALL
 chmod +x "$SCRIPTS_DIR/postinstall"
+
+echo "▶  Verifying staged root before pkgbuild"
+echo "   Root dir : $ROOT"
+echo "   Contents :"
+ls -laR "$ROOT"
+echo "   INSTALL_LOCATION : $INSTALL_LOCATION"
+echo "   Scripts dir      :"
+ls -la "$SCRIPTS_DIR"
+echo ""
 
 echo "▶  pkgbuild → $COMPONENT_PKG"
 cd "$WORKDIR"
