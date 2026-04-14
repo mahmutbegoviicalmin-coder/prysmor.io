@@ -76,63 +76,107 @@ rm -f "$ROOT/.debug" 2>/dev/null || true
 
 SCRIPTS_DIR="$WORKDIR/scripts"
 mkdir -p "$SCRIPTS_DIR"
+
+# preinstall — creates the parent CEP directory so pkgbuild can install there
+cat > "$SCRIPTS_DIR/preinstall" << 'PREINSTALL'
+#!/usr/bin/env bash
+log() { echo "[prysmor-preinstall] $*"; logger -t "prysmor-preinstall" "$*" 2>/dev/null || true; }
+log "Creating parent CEP extensions directory if absent..."
+mkdir -p "/Library/Application Support/Adobe/CEP/extensions"
+log "Done: $(ls -la '/Library/Application Support/Adobe/CEP/extensions' 2>&1 | head -3)"
+exit 0
+PREINSTALL
+chmod +x "$SCRIPTS_DIR/preinstall"
+
 cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
 #!/usr/bin/env bash
-# All output is captured in system log — open Console.app and search "prysmor"
+# All output goes to Console.app — search "prysmor-postinstall"
 log() { echo "[prysmor-postinstall] $*"; logger -t "prysmor-postinstall" "$*" 2>/dev/null || true; }
 
 log "=== Prysmor CEP Panel postinstall START ==="
 
 SYS_INSTALL="/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
 
-# ── Resolve the real logged-in user (not root) ──────────────────────────────
+# ── Verify system install path exists (pkgbuild put files here) ─────────────
+log "Checking system install path: $SYS_INSTALL"
+if [ ! -d "$SYS_INSTALL" ]; then
+  log "ERROR: System install path not found: $SYS_INSTALL"
+  log "Contents of /Library/Application Support/:"
+  ls -la "/Library/Application Support/" 2>&1 | while IFS= read -r line; do log "  $line"; done
+  log "Contents of /Library/Application Support/Adobe/ (if exists):"
+  ls -la "/Library/Application Support/Adobe/" 2>&1 | while IFS= read -r line; do log "  $line"; done
+  log "Contents of /Library/Application Support/Adobe/CEP/ (if exists):"
+  ls -la "/Library/Application Support/Adobe/CEP/" 2>&1 | while IFS= read -r line; do log "  $line"; done
+  log "Contents of /Library/Application Support/Adobe/CEP/extensions/ (if exists):"
+  ls -la "/Library/Application Support/Adobe/CEP/extensions/" 2>&1 | while IFS= read -r line; do log "  $line"; done
+  exit 1
+fi
+log "OK: System install path exists."
+log "Contents:"
+ls -la "$SYS_INSTALL" 2>&1 | while IFS= read -r line; do log "  $line"; done
+
+# ── Resolve the real logged-in user ─────────────────────────────────────────
+log "Detecting logged-in user..."
 LOGGED_IN_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
-log "stat /dev/console → '$LOGGED_IN_USER'"
+log "  stat /dev/console → '$LOGGED_IN_USER'"
 
 if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
   LOGGED_IN_USER=$(logname 2>/dev/null || echo "")
-  log "logname fallback → '$LOGGED_IN_USER'"
+  log "  logname fallback → '$LOGGED_IN_USER'"
 fi
 
 if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
   LOGGED_IN_USER=$(ls /Users 2>/dev/null | grep -v Shared | grep -v Guest | head -1 || echo "")
-  log "/Users scan fallback → '$LOGGED_IN_USER'"
+  log "  /Users scan fallback → '$LOGGED_IN_USER'"
 fi
 
 if [ -z "$LOGGED_IN_USER" ]; then
-  log "ERROR: Could not determine logged-in user. Aborting."
+  log "ERROR: Could not determine logged-in user."
   exit 1
 fi
+log "OK: Logged-in user = '$LOGGED_IN_USER'"
 
 USER_DEST="/Users/$LOGGED_IN_USER/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
-log "Installing for user : '$LOGGED_IN_USER'"
-log "System install path : '$SYS_INSTALL'"
-log "User dest path      : '$USER_DEST'"
+log "User destination: $USER_DEST"
 
-# ── Copy from system CEP location → user CEP location ───────────────────────
+# ── Create user CEP extensions directory ────────────────────────────────────
+log "Creating user dest directory..."
 mkdir -p "$USER_DEST"
-cp -R "$SYS_INSTALL/." "$USER_DEST/"
 if [ $? -ne 0 ]; then
-  log "ERROR: cp from system to user location failed"
+  log "ERROR: mkdir -p '$USER_DEST' failed"
   exit 1
 fi
+log "OK: Directory created."
 
-chown -R "$LOGGED_IN_USER" "$USER_DEST"
-log "Ownership set to '$LOGGED_IN_USER'"
+# ── Copy files from system install → user directory ─────────────────────────
+log "Copying files: '$SYS_INSTALL/.' → '$USER_DEST/'"
+cp -R "$SYS_INSTALL/." "$USER_DEST/"
+if [ $? -ne 0 ]; then
+  log "ERROR: cp failed"
+  exit 1
+fi
+log "OK: Copy complete."
 
-log "Installed files:"
+log "Destination contents:"
 ls -la "$USER_DEST" 2>&1 | while IFS= read -r line; do log "  $line"; done
 
-# ── Clean up system-level install (not needed — user path is sufficient) ─────
-rm -rf "$SYS_INSTALL"
-log "System install location cleaned up."
+# ── Fix ownership ────────────────────────────────────────────────────────────
+log "Setting ownership to '$LOGGED_IN_USER'..."
+chown -R "$LOGGED_IN_USER" "$USER_DEST"
+log "OK: Ownership set."
 
-# ── Write Adobe CSXS PlayerDebugMode for the real user ──────────────────────
-log "Writing CSXS PlayerDebugMode ..."
+# ── Remove system-level copy (user copy is sufficient) ───────────────────────
+log "Cleaning up system install path..."
+rm -rf "$SYS_INSTALL"
+log "OK: System path cleaned."
+
+# ── Write PlayerDebugMode for the real user ──────────────────────────────────
+log "Writing CSXS PlayerDebugMode for '$LOGGED_IN_USER'..."
 for v in 10 11 12 13; do
   sudo -u "$LOGGED_IN_USER" defaults write "com.adobe.CSXS.${v}" PlayerDebugMode 1 2>/dev/null || true
+  log "  CSXS.$v PlayerDebugMode = 1"
 done
-log "PlayerDebugMode written."
+log "OK: PlayerDebugMode written."
 
 log "=== Prysmor CEP Panel postinstall DONE ==="
 exit 0
