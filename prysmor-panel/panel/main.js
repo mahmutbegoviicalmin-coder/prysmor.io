@@ -1860,17 +1860,54 @@ function isNewerVersion(remote, local) {
 }
 
 /**
- * Downloads new main.js (and optionally styles.css) and writes them to disk.
- * Shows a restart-Premiere banner when done.
+ * Downloads a URL using Node.js https module — bypasses browser CSP/CORS
+ * and correctly follows HTTP redirects (GitHub raw always redirects).
+ * Returns a Promise<string> with the response body as UTF-8 text.
+ */
+function nodeHttpGet(url, _redirects) {
+  _redirects = _redirects || 0;
+  return new Promise(function (resolve, reject) {
+    if (_redirects > 10) return reject(new Error('Too many redirects: ' + url));
+    try {
+      var https = require('https');
+      var http  = require('http');
+      var mod   = url.startsWith('https://') ? https : http;
+      var req   = mod.get(url, { headers: { 'User-Agent': 'Prysmor-Panel/2.4.1' } }, function (res) {
+        // Follow redirects (301/302/307/308)
+        if (res.statusCode >= 301 && res.statusCode <= 308 && res.headers.location) {
+          console.log('[Prysmor:update] redirect', res.statusCode, '→', res.headers.location);
+          res.resume(); // drain to free socket
+          return nodeHttpGet(res.headers.location, _redirects + 1).then(resolve).catch(reject);
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          res.resume();
+          return reject(new Error('HTTP ' + res.statusCode + ' for ' + url));
+        }
+        var chunks = [];
+        res.on('data', function (c) { chunks.push(c); });
+        res.on('end',  function ()  { resolve(Buffer.concat(chunks).toString('utf8')); });
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.end();
+    } catch (e) { reject(e); }
+  });
+}
+
+/**
+ * Downloads new main.js + styles.css via Node.js https (not browser fetch)
+ * and writes them to the panel folder, then shows a restart banner.
  */
 function applyUpdate(data) {
-  console.log('[Prysmor:update] Downloading update', data.version, '…');
+  console.log('[Prysmor:update] Applying update', data.version, '…');
   var root     = getUpdateRoot();
   var nodeFs   = require('fs');
   var nodePath = require('path');
 
+  console.log('[Prysmor:update] Panel root:', root);
+
   var jobs = [
-    { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')   },
+    { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')    },
     { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
   ].filter(function (j) { return !!j.url; });
 
@@ -1878,20 +1915,17 @@ function applyUpdate(data) {
   if (pending === 0) return;
 
   jobs.forEach(function (job) {
-    fetch(job.url)
-      .then(function (r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
-      })
+    console.log('[Prysmor:update] Downloading:', job.url, '→', job.dest);
+    nodeHttpGet(job.url)
       .then(function (code) {
         nodeFs.writeFileSync(job.dest, code, 'utf8');
-        console.log('[Prysmor:update] Written:', job.dest);
+        console.log('[Prysmor:update] Written (' + code.length + ' chars):', job.dest);
         pending--;
         if (pending === 0) {
-          // All files written — update version.txt and notify
           try {
             var vf = nodePath.join(root, 'panel', 'version.txt');
             nodeFs.writeFileSync(vf, data.version, 'utf8');
+            console.log('[Prysmor:update] version.txt updated to', data.version);
           } catch (_) {}
           showUpdateBanner(data.version);
         }
@@ -1941,26 +1975,29 @@ function showUpdateBanner(version) {
 }
 
 /**
- * Checks for a newer panel version and silently downloads + applies it.
- * Called once on DOMContentLoaded — never blocks the login/main flow.
+ * Checks for a newer panel version using Node.js https (bypasses browser CSP)
+ * and silently downloads + applies it. Called once on DOMContentLoaded.
  */
 function checkForUpdates() {
   try { require('fs'); } catch (_) {
-    // Node.js not available (mock env) — skip
-    return;
+    return; // Node.js not available (mock env)
   }
   var localVersion = readLocalVersion();
-  console.log('[Prysmor:update] Local version:', localVersion);
+  console.log('[Prysmor:update] Local version:', localVersion, '| root:', getUpdateRoot());
 
-  fetch(VERSION_API)
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
+  nodeHttpGet(VERSION_API)
+    .then(function (body) {
+      var data;
+      try { data = JSON.parse(body); } catch (e) {
+        console.warn('[Prysmor:update] Bad JSON from version API:', body.slice(0, 100));
+        return;
+      }
       if (!data || !data.version) return;
       console.log('[Prysmor:update] Remote version:', data.version);
       if (isNewerVersion(data.version, localVersion)) {
         applyUpdate(data);
       } else {
-        console.log('[Prysmor:update] Already up to date.');
+        console.log('[Prysmor:update] Already up to date (', localVersion, ').');
       }
     })
     .catch(function (e) {
