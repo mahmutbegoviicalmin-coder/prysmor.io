@@ -814,8 +814,7 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
         '-ss', String(parseFloat((timeSec || 0).toFixed(6))),
         '-i',  sourcePath,
         '-vframes', '1',
-        '-vf', 'scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720',
-        '-q:v', '2',
+        '-q:v', '2',   // maximum quality — no downscale, native resolution
         '-y', outPath,
       ];
 
@@ -1118,22 +1117,14 @@ async function mfGenerate() {
       console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath +
         '  dims=' + preparedVideoWidth + 'x' + preparedVideoHeight);
       setStatus('Reading clip…', 20);
-      // Read file + capture 3 reference frames concurrently (file must exist for both)
-      var multiFrameResults = await Promise.all([
-        readFileBase64(preparedTmpPath),
-        captureMultipleFrames(preparedTmpPath, 0, clipDurSec),
-      ]);
-      fileBase64 = multiFrameResults[0];
-      var capturedFrames = multiFrameResults[1];
+      // Read prepared clip as base64 for upload.
+      // Reference frames were already captured at full quality from the original
+      // clip when it was loaded (storedReferenceFrames). Re-use them directly —
+      // they are the same 5 frames sent to Claude for Enhance.
+      fileBase64 = await readFileBase64(preparedTmpPath);
       extractionSucceeded = true;
-      // Update stored frames with clean extracted-clip frames (cropped native res)
-      if (capturedFrames && capturedFrames.length > 0) {
-        storedReferenceFrames = capturedFrames;
-        storedReferenceFrame  = capturedFrames[0];
-        console.log('[Prysmor:frame] captured ' + capturedFrames.length + ' reference frames from extracted clip');
-      } else {
-        console.log('[Prysmor:frame] captureMultipleFrames returned 0 frames — using storedReferenceFrames from clip load');
-      }
+      console.log('[Prysmor:frame] using ' + (storedReferenceFrames ? storedReferenceFrames.length : 0) +
+        ' pre-captured reference frames from original clip (full resolution)');
       try { require('fs').unlinkSync(preparedTmpPath); } catch (_) {
         try { window.cep.fs.deleteFile(preparedTmpPath); } catch (_) {}
       }
