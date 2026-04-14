@@ -891,10 +891,12 @@ function computeFrameSharpness(base64Jpeg) {
 async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
   var SAMPLE_COUNT  = 10;
   var KEEP_COUNT    = 5;
-  var SKIP_START    = 0.15;
-  var SKIP_END      = 0.15;
+  // For short clips reduce the skip margins so we don't waste too much of the clip.
+  // Clips < 3s: no skip. Clips 3-6s: 5% each end. Longer: 10% each end.
+  var SKIP_START = durationSec < 3 ? 0 : durationSec < 6 ? 0.05 : 0.10;
+  var SKIP_END   = SKIP_START;
 
-  // Build evenly spaced timestamps within [15%, 85%] of clip
+  // Build evenly spaced timestamps within the usable range of clip
   var usable    = durationSec * (1 - SKIP_START - SKIP_END);
   var startOff  = durationSec * SKIP_START;
   var timestamps = [];
@@ -927,11 +929,12 @@ async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
     })
   );
 
-  // Sort descending by sharpness, keep top N
+  // Sort descending by sharpness, keep top N (or all if fewer available)
   scored.sort(function (a, b) { return b.score - a.score; });
   var top = scored.slice(0, KEEP_COUNT);
 
-  console.log('[Prysmor:multiframe] top ' + top.length + ' sharpest frames selected (scores: ' +
+  console.log('[Prysmor:multiframe] top ' + top.length + '/' + scored.length +
+    ' sharpest frames selected (scores: ' +
     top.map(function (f) { return f.score.toFixed(0); }).join(', ') + ')');
 
   return top.map(function (f) { return f.b64; });
@@ -1456,8 +1459,27 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     return;
   }
 
-  const tmpDir  = state.mf.tempDir || (state._extRoot + '/panel/temp');
-  const outPath = tmpDir + '/mf-output-' + Date.now() + '.mp4';
+  // Resolve temp directory — prefer extension's panel/temp folder, fall back to OS temp dir
+  var tmpDir = state.mf.tempDir || '';
+  if (!tmpDir) {
+    // Try to use Node.js os.tmpdir() for a reliable writable path (works on both Win + Mac)
+    try { tmpDir = require('os').tmpdir(); } catch (_) {}
+  }
+  if (!tmpDir) {
+    tmpDir = state._extRoot + '/panel/temp';
+  }
+  // Ensure the temp directory exists before writing
+  try {
+    var _nfs = require('fs');
+    if (!_nfs.existsSync(tmpDir)) {
+      _nfs.mkdirSync(tmpDir, { recursive: true });
+      console.log('[Prysmor] created tmpDir:', tmpDir);
+    }
+  } catch (_mkErr) {
+    console.warn('[Prysmor] could not create tmpDir:', tmpDir, _mkErr.message);
+  }
+
+  const outPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-output-' + Date.now() + '.mp4';
   console.log('[Prysmor] writing to disk:', outPath);
 
   // Use string literal 'Base64' — avoids crashes when cep.encoding is undefined
@@ -1543,21 +1565,24 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
   }
 
   state.mf.outputPath = finalPath;
+  // Normalise to forward slashes (required by ExtendScript on all platforms)
+  // and escape any double-quotes that may appear in the path.
   const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
 
   setStatus(replaceMode ? 'Replacing original\u2026' : 'Inserting on V2\u2026', 98);
   console.log('[Prysmor] evalScript', replaceMode ? 'replaceSelection' : 'insertClipOnV2',
-    'path:', finalPath, 'startTimeSec:', startTimeSec);
+    'path:', finalPath, 'esc:', esc, 'startTimeSec:', startTimeSec);
 
   await new Promise(function (resolve) {
     const fn = replaceMode
       ? 'replaceSelection("' + esc + '")'
       : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
 
+    console.log('[Prysmor] evalScript fn:', fn);
     cs.evalScript(fn, function (r) {
       console.log('[Prysmor] evalScript result:', r);
-      if (r && r.indexOf('error') === 0) {
-        showToast(r.replace('error: ', ''), 'error');
+      if (r && (r.indexOf('error') === 0 || r.indexOf('Error') === 0)) {
+        showToast(r.replace(/^error:\s*/i, ''), 'error');
       } else {
         showToast(replaceMode
           ? 'Original replaced with AI result!'
@@ -1571,16 +1596,20 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
   console.log('[Prysmor] insert done, showing result');
   showResult(blobUrl || ('file:///' + finalPath.replace(/\\/g, '/').replace(/^\//, '')));
 
-  // Clean up processed temp file (outPath already deleted above if ffmpeg ran)
-  setTimeout(function () {
-    try {
-      var nfs = require('fs');
-      if (finalPath !== outPath && nfs.existsSync(finalPath)) {
-        nfs.unlinkSync(finalPath);
-        console.log('[Prysmor:postprocess] temp file cleaned up:', finalPath);
-      }
-    } catch (_) {}
-  }, 5000);
+  // Do NOT delete finalPath immediately — Premiere needs time to import it.
+  // OS temp cleanup handles stale files on next boot.
+  // Only delete the intermediate outPath if ffmpeg produced a processed version.
+  if (finalPath !== outPath) {
+    setTimeout(function () {
+      try {
+        var nfs = require('fs');
+        if (nfs.existsSync(outPath)) {
+          nfs.unlinkSync(outPath);
+          console.log('[Prysmor:postprocess] raw temp cleaned up:', outPath);
+        }
+      } catch (_) {}
+    }, 30000); // wait 30s so Premiere has finished reading
+  }
 }
 
 
