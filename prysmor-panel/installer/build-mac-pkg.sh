@@ -36,10 +36,9 @@ RES_DIR="$SCRIPT_DIR/mac-resources"
 
 VERSION="2.2.0"
 BUNDLE_ID="com.prysmor.panel"
-# Neutral staging location — postinstall relocates to the real user's $HOME.
-# /private/var/tmp persists across the install session (unlike /private/tmp
-# which can be cleaned mid-session on some macOS versions).
-INSTALL_LOCATION="/private/var/tmp/com.prysmor.panel-stage"
+# Install to system-wide CEP path. pkgbuild copies files here BEFORE postinstall
+# runs. postinstall then copies to the real user's ~/Library and cleans up.
+INSTALL_LOCATION="/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
 
 WORKDIR="$REPO_ROOT/dist/mac-pkg-work"
 ROOT="$WORKDIR/com.prysmor.panel"
@@ -79,27 +78,14 @@ SCRIPTS_DIR="$WORKDIR/scripts"
 mkdir -p "$SCRIPTS_DIR"
 cat > "$SCRIPTS_DIR/postinstall" << 'POSTINSTALL'
 #!/usr/bin/env bash
-# All output goes to system log (visible in Console.app → search "prysmor")
+# All output is captured in system log — open Console.app and search "prysmor"
 log() { echo "[prysmor-postinstall] $*"; logger -t "prysmor-postinstall" "$*" 2>/dev/null || true; }
 
 log "=== Prysmor CEP Panel postinstall START ==="
 
-SOURCE="/private/var/tmp/com.prysmor.panel-stage"
-
-# ── Verify the staged payload is present ────────────────────────────────────
-log "Checking source: $SOURCE"
-if [ ! -d "$SOURCE" ]; then
-  log "ERROR: Stage folder not found: $SOURCE"
-  log "Contents of /private/var/tmp:"
-  ls -la /private/var/tmp/ 2>&1 | while IFS= read -r line; do log "  $line"; done
-  exit 1
-fi
-
-log "Source exists. Contents:"
-ls -laR "$SOURCE" 2>&1 | while IFS= read -r line; do log "  $line"; done
+SYS_INSTALL="/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
 
 # ── Resolve the real logged-in user (not root) ──────────────────────────────
-# $HOME and $USER are /var/root when the .pkg runs as root during install.
 LOGGED_IN_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
 log "stat /dev/console → '$LOGGED_IN_USER'"
 
@@ -109,7 +95,6 @@ if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
 fi
 
 if [ -z "$LOGGED_IN_USER" ] || [ "$LOGGED_IN_USER" = "root" ]; then
-  # Last resort: first non-Shared directory under /Users
   LOGGED_IN_USER=$(ls /Users 2>/dev/null | grep -v Shared | grep -v Guest | head -1 || echo "")
   log "/Users scan fallback → '$LOGGED_IN_USER'"
 fi
@@ -119,40 +104,32 @@ if [ -z "$LOGGED_IN_USER" ]; then
   exit 1
 fi
 
-USER_HOME="/Users/$LOGGED_IN_USER"
-DEST="$USER_HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+USER_DEST="/Users/$LOGGED_IN_USER/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+log "Installing for user : '$LOGGED_IN_USER'"
+log "System install path : '$SYS_INSTALL'"
+log "User dest path      : '$USER_DEST'"
 
-log "Installing for user: '$LOGGED_IN_USER'"
-log "User home:           '$USER_HOME'"
-log "Destination:         '$DEST'"
-
-# ── Create destination and copy files ───────────────────────────────────────
-mkdir -p "$DEST"
+# ── Copy from system CEP location → user CEP location ───────────────────────
+mkdir -p "$USER_DEST"
+cp -R "$SYS_INSTALL/." "$USER_DEST/"
 if [ $? -ne 0 ]; then
-  log "ERROR: Could not create destination directory: $DEST"
+  log "ERROR: cp from system to user location failed"
   exit 1
 fi
 
-log "Copying from $SOURCE to $DEST ..."
-cp -R "$SOURCE/." "$DEST/"
-if [ $? -ne 0 ]; then
-  log "ERROR: cp failed"
-  exit 1
-fi
-log "Copy complete. Destination contents:"
-ls -la "$DEST" 2>&1 | while IFS= read -r line; do log "  $line"; done
+chown -R "$LOGGED_IN_USER" "$USER_DEST"
+log "Ownership set to '$LOGGED_IN_USER'"
 
-# Fix ownership so the user (not root) owns all files
-chown -R "$LOGGED_IN_USER" "$DEST"
-log "Ownership set to $LOGGED_IN_USER"
+log "Installed files:"
+ls -la "$USER_DEST" 2>&1 | while IFS= read -r line; do log "  $line"; done
 
-# Clean up staging area
-rm -rf "$SOURCE"
-log "Staging area removed."
+# ── Clean up system-level install (not needed — user path is sufficient) ─────
+rm -rf "$SYS_INSTALL"
+log "System install location cleaned up."
 
 # ── Write Adobe CSXS PlayerDebugMode for the real user ──────────────────────
-log "Writing CSXS PlayerDebugMode for user $LOGGED_IN_USER ..."
-for v in 9 10 11 12 13; do
+log "Writing CSXS PlayerDebugMode ..."
+for v in 10 11 12 13; do
   sudo -u "$LOGGED_IN_USER" defaults write "com.adobe.CSXS.${v}" PlayerDebugMode 1 2>/dev/null || true
 done
 log "PlayerDebugMode written."
