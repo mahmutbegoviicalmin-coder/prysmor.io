@@ -1487,29 +1487,52 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
   }
 
-  // ── ffmpeg post-process: remove black bars, scale to original clip dimensions ─
+  // ── ffmpeg post-process: scale Runway output to original clip dimensions ──────
+  // Strategy: scale to fill (force_original_aspect_ratio=increase) then crop to
+  // exact target size. This eliminates black bars completely — a tiny centre-crop
+  // is far less noticeable than black pillarboxing.
+  // Skip entirely when Runway's output is already the right size (aspect ratio
+  // difference < 2%), to avoid an unnecessary re-encode quality loss.
   var finalPath = outPath;
   var vidInfo   = storedVideoInfo;
 
   if (vidInfo && vidInfo.width > 0 && vidInfo.height > 0) {
-    var w          = vidInfo.width;
-    var h          = vidInfo.height;
-    var processedPath = tmpDir + '/mf-processed-' + Date.now() + '.mp4';
+    var w = vidInfo.width;
+    var h = vidInfo.height;
+
+    // Probe Runway output dimensions before deciding whether to post-process
+    var runwayDims = await probeVideoDimensionsFfmpeg(outPath).catch(function () { return null; });
+    var skipProcess = false;
+    if (runwayDims && runwayDims.width > 0 && runwayDims.height > 0) {
+      var srcRatio  = runwayDims.width  / runwayDims.height;
+      var destRatio = w / h;
+      var ratioDiff = Math.abs(srcRatio - destRatio) / destRatio;
+      if (ratioDiff < 0.02 && runwayDims.width === w && runwayDims.height === h) {
+        skipProcess = true;
+        console.log('[Prysmor:postprocess] Runway output already ' + w + 'x' + h + ' — skipping re-encode');
+      } else {
+        console.log('[Prysmor:postprocess] Runway output ' + runwayDims.width + 'x' + runwayDims.height +
+          ' → scaling to ' + w + 'x' + h);
+      }
+    }
+
+    if (!skipProcess) {
+    var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
     var ffmpegBin  = getFFmpegBin();
 
-    console.log('[Prysmor:postprocess] scaling ' + outPath + ' → ' + w + 'x' + h);
     setStatus('Processing video\u2026', 98);
 
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        var vf    = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=decrease,' +
-                    'pad=' + w + ':' + h + ':(ow-iw)/2:(oh-ih)/2,' +
+        // scale to FILL (increase) then centre-crop — no black bars ever
+        var vf    = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=increase,' +
                     'crop=' + w + ':' + h;
         var args  = [
           '-y',
           '-i',  outPath,
           '-vf', vf,
+          '-c:v', 'libx264', '-crf', '16', '-preset', 'fast',
           '-c:a', 'copy',
           processedPath,
         ];
@@ -1551,8 +1574,9 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     } else {
       console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
     }
+    } // end if (!skipProcess)
   } else {
-    console.log('[Prysmor:postprocess] no dimension info — skipping black bar removal');
+    console.log('[Prysmor:postprocess] no dimension info — skipping post-process');
   }
 
   state.mf.outputPath = finalPath;
