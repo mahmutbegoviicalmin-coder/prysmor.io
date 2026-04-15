@@ -1491,36 +1491,24 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
   }
 
-  // ── ffmpeg post-process: scale Runway output to original clip dimensions ──────
-  // Strategy: scale to fill (force_original_aspect_ratio=increase) then crop to
-  // exact target size. This eliminates black bars completely — a tiny centre-crop
-  // is far less noticeable than black pillarboxing.
-  // Skip entirely when Runway's output is already the right size (aspect ratio
-  // difference < 2%), to avoid an unnecessary re-encode quality loss.
+  // ── ffmpeg post-process: ensure output is 1920×1080 ──────────────────────────
+  // We always upload 1920×1080 to Runway, so its output is always 16:9.
+  // Target is ALWAYS 1920×1080 — never use storedVideoInfo dimensions here because
+  // the original clip may be a different ratio (2.39:1, 4:3, vertical…) which would
+  // stretch the 16:9 Runway output if we tried to scale it back to those dimensions.
   var finalPath = outPath;
-  var vidInfo   = storedVideoInfo;
+  var TARGET_W = 1920;
+  var TARGET_H = 1080;
 
-  if (vidInfo && vidInfo.width > 0 && vidInfo.height > 0) {
-    var w = vidInfo.width;
-    var h = vidInfo.height;
+  // Probe Runway output — skip re-encode if it's already 1920×1080.
+  var runwayDims = await probeVideoDimensionsFfmpeg(outPath).catch(function () { return null; });
+  if (runwayDims && runwayDims.width === TARGET_W && runwayDims.height === TARGET_H) {
+    console.log('[Prysmor:postprocess] Runway output already 1920×1080 — no re-encode needed');
+  } else {
+    console.log('[Prysmor:postprocess] Runway output ' +
+      (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
+      ' → scaling to 1920×1080');
 
-    // Probe Runway output dimensions before deciding whether to post-process
-    var runwayDims = await probeVideoDimensionsFfmpeg(outPath).catch(function () { return null; });
-    var skipProcess = false;
-    if (runwayDims && runwayDims.width > 0 && runwayDims.height > 0) {
-      var srcRatio  = runwayDims.width  / runwayDims.height;
-      var destRatio = w / h;
-      var ratioDiff = Math.abs(srcRatio - destRatio) / destRatio;
-      if (ratioDiff < 0.02 && runwayDims.width === w && runwayDims.height === h) {
-        skipProcess = true;
-        console.log('[Prysmor:postprocess] Runway output already ' + w + 'x' + h + ' — skipping re-encode');
-      } else {
-        console.log('[Prysmor:postprocess] Runway output ' + runwayDims.width + 'x' + runwayDims.height +
-          ' → scaling to ' + w + 'x' + h);
-      }
-    }
-
-    if (!skipProcess) {
     var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
     var ffmpegBin  = getFFmpegBin();
 
@@ -1529,14 +1517,12 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        // Direct scale to target dimensions — Runway output is always 16:9 (same as
-        // our 1920x1080 input), so direct scale never crops or pads. A sub-pixel
-        // ratio difference causes imperceptible stretch, far preferable to cropping.
-        var vf    = 'scale=' + w + ':' + h;
+        // Direct scale to 1920:1080. Runway always outputs 16:9, so this is
+        // a clean scale with no crop, no pad, no black bars.
         var args  = [
           '-y',
           '-i',  outPath,
-          '-vf', vf,
+          '-vf', 'scale=1920:1080',
           '-c:v', 'libx264', '-crf', '16', '-preset', 'fast',
           '-c:a', 'copy',
           processedPath,
@@ -1551,7 +1537,7 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
           if (code === 0) {
             var nfs = require('fs');
             if (nfs.existsSync(processedPath)) {
-              console.log('[Prysmor:postprocess] done — using processed file');
+              console.log('[Prysmor:postprocess] done — 1920×1080 output ready');
               try { nfs.unlinkSync(outPath); } catch (_) {}
               resolve(processedPath);
             } else {
@@ -1579,9 +1565,6 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     } else {
       console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
     }
-    } // end if (!skipProcess)
-  } else {
-    console.log('[Prysmor:postprocess] no dimension info — skipping post-process');
   }
 
   state.mf.outputPath = finalPath;
