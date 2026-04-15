@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="60%">
+      <stop offset="0%"   stop-color="#0F1F0A"/>
+      <stop offset="100%" stop-color="#0B0F14"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#9BFF2E" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#9BFF2E" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#9BFF2E" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur">
+      <feGaussianBlur stdDeviation="18" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- Grid -->
+  <g stroke="#A0A8B3" stroke-width="1" opacity="0.05">
+    <line x1="0" y1="270" x2="1920" y2="270"/>
+    <line x1="0" y1="540" x2="1920" y2="540"/>
+    <line x1="0" y1="810" x2="1920" y2="810"/>
+    <line x1="480" y1="0" x2="480" y2="1080"/>
+    <line x1="960" y1="0" x2="960" y2="1080"/>
+    <line x1="1440" y1="0" x2="1440" y2="1080"/>
+  </g>
+
+  <!-- Glow halo -->
+  <circle cx="960" cy="410" r="220" fill="url(#orb)" opacity="0.25"/>
+
+  <!-- Rings -->
+  <circle cx="960" cy="410" r="170" fill="none" stroke="#4D8BFF" stroke-width="1.5" stroke-dasharray="10 7" opacity="0.35"/>
+  <circle cx="960" cy="410" r="118" fill="none" stroke="#9BFF2E" stroke-width="2"   opacity="0.55"/>
+  <circle cx="960" cy="410" r="68"  fill="none" stroke="#9BFF2E" stroke-width="1.5" opacity="0.75"/>
+
+  <!-- Core orb -->
+  <circle cx="960" cy="410" r="32" fill="#9BFF2E" filter="url(#blur)" opacity="0.95"/>
+
+  <!-- Title -->
+  <text x="960" y="638"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="86" font-weight="900"
+    fill="#FFFFFF" text-anchor="middle" letter-spacing="-3">PRYSMOR</text>
+
+  <!-- Subtitle -->
+  <text x="960" y="700"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="28" fill="#A0A8B3"
+    text-anchor="middle" letter-spacing="5">AI VFX DEMO PREVIEW</text>
+
+  <!-- Badge -->
+  <rect x="680" y="752" width="560" height="48" rx="8" fill="#9BFF2E" opacity="0.1"/>
+  <rect x="680" y="752" width="560" height="48" rx="8" fill="none" stroke="#9BFF2E" stroke-width="1" opacity="0.2"/>
+  <text x="960" y="783"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="20" fill="#9BFF2E"
+    text-anchor="middle">Replace with prysmor-demo.mp4 + prysmor-demo.svg</text>
+
+  <!-- Corner brackets -->
+  <g stroke="#9BFF2E" stroke-width="2.5" fill="none" opacity="0.35">
+    <polyline points="44,44 44,96 96,96"/>
+    <polyline points="1876,44 1876,96 1824,96"/>
+    <polyline points="44,1036 44,984 96,984"/>
+    <polyline points="1876,1036 1876,984 1824,984"/>
+  </g>
+</svg>
