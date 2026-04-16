@@ -7,7 +7,7 @@
 Unicode True
 
 !define PRODUCT_NAME      "Prysmor"
-!define PRODUCT_VERSION   "2.6.1"
+!define PRODUCT_VERSION   "2.6.2"
 !define PRODUCT_PUBLISHER "Prysmor"
 !define PRODUCT_URL       "https://prysmor.io"
 !define BUNDLE_ID         "com.prysmor.panel"
