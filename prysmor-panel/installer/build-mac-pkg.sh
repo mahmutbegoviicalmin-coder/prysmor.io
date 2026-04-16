@@ -12,7 +12,7 @@
 # What it does:
 #   1. Stages `com.prysmor.panel/` (CSXS + panel + mac ffmpeg, no win exe)
 #   2. pkgbuild → flat component package PrysmorPanel.pkg
-#   3. productbuild + mac-resources/distribution.xml → dist/Prysmor-2.6.3.pkg
+#   3. productbuild + mac-resources/distribution.xml → dist/Prysmor-2.6.4.pkg
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -34,7 +34,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PANEL_SRC="$REPO_ROOT/prysmor-panel"
 RES_DIR="$SCRIPT_DIR/mac-resources"
 
-VERSION="2.6.3"
+VERSION="2.6.4"
 BUNDLE_ID="com.prysmor.panel"
 # RELATIVE path (no leading /) — distribution.xml has enable_currentUserHome="true"
 # and enable_localSystem="false", so the installer runs as the current user and

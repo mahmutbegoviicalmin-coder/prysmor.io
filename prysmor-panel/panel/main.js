@@ -1382,7 +1382,7 @@ function startPolling(jobId) {
     setStatus('Downloading result\u2026', 98);
     try {
       console.log('[Prysmor] downloadAndInsert start:', job.outputUrl);
-      await downloadAndInsert(job.outputUrl, sel ? sel.startTimeSec : 0, state.mf.replaceMode);
+      await downloadAndInsert(job.outputUrl, sel ? sel.startTimeSec : 0, state.mf.replaceMode, (state.mf.selInfo && state.mf.selInfo.durationSec) || 0);
       console.log('[Prysmor] downloadAndInsert complete');
     } catch (err) {
       console.error('[Prysmor] downloadAndInsert threw:', err.message);
@@ -1417,7 +1417,7 @@ function stopMfPolling() {
 
 // ─── Download & Insert into Premiere ─────────────────────────────────────────
 
-async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
+async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSec) {
   console.log('[Prysmor] downloadAndInsert — url:', outputUrl);
 
   // Runway output URLs are public S3/CDN presigned URLs — do NOT send auth headers
@@ -1502,14 +1502,22 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
   var TARGET_W = 1920;
   var TARGET_H = 1080;
 
-  // Probe Runway output — skip re-encode if it's already 1920×1080.
+  // Probe Runway output — decide whether we need scale and/or duration trim.
   var runwayDims = await probeVideoDimensionsFfmpeg(outPath).catch(function () { return null; });
-  if (runwayDims && runwayDims.width === TARGET_W && runwayDims.height === TARGET_H) {
-    console.log('[Prysmor:postprocess] Runway output already 1920×1080 — no re-encode needed');
+  var needsScale = !(runwayDims && runwayDims.width === TARGET_W && runwayDims.height === TARGET_H);
+  // Trim output to match original clip duration (Runway may generate 5 or 10s regardless of input)
+  var trimSec = (typeof clipDurSec === 'number' && clipDurSec > 0) ? clipDurSec : 0;
+
+  if (!needsScale && trimSec <= 0) {
+    console.log('[Prysmor:postprocess] Runway output already 1920×1080, no trim needed — skipping re-encode');
   } else {
-    console.log('[Prysmor:postprocess] Runway output ' +
-      (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
-      ' → scaling to 1920×1080');
+    if (needsScale) {
+      console.log('[Prysmor:postprocess] Runway output ' +
+        (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
+        ' → scaling to 1920×1080' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
+    } else {
+      console.log('[Prysmor:postprocess] Runway output already 1920×1080 — trimming to ' + trimSec.toFixed(3) + 's');
+    }
 
     var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
     var ffmpegBin  = getFFmpegBin();
@@ -1519,16 +1527,17 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        // Direct scale to 1920:1080. Runway always outputs 16:9, so this is
-        // a clean scale with no crop, no pad, no black bars.
-        var args  = [
-          '-y',
-          '-i',  outPath,
-          '-vf', 'scale=1920:1080',
-          '-c:v', 'libx264', '-crf', '16', '-preset', 'fast',
-          '-c:a', 'copy',
-          processedPath,
-        ];
+        var args = ['-y', '-i', outPath];
+        // Add output duration trim before video filter so ffmpeg stops at clipDurSec
+        if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
+        if (needsScale) {
+          // Direct scale to 1920:1080 with high quality re-encode
+          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'copy');
+        } else {
+          // Only trimming needed — stream copy is fast and lossless
+          args.push('-c', 'copy');
+        }
+        args.push(processedPath);
         console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
         var proc = spawn(ffmpegBin, args);
 
