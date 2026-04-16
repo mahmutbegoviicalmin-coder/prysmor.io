@@ -151,8 +151,8 @@ export interface RunwayTaskStatus {
  *                   (lighting, fog, particles) a reference image prevents VFX from
  *                   applying because Runway treats it as "keep output close to this".
  *
- * Duration is NOT a parameter — output length matches the input video.
- * Trim the input to max 8 s before calling this function.
+ * Duration is optional — pass durationSec to request 5 or 10 s output (rounded up).
+ * If omitted, Runway uses its default (typically matches input length).
  *
  * @param effectType  'overlay' | 'background' — controls whether the reference
  *                    image is attached. Overlay effects MUST NOT use a reference.
@@ -162,6 +162,7 @@ export async function createVideoToVideoTask(
   prompt: string,
   referenceImageUris?: string | string[],
   effectType: 'overlay' | 'background' = 'background',
+  durationSec?: number,
 ): Promise<RunwayTaskCreated> {
 
   // Normalise single URI or array to a clean string[]
@@ -170,13 +171,20 @@ export async function createVideoToVideoTask(
         .filter(u => typeof u === 'string' && u.length > 0)
     : [];
 
+  // Runway gen4_aleph supports duration 5 or 10 seconds.
+  // Round up to the nearest supported value so output is never shorter than the clip.
+  const resolvedDuration = durationSec && durationSec > 0
+    ? (durationSec <= 5 ? 5 : 10)
+    : undefined;
+
   const body: Record<string, unknown> = {
     model:      'gen4_aleph',
     videoUri:   inputVideoUrl,
     promptText: prompt,
+    ...(resolvedDuration !== undefined ? { duration: resolvedDuration } : {}),
   };
 
-  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" videoUri="${inputVideoUrl}" effectType=${effectType}`);
+  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" effectType=${effectType} duration=${resolvedDuration ?? 'unset'}`);
 
   // CRITICAL: Only attach reference images for background/environment effects.
   // For overlay effects (lighting, glow, fog, particles, god rays) reference

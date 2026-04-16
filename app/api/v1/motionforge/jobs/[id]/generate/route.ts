@@ -129,6 +129,7 @@ export async function POST(
     referenceFrames?: string[];
     videoWidth?: number;
     videoHeight?: number;
+    clipDuration?: number;
   };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
@@ -150,7 +151,11 @@ export async function POST(
     }
   }
 
-  const effectType = classifyPromptEffect(rawPrompt);
+  const effectType  = classifyPromptEffect(rawPrompt);
+  // Clip duration sent from panel — used to request matching output length from Runway (max 16s)
+  const clipDuration = typeof body.clipDuration === 'number' && body.clipDuration > 0
+    ? Math.min(Math.ceil(body.clipDuration), 16)
+    : undefined;
 
   // Pass the prompt through as-is — Runway Aleph sees the video directly and
   // does not need clothing/face descriptions. Just sanitize for moderation.
@@ -252,7 +257,7 @@ export async function POST(
 
       // Local dev: single anchor frame from ffmpeg identity extraction
       const localRefUris: string[] = refUri ? [refUri] : [];
-      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, effectType);
+      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, effectType, clipDuration);
       log(TAG, `Runway task started: ${task.id}`);
 
       await updateJob(userId, params.id, {
@@ -311,7 +316,7 @@ export async function POST(
     console.log('[runway] effectType:', effectType);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refUris, effectType);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refUris, effectType, clipDuration);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {

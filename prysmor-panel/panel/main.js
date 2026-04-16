@@ -1189,6 +1189,8 @@ async function mfGenerate() {
   console.log('[Prysmor:frame] sending ' + storedReferenceFrames.length + ' reference frame(s) to generate endpoint');
   try {
     var genBody = { prompt: prompt };
+    // Send clip duration so Runway can match output length to the original clip
+    genBody.clipDuration = clipDurSec;
     // Send all captured reference frames (primary + extras for identity conditioning)
     if (storedReferenceFrames.length > 0) {
       genBody.referenceFrameBase64 = storedReferenceFrames[0];      // primary (backward compat)

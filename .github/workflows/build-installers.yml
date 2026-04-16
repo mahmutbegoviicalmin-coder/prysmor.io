@@ -1,4 +1,4 @@
-# Build Windows (.exe) + macOS (.pkg) installers and attach to GitHub Release v2.6.2
+# Build Windows (.exe) + macOS (.pkg) installers and attach to GitHub Release v2.6.3
 name: Build installers
 
 on:
@@ -52,14 +52,14 @@ jobs:
         run: |
           chmod +x prysmor-panel/installer/build-mac-pkg.sh
           bash prysmor-panel/installer/build-mac-pkg.sh
-          test -f dist/Prysmor-2.6.2.pkg
-          ls -lh dist/Prysmor-2.6.2.pkg
+          test -f dist/Prysmor-2.6.3.pkg
+          ls -lh dist/Prysmor-2.6.3.pkg
 
       - name: Upload mac-installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: mac-installer
-          path: dist/Prysmor-2.6.2.pkg
+          path: dist/Prysmor-2.6.3.pkg
 
   release:
     name: release
@@ -73,16 +73,16 @@ jobs:
         with:
           path: assets
 
-      - name: Create or update GitHub Release v2.6.2
+      - name: Create or update GitHub Release v2.6.3
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           WIN="assets/windows-installer/PrysmrSetup.exe"
-          MAC="assets/mac-installer/Prysmor-2.6.2.pkg"
+          MAC="assets/mac-installer/Prysmor-2.6.3.pkg"
           test -f "$WIN"
           test -f "$MAC"
-          TAG="v2.6.2"
+          TAG="v2.6.3"
           REPO="${GITHUB_REPOSITORY}"
 
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
@@ -93,7 +93,7 @@ jobs:
             gh release create "$TAG" "$WIN" "$MAC" \
               --repo "$REPO" \
               --title "Prysmor Panel $TAG" \
-              --notes "Built by GitHub Actions — Windows (PrysmrSetup.exe) + macOS (Prysmor-2.6.2.pkg)."
+              --notes "Built by GitHub Actions — Windows (PrysmrSetup.exe) + macOS (Prysmor-2.6.3.pkg)."
           fi
 
           echo ""
@@ -101,4 +101,4 @@ jobs:
           OWNER="${GITHUB_REPOSITORY%%/*}"
           NAME="${GITHUB_REPOSITORY#*/}"
           echo "https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmrSetup.exe"
-          echo "https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-2.6.2.pkg"
+          echo "https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-2.6.3.pkg"
