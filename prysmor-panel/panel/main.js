@@ -1040,7 +1040,7 @@ async function mfGenerate() {
     showToast('Please wait, clip is still loading…', 'error');
     return;
   }
-  // Any aspect ratio is allowed — extractAndPrepareClip always crops/scales to 1920x1080.
+  // Any aspect ratio is allowed — extractAndPrepareClip letterboxes to 1920x1080, content never cropped.
   if (storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
     var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
     console.log('[Prysmor:aspectRatio] ratio=' + aspectRatio.toFixed(4) + ' — will be normalised to 16:9 by ffmpeg');
@@ -2193,9 +2193,20 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
 
     var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-clip-' + Date.now() + '.mp4';
 
-    // Crop to 16:9 from centre, then scale to 1920×1080 for Runway.
-    // Works for any input: portrait, square, ultrawide, landscape.
-    var filter = 'crop=ih*16/9:ih:(iw-ih*16/9)/2:0,scale=1920:1080';
+    // Preserve original aspect ratio — NEVER crop content.
+    // Runway's only hard limit is max 2.358:1 width:height ratio.
+    // Strategy:
+    //   1. If clip exceeds 2.358:1, crop the minimum width needed to satisfy Runway.
+    //   2. Scale to fit inside 1920×1080 (force_original_aspect_ratio=decrease).
+    //   3. Pad to exactly 1920×1080 so Runway always receives a standard frame.
+    //      Black bars are added only where the original ratio requires them.
+    // Result: 2.39:1 clip → slight width crop to 2.358:1 → 1920×816 → pad → 1920×1080 (132px bars top+bottom)
+    //         16:9 clip  → no crop → 1920×1080 → no pad needed
+    var filter = [
+      "crop='min(iw,ih*2.358)':ih:'(iw-min(iw,ih*2.358))/2':0",
+      'scale=1920:1080:force_original_aspect_ratio=decrease',
+      'pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+    ].join(',');
 
     // -ss before -i = fast seek (stream copy to target point then decode).
     var args = [
