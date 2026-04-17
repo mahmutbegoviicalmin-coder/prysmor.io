@@ -186,15 +186,12 @@ export async function createVideoToVideoTask(
 
   console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" effectType=${effectType} duration=${resolvedDuration ?? 'unset'}`);
 
-  // CRITICAL: Only attach reference images for background/environment effects.
-  // For overlay effects (lighting, glow, fog, particles, god rays) reference
-  // images tell Runway "keep output looking like this frame" — which directly
-  // prevents VFX from being applied. The VFX prompt alone is sufficient for overlays.
-  if (refUris.length > 0 && effectType === 'background') {
+  // Always attach reference images for identity preservation regardless of effect type.
+  // Reference images are needed for ALL effects (overlay and background) to preserve
+  // character identity across the generation.
+  if (refUris.length > 0) {
     body.references = refUris.map(uri => ({ type: 'image', uri }));
-    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning (background effect)`);
-  } else if (refUris.length > 0 && effectType === 'overlay') {
-    console.log(`[runway] Skipping ${refUris.length} reference image(s) for overlay effect — letting prompt drive VFX`);
+    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning (effectType=${effectType})`);
   }
 
   console.log('[runway] references being sent to Runway:', body.references ? JSON.stringify(body.references) : 'NONE');
