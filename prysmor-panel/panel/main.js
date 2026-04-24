@@ -1849,6 +1849,14 @@ function showResult(videoUrl) {
   var vid = el('mf-result-video');
   if (vid) { vid.src = videoUrl; vid.load(); vid.play && vid.play().catch(function () {}); }
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Always ensure Generate button is unlocked when result is shown
+  var btn = el('mf-btn-generate');
+  if (btn) { btn.disabled = false; btn.style.display = ''; }
+  var gs = el('mf-gen-state');
+  if (gs) gs.classList.add('hidden');
+  state.mf.generating = false;
+  stopElapsedTimer();
 }
 
 function resetUI() {
@@ -2643,13 +2651,29 @@ function bindEvents() {
     });
   }
 
-  // New generation
+  // New Effect — clear prompt, hide result, keep clip + mode, ready for new generation
   el('mf-btn-new-gen').addEventListener('click', function () {
-    el('mf-section-result').classList.add('hidden');
-    state.mf.jobId       = null;
-    state.mf.outputUrl   = null;
+    // Hide result card
+    var rs = el('mf-section-result');
+    if (rs) rs.classList.add('hidden');
+    // Clear old job state
+    state.mf.jobId        = null;
+    state.mf.outputUrl    = null;
     state.mf.rawOutputUrl = null;
-    el('mf-prompt').focus();
+    // Clear prompt input
+    var promptEl = el('mf-prompt');
+    if (promptEl) { promptEl.value = ''; promptEl.dispatchEvent(new Event('input')); }
+    var cc = el('mf-char-count'); if (cc) cc.textContent = '0';
+    // Ensure Generate button is visible and unlocked
+    var btn = el('mf-btn-generate');
+    if (btn) { btn.disabled = false; btn.style.display = ''; }
+    state.mf.generating = false;
+    stopElapsedTimer();
+    // Scroll to prompt and focus
+    if (promptEl) {
+      promptEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      setTimeout(function () { promptEl.focus(); }, 300);
+    }
   });
 
   // Settings
