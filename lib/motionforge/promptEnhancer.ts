@@ -22,10 +22,10 @@ const TAG = 'promptEnhancer';
 // ─── Claude config ────────────────────────────────────────────────────────────
 
 const MODEL_TEXT   = 'claude-haiku-4-5-20251001';  // fast + cheap for text-only
-const MODEL_VISION = 'claude-opus-4-5';             // vision-capable for frame analysis
+const MODEL_VISION = 'claude-haiku-4-5-20251001';  // vision-capable for frame analysis
 const MAX_TOKENS   = 220;
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+export const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 

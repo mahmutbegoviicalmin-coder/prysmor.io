@@ -146,22 +146,17 @@ export interface RunwayTaskStatus {
  *   model:          "gen4_aleph"
  *   videoUri:       HTTPS URL or runway:// URI of the input video
  *   promptText:     generation prompt (max 1000 chars)
- *   references:     optional array of reference images for identity conditioning
- *                   — ONLY for background/environment effects. For overlay effects
- *                   (lighting, fog, particles) a reference image prevents VFX from
- *                   applying because Runway treats it as "keep output close to this".
+ *   references:     optional array of reference images for identity conditioning.
+ *                   Callers control which refs to pass — relight/style send frames
+ *                   for identity preservation; background/vfx pass none.
  *
  * Duration is optional — pass durationSec to request 5 or 10 s output (rounded up).
  * If omitted, Runway uses its default (typically matches input length).
- *
- * @param effectType  'overlay' | 'background' — controls whether the reference
- *                    image is attached. Overlay effects MUST NOT use a reference.
  */
 export async function createVideoToVideoTask(
   inputVideoUrl: string,
   prompt: string,
   referenceImageUris?: string | string[],
-  effectType: 'overlay' | 'background' = 'background',
   durationSec?: number,
 ): Promise<RunwayTaskCreated> {
 
@@ -184,14 +179,11 @@ export async function createVideoToVideoTask(
     ...(resolvedDuration !== undefined ? { duration: resolvedDuration } : {}),
   };
 
-  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" effectType=${effectType} duration=${resolvedDuration ?? 'unset'}`);
+  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" refs=${refUris.length} duration=${resolvedDuration ?? 'unset'}`);
 
-  // Always attach reference images for identity preservation regardless of effect type.
-  // Reference images are needed for ALL effects (overlay and background) to preserve
-  // character identity across the generation.
   if (refUris.length > 0) {
     body.references = refUris.map(uri => ({ type: 'image', uri }));
-    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning (effectType=${effectType})`);
+    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning`);
   }
 
   console.log('[runway] references being sent to Runway:', body.references ? JSON.stringify(body.references) : 'NONE');

@@ -261,7 +261,7 @@ export async function POST(
       const sendRefs = mode === 'relight' || mode === 'style';
       const localRefUris: string[] = sendRefs && refUri ? [refUri] : [];
       console.log('[MotionForge] Mode:', mode, '— refs sent:', localRefUris.length > 0);
-      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, 'background', clipDuration);
+      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, clipDuration);
       log(TAG, `Runway task started: ${task.id}`);
 
       await updateJob(userId, params.id, {
@@ -325,7 +325,7 @@ export async function POST(
     console.log('[runway] mode:', mode);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, 'background', clipDuration);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, clipDuration);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {

@@ -6,298 +6,257 @@
   <title>Prysmor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=18"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css?v=19"/>
   <style>
-    /* ═══════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════
        DESIGN TOKENS
-    ═══════════════════════════════════════════════════════ */
+    ═══════════════════════════════════════════ */
     :root {
       --bg:             #141414;
       --card:           #1e1e1e;
-      --card-hover:     #252525;
+      --accent:         #00e676;
+      --accent-dim:     rgba(0,230,118,0.10);
+      --accent-border:  rgba(0,230,118,0.28);
       --border:         rgba(255,255,255,0.08);
       --border-strong:  rgba(255,255,255,0.14);
-      --accent:         #00e676;
-      --accent-glow:    rgba(0,230,118,0.18);
-      --accent-soft:    rgba(0,230,118,0.08);
-      --text-primary:   #f5f5f7;
-      --text-secondary: rgba(245,245,247,0.52);
-      --text-tertiary:  rgba(245,245,247,0.28);
+      --text-1:         #f5f5f7;
+      --text-2:         rgba(245,245,247,0.50);
+      --text-3:         rgba(245,245,247,0.26);
       --red:            #ff453a;
-      --radius:         12px;
-      --radius-sm:      8px;
-      --inset-glow:     0 1px 0 rgba(255,255,255,0.05) inset;
+      --r:              12px;
+      --r-sm:           8px;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       RESET + BASE
-    ═══════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════
+       RESET
+    ═══════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, system-ui, 'Inter', sans-serif;
+    html, body {
+      height: 100%; overflow: hidden;
       background: var(--bg);
-      color: var(--text-primary);
+      color: var(--text-1);
+      font-family: -apple-system, 'Inter', system-ui, sans-serif;
       font-size: 13px;
       line-height: 1.4;
       -webkit-font-smoothing: antialiased;
-      overflow: hidden;
     }
     button { font-family: inherit; cursor: pointer; }
     .hidden        { display: none !important; }
-    .sr-only       { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+    .sr-only       { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
     .compat-hidden { display: none !important; }
 
-    /* ═══════════════════════════════════════════════════════
-       TOAST
-    ═══════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════
+       TOAST — bottom sheet, slides up
+    ═══════════════════════════════════════════ */
     .toast {
-      position: fixed; top: 0; left: 0; right: 0;
-      transform: translateY(-100%); opacity: 0;
-      background: #1c1c1e;
-      border-bottom: 1px solid var(--border-strong);
-      padding: 9px 16px;
-      font-size: 12px; font-weight: 500;
+      position: fixed; bottom: 10px; left: 10px; right: 10px; z-index: 9999;
       display: flex; align-items: center; gap: 8px;
-      z-index: 9999;
-      transition: transform .22s cubic-bezier(.32,0,.67,0), opacity .22s ease;
-      pointer-events: none; min-height: 38px;
+      padding: 10px 13px; border-radius: 10px;
+      background: rgba(28,28,30,0.98);
+      border: 1px solid var(--border-strong);
+      font-size: 12px; font-weight: 500;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+      opacity: 0; transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
     }
-    .toast.toast-visible {
-      opacity: 1; transform: translateY(0); pointer-events: auto;
-      transition: transform .28s cubic-bezier(.33,1,.68,1), opacity .2s ease;
-    }
+    .toast.toast-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
     .toast-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .toast.success .toast-dot { background: var(--accent); }
     .toast.error   .toast-dot { background: var(--red); }
     .toast.info    .toast-dot { background: #0a84ff; }
     #toast-icon { display: none; }
-    #toast-text { color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #toast-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ═══════════════════════════════════════════════════════
-       VIEWS
-    ═══════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════
+       VIEWS — stacked absolutely
+    ═══════════════════════════════════════════ */
     .view { position: absolute; inset: 0; overflow: hidden; }
 
-    /* ═══════════════════════════════════════════════════════
-       MAIN V2 PANEL
-    ═══════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════
+       MAIN PANEL (v2)
+    ═══════════════════════════════════════════ */
     .v2-panel {
       display: flex; flex-direction: column;
       background: var(--bg);
       height: 100%;
-      overflow-y: auto;
+      position: relative; /* anchor for absolute children */
+      overflow: hidden;
     }
-    .v2-panel::-webkit-scrollbar { width: 0; }
 
-    /* ── Header ─────────────────────────────────────────── */
+    /* ─── HEADER ────────────────────────────── */
     .v2-hdr {
       height: 44px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 14px;
+      display: flex; align-items: center;
+      padding: 0 12px; gap: 0;
       border-bottom: 1px solid var(--border);
     }
     .v2-hdr-logo {
-      font-size: 14px; font-weight: 800; letter-spacing: -0.03em;
-      color: var(--text-primary);
+      font-size: 14px; font-weight: 800; letter-spacing: -0.04em;
+      color: var(--text-1);
     }
-    .v2-hdr-center { display: flex; align-items: center; }
-    .v2-hdr-right  { display: flex; align-items: center; gap: 8px; }
+    .v2-hdr-center {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .v2-hdr-right { display: flex; align-items: center; gap: 6px; }
 
-    /* Credits */
+    /* Credits pill */
     #topbar-credits {
-      display: flex; align-items: center; gap: 5px;
-      background: rgba(0,230,118,0.07);
-      border: 1px solid rgba(0,230,118,0.2);
-      border-radius: 20px; padding: 4px 11px 4px 9px;
+      display: flex; align-items: center; gap: 4px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      border-radius: 20px; padding: 3px 10px 3px 8px;
     }
-    #topbar-credits svg { color: var(--accent); flex-shrink: 0; }
     #topbar-credits-val {
-      font-size: 13px; font-weight: 700;
-      color: var(--accent); letter-spacing: -0.5px;
+      font-size: 12px; font-weight: 700;
+      color: var(--accent); letter-spacing: -0.3px;
       font-variant-numeric: tabular-nums;
     }
-    .v2-credits-lbl { font-size: 10px; font-weight: 500; color: rgba(0,230,118,0.45); margin-left: 1px; }
-    #topbar-credits.low {
-      background: rgba(255,159,10,0.07); border-color: rgba(255,159,10,0.24);
+    .v2-credits-lbl {
+      font-size: 10px; font-weight: 500; color: rgba(0,230,118,0.5);
     }
+    #topbar-credits.low { background: rgba(255,159,10,0.08); border-color: rgba(255,159,10,0.28); }
     #topbar-credits.low #topbar-credits-val { color: #ff9f0a; }
-    #topbar-credits.low svg                { color: #ff9f0a; }
-    #topbar-credits.low .v2-credits-lbl   { color: rgba(255,159,10,0.5); }
+    #topbar-credits.low .v2-credits-lbl    { color: rgba(255,159,10,0.55); }
 
     /* Plan badge */
     #topbar-plan {
-      font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
-      color: var(--text-primary);
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13);
-      border-radius: 20px; padding: 3px 9px;
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 0.7px; text-transform: uppercase;
+      color: var(--text-1);
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 3px 8px;
     }
-    #topbar-plan::before { content: "◆ "; font-size: 7px; color: var(--accent); vertical-align: middle; }
 
-    /* Gear button */
+    /* Gear / settings button */
     .v2-gear-btn {
-      background: none; border: none; color: var(--text-secondary);
+      background: none; border: none; color: var(--text-2);
       display: flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px; border-radius: 8px;
-      transition: color .18s, background .18s;
+      width: 28px; height: 28px; border-radius: 7px;
+      transition: color .15s, background .15s;
     }
-    .v2-gear-btn:hover { color: var(--text-primary); background: var(--card); }
-    .v2-gear-btn:active { transform: scale(0.92); }
+    .v2-gear-btn:hover  { color: var(--text-1); background: var(--card); }
+    .v2-gear-btn:active { transform: scale(0.9); }
 
-    /* ── Clip Row ───────────────────────────────────────── */
+    /* ─── CLIP ROW ──────────────────────────── */
     .v2-clip-row {
-      flex-shrink: 0; min-height: 60px;
-      border-bottom: 1px solid var(--border);
+      height: 60px; flex-shrink: 0;
       display: flex; align-items: center;
-      padding: 0 14px;
+      padding: 0 12px; gap: 10px;
+      border-bottom: 1px solid var(--border);
     }
 
     /* Empty state */
     .v2-clip-empty {
       display: flex; align-items: center; gap: 10px;
-      width: 100%;
-      color: var(--text-secondary);
-      font-size: 12px;
+      width: 100%; color: var(--text-2); font-size: 12px;
     }
-    .v2-clip-empty-icon { color: var(--text-tertiary); flex-shrink: 0; }
+    .v2-clip-empty-icon { color: var(--text-3); flex-shrink: 0; }
     .v2-clip-empty-text { flex: 1; }
     .clip-auto-badge {
-      display: inline-flex; align-items: center; gap: 5px;
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: 10px; font-weight: 600;
-      color: var(--accent); background: var(--accent-soft);
-      border: 1px solid rgba(0,230,118,0.15);
-      border-radius: 20px; padding: 3px 9px;
+      color: var(--accent); background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      border-radius: 20px; padding: 2px 8px;
     }
     .clip-auto-dot {
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--accent);
+      width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
       animation: breathe 1.8s ease-in-out infinite;
     }
     @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
 
     /* Filled state */
-    .v2-clip-info {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%;
-    }
+    .v2-clip-info { display: flex; align-items: center; gap: 10px; width: 100%; }
     .v2-clip-thumb {
       width: 48px; height: 48px; flex-shrink: 0;
-      object-fit: cover; border-radius: 8px;
+      object-fit: cover; border-radius: var(--r-sm);
       background: #000; display: block;
     }
-    #clip-thumb-placeholder { display: none; } /* placeholder inside hidden compat area */
     .v2-clip-name {
       flex: 1; font-size: 12px; font-weight: 500;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      color: var(--text-primary);
+      color: var(--text-1);
     }
     .v2-clip-dur {
       flex-shrink: 0;
-      display: inline-flex; align-items: center;
-      font-size: 11px; font-weight: 600; letter-spacing: .2px;
+      font-size: 11px; font-weight: 600;
       padding: 3px 8px; border-radius: 20px;
-      background: rgba(0,230,118,.12); color: var(--accent);
+      background: var(--accent-dim); color: var(--accent);
     }
 
-    /* ── Mode Pills ─────────────────────────────────────── */
+    /* ─── MODE PILLS ────────────────────────── */
     .v2-modes {
       flex-shrink: 0;
       display: flex; gap: 6px;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-bottom: 1px solid var(--border);
     }
     .mode-pill {
-      flex: 1; padding: 7px 0; border-radius: 8px;
-      font-size: 11px; font-weight: 700; letter-spacing: .2px; text-align: center;
-      cursor: pointer;
+      flex: 1; padding: 7px 0;
+      border-radius: var(--r-sm);
+      font-size: 11px; font-weight: 700;
+      text-align: center; cursor: pointer;
       background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      color: var(--text-secondary);
-      transition: all .16s ease;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      transition: all .15s ease;
     }
-    .mode-pill:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .mode-pill:hover  { background: rgba(255,255,255,0.08); color: var(--text-1); }
     .mode-pill.active {
-      background: rgba(0,230,118,0.1);
-      border-color: rgba(0,230,118,0.45);
+      background: var(--accent-dim);
+      border-color: var(--accent-border);
       color: var(--accent);
-      box-shadow: 0 0 10px rgba(0,230,118,0.1);
     }
 
-    /* ── Prompt (hero) ──────────────────────────────────── */
+    /* ─── PROMPT (hero) ─────────────────────── */
     .v2-prompt-wrap {
-      flex-shrink: 0;
+      flex: 1; min-height: 120px;
       display: flex; flex-direction: column;
       background: var(--card);
       border-bottom: 1px solid var(--border);
     }
     .v2-prompt-wrap textarea {
+      flex: 1;
       width: 100%; background: transparent; border: none; outline: none;
-      color: var(--text-primary); font-size: 13px; font-family: inherit;
-      resize: none; padding: 14px 14px 6px;
-      line-height: 1.6; min-height: 108px;
+      color: var(--text-1); font-size: 13px; font-family: inherit;
+      resize: none; padding: 12px 12px 6px;
+      line-height: 1.6;
       caret-color: var(--accent);
     }
-    .v2-prompt-wrap textarea::placeholder { color: var(--text-tertiary); }
+    .v2-prompt-wrap textarea::placeholder { color: var(--text-3); }
     .v2-prompt-foot {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 12px 10px;
+      padding: 6px 10px 10px; flex-shrink: 0;
     }
+
+    /* Enhance button */
     .v2-enhance-btn {
-      display: flex; align-items: center; gap: 6px;
-      background: rgba(0,230,118,0.1);
-      border: 1px solid rgba(0,230,118,0.26);
+      display: flex; align-items: center; gap: 5px;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
       color: var(--accent);
       font-size: 11px; font-weight: 700;
-      padding: 6px 13px; border-radius: 20px;
-      transition: all .2s ease;
+      padding: 5px 12px; border-radius: 20px;
+      transition: all .18s ease;
     }
-    .v2-enhance-btn:hover {
-      background: rgba(0,230,118,0.2); border-color: rgba(0,230,118,0.5); color: #fff;
-    }
-    .v2-enhance-btn:active { transform: scale(0.97); }
+    .v2-enhance-btn:hover   { background: rgba(0,230,118,0.18); border-color: rgba(0,230,118,0.5); }
+    .v2-enhance-btn:active  { transform: scale(0.97); }
     .v2-enhance-btn:disabled { opacity: .35; cursor: wait; }
-    .v2-char-count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+    .v2-enhance-btn.ai-btn--done { background: rgba(0,230,118,0.2); border-color: var(--accent); color: #fff; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .v2-enhance-btn.enhancing .ai-btn-icon { animation: spin 0.9s linear infinite; display: inline-block; }
 
-    /* ── Generate Button ────────────────────────────────── */
-    .v2-gen-btn {
-      flex-shrink: 0;
-      position: relative; overflow: hidden;
-      width: 100%; height: 48px;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: var(--accent); color: #000;
-      font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
-      border: none; cursor: pointer;
-      transition: filter .2s, background .2s;
-    }
-    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) { filter: brightness(1.08); }
-    .v2-gen-btn:active:not(.v2-generating) { transform: scale(0.99); }
-    .v2-gen-btn:disabled:not(.v2-generating) { opacity: .35; cursor: not-allowed; }
+    /* Character counter */
+    .v2-char-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 
-    /* Generating state */
-    .v2-gen-btn.v2-generating {
-      background: #1e1e1e; color: var(--text-primary);
-      cursor: default;
-    }
-    .v2-gen-cost {
-      background: rgba(0,0,0,0.22); border-radius: 20px;
-      padding: 2px 8px; font-size: 11px; font-weight: 700;
-    }
-    .v2-generating .v2-gen-cost { display: none; }
-
-    /* Progress line — 2px bar at the bottom of the button */
-    .v2-gen-pline {
-      position: absolute; bottom: 0; left: 0;
-      height: 2px; width: 0%;
-      background: var(--accent);
-      transition: width .35s ease;
-      box-shadow: 0 0 8px rgba(0,230,118,0.5);
-    }
-
-    /* ── Error / No Credits ─────────────────────────────── */
+    /* ─── ERROR / NO CREDITS ────────────────── */
     .v2-inline-error {
       flex-shrink: 0;
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px;
       background: rgba(255,69,58,0.06);
       border-bottom: 1px solid rgba(255,69,58,0.14);
       font-size: 12px; color: rgba(255,69,58,0.9);
@@ -306,26 +265,71 @@
       margin-left: auto; flex-shrink: 0;
       background: none; border: 1px solid rgba(255,69,58,0.35);
       color: var(--red); font-size: 11px; font-weight: 600;
-      padding: 4px 11px; border-radius: 20px;
-      transition: background .18s, border-color .18s;
+      padding: 4px 10px; border-radius: 20px;
+      transition: background .15s;
     }
-    .v2-err-retry:hover { background: rgba(255,69,58,0.1); border-color: rgba(255,69,58,0.55); }
-    .v2-err-link {
-      margin-left: auto; color: var(--accent);
-      font-weight: 600; font-size: 11px; text-decoration: none;
-    }
-    .v2-err-link:hover { text-decoration: underline; }
+    .v2-err-retry:hover { background: rgba(255,69,58,0.1); }
 
-    /* ── Output (Before / After Slider) ────────────────── */
-    .v2-output {
+    .no-credits-bar {
       flex-shrink: 0;
-      display: flex; flex-direction: column;
-      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,69,58,0.06);
+      border-bottom: 1px solid rgba(255,69,58,0.14);
+      padding: 9px 12px; font-size: 12px; color: var(--red);
     }
+    .no-credits-link {
+      color: var(--accent); text-decoration: none;
+      margin-left: auto; font-weight: 600; font-size: 11px;
+    }
+    .no-credits-link:hover { text-decoration: underline; }
+
+    /* ─── GENERATE BUTTON ───────────────────── */
+    .v2-gen-btn {
+      flex-shrink: 0;
+      position: relative; overflow: hidden;
+      width: 100%; height: 48px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--accent); color: #000;
+      font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+      border: none; cursor: pointer;
+      transition: filter .18s ease, background .2s ease;
+    }
+    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) { filter: brightness(1.08); }
+    .v2-gen-btn:active:not(.v2-generating)               { transform: scale(0.99); }
+    .v2-gen-btn:disabled:not(.v2-generating)              { opacity: .35; cursor: not-allowed; }
+
+    /* Generating state */
+    .v2-gen-btn.v2-generating {
+      background: var(--card); color: var(--text-1); cursor: default;
+    }
+    .v2-gen-cost {
+      background: rgba(0,0,0,0.18); border-radius: 20px;
+      padding: 2px 8px; font-size: 11px; font-weight: 700;
+    }
+    .v2-generating .v2-gen-cost { display: none; }
+
+    /* 2px progress line at bottom */
+    .v2-gen-pline {
+      position: absolute; bottom: 0; left: 0;
+      height: 2px; width: 0%;
+      background: var(--accent);
+      transition: width .35s ease;
+      box-shadow: 0 0 8px rgba(0,230,118,0.6);
+    }
+
+    /* ─── OUTPUT SECTION — full-panel overlay ── */
+    #mf-section-result {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+    }
+    /* .hidden uses display:none !important — defined in reset above */
+
+    /* Before / After slider — takes all remaining height */
     .v2-ba-wrap {
+      flex: 1; min-height: 0;
       position: relative;
-      width: 100%; aspect-ratio: 16/9;
-      background: #111; overflow: hidden;
+      background: #0a0a0a; overflow: hidden;
       user-select: none;
     }
     .v2-ba-img {
@@ -333,25 +337,27 @@
       width: 100%; height: 100%;
       object-fit: cover; display: block;
     }
-    .v2-ba-after {
-      clip-path: inset(0 0 0 50%); /* updated by JS */
-    }
+    .v2-ba-after { clip-path: inset(0 0 0 50%); }
+
+    /* Divider line */
     .v2-ba-divider {
       position: absolute; top: 0; bottom: 0;
       left: 50%; width: 2px;
-      background: #fff; transform: translateX(-50%);
+      background: rgba(255,255,255,0.9); transform: translateX(-50%);
       pointer-events: none;
-      box-shadow: 0 0 6px rgba(0,0,0,0.5);
+      box-shadow: 0 0 10px rgba(0,0,0,0.6);
     }
     /* Drag handle circle */
     .v2-ba-divider::after {
       content: '';
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 26px; height: 26px; border-radius: 50%;
+      width: 28px; height: 28px; border-radius: 50%;
       background: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
     }
+
+    /* Transparent range input captures drag events */
     .v2-ba-slider {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
@@ -362,145 +368,149 @@
       -webkit-appearance: none; appearance: none;
       width: 44px; height: 100vh; cursor: ew-resize;
     }
+
+    /* Before / After labels */
     .v2-ba-lbl {
       position: absolute; top: 10px;
-      padding: 3px 9px; background: rgba(0,0,0,0.62);
+      padding: 3px 9px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
       color: #fff; font-size: 10px; font-weight: 700;
       border-radius: 20px; pointer-events: none;
-      letter-spacing: .3px;
+      letter-spacing: 0.3px;
     }
     .v2-ba-lbl-l { left: 10px; }
     .v2-ba-lbl-r { right: 10px; }
+
+    /* Action buttons below slider */
     .v2-output-actions {
+      flex-shrink: 0;
       display: flex; gap: 8px;
-      padding: 10px 14px 12px;
+      padding: 10px 12px 14px;
+      border-top: 1px solid var(--border);
     }
     .v2-timeline-btn {
       flex: 1;
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 10px 12px; border-radius: var(--radius-sm);
+      padding: 10px 12px; border-radius: var(--r-sm);
       font-size: 12px; font-weight: 700;
       background: var(--accent); color: #000; border: none;
-      transition: filter .2s, transform .1s;
+      transition: filter .18s;
     }
-    .v2-timeline-btn:hover { filter: brightness(1.08); }
-    .v2-timeline-btn:active { transform: scale(0.98); }
-    .v2-timeline-btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+    .v2-timeline-btn:hover   { filter: brightness(1.08); }
+    .v2-timeline-btn:active  { transform: scale(0.98); }
+    .v2-timeline-btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
     .v2-new-effect-btn {
       flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 10px 14px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 10px 14px; border-radius: var(--r-sm);
       font-size: 12px; font-weight: 600;
-      background: transparent; color: var(--text-primary);
+      background: transparent; color: var(--text-1);
       border: 1px solid var(--border);
-      transition: all .18s ease;
+      transition: border-color .15s, background .15s;
     }
-    .v2-new-effect-btn:hover { border-color: var(--border-strong); background: var(--card); }
+    .v2-new-effect-btn:hover  { border-color: var(--border-strong); background: var(--card); }
     .v2-new-effect-btn:active { transform: scale(0.98); }
 
-    /* ═══════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════
        SETTINGS OVERLAY
-    ═══════════════════════════════════════════════════════ */
+    ═══════════════════════════════════════════ */
     #section-settings {
       position: fixed; inset: 0; z-index: 100;
       background: rgba(0,0,0,0.55);
       backdrop-filter: blur(12px);
       display: flex; flex-direction: column; justify-content: flex-end;
       opacity: 0; pointer-events: none;
-      transition: opacity .25s ease;
+      transition: opacity .22s ease;
     }
     #section-settings.settings-visible { opacity: 1; pointer-events: auto; }
+
     .settings-sheet {
-      background: rgba(28,28,30,0.97);
+      background: rgba(26,26,26,0.97);
       border: 1px solid var(--border-strong); border-bottom: none;
-      border-radius: 16px 16px 0 0;
-      box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
-      transform: translateY(20px);
-      transition: transform .25s cubic-bezier(.32,0,.67,0);
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -24px 60px rgba(0,0,0,0.5);
+      transform: translateY(16px);
+      transition: transform .22s ease;
     }
-    #section-settings.settings-visible .settings-sheet {
-      transform: translateY(0);
-      transition: transform .3s cubic-bezier(.33,1,.68,1);
-    }
+    #section-settings.settings-visible .settings-sheet { transform: translateY(0); }
+
     .settings-handle {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 18px 8px; border-bottom: 1px solid var(--border);
+      padding: 14px 16px 8px; border-bottom: 1px solid var(--border);
     }
-    .settings-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .settings-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
     .settings-close {
-      background: rgba(255,255,255,0.08); border: none; color: var(--text-secondary);
-      width: 26px; height: 26px; border-radius: 50%;
+      background: rgba(255,255,255,0.08); border: none; color: var(--text-2);
+      width: 24px; height: 24px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 600;
-      transition: background .2s;
+      font-size: 13px; font-weight: 600;
+      transition: background .15s;
     }
-    .settings-close:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
+    .settings-close:hover { background: rgba(255,255,255,0.14); color: var(--text-1); }
+
+    /* Hidden JS-compat toggles */
     .settings-toggle { display: none; }
     .settings-menu   { display: none; }
+
     .sm-item {
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: center; gap: 11px;
       background: none; border: none;
-      color: var(--text-secondary); font-size: 13px; font-weight: 500;
-      padding: 13px 18px; width: 100%; text-align: left;
+      color: var(--text-2); font-size: 13px; font-weight: 500;
+      padding: 12px 16px; width: 100%; text-align: left;
       border-bottom: 1px solid var(--border);
-      transition: color .15s, background .15s;
+      transition: color .12s, background .12s;
     }
     .sm-item:last-child { border-bottom: none; }
-    .sm-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
-    .sm-danger:hover { color: var(--red); }
+    .sm-item:hover      { color: var(--text-1); background: rgba(255,255,255,0.03); }
+    .sm-danger:hover    { color: var(--red); }
+
     .sm-item-icon {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: rgba(255,255,255,.07);
+      width: 28px; height: 28px; border-radius: 7px;
+      background: rgba(255,255,255,0.07);
       display: flex; align-items: center; justify-content: center;
-      color: var(--text-secondary); flex-shrink: 0;
+      color: var(--text-2); flex-shrink: 0;
     }
+
+    /* Diagnostics */
     .diag-box {
       background: rgba(255,255,255,0.03); border-top: 1px solid var(--border);
-      padding: 10px 18px; display: flex; flex-direction: column; gap: 6px;
+      padding: 10px 16px; display: flex; flex-direction: column; gap: 5px;
     }
     .diag-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; }
+    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
     .diag-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
-    .dk { color: var(--text-secondary); }
-    .dv { color: var(--text-primary); font-family: 'SF Mono', monospace; font-size: 10px; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ghost-lnk { background: none; border: none; color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; }
-    .diag-status.ok  { color: var(--accent); }
-    .diag-status.err { color: var(--red); }
+    .dk { color: var(--text-2); }
+    .dv {
+      color: var(--text-1); font-family: 'SF Mono', ui-monospace, monospace;
+      font-size: 10px; text-align: right;
+      max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ghost-lnk {
+      background: none; border: none; color: var(--accent);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+    }
 
-    /* Chip helpers used in hidden compat area */
+    /* ─── Chip helpers (used in hidden compat area) ── */
     .chip { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
-    .chip-green { background: rgba(0,230,118,.12); color: var(--accent); }
-    .chip-gray  { background: rgba(255,255,255,.06); color: var(--text-secondary); }
-    .chip-amber { background: rgba(255,159,10,.1); color: #ff9f0a; }
-
-    /* No-credits bar (reused style) */
-    .no-credits-bar {
-      display: flex; align-items: center; gap: 7px;
-      background: rgba(255,69,58,.06); border-bottom: 1px solid rgba(255,69,58,.14);
-      padding: 9px 14px; font-size: 12px; color: #ff453a; flex-shrink: 0;
-    }
-    .no-credits-link {
-      color: var(--accent); text-decoration: none;
-      margin-left: auto; font-weight: 600; font-size: 11px;
-    }
-    .no-credits-link:hover { text-decoration: underline; }
-
-    /* AI enhance btn spin animation */
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .v2-enhance-btn.enhancing svg { animation: spin 0.9s linear infinite; }
+    .chip-green { background: var(--accent-dim); color: var(--accent); }
+    .chip-gray  { background: rgba(255,255,255,0.06); color: var(--text-2); }
+    .chip-amber { background: rgba(255,159,10,0.10); color: #ff9f0a; }
   </style>
 </head>
 <body>
 
+  <!-- ══════════════════════════════════════════
+       TOAST
+  ══════════════════════════════════════════ -->
   <div id="toast" class="toast hidden" role="alert" aria-live="polite">
     <span class="toast-dot"></span>
     <span id="toast-icon"></span>
     <span id="toast-text"></span>
   </div>
 
-  <!-- ══════════════════════════════════════
+  <!-- ══════════════════════════════════════════
        LOGIN VIEW
-  ══════════════════════════════════════ -->
+  ══════════════════════════════════════════ -->
   <div id="view-login" class="view login-view">
     <div class="lbg" aria-hidden="true">
       <div class="lbg-glow-center"></div>
@@ -563,19 +573,19 @@
     </div>
   </div>
 
-
-  <!-- ══════════════════════════════════════
-       MAIN PANEL VIEW  (v2 redesign)
-  ══════════════════════════════════════ -->
+  <!-- ══════════════════════════════════════════
+       MAIN PANEL VIEW
+  ══════════════════════════════════════════ -->
   <div id="view-main" class="view v2-panel hidden">
 
-    <!-- ── HEADER ───────────────────────────────────────── -->
+    <!-- ── HEADER ──────────────────────────── -->
     <header class="v2-hdr">
       <span class="v2-hdr-logo">Prysmor</span>
 
       <div class="v2-hdr-center">
         <div id="topbar-credits" style="display:none">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <!-- Lightning bolt icon -->
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span id="topbar-credits-val">—</span>
           <span class="v2-credits-lbl">cr</span>
         </div>
@@ -589,7 +599,7 @@
       </div>
     </header>
 
-    <!-- ── CLIP ROW ──────────────────────────────────────── -->
+    <!-- ── CLIP ROW ─────────────────────────── -->
     <div class="v2-clip-row">
       <!-- Empty state -->
       <div id="clip-empty" class="v2-clip-empty">
@@ -611,42 +621,30 @@
       </div>
     </div>
 
-    <!-- ── MODE PILLS ────────────────────────────────────── -->
+    <!-- ── MODE PILLS ────────────────────────── -->
     <div class="v2-modes">
       <button class="mode-pill active" data-mode="background">Background</button>
-      <button class="mode-pill" data-mode="relight">Relight</button>
-      <button class="mode-pill" data-mode="vfx">VFX</button>
+      <button class="mode-pill"        data-mode="relight">Relight</button>
+      <button class="mode-pill"        data-mode="vfx">VFX</button>
     </div>
 
-    <!-- ── PROMPT (hero) ─────────────────────────────────── -->
+    <!-- ── PROMPT (hero) ────────────────────── -->
     <div class="v2-prompt-wrap">
       <textarea id="mf-prompt" maxlength="1000"
         placeholder="Describe your effect…"></textarea>
       <div class="v2-prompt-foot">
         <button id="btn-compile-prompt" class="v2-enhance-btn">
-          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 2C10 2 10.8 5.2 12.5 6.5C14.2 7.8 17.5 8 17.5 8C17.5 8 14.2 8.2 12.5 9.5C10.8 10.8 10 14 10 14C10 14 9.2 10.8 7.5 9.5C5.8 8.2 2.5 8 2.5 8C2.5 8 5.8 7.8 7.5 6.5C9.2 5.2 10 2 10 2Z" fill="currentColor"/>
-            <path d="M15.5 13.5C15.5 13.5 15.9 14.9 16.6 15.4C17.3 15.9 18.5 16 18.5 16C18.5 16 17.3 16.1 16.6 16.6C15.9 17.1 15.5 18.5 15.5 18.5C15.5 18.5 15.1 17.1 14.4 16.6C13.7 16.1 12.5 16 12.5 16C12.5 16 13.7 15.9 14.4 15.4C15.1 14.9 15.5 13.5 15.5 13.5Z" fill="currentColor" opacity="0.7"/>
-          </svg>
+          <span class="ai-btn-icon">✦</span>
           <span id="compile-label">Enhance</span>
         </button>
         <span class="v2-char-count"><span id="mf-char-count">0</span> / 1000</span>
       </div>
     </div>
 
-    <!-- ── GENERATE BUTTON ───────────────────────────────── -->
-    <button id="mf-btn-generate" class="v2-gen-btn">
-      <span id="gen-btn-label">▶ Generate Effect</span>
-      <span id="gen-btn-cost" class="v2-gen-cost" style="display:none">
-        <span id="gen-btn-cost-val">—</span> cr
-      </span>
-      <div class="v2-gen-pline" id="v2-gen-pline"></div>
-    </button>
-
-    <!-- ── ERROR / NO CREDITS ────────────────────────────── -->
+    <!-- ── ERROR / NO CREDITS ────────────────── -->
     <div id="mf-gen-failed" class="v2-inline-error hidden">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span id="gen-fail-msg" class="v2-err-msg">Something went wrong.</span>
+      <span id="gen-fail-msg">Something went wrong.</span>
       <button id="gen-retry-btn" class="v2-err-retry">Retry</button>
     </div>
 
@@ -656,41 +654,31 @@
       <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
     </div>
 
-    <!-- ── OUTPUT — Before / After Slider ───────────────── -->
-    <div id="mf-section-result" class="v2-output hidden">
-      <div class="v2-ba-wrap">
-        <!-- Before: original frame (bottom layer) -->
-        <img id="ba-before" class="v2-ba-img" alt="Before" src="">
-        <!-- After: AI output frame (top layer, clipped by slider) -->
-        <img id="ba-after" class="v2-ba-img v2-ba-after" alt="After" src="">
-        <!-- Divider line + handle -->
-        <div class="v2-ba-divider" id="ba-divider"></div>
-        <!-- Transparent range input captures drag events -->
-        <input type="range" id="ba-slider" class="v2-ba-slider" value="50" min="0" max="100">
-        <!-- Labels -->
-        <span class="v2-ba-lbl v2-ba-lbl-l">Before</span>
-        <span class="v2-ba-lbl v2-ba-lbl-r">After</span>
-      </div>
-      <div class="v2-output-actions">
-        <button id="btn-add-to-timeline" class="v2-timeline-btn">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-          Add to Timeline
-        </button>
-        <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
-      </div>
-    </div>
+    <!-- ── GENERATE BUTTON ───────────────────── -->
+    <button id="mf-btn-generate" class="v2-gen-btn">
+      <span id="gen-btn-label">▶ Generate Effect</span>
+      <span id="gen-btn-cost" class="v2-gen-cost" style="display:none">
+        <span id="gen-btn-cost-val">—</span> cr
+      </span>
+      <div class="v2-gen-pline" id="v2-gen-pline"></div>
+    </button>
 
     <!-- ── HIDDEN COMPAT ELEMENTS (JS still references these IDs) ── -->
-    <div style="display:none">
-      <!-- Legacy credits/usage -->
-      <div id="credits-card"><b id="usage-used">—</b>/<span id="usage-limit">1000</span><span id="usage-seconds"></span></div>
+    <div style="display:none" aria-hidden="true">
+      <!-- Legacy credits / usage -->
+      <div id="credits-card">
+        <b id="usage-used">—</b>/<span id="usage-limit">1000</span>
+        <span id="usage-seconds"></span>
+      </div>
       <div id="progress-fill" style="width:0%"></div>
-      <!-- Output mode toggle (legacy) -->
+
+      <!-- Output mode (legacy) -->
       <input type="checkbox" id="mf-replace-toggle"/>
       <div id="output-hint"></div>
       <button id="out-btn-v2"></button>
       <button id="out-btn-replace"></button>
-      <!-- Progress section (legacy, still updated by JS for ETA logic) -->
+
+      <!-- Generation progress (legacy, still updated by JS for ETA logic) -->
       <div id="mf-gen-state">
         <span id="gp-phase-label"></span>
         <div id="gp-fill" style="width:0%"></div>
@@ -701,10 +689,16 @@
         <span id="mf-status-text"></span>
         <span id="mf-gen-pct"></span>
         <span id="mf-gen-elapsed"></span>
-        <span id="gs-upload"></span><span id="gs-generate"></span><span id="gs-done"></span>
-        <span id="gs-line-1"></span><span id="gs-line-2"></span>
+        <span id="gs-upload"></span>
+        <span id="gs-generate"></span>
+        <span id="gs-done"></span>
+        <span id="gs-line-1"></span>
+        <span id="gs-line-2"></span>
       </div>
+
+      <!-- Cost preview (legacy) -->
       <div id="gen-cost-preview"></div>
+
       <!-- Clip extras (legacy) -->
       <button id="btn-refresh-clip"></button>
       <span id="clip-thumb-placeholder"></span>
@@ -712,24 +706,54 @@
       <span id="clip-start-badge"></span>
       <p id="clip-trim-warning"></p>
       <div class="clip-live"></div>
+
       <!-- Legacy result video (not shown in new UI) -->
       <video id="mf-result-video" src="" muted loop playsinline></video>
     </div>
 
+    <!-- ── OUTPUT — full panel overlay ─────── -->
+    <!--
+      Position: absolute, inset: 0, z-index: 20.
+      When JS removes .hidden, this covers the whole panel without scroll.
+      Before image = original clip frame, After image = AI output frame.
+    -->
+    <div id="mf-section-result" class="hidden">
+      <!-- B/A slider — fills all height above action buttons -->
+      <div class="v2-ba-wrap">
+        <img id="ba-before" class="v2-ba-img" alt="Before" src="">
+        <img id="ba-after"  class="v2-ba-img v2-ba-after" alt="After" src="">
+        <div class="v2-ba-divider" id="ba-divider"></div>
+        <input type="range" id="ba-slider" class="v2-ba-slider"
+               value="50" min="0" max="100" aria-label="Compare before and after">
+        <span class="v2-ba-lbl v2-ba-lbl-l">Before</span>
+        <span class="v2-ba-lbl v2-ba-lbl-r">After</span>
+      </div>
+      <!-- Action buttons -->
+      <div class="v2-output-actions">
+        <button id="btn-add-to-timeline" class="v2-timeline-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          Add to Timeline
+        </button>
+        <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
+      </div>
+    </div>
+
   </div><!-- /view-main -->
 
-  <!-- ── SETTINGS OVERLAY ──────────────────────────────── -->
+  <!-- ══════════════════════════════════════════
+       SETTINGS OVERLAY
+  ══════════════════════════════════════════ -->
   <div id="section-settings">
     <div class="settings-sheet">
       <div class="settings-handle">
         <span class="settings-title">Settings</span>
-        <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
+        <button class="settings-close" id="settings-close-btn" aria-label="Close settings">✕</button>
       </div>
 
-      <!-- JS-compat hidden elements -->
+      <!-- JS-compat hidden toggles -->
       <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
-      <div class="settings-menu" id="settings-menu" style="display:none"></div>
-      <span class="st-chev" id="settings-chevron" style="display:none"></span>
+      <div    class="settings-menu"   id="settings-menu"    style="display:none"></div>
+      <span                           id="settings-chevron" style="display:none"></span>
 
       <button class="sm-item" id="btn-dashboard">
         <span class="sm-item-icon">
@@ -737,18 +761,21 @@
         </span>
         Open Dashboard
       </button>
+
       <button class="sm-item" id="btn-updates">
         <span class="sm-item-icon">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
         </span>
         Check for Updates
       </button>
+
       <button class="sm-item" id="btn-diagnostics">
         <span class="sm-item-icon">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         </span>
         <span id="btn-diagnostics-label">Diagnostics</span>
       </button>
+
       <div class="diag-box hidden" id="diag-panel">
         <div class="diag-top">
           <span class="diag-ttl">Environment</span>
@@ -756,11 +783,12 @@
         </div>
         <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
         <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
-        <div class="diag-row"><span class="dk">CEP</span><span class="dv" id="diag-cep">…</span></div>
-        <div class="diag-row"><span class="dk">cep.fs</span><span class="dv" id="diag-cepfs">…</span></div>
-        <div class="diag-row"><span class="dk">Backend</span><span class="dv" id="diag-backend">…</span></div>
+        <div class="diag-row"><span class="dk">CEP</span>     <span class="dv" id="diag-cep">…</span></div>
+        <div class="diag-row"><span class="dk">cep.fs</span>  <span class="dv" id="diag-cepfs">…</span></div>
+        <div class="diag-row"><span class="dk">Backend</span> <span class="dv" id="diag-backend">…</span></div>
         <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
       </div>
+
       <button class="sm-item sm-danger" id="btn-logout">
         <span class="sm-item-icon">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -771,48 +799,65 @@
   </div>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=31"></script>
+  <script src="main.js?v=32"></script>
   <script>
-    /* Grain canvas for login view */
-    (function(){
-      var c=document.getElementById('grain');
-      if(!c)return;
-      var ctx=c.getContext('2d');
-      function draw(){
-        c.width=c.offsetWidth;c.height=c.offsetHeight;
-        var img=ctx.createImageData(c.width,c.height);
-        var d=img.data;
-        for(var i=0;i<d.length;i+=4){var v=Math.random()*22|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=16;}
-        ctx.putImageData(img,0,0);setTimeout(draw,80);
+    /* ─── Login view grain canvas ─────────────────── */
+    (function () {
+      var c = document.getElementById('grain');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      function draw() {
+        c.width  = c.offsetWidth;
+        c.height = c.offsetHeight;
+        var img = ctx.createImageData(c.width, c.height);
+        var d = img.data;
+        for (var i = 0; i < d.length; i += 4) {
+          var v = Math.random() * 22 | 0;
+          d[i] = d[i + 1] = d[i + 2] = v;
+          d[i + 3] = 16;
+        }
+        ctx.putImageData(img, 0, 0);
+        setTimeout(draw, 80);
       }
       draw();
-    })();
+    }());
 
-    /* Settings overlay close */
-    document.addEventListener('DOMContentLoaded', function() {
-      var closeBtn = document.getElementById('settings-close-btn');
+    /* ─── Settings overlay open / close ───────────── */
+    document.addEventListener('DOMContentLoaded', function () {
       var overlay  = document.getElementById('section-settings');
+      var closeBtn = document.getElementById('settings-close-btn');
+      var openBtn  = document.getElementById('btn-scroll-settings');
+
+      if (openBtn && overlay) {
+        openBtn.addEventListener('click', function () {
+          overlay.classList.add('settings-visible');
+        });
+      }
       if (closeBtn && overlay) {
-        closeBtn.addEventListener('click', function() {
+        closeBtn.addEventListener('click', function () {
           overlay.classList.remove('settings-visible');
         });
-        overlay.addEventListener('click', function(e) {
+        overlay.addEventListener('click', function (e) {
           if (e.target === overlay) overlay.classList.remove('settings-visible');
         });
       }
 
-      /* Before/After slider */
+      /* ─── Before / After slider ────────────────── */
       var slider  = document.getElementById('ba-slider');
       var after   = document.getElementById('ba-after');
       var divider = document.getElementById('ba-divider');
+
+      function updateSlider(val) {
+        /* val = 0–100; left side (Before) shows (100-val)% of width */
+        after.style.clipPath = 'inset(0 0 0 ' + (100 - val) + '%)';
+        divider.style.left   = val + '%';
+      }
+
       if (slider && after && divider) {
-        function updateSlider(val) {
-          var clip = 100 - val; // inset from left = (100-val)% → "after" shows right (val)%
-          after.style.clipPath = 'inset(0 0 0 ' + clip + '%)';
-          divider.style.left   = val + '%';
-        }
-        updateSlider(50); // init
-        slider.addEventListener('input', function() { updateSlider(parseInt(this.value)); });
+        updateSlider(50);
+        slider.addEventListener('input', function () {
+          updateSlider(parseInt(this.value, 10));
+        });
       }
     });
   </script>

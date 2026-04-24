@@ -18,9 +18,8 @@
  * first maximises its effect on the generated output.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { log, warn } from './logger';
-import { validatePrompt } from './promptEnhancer';
+import { validatePrompt, client } from './promptEnhancer';
 
 const TAG = 'promptCompiler';
 
@@ -28,8 +27,6 @@ const TAG = 'promptCompiler';
 
 const MODEL      = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 160;  // identity + VFX only; prefix is prepended by us
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Anti-artifact prefix (hard rule, always first) ──────────────────────────
 
@@ -330,17 +327,6 @@ async function callClaude(userPrompt: string): Promise<string> {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-
-/**
- * Injected into background-effect prompts to anchor subject appearance.
- * Placed BEFORE the VFX instruction (right after ANTI_ARTIFACT_PREFIX) so that
- * Runway's highest-weight instruction slot contains the identity constraint.
- * Uses positive language only — Runway responds to "maintain X" better than "do not change X".
- */
-const FACE_PRESERVE_SUFFIX =
-  'All subjects maintain their exact facial features, skin tone, hair color and style,' +
-  ' clothing, and body proportions from the source video, appearing identical throughout' +
-  ' the transformation.';
 
 /**
  * Compiles a user's VFX idea into a production-ready Runway transformation prompt.

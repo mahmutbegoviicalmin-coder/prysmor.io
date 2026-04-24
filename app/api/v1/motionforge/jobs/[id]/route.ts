@@ -17,6 +17,25 @@ function safeUnlink(filePath: string): void {
   try { if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
 }
 
+/** Retries refundCredits up to 3 times with a 2 s delay so transient failures don't permanently lose credits. */
+async function refundWithRetry(userId: string, credits: number, jobId: string): Promise<void> {
+  const MAX_ATTEMPTS = 3;
+  const DELAY_MS     = 2_000;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await refundCredits(userId, credits);
+      return;
+    } catch (e) {
+      if (attempt < MAX_ATTEMPTS) {
+        warn(TAG, `Credit refund attempt ${attempt}/${MAX_ATTEMPTS} failed for job ${jobId} — retrying`, e);
+        await new Promise(r => setTimeout(r, DELAY_MS));
+      } else {
+        warn(TAG, `Credit refund failed after ${MAX_ATTEMPTS} attempts for job ${jobId} — credits lost`, e);
+      }
+    }
+  }
+}
+
 export const runtime     = 'nodejs';
 export const maxDuration = 60; // Firebase cold start (5-8s) + Runway API (up to 20s) + buffer
 
@@ -76,9 +95,7 @@ export async function GET(
       }
       await updateJob(userId, params.id, { status: 'failed', error: 'Compositing timed out with no fallback URL' });
       if (job.userId && job.creditCost) {
-        refundCredits(job.userId, job.creditCost).catch(e =>
-          warn(TAG, `Credit refund failed for job ${params.id}`, e),
-        );
+        refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});
       }
       return NextResponse.json({ status: 'failed', error: 'Compositing timed out' });
     }
@@ -140,9 +157,7 @@ export async function GET(
         cleanupAnchorFrames(job.identityAnchorPaths ?? []);
         await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {
-          refundCredits(job.userId, job.creditCost).catch(e =>
-            warn(TAG, `Credit refund failed for job ${params.id}`, e),
-          );
+          refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});
         }
         return NextResponse.json({ status: 'failed', error: reason });
       }

@@ -589,7 +589,6 @@ function showClipInfo(info) {
 function apiHeaders(extra) {
   var headers = {};
   var token = state.auth.token;
-  console.log('[auth] token being sent:', token ? 'YES length=' + token.length : 'NO TOKEN');
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
@@ -894,7 +893,7 @@ function computeFrameSharpness(base64Jpeg) {
  * @returns {Promise<string[]>} up to 5 base64 JPEG strings, sharpest first
  */
 async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
-  var SAMPLE_COUNT  = 10;
+  var SAMPLE_COUNT  = 5;
   var KEEP_COUNT    = 5;
   // For short clips reduce the skip margins so we don't waste too much of the clip.
   // Clips < 3s: no skip. Clips 3-6s: 5% each end. Longer: 10% each end.
@@ -1057,8 +1056,8 @@ async function mfGenerate() {
 
   // ── Step 1: Create job (deducts credits atomically on server) ────────────
   let jobId;
+  var clipDurSec = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
   try {
-    var clipDurSec = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
     const created = await apiFetch('/api/v1/motionforge/jobs', {
       method:  'POST',
       headers: apiHeaders({
@@ -1085,7 +1084,7 @@ async function mfGenerate() {
   }
 
   var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
-  var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
+  clipDurSec     = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
   var sourcePath = normalisePath(state.mf.selInfo.sourcePath);
 
   console.log('[Prysmor:selInfo] mediaInSec  :', mediaInSec);
