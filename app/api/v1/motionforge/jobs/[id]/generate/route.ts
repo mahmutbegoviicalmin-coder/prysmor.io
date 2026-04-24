@@ -10,7 +10,7 @@ import {
 }                                      from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
-import { sanitizeForRunway, classifyPromptEffect } from '@/lib/motionforge/promptCompiler';
+import { sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
 import { getConfig }                   from '@/lib/motionforge/config';
 import * as fs   from 'fs';
 import * as os   from 'os';
@@ -130,6 +130,7 @@ export async function POST(
     videoWidth?: number;
     videoHeight?: number;
     clipDuration?: number;
+    mode?: string;
   };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
@@ -151,7 +152,8 @@ export async function POST(
     }
   }
 
-  const effectType  = classifyPromptEffect(rawPrompt);
+  // Mode sent from panel — drives reference frame logic
+  const mode = (body.mode ?? 'background').trim();
   // Clip duration sent from panel — used to request matching output length from Runway (max 16s)
   const clipDuration = typeof body.clipDuration === 'number' && body.clipDuration > 0
     ? Math.min(Math.ceil(body.clipDuration), 16)
@@ -161,7 +163,7 @@ export async function POST(
   // does not need clothing/face descriptions. Just sanitize for moderation.
   const prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
 
-  log(TAG, `Effect type: ${effectType}`);
+  log(TAG, `Mode: ${mode}`);
 
   const config = getConfig();
 
@@ -255,16 +257,17 @@ export async function POST(
       ]);
       runwayUri = uri;
 
-      // Local dev: single anchor frame — only for overlay effects
-      const localRefUris: string[] = effectType === 'overlay' && refUri ? [refUri] : [];
-      console.log('[MotionForge] effectType:', effectType, '— reference frames sent:', effectType === 'overlay');
-      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, effectType, clipDuration);
+      // relight + style → send reference frames; background + vfx → no reference frames
+      const sendRefs = mode === 'relight' || mode === 'style';
+      const localRefUris: string[] = sendRefs && refUri ? [refUri] : [];
+      console.log('[MotionForge] Mode:', mode, '— refs sent:', localRefUris.length > 0);
+      const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, 'background', clipDuration);
       log(TAG, `Runway task started: ${task.id}`);
 
       await updateJob(userId, params.id, {
         status:                  'generating',
         prompt,
-        effectType,
+        mode,
         runwayTaskId:            task.id,
         originalVideoPath:       preservedVideoPath,
         identityAnchorPaths:     anchorFrames.map(a => a.path),
@@ -312,22 +315,23 @@ export async function POST(
       uploaded.forEach(uri => { if (uri) refUris.push(uri); });
     }
 
-    // background effects → no reference images (let Runway freely transform the scene)
-    // overlay effects    → include reference images for identity preservation
-    const refsToSend = effectType === 'overlay' ? refUris : [];
-    console.log('[MotionForge] effectType:', effectType, '— reference frames sent:', effectType === 'overlay');
+    // relight + style → send reference frames for identity/appearance preservation
+    // background + vfx → no reference frames (let Runway freely transform)
+    const sendRefs  = mode === 'relight' || mode === 'style';
+    const refsToSend = sendRefs ? refUris : [];
+    console.log('[MotionForge] Mode:', mode, '— refs sent:', refsToSend.length > 0);
     console.log('[runway] refUris uploaded:', refUris.length);
     console.log('[runway] prompt being sent:', prompt);
-    console.log('[runway] effectType:', effectType);
+    console.log('[runway] mode:', mode);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, effectType, clipDuration);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, 'background', clipDuration);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {
       status:       'generating',
       prompt,
-      effectType,
+      mode,
       runwayTaskId: task.id,
       progress:     0,
     });

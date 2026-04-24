@@ -34,43 +34,46 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  * It is intentionally strict to prevent common Runway generation failures
  * (distorted faces, warped anatomy, changed clothing).
  */
-const SYSTEM_PROMPT = `You are a Runway Gen-4 prompt writer for MotionForge video transformation.
+// ─── Mode-specific system prompts ────────────────────────────────────────────
 
-Runway already sees the video — do NOT describe faces or people's physical features.
-Identify WHAT the user wants to transform and write a prompt targeting exactly that.
-
-TRANSFORMATION TARGET — analyse the user's intent carefully:
-• If user mentions clothing, costume, outfit, style, fashion, apparel, wear, suit, dress — write a prompt that transforms CLOTHING/APPEARANCE of the people in the scene
-• If user mentions room, scene, environment, background, location, setting, place, weather, sky, floor, walls — write a prompt that transforms the BACKGROUND/ENVIRONMENT
-• Match the transformation target precisely to what the user asked for — never substitute one for the other
-
-STRICT OUTPUT FORMAT — maximum 30 words:
-"Transform [specific element the user asked about] into [transformation]. Keep all [unchanged elements] unchanged."
-
+const SHARED_RULES = `
 Rules:
 • Start with "Transform"
-• Target only what the user explicitly asked to change
 • Keep output under 30 words total
-• Use clear, cinematic language. Describe what SHOULD appear — positive visual detail only
-• CAMERA — zero camera angle, movement, or shot-type language
+• Positive visual description only — describe what SHOULD appear
+• No camera angle, movement, or shot-type language
 • No explanations, disclaimers, or meta-commentary
 • Return only the final prompt as plain text. No quotes. No prefixes
-• When adding background objects (cars, props), specify position relative to frame (left, right, background)
 
-CORRECT examples:
-• User asks "make his jacket leather" → "Transform the jacket into a sleek black leather jacket. Keep the background and all other elements unchanged."
-• User asks "change room to luxury hotel" → "Transform the room into an opulent luxury hotel suite with marble floors. Keep all people unchanged."
-• User asks "make outfit look like a knight" → "Transform the clothing into full medieval knight armour with chainmail detail. Keep the background unchanged."
+BANNED WORDS: scanlines, banding, CRT, interlacing, glitch, VHS, corrupted, static, distorted,
+artifacts, compression artifacts, shutter artifact, signal interference, data-moshing, noise pattern.
 
-WRONG: "with man in blue hoodie maintaining identical appearance, transform..."
+TRADEMARK RULE: Never use character/franchise names. Describe appearance generically instead.`;
 
-BANNED WORDS — never include any of these:
-scanlines, banding, CRT, interlacing, glitch, VHS, corrupted, static, distorted, artifacts, compression artifacts,
-shutter artifact, signal interference, data-moshing, interlaced, noise pattern, horizontal lines, digital defects.
+const MODE_PROMPTS: Record<string, string> = {
+  background: `You are a Runway Gen-4 prompt writer. Transform ONLY the scene, environment, or location.
+Do NOT mention people, faces, clothing, or any person's appearance.
+Output: "Transform [scene element] into [new environment]. Keep all people unchanged."
+${SHARED_RULES}`,
 
-TRADEMARK / COPYRIGHT RULE:
-Never use trademarked character names, superhero names, or licensed franchise names.
-Describe visual appearance generically instead (e.g. "form-fitting bodysuit with web texture" not "Spider-Man suit").`;
+  relight: `You are a Runway Gen-4 prompt writer. Transform ONLY the lighting, atmosphere, and color grade.
+Do NOT change the scene layout, people, or objects — only light, shadow, color mood.
+Output: "Transform the lighting into [lighting style and mood]. Keep all people and scene elements unchanged."
+${SHARED_RULES}`,
+
+  style: `You are a Runway Gen-4 prompt writer. Transform ONLY the clothing, outfit, costume, or appearance of people in the scene.
+Do NOT change the background, environment, or scene.
+Output: "Transform the clothing into [specific outfit description]. Keep the background unchanged."
+${SHARED_RULES}`,
+
+  vfx: `You are a Runway Gen-4 prompt writer. Add cinematic visual effects: particles, fire, smoke, magic, energy, weather phenomena.
+Be dramatic and specific. Do NOT change people's appearance or the core scene structure.
+Output: "Transform the scene with [specific VFX description]. Keep all people unchanged."
+${SHARED_RULES}`,
+};
+
+// Fallback for unknown modes
+const DEFAULT_MODE = 'background';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -134,9 +137,11 @@ export function fallbackEnhance(userPrompt: string): string {
 async function callClaude(
   userPrompt: string,
   sceneFrames: string[],
+  mode: string = DEFAULT_MODE,
 ): Promise<string> {
-  const hasFrames = sceneFrames.length > 0;
-  const model     = hasFrames ? MODEL_VISION : MODEL_TEXT;
+  const hasFrames  = sceneFrames.length > 0;
+  const model      = hasFrames ? MODEL_VISION : MODEL_TEXT;
+  const systemPrompt = MODE_PROMPTS[mode] ?? MODE_PROMPTS[DEFAULT_MODE];
 
   type ContentBlock =
     | { type: 'text'; text: string }
@@ -167,10 +172,12 @@ async function callClaude(
 
   console.log('[claude-vision] callClaude — model:', model, '— frames sent:', sceneFrames.length);
 
+  console.log('[claude] mode:', mode, '— system prompt length:', systemPrompt.length);
+
   const response = await client.messages.create({
     model,
     max_tokens: MAX_TOKENS,
-    system:     SYSTEM_PROMPT,
+    system:     systemPrompt,
     messages:   [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
   });
 
@@ -202,15 +209,16 @@ async function callClaude(
 export async function enhanceMotionForgePrompt(
   userPrompt:  string,
   sceneFrames: string[] = [],
+  mode: string = DEFAULT_MODE,
 ): Promise<EnhancementResult> {
   const prompt    = validatePrompt(userPrompt);
   const frames    = sceneFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5);
   const hasFrames = frames.length > 0;
 
-  log(TAG, `Enhancing prompt (frames=${frames.length})`, { promptLen: prompt.length });
+  log(TAG, `Enhancing prompt (frames=${frames.length}, mode=${mode})`, { promptLen: prompt.length });
 
   try {
-    const enhanced = await callClaude(prompt, frames);
+    const enhanced = await callClaude(prompt, frames, mode);
 
     const wordCount = enhanced.split(/\s+/).length;
     if (wordCount < 15) {

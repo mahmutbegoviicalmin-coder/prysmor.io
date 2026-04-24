@@ -103,6 +103,7 @@ function stopClipAutoSelect() {
 // storedReferenceFrame is always storedReferenceFrames[0] for backward compat.
 var storedReferenceFrames = [];   // primary — array of base64 JPEG strings
 var storedReferenceFrame  = null; // alias → storedReferenceFrames[0] || null
+var selectedMode = 'background';  // active generation mode: background | relight | style | vfx
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -628,7 +629,7 @@ async function compilePrompt() {
       var intent = raw || 'make it cinematic and dramatic';
 
       console.log('[Prysmor:enhance] storedReferenceFrames:', storedReferenceFrames.length, 'frames available');
-      var enhanceBody = { intent: intent };
+      var enhanceBody = { intent: intent, mode: selectedMode };
       if (storedReferenceFrame)          enhanceBody.frameBase64 = storedReferenceFrame;
       if (storedReferenceFrames.length > 0) enhanceBody.frames = storedReferenceFrames;
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
@@ -674,7 +675,7 @@ async function compilePrompt() {
   lbl.textContent = 'Enhancing…';
 
   try {
-    var enhanceBody2 = { prompt: raw };
+    var enhanceBody2 = { prompt: raw, mode: selectedMode };
     if (storedReferenceFrames.length > 0) enhanceBody2.frames = storedReferenceFrames;
     else if (storedReferenceFrame)        enhanceBody2.frames = [storedReferenceFrame];
     console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0);
@@ -1188,7 +1189,7 @@ async function mfGenerate() {
   setStatus('Starting effect generation…', 38);
   console.log('[Prysmor:frame] sending ' + storedReferenceFrames.length + ' reference frame(s) to generate endpoint');
   try {
-    var genBody = { prompt: prompt };
+    var genBody = { prompt: prompt, mode: selectedMode };
     // Send clip duration so Runway can match output length to the original clip
     genBody.clipDuration = clipDurSec;
     // Send all captured reference frames (primary + extras for identity conditioning)
@@ -2517,6 +2518,16 @@ function bindEvents() {
     storedReferenceFrames = [];
     storedVideoInfo = null;
     refreshClip(false);
+  });
+
+  // Mode selector pills
+  document.querySelectorAll('.mode-pill').forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      selectedMode = this.getAttribute('data-mode');
+      document.querySelectorAll('.mode-pill').forEach(function (p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      console.log('[Prysmor] Mode changed to:', selectedMode);
+    });
   });
 
   // Prompt char count

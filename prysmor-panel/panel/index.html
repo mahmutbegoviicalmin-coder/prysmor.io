@@ -302,6 +302,22 @@
     }
     .prompt-count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
+    /* Mode selector pills */
+    .mode-selector {
+      display: flex; gap: 5px; padding: 10px 12px 0 12px;
+    }
+    .mode-pill {
+      flex: 1; padding: 5px 0; border-radius: 20px; font-size: 10px; font-weight: 700;
+      letter-spacing: .3px; text-align: center; cursor: pointer;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-secondary); transition: all .18s ease;
+    }
+    .mode-pill:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .mode-pill.active {
+      background: rgba(0,230,118,0.14); border-color: rgba(0,230,118,0.4);
+      color: var(--accent); box-shadow: 0 0 10px rgba(0,230,118,0.12);
+    }
+
     /* AI Enhance — the "brain" of the panel */
     .ai-btn {
       display: flex; align-items: center; gap: 6px;
@@ -762,6 +778,13 @@
 
       <!-- ── PROMPT CARD ────────────────────────────── -->
       <div class="card prompt-card">
+        <!-- Mode selector -->
+        <div class="mode-selector">
+          <button class="mode-pill active" data-mode="background">Background</button>
+          <button class="mode-pill" data-mode="relight">Relight</button>
+          <button class="mode-pill" data-mode="style">Style</button>
+          <button class="mode-pill" data-mode="vfx">VFX</button>
+        </div>
         <textarea id="mf-prompt" rows="4" maxlength="1000"
           placeholder="Transform the scene into… add cinematic fire… frozen arctic…"></textarea>
         <div class="prompt-footer">

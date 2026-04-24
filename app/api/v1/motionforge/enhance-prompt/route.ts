@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Parse body ──────────────────────────────────────────────────────────────
-  let body: { prompt?: string; frames?: unknown; frameBase64?: string };
+  let body: { prompt?: string; frames?: unknown; frameBase64?: string; mode?: string };
   try {
-    body = await req.json() as { prompt?: string; frames?: unknown; frameBase64?: string };
+    body = await req.json() as { prompt?: string; frames?: unknown; frameBase64?: string; mode?: string };
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -66,12 +66,13 @@ export async function POST(req: NextRequest) {
         .slice(0, 5)
     : singleFrame;
 
-  log(TAG, `Enhance request — frames=${frames.length}`, { promptLen: cleanPrompt.length });
+  const mode = (body.mode ?? 'background').trim();
+  log(TAG, `Enhance request — frames=${frames.length} mode=${mode}`, { promptLen: cleanPrompt.length });
 
   // ── Enhance ─────────────────────────────────────────────────────────────────
   let result: Awaited<ReturnType<typeof enhanceMotionForgePrompt>>;
   try {
-    result = await enhanceMotionForgePrompt(cleanPrompt, frames);
+    result = await enhanceMotionForgePrompt(cleanPrompt, frames, mode);
   } catch (err) {
     // enhanceMotionForgePrompt is designed never to throw, but be defensive
     logError(TAG, 'Unexpected error from enhanceMotionForgePrompt', err);

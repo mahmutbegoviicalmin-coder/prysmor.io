@@ -17,7 +17,7 @@ export const maxDuration = 30;
 import { NextRequest, NextResponse }             from 'next/server';
 import { getJob, getJobAny }                     from '@/lib/motionforge/jobs';
 import { validatePanelKey, validatePanelToken }  from '@/lib/motionforge/auth';
-import { enhancePromptWithClaude }               from '@/lib/motionforge/claudeSceneAnalyzer';
+import { enhanceMotionForgePrompt }              from '@/lib/motionforge/promptEnhancer';
 import { log, warn }                             from '@/lib/motionforge/logger';
 
 const TAG = 'enhance-prompt';
@@ -45,55 +45,34 @@ export async function POST(
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 
   // ── Parse body ──────────────────────────────────────────────────────────────
-  let body: { intent?: string; frameBase64?: string };
+  let body: { intent?: string; frameBase64?: string; frames?: string[]; mode?: string };
   try { body = await req.json(); }
   catch { body = {}; }
 
-  const userIntent  = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
-  const frameBase64 = (body.frameBase64 ?? '').trim();
+  const userIntent = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
+  const mode       = (body.mode ?? 'background').trim();
+  const frames: string[] = Array.isArray(body.frames) && body.frames.length > 0
+    ? body.frames
+    : (body.frameBase64 ?? '').trim() ? [body.frameBase64!.trim()] : [];
+
   log(TAG, `Enhance-prompt request for job ${params.id}`, {
-    userIntent,
-    hasFrame: !!frameBase64,
+    userIntent, mode, frameCount: frames.length,
   });
 
-  // ── Claude vision path (frame provided) ─────────────────────────────────────
-  if (frameBase64) {
-    try {
-      const result = await enhancePromptWithClaude(frameBase64, userIntent);
-      log(TAG, 'Claude enhance-prompt complete', { effectType: result.effectType });
-      return NextResponse.json({
-        prompt:        result.compiledPrompt,
-        effectType:    result.effectType,
-        sceneAnalysis: null,
-        method:        'claude-vision',
-      });
-    } catch (err) {
-      warn(TAG, 'Claude vision failed — falling back to compileVfxPrompt', {
-        err: (err as Error).message,
-      });
-    }
-  }
-
-  // ── Text-only fallback: compileVfxPrompt (Claude Haiku) ─────────────────────
   try {
-    const { compileVfxPrompt } = await import('@/lib/motionforge/promptCompiler');
-    const result = await compileVfxPrompt(userIntent).catch(() => ({
-      compiledPrompt: userIntent,
-      effectType: 'background' as const,
-      method: 'fallback' as const,
-    }));
-    log(TAG, 'Enhance-prompt complete', { method: result.method });
+    const result = await enhanceMotionForgePrompt(userIntent, frames, mode);
+    log(TAG, 'Enhance-prompt complete', { method: result.method, mode });
     return NextResponse.json({
-      prompt:        result.compiledPrompt,
-      effectType:    result.effectType,
+      prompt:        result.enhancedPrompt,
+      mode,
       sceneAnalysis: null,
       method:        result.method,
     });
   } catch (err) {
-    warn(TAG, 'compileVfxPrompt failed', { err: (err as Error).message });
+    warn(TAG, 'enhanceMotionForgePrompt failed', { err: (err as Error).message });
     return NextResponse.json({
       prompt:        userIntent,
-      effectType:    'background',
+      mode,
       sceneAnalysis: null,
       method:        'fallback',
     });
