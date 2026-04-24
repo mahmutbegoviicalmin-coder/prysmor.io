@@ -1579,6 +1579,74 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
     }
   }
 
+  // ── Audio merge: take video from Runway output, audio from original clip ──────
+  // Runway generates video-only (no audio). Re-attach audio from the source clip
+  // so the timeline clip has its original sound.
+  var originalSourcePath = state.mf.selInfo && state.mf.selInfo.sourcePath
+    ? state.mf.selInfo.sourcePath : null;
+
+  if (originalSourcePath) {
+    var nfsCheck = require('fs');
+    if (nfsCheck.existsSync(originalSourcePath)) {
+      var audioMergedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-audio-' + Date.now() + '.mp4';
+      var ffmpegBinAudio  = getFFmpegBin();
+
+      var audioDone = await new Promise(function (resolve) {
+        try {
+          var spawn = require('child_process').spawn;
+          // -map 0:v  → video from Runway output (finalPath)
+          // -map 1:a? → audio from original clip (? = optional, skips if no audio track)
+          // -c:v copy → no re-encode of video
+          // -c:a aac  → encode audio to AAC
+          // -shortest → stop at the shorter of the two streams
+          var args = [
+            '-y',
+            '-i', finalPath,
+            '-i', originalSourcePath,
+            '-map', '0:v',
+            '-map', '1:a?',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-shortest',
+            audioMergedPath,
+          ];
+          console.log('[MotionForge] Audio merge — ffmpeg args:', args.join(' '));
+          var proc = spawn(ffmpegBinAudio, args);
+
+          var stderr = '';
+          proc.stderr.on('data', function (d) { stderr += d.toString(); });
+
+          proc.on('close', function (code) {
+            var nfs2 = require('fs');
+            if (code === 0 && nfs2.existsSync(audioMergedPath)) {
+              console.log('[MotionForge] Audio merged from original clip');
+              try { nfs2.unlinkSync(finalPath); } catch (_) {}
+              resolve(audioMergedPath);
+            } else {
+              // No audio track in source or ffmpeg error — use video-only output silently
+              console.warn('[MotionForge] Audio merge skipped (no audio track or ffmpeg error) — stderr:', stderr.slice(-200));
+              try { if (nfs2.existsSync(audioMergedPath)) nfs2.unlinkSync(audioMergedPath); } catch (_) {}
+              resolve(null);
+            }
+          });
+          proc.on('error', function (err) {
+            console.warn('[MotionForge] Audio merge spawn error:', err.message);
+            resolve(null);
+          });
+        } catch (e) {
+          console.warn('[MotionForge] Audio merge exception:', e.message);
+          resolve(null);
+        }
+      });
+
+      if (audioDone) finalPath = audioDone;
+    } else {
+      console.warn('[MotionForge] Audio merge skipped — source file not found:', originalSourcePath);
+    }
+  } else {
+    console.log('[MotionForge] Audio merge skipped — no source path available');
+  }
+
   state.mf.outputPath = finalPath;
   // Normalise to forward slashes (required by ExtendScript on all platforms)
   // and escape any double-quotes that may appear in the path.
