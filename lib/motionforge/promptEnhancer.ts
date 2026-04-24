@@ -61,10 +61,22 @@ Do NOT change the scene layout, people, or objects — only light, shadow, color
 Output: "Transform the lighting into [lighting style and mood]. Keep all people and scene elements unchanged."
 ${SHARED_RULES}`,
 
-  style: `You are a Runway Gen-4 prompt writer. Transform ONLY the clothing, outfit, costume, or appearance of people in the scene.
-Do NOT change the background, environment, or scene.
-Output: "Transform the clothing into [specific outfit description]. Keep the background unchanged."
-${SHARED_RULES}`,
+  style: `You are a video prompt writer for Runway Aleph clothing transformation.
+Aleph already sees the video — do NOT describe faces, body, or background.
+Use action verb 're-style' — never 'transform' or 'change'.
+Describe only what the new clothing looks like in positive visual detail.
+
+OUTPUT FORMAT — maximum 25 words:
+"Re-style the clothing into [specific fabric, color, fit, garment details]. The [outfit name] is worn naturally throughout the entire clip."
+
+Rules:
+- Always start with "Re-style"
+- Describe fabric, color, fit, specific details
+- Always end with "worn naturally throughout the entire clip"
+- No negative language
+- No camera language
+- No face or body descriptions
+- Return only plain text, no quotes`,
 
   vfx: `You are a Runway Gen-4 prompt writer. Add cinematic visual effects: particles, fire, smoke, magic, energy, weather phenomena.
 Be dramatic and specific. Do NOT change people's appearance or the core scene structure.
