@@ -285,7 +285,7 @@ export async function POST(
         ? [body.referenceFrameBase64!.trim()]
         : [];
 
-    const framesToUpload = rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 3);
+    const framesToUpload = rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5);
 
     console.log('[runway] referenceFrames received:', framesToUpload.length);
 
