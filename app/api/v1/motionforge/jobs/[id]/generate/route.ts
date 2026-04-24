@@ -255,8 +255,9 @@ export async function POST(
       ]);
       runwayUri = uri;
 
-      // Local dev: single anchor frame from ffmpeg identity extraction
-      const localRefUris: string[] = refUri ? [refUri] : [];
+      // Local dev: single anchor frame — only for overlay effects
+      const localRefUris: string[] = effectType === 'overlay' && refUri ? [refUri] : [];
+      console.log('[MotionForge] effectType:', effectType, '— reference frames sent:', effectType === 'overlay');
       const task = await createVideoToVideoTask(runwayUri, prompt, localRefUris, effectType, clipDuration);
       log(TAG, `Runway task started: ${task.id}`);
 
@@ -311,12 +312,16 @@ export async function POST(
       uploaded.forEach(uri => { if (uri) refUris.push(uri); });
     }
 
+    // background effects → no reference images (let Runway freely transform the scene)
+    // overlay effects    → include reference images for identity preservation
+    const refsToSend = effectType === 'overlay' ? refUris : [];
+    console.log('[MotionForge] effectType:', effectType, '— reference frames sent:', effectType === 'overlay');
     console.log('[runway] refUris uploaded:', refUris.length);
     console.log('[runway] prompt being sent:', prompt);
     console.log('[runway] effectType:', effectType);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refUris, effectType, clipDuration);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, effectType, clipDuration);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {
