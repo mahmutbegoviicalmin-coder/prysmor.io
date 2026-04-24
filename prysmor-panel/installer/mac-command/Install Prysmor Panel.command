@@ -20,7 +20,7 @@ fail() { echo -e "${RED}✗${NC}  $*"; exit 1; }
 
 echo ""
 echo "  ╔═══════════════════════════════════════╗"
-echo "  ║   Prysmor Panel Installer v2.7.3      ║"
+echo "  ║   Prysmor Panel Installer v2.8.0      ║"
 echo "  ╚═══════════════════════════════════════╝"
 echo ""
 

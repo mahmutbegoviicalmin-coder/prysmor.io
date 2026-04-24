@@ -457,7 +457,8 @@ function logout() {
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
     pollTimer: null, pollStart: 0, outputUrl: null, rawOutputUrl: null,
-    outputPath: null, tempDir: '', generating: false,
+    outputPath: null, startTimeSec: 0, resultAfterBase64: null,
+    tempDir: '', generating: false,
   };
   var btn = el('btn-continue');
   if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
@@ -1647,37 +1648,35 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
     console.log('[MotionForge] Audio merge skipped — no source path available');
   }
 
-  state.mf.outputPath = finalPath;
-  // Normalise to forward slashes (required by ExtendScript on all platforms)
-  // and escape any double-quotes that may appear in the path.
-  const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  state.mf.outputPath  = finalPath;
+  state.mf.startTimeSec = startTimeSec; // store for "Add to Timeline" button
 
-  setStatus(replaceMode ? 'Replacing original\u2026' : 'Inserting on V2\u2026', 98);
-  console.log('[Prysmor] evalScript', replaceMode ? 'replaceSelection' : 'insertClipOnV2',
-    'path:', finalPath, 'esc:', esc, 'startTimeSec:', startTimeSec);
-
-  await new Promise(function (resolve) {
-    const fn = replaceMode
-      ? 'replaceSelection("' + esc + '")'
-      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
-
-    console.log('[Prysmor] evalScript fn:', fn);
-    cs.evalScript(fn, function (r) {
-      console.log('[Prysmor] evalScript result:', r);
-      if (r && (r.indexOf('error') === 0 || r.indexOf('Error') === 0)) {
-        showToast(r.replace(/^error:\s*/i, ''), 'error');
-      } else {
-        showToast(replaceMode
-          ? 'Original replaced with AI result!'
-          : 'AI clip inserted on V2 \u2014 aligned to selection!', 'success');
-      }
-      resolve();
+  // ── Extract first frame from output for Before/After slider ──────────────
+  setStatus('Processing result\u2026', 98);
+  try {
+    var afterFramePath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-after-' + Date.now() + '.jpg';
+    var ffmpegBinAf    = getFFmpegBin();
+    await new Promise(function (resolveAf) {
+      try {
+        var spawnAf = require('child_process').spawn;
+        var procAf  = spawnAf(ffmpegBinAf, ['-y', '-i', finalPath, '-vframes', '1', '-q:v', '2', afterFramePath]);
+        procAf.on('close', resolveAf);
+        procAf.on('error', resolveAf);
+      } catch (_) { resolveAf(); }
     });
-  });
+    var nfsAf = require('fs');
+    if (nfsAf.existsSync(afterFramePath)) {
+      state.mf.resultAfterBase64 = nfsAf.readFileSync(afterFramePath).toString('base64');
+      console.log('[Prysmor] after-frame extracted:', afterFramePath);
+      try { nfsAf.unlinkSync(afterFramePath); } catch (_) {}
+    }
+  } catch (afErr) {
+    console.warn('[Prysmor] after-frame extract failed:', afErr.message);
+  }
 
   setStatus('Done!', 100);
-  console.log('[Prysmor] insert done, showing result');
-  showResult(blobUrl || ('file:///' + finalPath.replace(/\\/g, '/').replace(/^\//, '')));
+  console.log('[Prysmor] processing done, showing before/after result');
+  showResult(null);
 
   // Do NOT delete finalPath immediately — Premiere needs time to import it.
   // OS temp cleanup handles stale files on next boot.
@@ -1726,34 +1725,43 @@ function showClipThumbnail(base64) {
 
 function setGenerating(active) {
   state.mf.generating = active;
-  var btn = el('mf-btn-generate');
-  if (btn) { btn.disabled = active; btn.style.display = active ? 'none' : ''; }
-  var costBadge = el('gen-btn-cost');
-  if (costBadge && active) costBadge.style.display = 'none';
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
 
-  var gs = el('mf-gen-state');
-  if (gs) gs.classList.toggle('hidden', !active);
-
-  // Hide result and error when starting
-  var rs = el('mf-section-result');
-  if (rs && active) rs.classList.add('hidden');
-  var failEl = el('mf-gen-failed');
-  if (failEl && active) failEl.classList.add('hidden');
+  if (btn) {
+    btn.disabled = active; // disabled while generating so double-clicks are blocked
+    btn.classList.toggle('v2-generating', active);
+  }
 
   if (active) {
-    // Reset progress state
+    // Show generating state in button
+    if (lbl)   lbl.textContent = 'Generating\u2026 0%';
+    if (pline) pline.style.width = '0%';
+    // Hide cost badge while generating
+    var costBadge = el('gen-btn-cost');
+    if (costBadge) costBadge.style.display = 'none';
+
+    // Hide result and error when starting a new generation
+    var rs = el('mf-section-result');
+    if (rs) rs.classList.add('hidden');
+    var failEl = el('mf-gen-failed');
+    if (failEl) failEl.classList.add('hidden');
+
+    // Reset legacy progress state (hidden compat elements)
     _displayPct      = 0;
     _progressHistory = [];
     var fill = el('gp-fill'); if (fill) fill.style.width = '0%';
     var pct  = el('gp-pct');  if (pct)  pct.textContent  = '0%';
     var est  = el('gp-estimate'); if (est) est.textContent = '';
-    var lbl  = el('gp-phase-label'); if (lbl) lbl.textContent = 'Starting\u2026';
+    var plbl = el('gp-phase-label'); if (plbl) plbl.textContent = 'Starting\u2026';
 
     startElapsedTimer();
-
-    // Compat shims: keep old hidden elements current
-    setStage('upload');
+    setStage('upload'); // compat shim
   } else {
+    // Restore button to normal state
+    if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+    if (pline) pline.style.width = '0%';
     stopElapsedTimer();
     _genStartTime = null;
     updateCostPreview();
@@ -1779,11 +1787,24 @@ function setStage(stage) {
 }
 
 function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
-  // Phase label
+  // ── Update the generate button inline during generation ──────────────────
+  if (state.mf.generating) {
+    var genLbl  = el('gen-btn-label');
+    var genPline = el('v2-gen-pline');
+    if (genLbl) {
+      var pctNum = pct != null ? Math.round(Math.min(Math.max(pct, 0), 100)) : null;
+      genLbl.textContent = text + (pctNum != null ? ' ' + pctNum + '%' : '');
+    }
+    if (genPline && pct != null) {
+      var clampedP = Math.min(Math.max(pct, 0), 100);
+      if (clampedP >= _displayPct) genPline.style.width = clampedP + '%';
+    }
+  }
+
+  // ── Legacy hidden compat elements ────────────────────────────────────────
   var lbl = el('gp-phase-label');
   if (lbl) lbl.textContent = text;
 
-  // Progress bar — never goes backwards
   if (pct != null) {
     var clamped = Math.min(Math.max(pct, 0), 100);
     if (clamped >= _displayPct) {
@@ -1793,22 +1814,10 @@ function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
       var pctLbl = el('gp-pct');
       if (pctLbl) pctLbl.textContent = Math.round(clamped) + '%';
 
-      // Record progress sample for ETA estimation
       _progressHistory.push({ t: Date.now(), pct: clamped });
       if (_progressHistory.length > 8) _progressHistory.shift();
       updateETA(clamped);
     }
-  }
-
-  // Stage-based dot color: uploading→amber, generating/completing→green
-  var dot = document.querySelector('.gp-dot');
-  if (dot && pct != null) {
-    if (_displayPct < 40)  dot.style.background = '#FF9F0A';       // amber: uploading
-    else                   dot.style.background = 'var(--accent)'; // green: generating/completing
-  }
-
-  // Compat shims: keep legacy hidden elements in sync
-  if (pct != null) {
     var clamped2 = Math.min(Math.max(pct, 0), 100);
     var oldBar = el('mf-gen-bar'); if (oldBar) oldBar.style.width = clamped2 + '%';
     var oldPct = el('mf-gen-pct'); if (oldPct) oldPct.textContent = Math.round(clamped2) + '%';
@@ -1825,12 +1834,14 @@ function fail(msg) {
   _genStartTime = null;
   state.mf.generating = false;
 
-  // Hide generate button (restored on retry)
-  var btn = el('mf-btn-generate');
-  if (btn) { btn.disabled = false; btn.style.display = 'none'; }
-  // Hide progress bar
-  var gs = el('mf-gen-state');
-  if (gs) gs.classList.add('hidden');
+  // Reset button to normal (not generating) state — do NOT hide it
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
+  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+  if (pline) pline.style.width = '0%';
+  updateCostPreview();
 
   // Show inline error card
   var failEl  = el('mf-gen-failed');
@@ -1838,7 +1849,6 @@ function fail(msg) {
   if (failEl)  failEl.classList.remove('hidden');
   if (failMsg) failMsg.textContent = msg || 'Generation failed.';
 
-  // Also surface as toast for immediate visibility
   showToast(msg, 'error');
 }
 
@@ -1846,17 +1856,48 @@ function showResult(videoUrl) {
   var sec = el('mf-section-result');
   if (!sec) return;
   sec.classList.remove('hidden');
-  var vid = el('mf-result-video');
-  if (vid) { vid.src = videoUrl; vid.load(); vid.play && vid.play().catch(function () {}); }
+
+  // ── Before image: first reference frame from original clip ───────────────
+  var beforeImg = el('ba-before');
+  if (beforeImg && storedReferenceFrames && storedReferenceFrames.length > 0) {
+    beforeImg.src = 'data:image/jpeg;base64,' + storedReferenceFrames[0];
+  }
+
+  // ── After image: first frame of AI output (set by downloadAndProcess) ────
+  var afterImg = el('ba-after');
+  if (afterImg) {
+    if (state.mf.resultAfterBase64) {
+      afterImg.src = 'data:image/jpeg;base64,' + state.mf.resultAfterBase64;
+      afterImg.style.display = 'block';
+    } else {
+      // No after frame available (fallback path) — hide after image
+      afterImg.style.display = 'none';
+    }
+  }
+
+  // Reset slider to 50%
+  var slider  = el('ba-slider');
+  var divider = el('ba-divider');
+  if (slider)  slider.value = 50;
+  if (afterImg) afterImg.style.clipPath = 'inset(0 0 0 50%)';
+  if (divider)  divider.style.left = '50%';
+
+  // Enable/disable Add to Timeline button based on whether local file exists
+  var addBtn = el('btn-add-to-timeline');
+  if (addBtn) addBtn.disabled = !state.mf.outputPath;
+
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // Always ensure Generate button is unlocked when result is shown
-  var btn = el('mf-btn-generate');
-  if (btn) { btn.disabled = false; btn.style.display = ''; }
-  var gs = el('mf-gen-state');
-  if (gs) gs.classList.add('hidden');
+  // ── Always unlock Generate button when result is shown ───────────────────
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
+  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+  if (pline) pline.style.width = '0%';
   state.mf.generating = false;
   stopElapsedTimer();
+  updateCostPreview();
 }
 
 function resetUI() {
@@ -1866,6 +1907,46 @@ function resetUI() {
   const rs = el('mf-section-result'); if (rs) rs.classList.add('hidden');
   const p  = el('mf-prompt');         if (p) p.value = '';
   const cc = el('mf-char-count');     if (cc) cc.textContent = '0';
+}
+
+// ─── Add to Timeline ──────────────────────────────────────────────────────────
+
+async function addToTimeline() {
+  var finalPath    = state.mf.outputPath;
+  var replaceMode  = state.mf.replaceMode;
+  var startTimeSec = state.mf.startTimeSec || (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 0;
+
+  if (!finalPath) {
+    showToast('No output available — generate first', 'error');
+    return;
+  }
+
+  var btn = el('btn-add-to-timeline');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding\u2026'; }
+
+  const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  console.log('[Prysmor] addToTimeline — path:', finalPath, 'replaceMode:', replaceMode, 'startTimeSec:', startTimeSec);
+
+  await new Promise(function (resolve) {
+    const fn = replaceMode
+      ? 'replaceSelection("' + esc + '")'
+      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
+
+    cs.evalScript(fn, function (r) {
+      console.log('[Prysmor] addToTimeline evalScript result:', r);
+      if (r && (r.indexOf('error') === 0 || r.indexOf('Error') === 0)) {
+        showToast(r.replace(/^error:\s*/i, ''), 'error');
+      } else {
+        showToast('AI clip added to timeline!', 'success');
+      }
+      resolve();
+    });
+  });
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Add to Timeline';
+  }
 }
 
 // ─── File I/O Helpers ─────────────────────────────────────────────────────────
@@ -2638,42 +2719,49 @@ function bindEvents() {
   // Generate
   el('mf-btn-generate').addEventListener('click', mfGenerate);
 
-  // Retry after failure — hide error card and restore generate button
+  // Retry after failure
   var retryBtn = el('gen-retry-btn');
   if (retryBtn) {
     retryBtn.addEventListener('click', function () {
       var failEl = el('mf-gen-failed');
       if (failEl) failEl.classList.add('hidden');
-      // Restore generate button
       var genBtn = el('mf-btn-generate');
-      if (genBtn) { genBtn.disabled = false; genBtn.style.display = ''; }
+      if (genBtn) { genBtn.disabled = false; genBtn.classList.remove('v2-generating'); }
       updateCostPreview();
     });
   }
 
-  // New Effect — clear prompt, hide result, keep clip + mode, ready for new generation
+  // Add to Timeline button
+  var addBtn = el('btn-add-to-timeline');
+  if (addBtn) {
+    addBtn.addEventListener('click', function () { addToTimeline(); });
+  }
+
+  // New Effect — clear prompt, hide result, keep clip + mode
   el('mf-btn-new-gen').addEventListener('click', function () {
-    // Hide result card
     var rs = el('mf-section-result');
     if (rs) rs.classList.add('hidden');
-    // Clear old job state
-    state.mf.jobId        = null;
-    state.mf.outputUrl    = null;
-    state.mf.rawOutputUrl = null;
-    // Clear prompt input
+    // Clear job + result state
+    state.mf.jobId             = null;
+    state.mf.outputUrl         = null;
+    state.mf.rawOutputUrl      = null;
+    state.mf.outputPath        = null;
+    state.mf.resultAfterBase64 = null;
+    // Clear prompt
     var promptEl = el('mf-prompt');
     if (promptEl) { promptEl.value = ''; promptEl.dispatchEvent(new Event('input')); }
     var cc = el('mf-char-count'); if (cc) cc.textContent = '0';
-    // Ensure Generate button is visible and unlocked
-    var btn = el('mf-btn-generate');
-    if (btn) { btn.disabled = false; btn.style.display = ''; }
+    // Restore Generate button
+    var btn   = el('mf-btn-generate');
+    var lbl   = el('gen-btn-label');
+    var pline = el('v2-gen-pline');
+    if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+    if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+    if (pline) pline.style.width = '0%';
     state.mf.generating = false;
     stopElapsedTimer();
-    // Scroll to prompt and focus
-    if (promptEl) {
-      promptEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      setTimeout(function () { promptEl.focus(); }, 300);
-    }
+    updateCostPreview();
+    if (promptEl) setTimeout(function () { promptEl.focus(); }, 150);
   });
 
   // Settings
