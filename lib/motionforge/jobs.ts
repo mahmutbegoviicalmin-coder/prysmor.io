@@ -1,11 +1,12 @@
 /**
  * MotionForge job data model.
- * Extended for Identity Lock v2 with identity analysis and compositing metadata.
  */
 
 import { db } from '@/lib/firebaseAdmin';
-import type { DriftSeverity } from './identityAnalysis';
 import type { RestorationMode } from './config';
+
+// Inlined from the removed identityAnalysis module — kept for Firestore backward-compat.
+type DriftSeverity = 'low' | 'medium' | 'high';
 
 // ─── Status ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,6 @@ export type JobStatus =
   | 'created'
   | 'uploading'
   | 'generating'
-  | 'compositing'   // Identity Lock v2 post-processing running
   | 'completed'
   | 'failed';
 

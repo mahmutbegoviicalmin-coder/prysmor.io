@@ -36,52 +36,66 @@ export const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
  */
 // ─── Mode-specific system prompts ────────────────────────────────────────────
 
-const SHARED_RULES = `
-Rules:
-• Start with "Transform"
-• Keep output under 30 words total
-• Positive visual description only — describe what SHOULD appear
-• No camera angle, movement, or shot-type language
-• No explanations, disclaimers, or meta-commentary
-• Return only the final prompt as plain text. No quotes. No prefixes
-
-BANNED WORDS: scanlines, banding, CRT, interlacing, glitch, VHS, corrupted, static, distorted,
-artifacts, compression artifacts, shutter artifact, signal interference, data-moshing, noise pattern.
-
-TRADEMARK RULE: Never use character/franchise names. Describe appearance generically instead.`;
-
 const MODE_PROMPTS: Record<string, string> = {
-  background: `You are a Runway Gen-4 prompt writer. Transform ONLY the scene, environment, or location.
-Do NOT mention people, faces, clothing, or any person's appearance.
-Output: "Transform [scene element] into [new environment]. Keep all people unchanged."
-${SHARED_RULES}`,
+  background: `You are a Runway Gen-4 Aleph prompt writer.
+The user wants to change the background or environment of a video clip.
+Analyse the user intent and write a single Runway prompt.
 
-  relight: `You are a Runway Gen-4 prompt writer. Transform ONLY the lighting, atmosphere, and color grade.
-Do NOT change the scene layout, people, or objects — only light, shadow, color mood.
-Output: "Transform the lighting into [lighting style and mood]. Keep all people and scene elements unchanged."
-${SHARED_RULES}`,
-
-  style: `You are a video prompt writer for Runway Aleph clothing transformation.
-Aleph already sees the video — do NOT describe faces, body, or background.
-Use action verb 're-style' — never 'transform' or 'change'.
-Describe only what the new clothing looks like in positive visual detail.
-
-OUTPUT FORMAT — maximum 25 words:
-"Re-style the clothing into [specific fabric, color, fit, garment details]. The [outfit name] is worn naturally throughout the entire clip."
+OUTPUT FORMAT (strict):
+"Replace the background with [new environment, lighting, atmosphere]. Keep all people, faces, clothing and positions completely unchanged."
 
 Rules:
-- Always start with "Re-style"
-- Describe fabric, color, fit, specific details
-- Always end with "worn naturally throughout the entire clip"
-- No negative language
-- No camera language
-- No face or body descriptions
-- Return only plain text, no quotes`,
+- Always start with "Replace the background with"
+- Describe only the new environment: location, time of day, weather, atmosphere
+- Never mention people, faces, clothing, or body in the transformation part
+- Always end with "Keep all people, faces, clothing and positions completely unchanged."
+- Max 30 words total
+- Plain text only. No quotes. No markdown.`,
 
-  vfx: `You are a Runway Gen-4 prompt writer. Add cinematic visual effects: particles, fire, smoke, magic, energy, weather phenomena.
-Be dramatic and specific. Do NOT change people's appearance or the core scene structure.
-Output: "Transform the scene with [specific VFX description]. Keep all people unchanged."
-${SHARED_RULES}`,
+  relight: `You are a Runway Gen-4 Aleph prompt writer.
+The user wants to change the lighting or atmosphere of a video clip.
+Analyse the user intent and write a single Runway prompt.
+
+OUTPUT FORMAT (strict):
+"Re-light the scene with [lighting style, color temperature, mood, shadow direction]. Keep all people and scene elements unchanged."
+
+Rules:
+- Always start with "Re-light the scene with"
+- Describe only: light quality, direction, color temperature, mood
+- Never mention people, clothing or changing any subjects
+- Always end with "Keep all people and scene elements unchanged."
+- Max 25 words total
+- Plain text only. No quotes. No markdown.`,
+
+  style: `You are a Runway Gen-4 Aleph prompt writer for clothing transformation.
+The user wants to change what a person is wearing in a video clip.
+Aleph already sees the video — do NOT describe faces, body, or background.
+
+OUTPUT FORMAT (strict):
+"Re-style the clothing into [garment type, fabric, color, fit, key details]. Keep the person's face, body and position unchanged throughout the entire clip."
+
+Rules:
+- Always start with "Re-style the clothing into"
+- Describe only: garment type, fabric texture, color, fit, specific details
+- Never mention face, skin, hair, or background
+- Always end with "Keep the person's face, body and position unchanged throughout the entire clip."
+- Max 30 words total
+- Plain text only. No quotes. No markdown.`,
+
+  vfx: `You are a Runway Gen-4 Aleph prompt writer for visual effects.
+The user wants to add a cinematic visual effect to a video clip.
+Analyse the user intent and write a single Runway prompt.
+
+OUTPUT FORMAT (strict):
+"Add [specific VFX: particles, fire, fog, rain, smoke, energy, sparks, etc] to the scene. Keep all people and objects completely unchanged."
+
+Rules:
+- Always start with "Add"
+- Be specific and cinematic: describe the effect's appearance, color, intensity
+- Never mention changing people, clothing, or background
+- Always end with "Keep all people and objects completely unchanged."
+- Max 25 words total
+- Plain text only. No quotes. No markdown.`,
 };
 
 // Fallback for unknown modes
@@ -113,29 +127,31 @@ export function validatePrompt(raw: string): string {
 const TRANSFORMATION_VERBS = /\b(replace|change|make it|turn into|convert|transform|apply|set in|put in|move to|switch to)\b/gi;
 
 /**
- * Minimal rule-based fallback: prepends the identity-preservation header,
- * strips transformation verbs, and returns a clean production prompt.
- *
- * This is NOT a template database — it applies simple grammar cleanup
- * only and relies on the user's own words for the creative content.
- *
- * Activated only when Claude is unavailable. Always marked method='fallback'.
+ * Mode-aware rule-based fallback. Activated only when Claude is unavailable.
+ * Mirrors the output format of each mode's system prompt so the result is
+ * structurally consistent with what Claude would have produced.
  */
-export function fallbackEnhance(userPrompt: string): string {
+export function fallbackEnhance(userPrompt: string, mode?: string): string {
   const cleaned = userPrompt
     .replace(TRANSFORMATION_VERBS, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // Capitalise first letter
   const body = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  const stmt = body.endsWith('.') ? body.slice(0, -1) : body;
 
-  return (
-    'Transform the scene — ' +
-    body.charAt(0).toLowerCase() + body.slice(1) +
-    (body.endsWith('.') ? '' : ',') +
-    ' while preserving all existing characters and objects in the scene. Leave all other elements unchanged.'
-  );
+  switch (mode) {
+    case 'background':
+      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people, faces, clothing and positions completely unchanged.`;
+    case 'relight':
+      return `Re-light the scene with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people and scene elements unchanged.`;
+    case 'style':
+      return `Re-style the clothing into ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person's face, body and position unchanged throughout the entire clip.`;
+    case 'vfx':
+      return `Add ${stmt.charAt(0).toLowerCase() + stmt.slice(1)} to the scene. Keep all people and objects completely unchanged.`;
+    default:
+      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people and their appearance unchanged.`;
+  }
 }
 
 // ─── Claude call ──────────────────────────────────────────────────────────────
@@ -249,7 +265,7 @@ export async function enhanceMotionForgePrompt(
       err: (err as Error).message,
     });
 
-    const enhanced = fallbackEnhance(prompt);
+    const enhanced = fallbackEnhance(prompt, mode);
     log(TAG, 'Fallback enhancement used', { wordCount: enhanced.split(/\s+/).length });
 
     return { enhancedPrompt: enhanced, method: 'fallback', sceneAnalysed: false };

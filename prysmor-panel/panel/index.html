@@ -6,266 +6,464 @@
   <title>Prysmor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="styles.css?v=19"/>
   <style>
-    /* ═══════════════════════════════════════════
+    /* ─────────────────────────────────────────────
        DESIGN TOKENS
-    ═══════════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     :root {
-      --bg:             #141414;
-      --card:           #1e1e1e;
-      --accent:         #00e676;
-      --accent-dim:     rgba(0,230,118,0.10);
-      --accent-border:  rgba(0,230,118,0.28);
-      --border:         rgba(255,255,255,0.08);
-      --border-strong:  rgba(255,255,255,0.14);
-      --text-1:         #f5f5f7;
-      --text-2:         rgba(245,245,247,0.50);
-      --text-3:         rgba(245,245,247,0.26);
-      --red:            #ff453a;
-      --r:              12px;
-      --r-sm:           8px;
+      --bg:              #080808;
+      --bg2:             #0d0d0d;
+      --surface:         #111111;
+      --surface2:        #181818;
+      --surface3:        #1e1e1e;
+      --border:          rgba(255,255,255,0.07);
+      --border-med:      rgba(255,255,255,0.11);
+      --border-strong:   rgba(255,255,255,0.16);
+      --accent:          #00e676;
+      --accent-hi:       #26ffb0;
+      --accent-dim:      rgba(0,230,118,0.10);
+      --accent-glow:     rgba(0,230,118,0.18);
+      --accent-border:   rgba(0,230,118,0.30);
+      --accent-border-hi:rgba(0,230,118,0.55);
+      --text:            #f0f0f0;
+      --text-2:          rgba(240,240,240,0.55);
+      --text-3:          rgba(240,240,240,0.28);
+      --red:             #ff4545;
+      --r:               10px;
+      --r-sm:            6px;
+      --r-xs:            4px;
+      --font:            'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      /* backward-compat aliases */
+      --card:            #111111;
+      --text-1:          #f0f0f0;
+      --text-muted:      rgba(240,240,240,0.55);
+      --text-dim:        rgba(240,240,240,0.28);
+      --border-strong-old: rgba(255,255,255,0.16);
+      --radius:          10px;
+      --radius-sm:       6px;
     }
 
-    /* ═══════════════════════════════════════════
+    /* ─────────────────────────────────────────────
        RESET
-    ═══════════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       height: 100%; overflow: hidden;
       background: var(--bg);
-      color: var(--text-1);
-      font-family: -apple-system, 'Inter', system-ui, sans-serif;
+      color: var(--text);
+      font-family: var(--font);
       font-size: 13px;
-      line-height: 1.4;
+      line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    button { font-family: inherit; cursor: pointer; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    textarea { font-family: inherit; }
     .hidden        { display: none !important; }
-    .sr-only       { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+    .sr-only       { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
     .compat-hidden { display: none !important; }
 
-    /* ═══════════════════════════════════════════
-       TOAST — bottom sheet, slides up
-    ═══════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       TOAST
+    ───────────────────────────────────────────── */
     .toast {
-      position: fixed; bottom: 10px; left: 10px; right: 10px; z-index: 9999;
+      position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 9999;
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 13px; border-radius: 10px;
-      background: rgba(28,28,30,0.98);
-      border: 1px solid var(--border-strong);
+      padding: 10px 14px;
+      background: rgba(18,18,18,0.97);
+      border: 1px solid var(--border-med);
+      border-radius: 10px;
       font-size: 12px; font-weight: 500;
-      backdrop-filter: blur(20px);
-      box-shadow: 0 16px 48px rgba(0,0,0,0.7);
-      opacity: 0; transform: translateY(6px);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03);
+      opacity: 0; transform: translateY(8px);
       pointer-events: none;
-      transition: opacity .2s ease, transform .2s ease;
+      transition: opacity .2s ease, transform .22s ease;
     }
     .toast.toast-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
-    .toast-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .toast.success .toast-dot { background: var(--accent); }
+    .toast-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .toast.success .toast-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
     .toast.error   .toast-dot { background: var(--red); }
-    .toast.info    .toast-dot { background: #0a84ff; }
+    .toast.info    .toast-dot { background: #3b82f6; }
     #toast-icon { display: none; }
-    #toast-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #toast-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 
-    /* ═══════════════════════════════════════════
-       VIEWS — stacked absolutely
-    ═══════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       VIEWS
+    ───────────────────────────────────────────── */
     .view { position: absolute; inset: 0; overflow: hidden; }
 
-    /* ═══════════════════════════════════════════
-       MAIN PANEL (v2)
-    ═══════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       MAIN PANEL SHELL
+    ───────────────────────────────────────────── */
     .v2-panel {
       display: flex; flex-direction: column;
-      background: var(--bg);
       height: 100%;
-      position: relative; /* anchor for absolute children */
+      background: var(--bg);
+      position: relative;
       overflow: hidden;
     }
 
-    /* ─── HEADER ────────────────────────────── */
+    /* ─────────────────────────────────────────────
+       HEADER
+    ───────────────────────────────────────────── */
     .v2-hdr {
       height: 44px; flex-shrink: 0;
       display: flex; align-items: center;
-      padding: 0 12px; gap: 0;
+      padding: 0 14px;
       border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
     }
+
+    /* Logo */
     .v2-hdr-logo {
-      font-size: 14px; font-weight: 800; letter-spacing: -0.04em;
-      color: var(--text-1);
+      font-size: 14px; font-weight: 700; letter-spacing: -0.5px;
+      color: var(--text);
+      flex-shrink: 0;
     }
-    .v2-hdr-center {
-      flex: 1; display: flex; align-items: center; justify-content: center;
+    .v2-hdr-logo span {
+      /* subtle green tint on the last letter */
+      background: linear-gradient(135deg, #ffffff 40%, #6effc2 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-    .v2-hdr-right { display: flex; align-items: center; gap: 6px; }
 
-    /* Credits pill */
+    /* Credits badge (JS reveals via style.display='') */
     #topbar-credits {
-      display: flex; align-items: center; gap: 4px;
-      background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      border-radius: 20px; padding: 3px 10px 3px 8px;
+      display: flex;
+      align-items: center; gap: 5px;
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px;
+      padding: 3px 9px 3px 7px;
+      transition: border-color .2s, background .2s;
     }
+    #topbar-credits:hover {
+      background: rgba(0,230,118,0.13);
+      border-color: rgba(0,230,118,0.38);
+    }
+    #topbar-credits svg { flex-shrink: 0; }
     #topbar-credits-val {
-      font-size: 12px; font-weight: 700;
-      color: var(--accent); letter-spacing: -0.3px;
+      font-size: 12px; font-weight: 700; letter-spacing: -0.3px;
+      color: var(--accent);
       font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 12px rgba(0,230,118,0.5);
     }
-    .v2-credits-lbl {
-      font-size: 10px; font-weight: 500; color: rgba(0,230,118,0.5);
+    #topbar-credits.low {
+      background: rgba(255,159,10,0.08);
+      border-color: rgba(255,159,10,0.25);
     }
-    #topbar-credits.low { background: rgba(255,159,10,0.08); border-color: rgba(255,159,10,0.28); }
-    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; }
-    #topbar-credits.low .v2-credits-lbl    { color: rgba(255,159,10,0.55); }
+    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; text-shadow: none; }
 
-    /* Plan badge */
+    /* Right side of header */
+    .v2-hdr-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+    /* Plan badge (JS reveals via style.display='') */
     #topbar-plan {
-      font-size: 9px; font-weight: 700;
-      letter-spacing: 0.7px; text-transform: uppercase;
-      color: var(--text-1);
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 20px; padding: 3px 8px;
-    }
-
-    /* Gear / settings button */
-    .v2-gear-btn {
-      background: none; border: none; color: var(--text-2);
-      display: flex; align-items: center; justify-content: center;
-      width: 28px; height: 28px; border-radius: 7px;
-      transition: color .15s, background .15s;
-    }
-    .v2-gear-btn:hover  { color: var(--text-1); background: var(--card); }
-    .v2-gear-btn:active { transform: scale(0.9); }
-
-    /* ─── CLIP ROW ──────────────────────────── */
-    .v2-clip-row {
-      height: 60px; flex-shrink: 0;
-      display: flex; align-items: center;
-      padding: 0 12px; gap: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    /* Empty state */
-    .v2-clip-empty {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; color: var(--text-2); font-size: 12px;
-    }
-    .v2-clip-empty-icon { color: var(--text-3); flex-shrink: 0; }
-    .v2-clip-empty-text { flex: 1; }
-    .clip-auto-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; font-weight: 600;
-      color: var(--accent); background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
+      display: inline-block;
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.8px; text-transform: uppercase;
+      color: var(--text-3);
+      border: 1px solid var(--border);
       border-radius: 20px; padding: 2px 8px;
     }
-    .clip-auto-dot {
-      width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
-      animation: breathe 1.8s ease-in-out infinite;
-    }
-    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
 
-    /* Filled state */
-    .v2-clip-info { display: flex; align-items: center; gap: 10px; width: 100%; }
-    .v2-clip-thumb {
-      width: 48px; height: 48px; flex-shrink: 0;
-      object-fit: cover; border-radius: var(--r-sm);
-      background: #000; display: block;
+    /* Gear button */
+    .v2-gear-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      color: var(--text-3);
+      transition: color .15s, background .15s;
     }
-    .v2-clip-name {
-      flex: 1; font-size: 12px; font-weight: 500;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      color: var(--text-1);
-    }
-    .v2-clip-dur {
-      flex-shrink: 0;
-      font-size: 11px; font-weight: 600;
-      padding: 3px 8px; border-radius: 20px;
-      background: var(--accent-dim); color: var(--accent);
-    }
+    .v2-gear-btn:hover { color: var(--text-2); background: var(--surface3); }
+    .v2-gear-btn:active { transform: scale(0.9); }
 
-    /* ─── MODE PILLS ────────────────────────── */
-    .v2-modes {
-      flex-shrink: 0;
-      display: flex; gap: 6px;
-      padding: 8px 12px;
+    /* ─────────────────────────────────────────────
+       VIDEO PREVIEW  (16:9)
+    ───────────────────────────────────────────── */
+    .v2-preview {
+      position: relative; flex-shrink: 0;
+      width: 100%; aspect-ratio: 16/9;
+      background: #0a0a0a;
+      overflow: hidden;
       border-bottom: 1px solid var(--border);
     }
-    .mode-pill {
-      flex: 1; padding: 7px 0;
-      border-radius: var(--r-sm);
-      font-size: 11px; font-weight: 700;
-      text-align: center; cursor: pointer;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      color: var(--text-2);
-      transition: all .15s ease;
+
+    /* EMPTY STATE */
+    #clip-empty {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(0,230,118,0.04) 0%, transparent 70%);
     }
-    .mode-pill:hover  { background: rgba(255,255,255,0.08); color: var(--text-1); }
-    .mode-pill.active {
-      background: var(--accent-dim);
-      border-color: var(--accent-border);
+    .pv-empty-icon {
+      position: relative; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pv-empty-glow {
+      position: absolute; inset: -14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,230,118,0.12) 0%, transparent 70%);
+      animation: glow-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.9); }
+      50%       { opacity: 1;   transform: scale(1.1); }
+    }
+    .pv-empty-icon svg {
+      position: relative; z-index: 1;
+      animation: icon-float 3s ease-in-out infinite;
+    }
+    @keyframes icon-float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-2px); }
+    }
+    .pv-empty-title {
+      font-size: 13px; font-weight: 600; color: var(--text-2);
+      letter-spacing: -0.2px;
+    }
+    .pv-empty-sub {
+      font-size: 11px; color: var(--text-3); margin-bottom: 8px;
+    }
+    .v2-watching-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
+      color: var(--accent);
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px; padding: 3px 9px;
+    }
+    .v2-watching-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
+
+    /* FILLED STATE */
+    #clip-info { position: absolute; inset: 0; }
+    #clip-thumbnail { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* LIVE badge */
+    .v2-preview-live {
+      position: absolute; top: 10px; right: 10px;
+      display: flex; align-items: center; gap: 5px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+      color: var(--accent);
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,230,118,0.35);
+      border-radius: var(--r-xs); padding: 4px 8px;
+    }
+    .v2-preview-live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+
+    /* Bottom info overlay */
+    .v2-preview-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: flex-end;
+      padding: 24px 12px 10px;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    }
+    #clip-name {
+      flex: 1; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.9);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-right: 10px;
+    }
+    #clip-dur-badge {
+      flex-shrink: 0;
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─────────────────────────────────────────────
+       MODE TABS  (replaces dropdown)
+    ───────────────────────────────────────────── */
+    .v2-mode-tabs {
+      flex-shrink: 0;
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-tab {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+      padding: 8px 4px;
+      color: var(--text-3);
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
+      border-bottom: 2px solid transparent;
+      transition: color .2s ease, border-color .2s ease, background .2s ease;
+      position: relative;
+    }
+    .mode-tab svg { transition: opacity .2s; opacity: 0.5; }
+    .mode-tab:hover { color: var(--text-2); background: rgba(255,255,255,0.02); }
+    .mode-tab:hover svg { opacity: 0.75; }
+    .mode-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: rgba(0,230,118,0.04);
+    }
+    .mode-tab.active svg {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px rgba(0,230,118,0.5));
+    }
+    .mode-tab:active { transform: scale(0.96); }
+
+    /* ─────────────────────────────────────────────
+       PROMPT GLASS CARD
+    ───────────────────────────────────────────── */
+    .v2-prompt-outer {
+      flex: 1; min-height: 80px;
+      display: flex; flex-direction: column;
+      padding: 10px 12px 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    /* Top decorative sparkle */
+    .v2-prompt-sparkle {
+      position: absolute; top: 14px; left: 16px;
+      font-size: 11px; color: var(--text-3);
+      pointer-events: none;
+      transition: color .2s;
+      line-height: 1;
+    }
+    .v2-prompt-outer:focus-within .v2-prompt-sparkle {
       color: var(--accent);
     }
 
-    /* ─── PROMPT (hero) ─────────────────────── */
-    .v2-prompt-wrap {
-      flex: 1; min-height: 120px;
+    /* Glass container around textarea */
+    .v2-prompt-glass {
+      flex: 1; min-height: 60px;
       display: flex; flex-direction: column;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
-    .v2-prompt-wrap textarea {
-      flex: 1;
-      width: 100%; background: transparent; border: none; outline: none;
-      color: var(--text-1); font-size: 13px; font-family: inherit;
-      resize: none; padding: 12px 12px 6px;
+    .v2-prompt-glass:focus-within {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 1px rgba(0,230,118,0.12), 0 0 20px rgba(0,230,118,0.06);
+    }
+    .v2-prompt-glass textarea {
+      flex: 1; min-height: 60px;
+      width: 100%;
+      background: transparent; border: none; outline: none; resize: none;
+      color: var(--text); font-size: 13px; font-family: var(--font);
+      padding: 10px 12px 6px 30px;  /* left pad for sparkle icon */
       line-height: 1.6;
       caret-color: var(--accent);
     }
-    .v2-prompt-wrap textarea::placeholder { color: var(--text-3); }
+    .v2-prompt-glass textarea::placeholder { color: var(--text-3); }
+
+    /* Footer: char count + enhance */
     .v2-prompt-foot {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 10px 10px; flex-shrink: 0;
+      padding: 6px 2px 0; flex-shrink: 0;
+    }
+    .v2-char-count {
+      font-size: 10px; color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.2px;
     }
 
-    /* Enhance button */
+    /* AI Enhance button — pill */
     .v2-enhance-btn {
       display: flex; align-items: center; gap: 5px;
-      background: var(--accent-dim);
-      border: 1px solid var(--accent-border);
-      color: var(--accent);
-      font-size: 11px; font-weight: 700;
-      padding: 5px 12px; border-radius: 20px;
-      transition: all .18s ease;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-3);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.1px;
+      padding: 4px 11px; border-radius: 20px;
+      transition: all .2s ease;
     }
-    .v2-enhance-btn:hover   { background: rgba(0,230,118,0.18); border-color: rgba(0,230,118,0.5); }
-    .v2-enhance-btn:active  { transform: scale(0.97); }
-    .v2-enhance-btn:disabled { opacity: .35; cursor: wait; }
-    .v2-enhance-btn.ai-btn--done { background: rgba(0,230,118,0.2); border-color: var(--accent); color: #fff; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .v2-enhance-btn:hover {
+      background: rgba(0,230,118,0.08);
+      border-color: var(--accent-border);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(0,230,118,0.1);
+    }
+    .v2-enhance-btn:active { transform: scale(0.97); }
+    .v2-enhance-btn:disabled { opacity: .3; cursor: wait; }
+    .v2-enhance-btn.ai-btn--done {
+      background: rgba(0,230,118,0.10);
+      border-color: var(--accent-border-hi);
+      color: var(--accent);
+      box-shadow: 0 0 14px rgba(0,230,118,0.15);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .v2-enhance-btn.enhancing .ai-btn-icon { animation: spin 0.9s linear infinite; display: inline-block; }
+    .ai-btn-icon { font-size: 12px; line-height: 1; }
 
-    /* Character counter */
-    .v2-char-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+    /* ─────────────────────────────────────────────
+       OUTPUT OPTIONS
+    ───────────────────────────────────────────── */
+    .v2-output-opts {
+      flex-shrink: 0;
+      padding: 10px 12px 9px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-opt-row { display: flex; align-items: center; }
+    .v2-opt-label {
+      font-size: 11px; font-weight: 600; color: var(--text-3);
+      letter-spacing: 0.3px; text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .v2-opt-seg {
+      display: flex;
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+    .v2-opt-pill {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 4px;
+      color: var(--text-3);
+      background: transparent;
+      transition: all .2s ease;
+    }
+    .v2-opt-pill:hover { color: var(--text-2); }
+    .v2-opt-pill.seg-active {
+      background: var(--surface3);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .v2-opt-hint {
+      font-size: 10px; color: var(--text-3);
+      margin-top: 5px; letter-spacing: 0.1px;
+    }
 
-    /* ─── ERROR / NO CREDITS ────────────────── */
+    /* ─────────────────────────────────────────────
+       ERRORS / NO CREDITS
+    ───────────────────────────────────────────── */
     .v2-inline-error {
       flex-shrink: 0;
       display: flex; align-items: center; gap: 8px;
-      padding: 9px 12px;
-      background: rgba(255,69,58,0.06);
-      border-bottom: 1px solid rgba(255,69,58,0.14);
-      font-size: 12px; color: rgba(255,69,58,0.9);
+      padding: 9px 14px;
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      font-size: 12px; color: rgba(255,80,70,0.9);
     }
     .v2-err-retry {
       margin-left: auto; flex-shrink: 0;
-      background: none; border: 1px solid rgba(255,69,58,0.35);
+      border: 1px solid rgba(255,69,58,0.3);
       color: var(--red); font-size: 11px; font-weight: 600;
-      padding: 4px 10px; border-radius: 20px;
+      padding: 3px 10px; border-radius: 20px;
       transition: background .15s;
     }
     .v2-err-retry:hover { background: rgba(255,69,58,0.1); }
@@ -273,91 +471,100 @@
     .no-credits-bar {
       flex-shrink: 0;
       display: flex; align-items: center; gap: 7px;
-      background: rgba(255,69,58,0.06);
-      border-bottom: 1px solid rgba(255,69,58,0.14);
-      padding: 9px 12px; font-size: 12px; color: var(--red);
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      padding: 9px 14px; font-size: 12px; color: var(--red);
     }
     .no-credits-link {
       color: var(--accent); text-decoration: none;
       margin-left: auto; font-weight: 600; font-size: 11px;
+      transition: opacity .15s;
     }
-    .no-credits-link:hover { text-decoration: underline; }
+    .no-credits-link:hover { opacity: 0.8; }
 
-    /* ─── GENERATE BUTTON ───────────────────── */
+    /* ─────────────────────────────────────────────
+       GENERATE BUTTON  — the hero CTA
+    ───────────────────────────────────────────── */
     .v2-gen-btn {
       flex-shrink: 0;
       position: relative; overflow: hidden;
-      width: 100%; height: 48px;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: var(--accent); color: #000;
-      font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
-      border: none; cursor: pointer;
-      transition: filter .18s ease, background .2s ease;
+      width: 100%; height: 54px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #008f4a 0%, #00c864 50%, #00e676 100%);
+      color: #000;
+      font-size: 14px; font-weight: 700; letter-spacing: -0.2px;
+      cursor: pointer;
+      transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
     }
-    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) { filter: brightness(1.08); }
-    .v2-gen-btn:active:not(.v2-generating)               { transform: scale(0.99); }
-    .v2-gen-btn:disabled:not(.v2-generating)              { opacity: .35; cursor: not-allowed; }
-
-    /* Generating state */
+    .v2-gen-btn::before {
+      /* Top specular highlight */
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) {
+      filter: brightness(1.08);
+      box-shadow: 0 0 28px rgba(0,230,118,0.3), 0 4px 20px rgba(0,0,0,0.5);
+      transform: translateY(-1px);
+    }
+    .v2-gen-btn:active:not(.v2-generating) {
+      transform: translateY(0) scale(0.995);
+      filter: brightness(0.96);
+    }
+    .v2-gen-btn:disabled:not(.v2-generating) { opacity: .35; cursor: not-allowed; }
     .v2-gen-btn.v2-generating {
-      background: var(--card); color: var(--text-1); cursor: default;
+      background: var(--surface2); color: var(--text-2);
+      cursor: default; transform: none; box-shadow: none; filter: none;
     }
     .v2-gen-cost {
-      background: rgba(0,0,0,0.18); border-radius: 20px;
-      padding: 2px 8px; font-size: 11px; font-weight: 700;
+      background: rgba(0,0,0,0.18);
+      border-radius: 20px; padding: 2px 9px;
+      font-size: 11px; font-weight: 700;
     }
     .v2-generating .v2-gen-cost { display: none; }
-
-    /* 2px progress line at bottom */
     .v2-gen-pline {
       position: absolute; bottom: 0; left: 0;
       height: 2px; width: 0%;
       background: var(--accent);
       transition: width .35s ease;
-      box-shadow: 0 0 8px rgba(0,230,118,0.6);
+      box-shadow: 0 0 10px rgba(0,230,118,0.7);
     }
 
-    /* ─── OUTPUT SECTION — full-panel overlay ── */
+    /* ─────────────────────────────────────────────
+       RESULT OVERLAY
+    ───────────────────────────────────────────── */
     #mf-section-result {
       position: absolute; inset: 0; z-index: 20;
       display: flex; flex-direction: column;
       background: var(--bg);
     }
-    /* .hidden uses display:none !important — defined in reset above */
-
-    /* Before / After slider — takes all remaining height */
     .v2-ba-wrap {
       flex: 1; min-height: 0;
       position: relative;
-      background: #0a0a0a; overflow: hidden;
+      background: #050505; overflow: hidden;
       user-select: none;
     }
     .v2-ba-img {
       position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover; display: block;
+      width: 100%; height: 100%; object-fit: cover; display: block;
     }
     .v2-ba-after { clip-path: inset(0 0 0 50%); }
-
-    /* Divider line */
     .v2-ba-divider {
       position: absolute; top: 0; bottom: 0;
       left: 50%; width: 2px;
-      background: rgba(255,255,255,0.9); transform: translateX(-50%);
+      background: rgba(255,255,255,0.85); transform: translateX(-50%);
       pointer-events: none;
       box-shadow: 0 0 10px rgba(0,0,0,0.6);
     }
-    /* Drag handle circle */
     .v2-ba-divider::after {
       content: '';
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 28px; height: 28px; border-radius: 50%;
       background: #fff;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      box-shadow: 0 2px 16px rgba(0,0,0,0.5);
     }
-
-    /* Transparent range input captures drag events */
     .v2-ba-slider {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
@@ -368,129 +575,122 @@
       -webkit-appearance: none; appearance: none;
       width: 44px; height: 100vh; cursor: ew-resize;
     }
-
-    /* Before / After labels */
     .v2-ba-lbl {
-      position: absolute; top: 10px;
-      padding: 3px 9px;
-      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
-      color: #fff; font-size: 10px; font-weight: 700;
-      border-radius: 20px; pointer-events: none;
-      letter-spacing: 0.3px;
+      position: absolute; top: 12px;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+      color: rgba(255,255,255,0.8); font-size: 10px; font-weight: 700;
+      border-radius: 20px; pointer-events: none; letter-spacing: 0.4px;
     }
-    .v2-ba-lbl-l { left: 10px; }
-    .v2-ba-lbl-r { right: 10px; }
+    .v2-ba-lbl-l { left: 12px; }
+    .v2-ba-lbl-r { right: 12px; }
 
-    /* Action buttons below slider */
+    /* Result action buttons */
     .v2-output-actions {
       flex-shrink: 0;
       display: flex; gap: 8px;
-      padding: 10px 12px 14px;
+      padding: 12px 12px 16px;
       border-top: 1px solid var(--border);
+      background: var(--bg2);
     }
     .v2-timeline-btn {
       flex: 1;
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 10px 12px; border-radius: var(--r-sm);
-      font-size: 12px; font-weight: 700;
-      background: var(--accent); color: #000; border: none;
-      transition: filter .18s;
+      padding: 11px 16px; border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 700; letter-spacing: -0.1px;
+      background: var(--accent); color: #000;
+      transition: filter .2s, transform .15s, box-shadow .2s;
     }
-    .v2-timeline-btn:hover   { filter: brightness(1.08); }
-    .v2-timeline-btn:active  { transform: scale(0.98); }
-    .v2-timeline-btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+    .v2-timeline-btn:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 0 18px rgba(0,230,118,0.25);
+      transform: translateY(-1px);
+    }
+    .v2-timeline-btn:active { transform: scale(0.98); filter: brightness(0.96); }
+    .v2-timeline-btn:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+
     .v2-new-effect-btn {
       flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 10px 14px; border-radius: var(--r-sm);
-      font-size: 12px; font-weight: 600;
-      background: transparent; color: var(--text-1);
+      padding: 11px 16px; border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 600; letter-spacing: -0.1px;
+      color: var(--text-2);
       border: 1px solid var(--border);
-      transition: border-color .15s, background .15s;
+      background: var(--surface);
+      transition: all .2s;
     }
-    .v2-new-effect-btn:hover  { border-color: var(--border-strong); background: var(--card); }
-    .v2-new-effect-btn:active { transform: scale(0.98); }
+    .v2-new-effect-btn:hover { border-color: var(--border-med); color: var(--text); background: var(--surface3); }
+    .v2-new-effect-btn:active { transform: scale(0.97); }
 
-    /* ═══════════════════════════════════════════
+    /* ─────────────────────────────────────────────
        SETTINGS OVERLAY
-    ═══════════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     #section-settings {
       position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(12px);
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(14px);
       display: flex; flex-direction: column; justify-content: flex-end;
       opacity: 0; pointer-events: none;
       transition: opacity .22s ease;
     }
     #section-settings.settings-visible { opacity: 1; pointer-events: auto; }
-
     .settings-sheet {
-      background: rgba(26,26,26,0.97);
-      border: 1px solid var(--border-strong); border-bottom: none;
+      background: rgba(14,14,14,0.98);
+      border: 1px solid var(--border-med); border-bottom: none;
       border-radius: 14px 14px 0 0;
-      box-shadow: 0 -24px 60px rgba(0,0,0,0.5);
-      transform: translateY(16px);
-      transition: transform .22s ease;
+      box-shadow: 0 -32px 80px rgba(0,0,0,0.6);
+      transform: translateY(20px);
+      transition: transform .24s ease;
     }
     #section-settings.settings-visible .settings-sheet { transform: translateY(0); }
-
     .settings-handle {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px 8px; border-bottom: 1px solid var(--border);
+      padding: 16px 16px 10px; border-bottom: 1px solid var(--border);
     }
-    .settings-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+    .settings-title { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
     .settings-close {
-      background: rgba(255,255,255,0.08); border: none; color: var(--text-2);
+      background: rgba(255,255,255,0.07); color: var(--text-3);
       width: 24px; height: 24px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 600;
-      transition: background .15s;
+      font-size: 12px; font-weight: 700;
+      transition: background .15s, color .15s;
     }
-    .settings-close:hover { background: rgba(255,255,255,0.14); color: var(--text-1); }
-
-    /* Hidden JS-compat toggles */
+    .settings-close:hover { background: rgba(255,255,255,0.13); color: var(--text); }
     .settings-toggle { display: none; }
     .settings-menu   { display: none; }
-
     .sm-item {
-      display: flex; align-items: center; gap: 11px;
-      background: none; border: none;
+      display: flex; align-items: center; gap: 12px;
       color: var(--text-2); font-size: 13px; font-weight: 500;
-      padding: 12px 16px; width: 100%; text-align: left;
+      padding: 13px 16px; width: 100%; text-align: left;
       border-bottom: 1px solid var(--border);
       transition: color .12s, background .12s;
     }
     .sm-item:last-child { border-bottom: none; }
-    .sm-item:hover      { color: var(--text-1); background: rgba(255,255,255,0.03); }
-    .sm-danger:hover    { color: var(--red); }
-
+    .sm-item:hover { color: var(--text); background: rgba(255,255,255,0.025); }
+    .sm-danger:hover { color: var(--red); }
     .sm-item-icon {
-      width: 28px; height: 28px; border-radius: 7px;
-      background: rgba(255,255,255,0.07);
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.06);
       display: flex; align-items: center; justify-content: center;
-      color: var(--text-2); flex-shrink: 0;
+      color: var(--text-3); flex-shrink: 0;
     }
-
-    /* Diagnostics */
     .diag-box {
-      background: rgba(255,255,255,0.03); border-top: 1px solid var(--border);
-      padding: 10px 16px; display: flex; flex-direction: column; gap: 5px;
+      background: rgba(255,255,255,0.018); border-top: 1px solid var(--border);
+      padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
     }
     .diag-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; }
     .diag-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
-    .dk { color: var(--text-2); }
+    .dk { color: var(--text-3); }
     .dv {
-      color: var(--text-1); font-family: 'SF Mono', ui-monospace, monospace;
+      color: var(--text-2); font-family: 'SF Mono', ui-monospace, monospace;
       font-size: 10px; text-align: right;
       max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .ghost-lnk {
       background: none; border: none; color: var(--accent);
-      font-size: 11px; font-weight: 600; cursor: pointer;
+      font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.1px;
     }
-
-    /* ─── Chip helpers (used in hidden compat area) ── */
     .chip { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
     .chip-green { background: var(--accent-dim); color: var(--accent); }
     .chip-gray  { background: rgba(255,255,255,0.06); color: var(--text-2); }
@@ -499,18 +699,18 @@
 </head>
 <body>
 
-  <!-- ══════════════════════════════════════════
+  <!-- ════════════════════════════════
        TOAST
-  ══════════════════════════════════════════ -->
+  ════════════════════════════════ -->
   <div id="toast" class="toast hidden" role="alert" aria-live="polite">
     <span class="toast-dot"></span>
     <span id="toast-icon"></span>
     <span id="toast-text"></span>
   </div>
 
-  <!-- ══════════════════════════════════════════
-       LOGIN VIEW
-  ══════════════════════════════════════════ -->
+  <!-- ════════════════════════════════
+       LOGIN VIEW  (untouched)
+  ════════════════════════════════ -->
   <div id="view-login" class="view login-view">
     <div class="lbg" aria-hidden="true">
       <div class="lbg-glow-center"></div>
@@ -541,9 +741,7 @@
           </div>
         </div>
       </div>
-
       <div class="lv-divider"></div>
-
       <div class="lv-workspace-card">
         <div class="lwc-header">
           <div class="lwc-icon">
@@ -562,7 +760,6 @@
         </button>
         <p id="login-status" style="display:none"></p>
       </div>
-
       <div class="lv-stats">
         <div class="lv-stat"><span class="lv-stat-label">Plan</span><span class="lv-stat-value">Not connected</span></div>
         <div class="lv-stat-sep"></div>
@@ -573,75 +770,159 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════
+  <!-- ════════════════════════════════
        MAIN PANEL VIEW
-  ══════════════════════════════════════════ -->
+  ════════════════════════════════ -->
   <div id="view-main" class="view v2-panel hidden">
 
-    <!-- ── HEADER ──────────────────────────── -->
+    <!-- ─ HEADER ──────────────────── -->
     <header class="v2-hdr">
-      <span class="v2-hdr-logo">Prysmor</span>
 
-      <div class="v2-hdr-center">
-        <div id="topbar-credits" style="display:none">
-          <!-- Lightning bolt icon -->
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span id="topbar-credits-val">—</span>
-          <span class="v2-credits-lbl">cr</span>
-        </div>
-      </div>
+      <!-- Logo — left -->
+      <div class="v2-hdr-logo">Pr<span>ysmor</span></div>
 
+      <!-- Credits + plan + gear — right -->
       <div class="v2-hdr-right">
+
+        <!-- Credits badge (JS reveals via style.display='') -->
+        <div id="topbar-credits" style="display:none">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span id="topbar-credits-val">—</span>
+        </div>
+
+        <!-- Plan pill (JS reveals via style.display='') -->
         <span id="topbar-plan" style="display:none"></span>
+
+        <!-- Settings gear -->
         <button class="v2-gear-btn" id="btn-scroll-settings" title="Settings" aria-label="Settings">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- ── CLIP ROW ─────────────────────────── -->
-    <div class="v2-clip-row">
-      <!-- Empty state -->
-      <div id="clip-empty" class="v2-clip-empty">
-        <div class="v2-clip-empty-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="3"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    <!-- ─ VIDEO PREVIEW (16:9) ─────── -->
+    <div class="v2-preview">
+
+      <!-- Empty: no clip selected -->
+      <div id="clip-empty">
+        <div class="pv-empty-icon">
+          <div class="pv-empty-glow"></div>
+          <!-- Film frame icon -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,230,118,0.7)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2.5"/>
+            <path d="M7 3v14M17 3v14M2 8h2M20 8h2M2 13h2M20 13h2"/>
+          </svg>
         </div>
-        <span class="v2-clip-empty-text">Select a clip in your timeline</span>
-        <div class="clip-auto-badge">
-          <span class="clip-auto-dot"></span>
-          Watching
+        <span class="pv-empty-title">Select a clip to start</span>
+        <span class="pv-empty-sub">Apply AI-powered effects in seconds</span>
+        <div class="v2-watching-badge">
+          <span class="v2-watching-dot"></span>
+          Watching timeline
         </div>
       </div>
 
-      <!-- Clip filled state -->
-      <div id="clip-info" class="v2-clip-info hidden">
-        <img id="clip-thumbnail" class="v2-clip-thumb" src="" alt="">
-        <span id="clip-name" class="v2-clip-name">clip.mp4</span>
-        <span id="clip-dur-badge" class="v2-clip-dur">—</span>
+      <!-- Filled: clip loaded -->
+      <div id="clip-info" class="hidden">
+        <img id="clip-thumbnail" src="" alt="Clip preview" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <!-- Live badge -->
+        <div class="v2-preview-live">
+          <span class="v2-preview-live-dot"></span>
+          LIVE
+        </div>
+        <!-- Info bar -->
+        <div class="v2-preview-bar">
+          <span id="clip-name">clip.mp4</span>
+          <span id="clip-dur-badge">—</span>
+        </div>
       </div>
+
     </div>
 
-    <!-- ── MODE PILLS ────────────────────────── -->
-    <div class="v2-modes">
-      <button class="mode-pill active" data-mode="background">Background</button>
-      <button class="mode-pill"        data-mode="relight">Relight</button>
-      <button class="mode-pill"        data-mode="vfx">VFX</button>
+    <!-- ─ MODE TABS ────────────────── -->
+    <!--
+      Each button has BOTH class="mode-tab mode-pill" — mode-pill preserves
+      JS compat (bindEvents querySelectorAll('.mode-pill')).
+      mode-tab is for new visual styling.
+    -->
+    <div class="v2-mode-tabs">
+
+      <button class="mode-tab mode-pill active" data-mode="background" onclick="prysmorSetMode('background')">
+        <!-- Landscape / background icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 16l5-5 4 4 3-3 4 4"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+        </svg>
+        BG
+      </button>
+
+      <button class="mode-tab mode-pill" data-mode="relight" onclick="prysmorSetMode('relight')">
+        <!-- Sun / light rays icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2"  x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/>
+          <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/>
+          <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        Light
+      </button>
+
+      <button class="mode-tab mode-pill" data-mode="style" onclick="prysmorSetMode('style')">
+        <!-- Clothing / hanger icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-.95 2.97L6 11l0 10h12V11l3.33-4.57a2 2 0 00-.95-2.97z"/>
+        </svg>
+        Style
+      </button>
+
+      <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
+        <!-- Sparkles / magic icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+        </svg>
+        VFX
+      </button>
+
     </div>
 
-    <!-- ── PROMPT (hero) ────────────────────── -->
-    <div class="v2-prompt-wrap">
-      <textarea id="mf-prompt" maxlength="1000"
-        placeholder="Describe your effect…"></textarea>
+    <!-- ─ PROMPT ────────────────────── -->
+    <div class="v2-prompt-outer">
+      <!-- Decorative sparkle — top-left inside glass -->
+      <span class="v2-prompt-sparkle" aria-hidden="true">✦</span>
+
+      <div class="v2-prompt-glass">
+        <textarea id="mf-prompt" maxlength="1000"
+          placeholder="Describe the new background…"></textarea>
+      </div>
+
       <div class="v2-prompt-foot">
+        <span class="v2-char-count"><span id="mf-char-count">0</span> / 1000</span>
         <button id="btn-compile-prompt" class="v2-enhance-btn">
           <span class="ai-btn-icon">✦</span>
-          <span id="compile-label">Enhance</span>
+          <span id="compile-label">AI Enhance</span>
         </button>
-        <span class="v2-char-count"><span id="mf-char-count">0</span> / 1000</span>
       </div>
     </div>
 
-    <!-- ── ERROR / NO CREDITS ────────────────── -->
+    <!-- ─ OUTPUT OPTIONS ────────────── -->
+    <div class="v2-output-opts">
+      <div class="v2-opt-row">
+        <span class="v2-opt-label">Output</span>
+        <div class="v2-opt-seg">
+          <button id="out-btn-v2" class="v2-opt-pill seg-active">New track</button>
+          <button id="out-btn-replace" class="v2-opt-pill">Replace</button>
+        </div>
+      </div>
+      <div id="output-hint" class="v2-opt-hint">Added on V2 — original clip untouched</div>
+      <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
+    </div>
+
+    <!-- ─ ERRORS ────────────────────── -->
     <div id="mf-gen-failed" class="v2-inline-error hidden">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span id="gen-fail-msg">Something went wrong.</span>
@@ -654,31 +935,25 @@
       <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
     </div>
 
-    <!-- ── GENERATE BUTTON ───────────────────── -->
+    <!-- ─ GENERATE CTA ──────────────── -->
     <button id="mf-btn-generate" class="v2-gen-btn">
-      <span id="gen-btn-label">▶ Generate Effect</span>
+      <span id="gen-btn-label">Generate Effect</span>
       <span id="gen-btn-cost" class="v2-gen-cost" style="display:none">
         <span id="gen-btn-cost-val">—</span> cr
       </span>
       <div class="v2-gen-pline" id="v2-gen-pline"></div>
     </button>
 
-    <!-- ── HIDDEN COMPAT ELEMENTS (JS still references these IDs) ── -->
+    <!-- ─ HIDDEN COMPAT ELEMENTS (all IDs JS references) ── -->
     <div style="display:none" aria-hidden="true">
-      <!-- Legacy credits / usage -->
-      <div id="credits-card">
-        <b id="usage-used">—</b>/<span id="usage-limit">1000</span>
-        <span id="usage-seconds"></span>
-      </div>
+      <div id="credits-card"><b id="usage-used">—</b>/<span id="usage-limit">1000</span><span id="usage-seconds"></span></div>
       <div id="progress-fill" style="width:0%"></div>
-
-      <!-- Output mode (legacy) -->
-      <input type="checkbox" id="mf-replace-toggle"/>
-      <div id="output-hint"></div>
-      <button id="out-btn-v2"></button>
-      <button id="out-btn-replace"></button>
-
-      <!-- Generation progress (legacy, still updated by JS for ETA logic) -->
+      <button id="btn-refresh-clip"></button>
+      <span id="clip-thumb-placeholder"></span>
+      <span id="clip-trim-badge"></span>
+      <span id="clip-start-badge"></span>
+      <p id="clip-trim-warning"></p>
+      <div class="clip-live"></div>
       <div id="mf-gen-state">
         <span id="gp-phase-label"></span>
         <div id="gp-fill" style="width:0%"></div>
@@ -695,30 +970,21 @@
         <span id="gs-line-1"></span>
         <span id="gs-line-2"></span>
       </div>
-
-      <!-- Cost preview (legacy) -->
       <div id="gen-cost-preview"></div>
-
-      <!-- Clip extras (legacy) -->
-      <button id="btn-refresh-clip"></button>
-      <span id="clip-thumb-placeholder"></span>
-      <span id="clip-trim-badge"></span>
-      <span id="clip-start-badge"></span>
-      <p id="clip-trim-warning"></p>
-      <div class="clip-live"></div>
-
-      <!-- Legacy result video (not shown in new UI) -->
       <video id="mf-result-video" src="" muted loop playsinline></video>
+      <!-- Dropdown kept for inline-script applyMode() compat -->
+      <select id="mf-mode-select">
+        <option value="background">Background</option>
+        <option value="relight">Relight</option>
+        <option value="style">Style</option>
+        <option value="vfx">VFX</option>
+      </select>
+      <a id="link-docs"  href="#"></a>
+      <a id="link-terms" href="#"></a>
     </div>
 
-    <!-- ── OUTPUT — full panel overlay ─────── -->
-    <!--
-      Position: absolute, inset: 0, z-index: 20.
-      When JS removes .hidden, this covers the whole panel without scroll.
-      Before image = original clip frame, After image = AI output frame.
-    -->
+    <!-- ─ RESULT OVERLAY ────────────── -->
     <div id="mf-section-result" class="hidden">
-      <!-- B/A slider — fills all height above action buttons -->
       <div class="v2-ba-wrap">
         <img id="ba-before" class="v2-ba-img" alt="Before" src="">
         <img id="ba-after"  class="v2-ba-img v2-ba-after" alt="After" src="">
@@ -728,11 +994,10 @@
         <span class="v2-ba-lbl v2-ba-lbl-l">Before</span>
         <span class="v2-ba-lbl v2-ba-lbl-r">After</span>
       </div>
-      <!-- Action buttons -->
       <div class="v2-output-actions">
         <button id="btn-add-to-timeline" class="v2-timeline-btn">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-          Add to Timeline
+          Import to Timeline
         </button>
         <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
       </div>
@@ -740,42 +1005,31 @@
 
   </div><!-- /view-main -->
 
-  <!-- ══════════════════════════════════════════
+  <!-- ════════════════════════════════
        SETTINGS OVERLAY
-  ══════════════════════════════════════════ -->
+  ════════════════════════════════ -->
   <div id="section-settings">
     <div class="settings-sheet">
       <div class="settings-handle">
         <span class="settings-title">Settings</span>
-        <button class="settings-close" id="settings-close-btn" aria-label="Close settings">✕</button>
+        <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
       </div>
-
-      <!-- JS-compat hidden toggles -->
       <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
       <div    class="settings-menu"   id="settings-menu"    style="display:none"></div>
       <span                           id="settings-chevron" style="display:none"></span>
 
       <button class="sm-item" id="btn-dashboard">
-        <span class="sm-item-icon">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        </span>
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
         Open Dashboard
       </button>
-
       <button class="sm-item" id="btn-updates">
-        <span class="sm-item-icon">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </span>
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></span>
         Check for Updates
       </button>
-
       <button class="sm-item" id="btn-diagnostics">
-        <span class="sm-item-icon">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </span>
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
         <span id="btn-diagnostics-label">Diagnostics</span>
       </button>
-
       <div class="diag-box hidden" id="diag-panel">
         <div class="diag-top">
           <span class="diag-ttl">Environment</span>
@@ -788,33 +1042,50 @@
         <div class="diag-row"><span class="dk">Backend</span> <span class="dv" id="diag-backend">…</span></div>
         <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
       </div>
-
       <button class="sm-item sm-danger" id="btn-logout">
-        <span class="sm-item-icon">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </span>
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
         Sign Out
       </button>
     </div>
   </div>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=32"></script>
+  <script src="main.js?v=34"></script>
   <script>
-    /* ─── Login view grain canvas ─────────────────── */
+    /* ── Mode switching — global so onclick= attributes can call it ── */
+    var _modePromptMap = {
+      background: 'Describe the new background...',
+      relight:    'Describe the lighting mood...',
+      style:      'Describe the new outfit...',
+      vfx:        'Describe the visual effect...',
+    };
+    function prysmorSetMode(mode) {
+      /* update global used by main.js */
+      if (typeof selectedMode !== 'undefined') selectedMode = mode;
+      /* toggle active class on all tab+pill buttons */
+      var tabs = document.querySelectorAll('.mode-tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', tabs[i].getAttribute('data-mode') === mode);
+      }
+      /* sync hidden select */
+      var sel = document.getElementById('mf-mode-select');
+      if (sel) sel.value = mode;
+      /* update prompt placeholder */
+      var prompt = document.getElementById('mf-prompt');
+      if (prompt) prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+    }
+
+    /* ── Login grain canvas ────────────────────────────────────── */
     (function () {
       var c = document.getElementById('grain');
       if (!c) return;
       var ctx = c.getContext('2d');
       function draw() {
-        c.width  = c.offsetWidth;
-        c.height = c.offsetHeight;
-        var img = ctx.createImageData(c.width, c.height);
-        var d = img.data;
+        c.width = c.offsetWidth; c.height = c.offsetHeight;
+        var img = ctx.createImageData(c.width, c.height), d = img.data;
         for (var i = 0; i < d.length; i += 4) {
           var v = Math.random() * 22 | 0;
-          d[i] = d[i + 1] = d[i + 2] = v;
-          d[i + 3] = 16;
+          d[i] = d[i+1] = d[i+2] = v; d[i+3] = 16;
         }
         ctx.putImageData(img, 0, 0);
         setTimeout(draw, 80);
@@ -822,43 +1093,33 @@
       draw();
     }());
 
-    /* ─── Settings overlay open / close ───────────── */
     document.addEventListener('DOMContentLoaded', function () {
+
+      /* ── Settings overlay ──────────────────────────────────── */
       var overlay  = document.getElementById('section-settings');
       var closeBtn = document.getElementById('settings-close-btn');
       var openBtn  = document.getElementById('btn-scroll-settings');
-
-      if (openBtn && overlay) {
-        openBtn.addEventListener('click', function () {
-          overlay.classList.add('settings-visible');
-        });
-      }
+      if (openBtn && overlay)  openBtn.addEventListener('click', function () { overlay.classList.add('settings-visible'); });
       if (closeBtn && overlay) {
-        closeBtn.addEventListener('click', function () {
-          overlay.classList.remove('settings-visible');
-        });
-        overlay.addEventListener('click', function (e) {
-          if (e.target === overlay) overlay.classList.remove('settings-visible');
-        });
+        closeBtn.addEventListener('click', function () { overlay.classList.remove('settings-visible'); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
       }
 
-      /* ─── Before / After slider ────────────────── */
+      /* ── Before/After slider ───────────────────────────────── */
       var slider  = document.getElementById('ba-slider');
       var after   = document.getElementById('ba-after');
       var divider = document.getElementById('ba-divider');
-
-      function updateSlider(val) {
-        /* val = 0–100; left side (Before) shows (100-val)% of width */
-        after.style.clipPath = 'inset(0 0 0 ' + (100 - val) + '%)';
-        divider.style.left   = val + '%';
+      function updateSlider(v) {
+        after.style.clipPath = 'inset(0 0 0 ' + (100 - v) + '%)';
+        divider.style.left   = v + '%';
       }
-
       if (slider && after && divider) {
         updateSlider(50);
-        slider.addEventListener('input', function () {
-          updateSlider(parseInt(this.value, 10));
-        });
+        slider.addEventListener('input', function () { updateSlider(parseInt(this.value, 10)); });
       }
+
+      /* Initial placeholder on load */
+      prysmorSetMode('background');
     });
   </script>
 </body>
