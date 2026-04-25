@@ -64,6 +64,7 @@ export async function POST(
     prompt?: string;
     referenceFrameBase64?: string;
     referenceFrames?: string[];
+    referenceImage?: string;
     videoWidth?: number;
     videoHeight?: number;
     clipDuration?: number;
@@ -113,18 +114,40 @@ export async function POST(
     const runwayUri = assetUrl;
     const refUris: string[] = [];
 
+    // User-uploaded reference image (optional) — sent from panel as base64 JPEG.
+    const referenceImageB64 = (body.referenceImage ?? '').trim() || null;
+
     // Panel sends reference frames as base64 JPEG strings (captured at clip-load time via ffmpeg).
-    // Upload them to Runway ephemeral storage and pass as reference_images for relight/style modes.
     const rawFrames: string[] = Array.isArray(body.referenceFrames) && body.referenceFrames.length > 0
       ? body.referenceFrames
       : (body.referenceFrameBase64 ?? '').trim()
         ? [body.referenceFrameBase64!.trim()]
         : [];
 
-    console.log('[runway-refs] Total frames received from panel:', rawFrames.length);
-    const framesToUpload = rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5);
-    console.log('[runway-refs] Frames after filter:', framesToUpload.length);
+    // ── Upload user referenceImage first (always, if provided) ────────────────
+    let referenceImageUri: string | null = null;
+    if (referenceImageB64) {
+      const refImgTmpPath = tmpPath(`ref-image-${params.id}.jpg`);
+      try {
+        fs.writeFileSync(refImgTmpPath, Buffer.from(referenceImageB64, 'base64'));
+        referenceImageUri = await uploadImageToRunway(refImgTmpPath);
+        log(TAG, `Reference image uploaded: ${referenceImageUri}`);
+      } catch (e) {
+        warn(TAG, 'Reference image upload failed', { err: (e as Error).message });
+      } finally {
+        try { fs.unlinkSync(refImgTmpPath); } catch (_) {}
+      }
+    }
 
+    // ── Upload video reference frames (relight/style only) ────────────────────
+    // background + vfx: skip video frames — only use referenceImage if provided
+    const isIdentityMode = mode === 'relight' || mode === 'style';
+    const framesToUpload = isIdentityMode
+      ? rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5)
+      : [];
+
+    console.log('[runway-refs] Total raw frames from panel:', rawFrames.length);
+    console.log('[runway-refs] Frames to upload (identity mode only):', framesToUpload.length);
     console.log('[runway] referenceFrames received:', framesToUpload.length);
 
     if (framesToUpload.length > 0) {
@@ -149,13 +172,21 @@ export async function POST(
       uploaded.forEach(uri => { if (uri) refUris.push(uri); });
     }
 
-    console.log('[runway-refs] Successfully uploaded URIs:', refUris.length);
+    console.log('[runway-refs] Video frame URIs uploaded:', refUris.length);
 
-    // relight + style → send reference frames for identity/appearance preservation
-    // background + vfx → no reference frames (let Runway freely transform the scene)
-    const sendRefs   = refUris.length > 0 && mode !== 'background';
-    const refsToSend = sendRefs ? refUris : [];
-    console.log('[runway-refs] sendRefs:', sendRefs, '— refs being sent to Runway:', refsToSend.length);
+    // ── Assemble final refs array ─────────────────────────────────────────────
+    // relight/style: referenceImage first, then video frames
+    // background/vfx: referenceImage only (no video frames)
+    let refsToSend: string[];
+    if (isIdentityMode) {
+      refsToSend = referenceImageUri
+        ? [referenceImageUri, ...refUris]
+        : refUris;
+    } else {
+      // background/vfx — send ONLY the user reference image if provided
+      refsToSend = referenceImageUri ? [referenceImageUri] : [];
+    }
+    console.log('[runway-refs] refsToSend:', refsToSend.length, '(mode:', mode + ')');
     console.log('[runway-refs] Final refs array:', JSON.stringify(refsToSend));
     console.log('[MotionForge] Mode:', mode, '— refs sent:', refsToSend.length > 0);
     console.log('[runway] refUris uploaded:', refUris.length);

@@ -45,15 +45,21 @@ export async function POST(
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
 
   // ── Parse body ──────────────────────────────────────────────────────────────
-  let body: { intent?: string; frameBase64?: string; frames?: string[]; mode?: string };
+  let body: { intent?: string; frameBase64?: string; frames?: string[]; mode?: string; referenceImage?: string };
   try { body = await req.json(); }
   catch { body = {}; }
 
-  const userIntent = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
-  const mode       = (body.mode ?? 'background').trim();
-  const frames: string[] = Array.isArray(body.frames) && body.frames.length > 0
+  const userIntent     = (body.intent ?? '').trim() || 'make it cinematic and dramatic';
+  const mode           = (body.mode ?? 'background').trim();
+  const referenceImage = typeof body.referenceImage === 'string' && body.referenceImage.length > 0
+    ? body.referenceImage : null;
+  const rawFrames: string[] = Array.isArray(body.frames) && body.frames.length > 0
     ? body.frames
     : (body.frameBase64 ?? '').trim() ? [body.frameBase64!.trim()] : [];
+  // Prepend referenceImage as first frame (most important for Claude vision)
+  const frames: string[] = referenceImage
+    ? [referenceImage, ...rawFrames].slice(0, 5)
+    : rawFrames;
 
   log(TAG, `Enhance-prompt request for job ${params.id}`, {
     userIntent, mode, frameCount: frames.length,

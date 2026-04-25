@@ -532,6 +532,51 @@
     }
 
     /* ─────────────────────────────────────────────
+       REFERENCE IMAGE UPLOAD ZONE
+    ───────────────────────────────────────────── */
+    .v2-ref-img-zone {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-ref-img-label {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; color: var(--text-3);
+      font-size: 11px; font-weight: 500;
+      padding: 6px 10px;
+      border: 1px dashed var(--border-med);
+      border-radius: var(--r-sm);
+      width: 100%;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .v2-ref-img-label:hover {
+      color: var(--text-2); border-color: var(--border-strong);
+      background: rgba(255,255,255,0.02);
+    }
+    .v2-ref-img-icon { font-size: 13px; line-height: 1; }
+    .v2-ref-img-preview {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0;
+    }
+    .v2-ref-img-thumb {
+      height: 40px; width: auto; max-width: 80px;
+      object-fit: cover;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border);
+    }
+    .v2-ref-img-name {
+      flex: 1; font-size: 11px; color: var(--text-2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .v2-ref-img-clear {
+      color: var(--text-3); font-size: 14px; line-height: 1;
+      padding: 2px 7px; border-radius: var(--r-xs);
+      transition: color .15s, background .15s;
+    }
+    .v2-ref-img-clear:hover { color: var(--red); background: rgba(255,69,58,0.08); }
+
+    /* ─────────────────────────────────────────────
        RESULT OVERLAY
     ───────────────────────────────────────────── */
     #mf-section-result {
@@ -539,65 +584,32 @@
       display: flex; flex-direction: column;
       background: var(--bg);
     }
-    .v2-ba-wrap {
+    .v2-result-preview {
       flex: 1; min-height: 0;
       position: relative;
       background: #050505; overflow: hidden;
-      user-select: none;
+      display: flex; align-items: center; justify-content: center;
     }
-    .v2-ba-img {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%; object-fit: cover; display: block;
+    .v2-result-preview img,
+    .v2-result-preview video {
+      width: 100%; height: 100%; object-fit: contain; display: block;
     }
-    .v2-ba-after { clip-path: inset(0 0 0 50%); }
-    .v2-ba-divider {
-      position: absolute; top: 0; bottom: 0;
-      left: 50%; width: 2px;
-      background: rgba(255,255,255,0.85); transform: translateX(-50%);
-      pointer-events: none;
-      box-shadow: 0 0 10px rgba(0,0,0,0.6);
-    }
-    .v2-ba-divider::after {
-      content: '';
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      width: 28px; height: 28px; border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.5);
-    }
-    .v2-ba-slider {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%;
-      opacity: 0; cursor: ew-resize; margin: 0;
-      -webkit-appearance: none; appearance: none;
-    }
-    .v2-ba-slider::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 44px; height: 100vh; cursor: ew-resize;
-    }
-    .v2-ba-lbl {
-      position: absolute; top: 12px;
-      padding: 4px 10px;
-      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
-      color: rgba(255,255,255,0.8); font-size: 10px; font-weight: 700;
-      border-radius: 20px; pointer-events: none; letter-spacing: 0.4px;
-    }
-    .v2-ba-lbl-l { left: 12px; }
-    .v2-ba-lbl-r { right: 12px; }
+    .v2-result-preview img.hidden,
+    .v2-result-preview video.hidden { display: none; }
 
     /* Result action buttons */
     .v2-output-actions {
       flex-shrink: 0;
-      display: flex; gap: 8px;
+      display: flex; flex-direction: column; gap: 8px;
       padding: 12px 12px 16px;
       border-top: 1px solid var(--border);
       background: var(--bg2);
     }
     .v2-timeline-btn {
-      flex: 1;
+      width: 100%;
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 11px 16px; border-radius: var(--r-sm);
-      font-size: 12px; font-weight: 700; letter-spacing: -0.1px;
+      padding: 12px 16px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 700; letter-spacing: -0.1px;
       background: var(--accent); color: #000;
       transition: filter .2s, transform .15s, box-shadow .2s;
     }
@@ -890,6 +902,20 @@
 
     </div>
 
+    <!-- ─ REFERENCE IMAGE UPLOAD ─── -->
+    <div class="v2-ref-img-zone">
+      <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
+        <span class="v2-ref-img-icon">＋</span>
+        <span>Reference image</span>
+      </label>
+      <input type="file" id="ref-img-input" accept="image/*" class="sr-only">
+      <div id="ref-img-preview" class="v2-ref-img-preview hidden">
+        <img id="ref-img-thumb" class="v2-ref-img-thumb" alt="Reference">
+        <span id="ref-img-name" class="v2-ref-img-name"></span>
+        <button id="ref-img-clear" class="v2-ref-img-clear" title="Remove reference image">×</button>
+      </div>
+    </div>
+
     <!-- ─ PROMPT ────────────────────── -->
     <div class="v2-prompt-outer">
       <!-- Decorative sparkle — top-left inside glass -->
@@ -985,22 +1011,23 @@
 
     <!-- ─ RESULT OVERLAY ────────────── -->
     <div id="mf-section-result" class="hidden">
-      <div class="v2-ba-wrap">
-        <img id="ba-before" class="v2-ba-img" alt="Before" src="">
-        <img id="ba-after"  class="v2-ba-img v2-ba-after" alt="After" src="">
-        <div class="v2-ba-divider" id="ba-divider"></div>
-        <input type="range" id="ba-slider" class="v2-ba-slider"
-               value="50" min="0" max="100" aria-label="Compare before and after">
-        <span class="v2-ba-lbl v2-ba-lbl-l">Before</span>
-        <span class="v2-ba-lbl v2-ba-lbl-r">After</span>
+      <div class="v2-result-preview">
+        <img id="result-preview-img" class="hidden" alt="Generated output">
+        <video id="result-preview-video" class="hidden" muted autoplay loop playsinline></video>
       </div>
       <div class="v2-output-actions">
         <button id="btn-add-to-timeline" class="v2-timeline-btn">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-          Import to Timeline
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          ↓ Add to Timeline
         </button>
         <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
       </div>
+    </div>
+
+    <!-- hidden compat: keep ba-* IDs so any lingering references don't throw -->
+    <div style="display:none" aria-hidden="true">
+      <img id="ba-before" src="" alt=""><img id="ba-after" src="" alt="">
+      <div id="ba-divider"></div><input type="range" id="ba-slider" value="50" min="0" max="100">
     </div>
 
   </div><!-- /view-main -->
@@ -1103,19 +1130,6 @@
       if (closeBtn && overlay) {
         closeBtn.addEventListener('click', function () { overlay.classList.remove('settings-visible'); });
         overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
-      }
-
-      /* ── Before/After slider ───────────────────────────────── */
-      var slider  = document.getElementById('ba-slider');
-      var after   = document.getElementById('ba-after');
-      var divider = document.getElementById('ba-divider');
-      function updateSlider(v) {
-        after.style.clipPath = 'inset(0 0 0 ' + (100 - v) + '%)';
-        divider.style.left   = v + '%';
-      }
-      if (slider && after && divider) {
-        updateSlider(50);
-        slider.addEventListener('input', function () { updateSlider(parseInt(this.value, 10)); });
       }
 
       /* Initial placeholder on load */

@@ -42,14 +42,14 @@ The user wants to change the background or environment of a video clip.
 Analyse the user intent and write a single Runway prompt.
 
 OUTPUT FORMAT (strict):
-"Replace the background with [new environment, lighting, atmosphere]. Keep all people, faces, clothing and positions completely unchanged."
+"Replace the background with [3-5 word environment]. Keep the person unchanged."
 
 Rules:
 - Always start with "Replace the background with"
-- Describe only the new environment: location, time of day, weather, atmosphere
+- Describe only the new environment in 3-5 words: location, time of day, weather, atmosphere
 - Never mention people, faces, clothing, or body in the transformation part
-- Always end with "Keep all people, faces, clothing and positions completely unchanged."
-- Max 30 words total
+- Always end with "Keep the person unchanged."
+- Max 15 words total
 - Plain text only. No quotes. No markdown.`,
 
   relight: `You are a Runway Gen-4 Aleph prompt writer.
@@ -57,14 +57,14 @@ The user wants to change the lighting or atmosphere of a video clip.
 Analyse the user intent and write a single Runway prompt.
 
 OUTPUT FORMAT (strict):
-"Re-light the scene with [lighting style, color temperature, mood, shadow direction]. Keep all people and scene elements unchanged."
+"Change the lighting to [3-5 word description]. Keep everything else the same."
 
 Rules:
-- Always start with "Re-light the scene with"
-- Describe only: light quality, direction, color temperature, mood
+- Always start with "Change the lighting to"
+- Describe only: light quality, direction, color temperature, mood in 3-5 words
 - Never mention people, clothing or changing any subjects
-- Always end with "Keep all people and scene elements unchanged."
-- Max 25 words total
+- Always end with "Keep everything else the same."
+- Max 12 words total
 - Plain text only. No quotes. No markdown.`,
 
   style: `You are a Runway Gen-4 Aleph prompt writer for clothing transformation.
@@ -72,14 +72,14 @@ The user wants to change what a person is wearing in a video clip.
 Aleph already sees the video — do NOT describe faces, body, or background.
 
 OUTPUT FORMAT (strict):
-"Re-style the clothing into [garment type, fabric, color, fit, key details]. Keep the person's face, body and position unchanged throughout the entire clip."
+"Re-style the clothing into [3-5 word description]. Keep the person's face and body unchanged."
 
 Rules:
 - Always start with "Re-style the clothing into"
-- Describe only: garment type, fabric texture, color, fit, specific details
+- Describe only: garment type, fabric texture, color, fit in 3-5 words
 - Never mention face, skin, hair, or background
-- Always end with "Keep the person's face, body and position unchanged throughout the entire clip."
-- Max 30 words total
+- Always end with "Keep the person's face and body unchanged."
+- Max 15 words total
 - Plain text only. No quotes. No markdown.`,
 
   vfx: `You are a Runway Gen-4 Aleph prompt writer for visual effects.
@@ -87,14 +87,14 @@ The user wants to add a cinematic visual effect to a video clip.
 Analyse the user intent and write a single Runway prompt.
 
 OUTPUT FORMAT (strict):
-"Add [specific VFX: particles, fire, fog, rain, smoke, energy, sparks, etc] to the scene. Keep all people and objects completely unchanged."
+"Add [3-5 word effect description] to the scene. Keep all people unchanged."
 
 Rules:
 - Always start with "Add"
-- Be specific and cinematic: describe the effect's appearance, color, intensity
+- Describe the effect in 3-5 words: type, color, intensity
 - Never mention changing people, clothing, or background
-- Always end with "Keep all people and objects completely unchanged."
-- Max 25 words total
+- Always end with "Keep all people unchanged."
+- Max 12 words total
 - Plain text only. No quotes. No markdown.`,
 };
 
@@ -142,15 +142,15 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
 
   switch (mode) {
     case 'background':
-      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people, faces, clothing and positions completely unchanged.`;
+      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person unchanged.`;
     case 'relight':
-      return `Re-light the scene with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people and scene elements unchanged.`;
+      return `Change the lighting to ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep everything else the same.`;
     case 'style':
-      return `Re-style the clothing into ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person's face, body and position unchanged throughout the entire clip.`;
+      return `Re-style the clothing into ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person's face and body unchanged.`;
     case 'vfx':
-      return `Add ${stmt.charAt(0).toLowerCase() + stmt.slice(1)} to the scene. Keep all people and objects completely unchanged.`;
+      return `Add ${stmt.charAt(0).toLowerCase() + stmt.slice(1)} to the scene. Keep all people unchanged.`;
     default:
-      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep all people and their appearance unchanged.`;
+      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person unchanged.`;
   }
 }
 

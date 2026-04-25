@@ -6,7 +6,7 @@
 const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
-const API_BASE  = 'http://localhost:3004';
+const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 2000;
 const POLL_MS_SLOW    = 10000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
@@ -103,6 +103,7 @@ function stopClipAutoSelect() {
 // storedReferenceFrame is always storedReferenceFrames[0] for backward compat.
 var storedReferenceFrames = [];   // primary — array of base64 JPEG strings
 var storedReferenceFrame  = null; // alias → storedReferenceFrames[0] || null
+var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG)
 var selectedMode = 'background';  // active generation mode: background | relight | style | vfx
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
@@ -306,9 +307,18 @@ async function startLogin() {
     try { cs.openURLInDefaultBrowser(data.pairingUrl); opened = true; } catch (_) {}
     if (!opened) {
       // CEP 12 fallback: ExtendScript app.openURLInBrowser
-      var escapedUrl = data.pairingUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      cs.evalScript('app.openURLInBrowser("' + escapedUrl + '")', function() {});
+      try {
+        var escapedUrl = data.pairingUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        cs.evalScript('app.openURLInBrowser("' + escapedUrl + '")', function() {});
+        opened = true;
+      } catch (_) {}
     }
+    if (!opened) {
+      // Last resort: show the URL so user can copy-paste it manually
+      try { window.open(data.pairingUrl, '_blank'); } catch (_) {}
+    }
+    // Always show the URL in the status so user can open manually if needed
+    setLoginStatus('Open this link to sign in: ' + data.pairingUrl, false);
     setLoginStatus('Complete sign in in your browser, then come back.', false);
     btn.textContent = 'Waiting for browser…';
     startAuthPolling(data.deviceCode);
@@ -453,6 +463,7 @@ function logout() {
   clearSession();
   storedReferenceFrame  = null;
   storedReferenceFrames = [];
+  storedReferenceImage  = null;
   storedVideoInfo = null;
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
@@ -630,8 +641,9 @@ async function compilePrompt() {
 
       console.log('[Prysmor:enhance] storedReferenceFrames:', storedReferenceFrames.length, 'frames available');
       var enhanceBody = { intent: intent, mode: selectedMode };
-      if (storedReferenceFrame)          enhanceBody.frameBase64 = storedReferenceFrame;
-      if (storedReferenceFrames.length > 0) enhanceBody.frames = storedReferenceFrames;
+      if (storedReferenceFrame)             enhanceBody.frameBase64 = storedReferenceFrame;
+      if (storedReferenceFrames.length > 0) enhanceBody.frames      = storedReferenceFrames;
+      if (storedReferenceImage)             enhanceBody.referenceImage = storedReferenceImage;
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
         method:  'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
@@ -678,7 +690,9 @@ async function compilePrompt() {
     var enhanceBody2 = { prompt: raw, mode: selectedMode };
     if (storedReferenceFrames.length > 0) enhanceBody2.frames = storedReferenceFrames;
     else if (storedReferenceFrame)        enhanceBody2.frames = [storedReferenceFrame];
-    console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0);
+    if (storedReferenceImage)             enhanceBody2.referenceImage = storedReferenceImage;
+    console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0,
+      'referenceImage:', !!storedReferenceImage);
 
     var res2 = await fetch(API_BASE + '/api/v1/motionforge/enhance-prompt', {
       method:  'POST',
@@ -1195,6 +1209,8 @@ async function mfGenerate() {
     var genBody = { prompt: prompt, mode: selectedMode };
     // Send clip duration so Runway can match output length to the original clip
     genBody.clipDuration = clipDurSec;
+    // Send user-uploaded reference image if available
+    if (storedReferenceImage) genBody.referenceImage = storedReferenceImage;
     // Send all captured reference frames (primary + extras for identity conditioning)
     if (storedReferenceFrames.length > 0) {
       genBody.referenceFrameBase64 = storedReferenceFrames[0];      // primary (backward compat)
@@ -1859,30 +1875,24 @@ function showResult(videoUrl) {
   if (!sec) return;
   sec.classList.remove('hidden');
 
-  // ── Before image: first reference frame from original clip ───────────────
-  var beforeImg = el('ba-before');
-  if (beforeImg && storedReferenceFrames && storedReferenceFrames.length > 0) {
-    beforeImg.src = 'data:image/jpeg;base64,' + storedReferenceFrames[0];
-  }
+  var previewImg   = el('result-preview-img');
+  var previewVideo = el('result-preview-video');
 
-  // ── After image: first frame of AI output (set by downloadAndProcess) ────
-  var afterImg = el('ba-after');
-  if (afterImg) {
-    if (state.mf.resultAfterBase64) {
-      afterImg.src = 'data:image/jpeg;base64,' + state.mf.resultAfterBase64;
-      afterImg.style.display = 'block';
-    } else {
-      // No after frame available (fallback path) — hide after image
-      afterImg.style.display = 'none';
-    }
+  if (videoUrl && previewVideo) {
+    // Show video playback
+    previewVideo.src = videoUrl;
+    previewVideo.classList.remove('hidden');
+    if (previewImg) previewImg.classList.add('hidden');
+  } else if (state.mf.resultAfterBase64 && previewImg) {
+    // Show first-frame still image from AI output
+    previewImg.src = 'data:image/jpeg;base64,' + state.mf.resultAfterBase64;
+    previewImg.classList.remove('hidden');
+    if (previewVideo) { previewVideo.classList.add('hidden'); previewVideo.src = ''; }
+  } else {
+    // Nothing available yet — hide both
+    if (previewImg)  previewImg.classList.add('hidden');
+    if (previewVideo) { previewVideo.classList.add('hidden'); previewVideo.src = ''; }
   }
-
-  // Reset slider to 50%
-  var slider  = el('ba-slider');
-  var divider = el('ba-divider');
-  if (slider)  slider.value = 50;
-  if (afterImg) afterImg.style.clipPath = 'inset(0 0 0 50%)';
-  if (divider)  divider.style.left = '50%';
 
   // Enable/disable Add to Timeline button based on whether local file exists
   var addBtn = el('btn-add-to-timeline');
@@ -1890,7 +1900,7 @@ function showResult(videoUrl) {
 
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // ── Always unlock Generate button when result is shown ───────────────────
+  // Unlock Generate button
   var btn   = el('mf-btn-generate');
   var lbl   = el('gen-btn-label');
   var pline = el('v2-gen-pline');
@@ -1930,9 +1940,24 @@ async function addToTimeline() {
   console.log('[Prysmor] addToTimeline — path:', finalPath, 'replaceMode:', replaceMode, 'startTimeSec:', startTimeSec);
 
   await new Promise(function (resolve) {
-    const fn = replaceMode
-      ? 'replaceSelection("' + esc + '")'
-      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
+    var fn;
+    if (replaceMode) {
+      fn = 'replaceSelection("' + esc + '")';
+    } else {
+      // Insert video-only: temporarily untarget all audio tracks so Premiere
+      // does not insert audio from the generated clip into the timeline.
+      fn = '(function() {' +
+        'try {' +
+        'var seq = app.project.activeSequence;' +
+        'if (!seq) return "error: no active sequence";' +
+        'var i, n = seq.audioTracks.numTracks;' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
+        'var result = insertClipOnV2("' + esc + '", ' + startTimeSec + ');' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        'return result;' +
+        '} catch(e) { return "error: " + e.toString(); }' +
+        '})()';
+    }
 
     cs.evalScript(fn, function (r) {
       console.log('[Prysmor] addToTimeline evalScript result:', r);
@@ -2083,6 +2108,7 @@ function applyUpdate(data) {
   var jobs = [
     { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')    },
     { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
+    { url: data.index_html_url, dest: nodePath.join(root, 'panel', 'index.html') },
   ].filter(function (j) { return !!j.url; });
 
   var pending = jobs.length;
@@ -2737,6 +2763,48 @@ function bindEvents() {
   var addBtn = el('btn-add-to-timeline');
   if (addBtn) {
     addBtn.addEventListener('click', function () { addToTimeline(); });
+  }
+
+  // Reference image upload
+  var refInput   = el('ref-img-input');
+  var refLabel   = el('ref-img-label');
+  var refPreview = el('ref-img-preview');
+  var refThumb   = el('ref-img-thumb');
+  var refName    = el('ref-img-name');
+  var refClear   = el('ref-img-clear');
+
+  if (refInput) {
+    refInput.addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var dataUrl = e.target.result;
+        // Strip the data URI prefix — backend expects raw base64
+        var comma = dataUrl.indexOf(',');
+        storedReferenceImage = comma !== -1 ? dataUrl.slice(comma + 1) : null;
+        if (!storedReferenceImage) return;
+        if (refThumb)   refThumb.src = dataUrl;
+        if (refName)    refName.textContent = file.name;
+        if (refLabel)   refLabel.classList.add('hidden');
+        if (refPreview) refPreview.classList.remove('hidden');
+        console.log('[Prysmor:refImg] Reference image stored, size:', storedReferenceImage.length);
+      };
+      reader.readAsDataURL(file);
+      // Reset input so the same file can be re-selected after clearing
+      this.value = '';
+    });
+  }
+
+  if (refClear) {
+    refClear.addEventListener('click', function () {
+      storedReferenceImage = null;
+      if (refThumb)   refThumb.src = '';
+      if (refName)    refName.textContent = '';
+      if (refPreview) refPreview.classList.add('hidden');
+      if (refLabel)   refLabel.classList.remove('hidden');
+      console.log('[Prysmor:refImg] Reference image cleared');
+    });
   }
 
   // New Effect — clear prompt, hide result, keep clip + mode
