@@ -99,7 +99,13 @@ export async function POST(
     : undefined;
 
   // Sanitize prompt for Runway moderation
-  const prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
+  let prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
+
+  // Auto-apply BG template when user skips AI Enhance
+  if (mode === 'background' && !prompt.startsWith('Replace the background with')) {
+    prompt = `Replace the background with ${prompt}. Keep all people, faces, clothing and positions completely unchanged.`;
+    console.log('[generate] BG template auto-applied:', prompt);
+  }
 
   log(TAG, `Mode: ${mode} — using pre-uploaded runway URI: ${assetUrl}`);
 
@@ -128,11 +134,6 @@ export async function POST(
         return (async () => {
           try {
             fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
-            if (process.env.NODE_ENV !== 'production') {
-              const debugPath = path.join('C:\\Users\\Almin\\Desktop\\refimages', `ref-frame-${i}.jpg`);
-              fs.writeFileSync(debugPath, Buffer.from(frameB64, 'base64'));
-              console.log('[runway-refs] DEBUG frame saved:', debugPath);
-            }
             const uri = await uploadImageToRunway(frameTmpPath);
             log(TAG, `Reference frame ${i + 1}/${framesToUpload.length} uploaded: ${uri}`);
             return uri;
@@ -151,8 +152,8 @@ export async function POST(
     console.log('[runway-refs] Successfully uploaded URIs:', refUris.length);
 
     // relight + style → send reference frames for identity/appearance preservation
-    // background + vfx → no reference frames (let Runway freely transform)
-    const sendRefs   = refUris.length > 0;
+    // background + vfx → no reference frames (let Runway freely transform the scene)
+    const sendRefs   = refUris.length > 0 && mode !== 'background';
     const refsToSend = sendRefs ? refUris : [];
     console.log('[runway-refs] sendRefs:', sendRefs, '— refs being sent to Runway:', refsToSend.length);
     console.log('[runway-refs] Final refs array:', JSON.stringify(refsToSend));

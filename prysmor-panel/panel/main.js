@@ -6,7 +6,7 @@
 const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
-const API_BASE  = 'https://prysmor-io.vercel.app';
+const API_BASE  = 'http://localhost:3004';
 const POLL_MS         = 2000;
 const POLL_MS_SLOW    = 10000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
@@ -986,10 +986,13 @@ async function captureClipReferenceFrame(sourcePath) {
     var freshInfo = null;
     try { freshInfo = JSON.parse(freshRaw || '{}'); } catch (_) {}
     if (freshInfo && !freshInfo.error) {
-      seqW = Number(freshInfo.seqWidth)  || 0;
-      seqH = Number(freshInfo.seqHeight) || 0;
-      console.log('[Prysmor:aspectRatio] ExtendScript seqWidth=' + freshInfo.seqWidth +
-        ' seqHeight=' + freshInfo.seqHeight + ' → seqW=' + seqW + ' seqH=' + seqH);
+      // Prefer clip source dimensions (actual media res); fall back to sequence dims
+      seqW = Number(freshInfo.clipWidth  || freshInfo.seqWidth)  || 0;
+      seqH = Number(freshInfo.clipHeight || freshInfo.seqHeight) || 0;
+      console.log('[Prysmor:aspectRatio] clipWidth=' + freshInfo.clipWidth +
+        ' clipHeight=' + freshInfo.clipHeight +
+        ' seqWidth=' + freshInfo.seqWidth + ' seqHeight=' + freshInfo.seqHeight +
+        ' → using ' + seqW + 'x' + seqH);
       if (state.mf.selInfo) {
         state.mf.selInfo.seqWidth  = seqW;
         state.mf.selInfo.seqHeight = seqH;

@@ -61,6 +61,8 @@ export interface MotionForgeJob {
 
   // ── Prompt ────────────────────────────────────────────────────────────────
   prompt?: string;
+  /** Generation mode selected in the panel: background | relight | style | vfx */
+  mode?: string;
   /** Classified effect type — determines which restoration mode to use. */
   effectType?: 'overlay' | 'background';
 

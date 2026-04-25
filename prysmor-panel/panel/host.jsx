@@ -165,9 +165,18 @@ function getSelectionInfo() {
       }
     } catch (_) {}
 
-    // Sequence output dimensions — the video is rendered at sequence resolution,
-    // not source-file resolution. Use these for aspect ratio validation so that
-    // a 16:9 sequence with a wider source file is not incorrectly blocked.
+    // Clip source dimensions — actual media resolution, used for Runway ratio selection.
+    // Try clip.source.width/height (TrackItem source), then projectItem.source,
+    // then fall back to sequence dimensions if the clip API isn't available.
+    var clipW = 0, clipH = 0;
+    try { clipW = selectedClip.source.width  || 0; } catch (_) {}
+    try { clipH = selectedClip.source.height || 0; } catch (_) {}
+    if (!clipW || !clipH) {
+      try { clipW = selectedClip.projectItem.source.width  || 0; } catch (_) {}
+      try { clipH = selectedClip.projectItem.source.height || 0; } catch (_) {}
+    }
+
+    // Sequence dimensions — kept as fallback for the too-wide guard.
     var seqW = 0, seqH = 0;
     try { seqW = seq.frameSizeHorizontal || 0; } catch (_) {}
     try { seqH = seq.frameSizeVertical   || 0; } catch (_) {}
@@ -179,6 +188,8 @@ function getSelectionInfo() {
       debugTimes:   _debugTimes,
       sourcePath:   sourcePath,
       clipName:     selectedClip.name || fileNameFromPath(sourcePath),
+      clipWidth:    clipW,
+      clipHeight:   clipH,
       seqWidth:     seqW,
       seqHeight:    seqH,
     });
