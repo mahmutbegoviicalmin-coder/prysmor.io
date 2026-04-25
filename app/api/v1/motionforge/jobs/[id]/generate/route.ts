@@ -6,6 +6,7 @@ import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import {
   uploadImageToRunway,
   createVideoToVideoTask,
+  pickRunwayRatio,
 }                                      from '@/lib/motionforge/runway';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
@@ -77,13 +78,16 @@ export async function POST(
   // Early aspect ratio guard — panel sends videoWidth/videoHeight from probed dimensions.
   const clientW = typeof body.videoWidth  === 'number' ? body.videoWidth  : 0;
   const clientH = typeof body.videoHeight === 'number' ? body.videoHeight : 0;
+  const runwayRatio = pickRunwayRatio(clientW, clientH);
   if (clientW > 0 && clientH > 0) {
     const clientRatio = clientW / clientH;
-    console.log(`[generate:earlyCheck] client dimensions ${clientW}x${clientH} ratio=${clientRatio.toFixed(4)}`);
+    console.log(`[generate:earlyCheck] client dimensions ${clientW}x${clientH} ratio=${clientRatio.toFixed(4)} → runway ratio="${runwayRatio}"`);
     if (clientRatio > RUNWAY_MAX_RATIO) {
       await updateJob(userId, params.id, { status: 'failed', error: ASPECT_RATIO_MSG }).catch(() => {});
       return NextResponse.json({ error: ASPECT_RATIO_MSG }, { status: 400 });
     }
+  } else {
+    console.log(`[generate:earlyCheck] no client dimensions — using default runway ratio="${runwayRatio}"`);
   }
 
   // Mode sent from panel — drives reference frame logic
@@ -124,6 +128,11 @@ export async function POST(
         return (async () => {
           try {
             fs.writeFileSync(frameTmpPath, Buffer.from(frameB64, 'base64'));
+            if (process.env.NODE_ENV !== 'production') {
+              const debugPath = path.join('C:\\Users\\Almin\\Desktop\\refimages', `ref-frame-${i}.jpg`);
+              fs.writeFileSync(debugPath, Buffer.from(frameB64, 'base64'));
+              console.log('[runway-refs] DEBUG frame saved:', debugPath);
+            }
             const uri = await uploadImageToRunway(frameTmpPath);
             log(TAG, `Reference frame ${i + 1}/${framesToUpload.length} uploaded: ${uri}`);
             return uri;
@@ -153,7 +162,7 @@ export async function POST(
     console.log('[runway] mode:', mode);
     console.log('[runway] videoUri:', runwayUri);
 
-    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, clipDuration);
+    const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, clipDuration, runwayRatio);
     log(TAG, `Runway task started: ${task.id}`);
 
     await updateJob(userId, params.id, {

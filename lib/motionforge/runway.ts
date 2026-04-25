@@ -124,6 +124,40 @@ export async function uploadImageToRunway(imagePath: string): Promise<string> {
   return runwayUri;
 }
 
+// ─── Ratio picker ────────────────────────────────────────────────────────────
+
+/**
+ * All aspect ratios supported by Runway gen4_aleph video_to_video.
+ * Stored as [label, numeric ratio (w/h)] pairs for fast comparison.
+ */
+const RUNWAY_RATIOS: [string, number][] = [
+  ['1280:720',  1280 / 720],   // 1.7778 — 16:9 landscape
+  ['720:1280',  720  / 1280],  // 0.5625 — 9:16 portrait
+  ['1104:832',  1104 / 832],   // 1.3269 — 4:3-ish landscape
+  ['960:960',   960  / 960],   // 1.0000 — square
+  ['832:1104',  832  / 1104],  // 0.7536 — 3:4-ish portrait
+  ['1584:672',  1584 / 672],   // 2.3571 — 21:9 ultrawide
+  ['848:480',   848  / 480],   // 1.7667 — 16:9 SD-ish
+  ['640:480',   640  / 480],   // 1.3333 — 4:3 SD
+];
+
+/**
+ * Returns the Runway ratio string (e.g. "1280:720") whose aspect ratio is
+ * closest to the input video's dimensions. Falls back to "1280:720" if
+ * dimensions are unknown or invalid.
+ */
+export function pickRunwayRatio(w: number, h: number): string {
+  if (w <= 0 || h <= 0) return '1280:720';
+  const input = w / h;
+  let best     = RUNWAY_RATIOS[0][0];
+  let bestDiff = Math.abs(RUNWAY_RATIOS[0][1] - input);
+  for (const [label, ratio] of RUNWAY_RATIOS) {
+    const diff = Math.abs(ratio - input);
+    if (diff < bestDiff) { bestDiff = diff; best = label; }
+  }
+  return best;
+}
+
 export interface RunwayTaskCreated {
   id: string;
   status: string;
@@ -158,6 +192,7 @@ export async function createVideoToVideoTask(
   prompt: string,
   referenceImageUris?: string | string[],
   durationSec?: number,
+  ratio?: string,
 ): Promise<RunwayTaskCreated> {
 
   // Normalise single URI or array to a clean string[]
@@ -172,14 +207,17 @@ export async function createVideoToVideoTask(
     ? (durationSec <= 5 ? 5 : 10)
     : undefined;
 
+  const resolvedRatio = ratio ?? '1280:720';
+
   const body: Record<string, unknown> = {
     model:      'gen4_aleph',
     videoUri:   inputVideoUrl,
     promptText: prompt,
+    ratio:      resolvedRatio,
     ...(resolvedDuration !== undefined ? { duration: resolvedDuration } : {}),
   };
 
-  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" refs=${refUris.length} duration=${resolvedDuration ?? 'unset'}`);
+  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" refs=${refUris.length} duration=${resolvedDuration ?? 'unset'} ratio=${resolvedRatio}`);
 
   if (refUris.length > 0) {
     body.references = refUris.map(uri => ({ type: 'image', uri }));
