@@ -14,16 +14,20 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { runwayUri?: string; mediaInSec?: number; clipDurSec?: number };
+  let body: { runwayUri?: string; beebleUri?: string; mediaInSec?: number; clipDurSec?: number };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { runwayUri, mediaInSec = 0, clipDurSec = 8 } = body;
-  if (!runwayUri || !runwayUri.startsWith('runway://')) {
-    return NextResponse.json({ error: 'Missing or invalid runwayUri' }, { status: 400 });
+  const { runwayUri, beebleUri, mediaInSec = 0, clipDurSec = 8 } = body;
+
+  if (!runwayUri && !beebleUri) {
+    return NextResponse.json({ error: 'Missing runwayUri or beebleUri' }, { status: 400 });
+  }
+  if (runwayUri && !runwayUri.startsWith('runway://')) {
+    return NextResponse.json({ error: 'Invalid runwayUri' }, { status: 400 });
   }
 
   const job = session
@@ -34,12 +38,14 @@ export async function POST(
   const userId = session?.userId ?? job.userId;
 
   try {
-    // Keep status as 'uploading' — generate route validates this status
+    const assetUrl = beebleUri ?? runwayUri!;
     await updateJob(userId, params.id, {
-      assetUrl:  runwayUri,
+      assetUrl,
       mediaInSec,
       clipDurSec,
-    });
+      // Store Beeble URI explicitly for the generate route to detect
+      ...(beebleUri ? { beebleVideoUri: beebleUri } : {}),
+    } as any);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

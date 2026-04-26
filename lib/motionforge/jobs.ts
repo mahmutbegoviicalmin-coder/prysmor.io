@@ -85,6 +85,13 @@ export interface MotionForgeJob {
   /** Last cached Runway progress (0-100) to return between Runway polls */
   runwayProgress?: number;
 
+  /** Beeble SwitchX task id — set for background and relight modes */
+  beebleTaskId?: string;
+  /** Beeble URI of the uploaded source video — set during /upload for bg/relight modes */
+  beebleVideoUri?: string;
+  /** Timestamp of the last Beeble poll */
+  beeblePolledAt?: FirebaseFirestore.Timestamp | Date;
+
   // ── Output URLs ───────────────────────────────────────────────────────────
   /** Raw Runway output URL (pre-compositing) */
   rawOutputUrl?: string;

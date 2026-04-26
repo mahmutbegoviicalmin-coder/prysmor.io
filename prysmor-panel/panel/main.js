@@ -1111,11 +1111,11 @@ async function mfGenerate() {
   console.log('[Prysmor:selInfo] sourcePath (norm):', sourcePath);
   console.log('[Prysmor:selInfo] full        :', JSON.stringify(state.mf.selInfo));
 
-  // ── Step 2: Get Runway pre-signed upload URL ──────────────────────────────
+  // ── Step 2: Get pre-signed upload URL (Beeble for bg/relight, Runway for style/vfx) ──
   setStatus('Preparing upload…', 12);
   var uploadSlot;
   try {
-    uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url');
+    uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url?mode=' + encodeURIComponent(selectedMode));
   } catch (err) {
     return fail('Upload init failed: ' + err.message);
   }
@@ -1172,15 +1172,25 @@ async function mfGenerate() {
     setStatus('Uploading clip…', 28);
     try {
       var blob = base64ToBlob(fileBase64, 'video/mp4');
-      var formData = new FormData();
-      var fields = uploadSlot.fields || {};
-      Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
-      formData.append('file', blob, 'clip.mp4');
-
-      var s3Res = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
-      if (!s3Res.ok && s3Res.status !== 204) {
-        var errText = await s3Res.text().catch(function () { return ''; });
-        throw new Error('S3 upload HTTP ' + s3Res.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+      var uploadRes;
+      if (uploadSlot.uploadMethod === 'put') {
+        // Beeble: raw PUT with binary body
+        uploadRes = await fetch(uploadSlot.uploadUrl, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'video/mp4' },
+          body:    blob,
+        });
+      } else {
+        // Runway: multipart FormData POST to S3
+        var formData = new FormData();
+        var fields = uploadSlot.fields || {};
+        Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
+        formData.append('file', blob, 'clip.mp4');
+        uploadRes = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+      }
+      if (!uploadRes.ok && uploadRes.status !== 204) {
+        var errText = await uploadRes.text().catch(function () { return ''; });
+        throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
       }
     } catch (err) {
       return fail('Upload failed: ' + err.message);
@@ -1189,14 +1199,16 @@ async function mfGenerate() {
   // ── Step 4: Notify server that upload is complete ─────────────────────────
   setStatus('Uploading clip…', 36);
   try {
+    var completeBody = { mediaInSec: mediaInSec, clipDurSec: clipDurSec };
+    if (uploadSlot.beebleUri) {
+      completeBody.beebleUri = uploadSlot.beebleUri;
+    } else {
+      completeBody.runwayUri = uploadSlot.runwayUri;
+    }
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-complete', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body:    JSON.stringify({
-        runwayUri:  uploadSlot.runwayUri,
-        mediaInSec: mediaInSec,
-        clipDurSec: clipDurSec,
-      }),
+      body:    JSON.stringify(completeBody),
     });
   } catch (err) {
     return fail('Upload confirm failed: ' + err.message);

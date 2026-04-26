@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { getRunwayTaskStatus } from '@/lib/motionforge/runway';
+import { pollSwitchXJob }      from '@/lib/motionforge/beeble';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { refundCredits }              from '@/lib/firestore/users';
@@ -48,6 +49,66 @@ export async function GET(
   }
 
   const userId = session?.userId ?? job.userId;
+
+  // ── Poll Beeble for background / relight modes ────────────────────────────
+  if (job.status === 'generating' && (job as any).beebleTaskId) {
+    const beebleTaskId = (job as any).beebleTaskId as string;
+
+    // Rate-limit to once every 8 s — same as Runway
+    const lastPolled = (job as any).beeblePolledAt
+      ? ((job as any).beeblePolledAt instanceof Date
+          ? (job as any).beeblePolledAt
+          : ((job as any).beeblePolledAt as FirebaseFirestore.Timestamp).toDate())
+      : null;
+    const msSinceLastPoll = lastPolled ? Date.now() - lastPolled.getTime() : Infinity;
+
+    if (msSinceLastPoll < 8_000) {
+      const cachedProgress = job.runwayProgress ?? 0;
+      log(TAG, `[beeble] Cached ${cachedProgress}% (${Math.round(msSinceLastPoll / 1000)}s since last poll)`);
+      return NextResponse.json({ status: 'generating', progress: cachedProgress });
+    }
+
+    try {
+      const result = await pollSwitchXJob(beebleTaskId);
+      log(TAG, `[beeble] Task ${beebleTaskId} → ${result.status}`);
+
+      if (result.status === 'generating') {
+        await updateJob(userId, params.id, {
+          beeblePolledAt: new Date(),
+          runwayProgress: 50,   // Beeble doesn't return fine-grained progress
+        } as any);
+        return NextResponse.json({ status: 'generating', progress: 50 });
+      }
+
+      if (result.status === 'failed') {
+        await updateJob(userId, params.id, { status: 'failed', error: 'Beeble SwitchX failed' });
+        if (job.userId && job.creditCost) {
+          refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});
+        }
+        return NextResponse.json({ status: 'failed', error: 'Beeble SwitchX failed' });
+      }
+
+      if (result.status === 'completed' && result.outputUrl) {
+        log(TAG, `[beeble] Completed for job ${params.id} — outputUrl: ${result.outputUrl.slice(0, 80)}`);
+        await updateJob(userId, params.id, {
+          status:       'completed',
+          outputUrl:    result.outputUrl,
+          rawOutputUrl: result.outputUrl,
+          progress:     100,
+        });
+        return NextResponse.json({ status: 'completed', progress: 100, outputUrl: result.outputUrl });
+      }
+
+      // Completed but outputUrl not yet available — wait
+      await updateJob(userId, params.id, { beeblePolledAt: new Date(), runwayProgress: 95 } as any);
+      return NextResponse.json({ status: 'generating', progress: 95 });
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Beeble polling error';
+      logError(TAG, `[beeble] Polling threw for job ${params.id}: ${msg}`, err);
+      return NextResponse.json({ status: 'generating', error: msg });
+    }
+  }
 
   // ── Poll Runway for generation status ──────────────────────────────────────
   if (job.status === 'generating' && job.runwayTaskId) {

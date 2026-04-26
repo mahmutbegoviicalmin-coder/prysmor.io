@@ -8,6 +8,7 @@ import * as os   from 'os';
 import * as path from 'path';
 import * as fs   from 'fs';
 import { uploadToRunway } from '@/lib/motionforge/runway';
+import { uploadToBeeble } from '@/lib/motionforge/beeble';
 
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 
@@ -66,17 +67,32 @@ export async function POST(
 
     const mediaInSec = parseFloat(req.headers.get('x-media-in')      ?? '0') || 0;
     const clipDurSec = parseFloat(req.headers.get('x-clip-duration') ?? '8') || 8;
+    const mode       = (req.headers.get('x-mode') ?? '').trim().toLowerCase();
 
-    // Upload directly to Runway — returns a runway:// URI valid 24 h
-    console.log(`[upload] Uploading to Runway…`);
-    const runwayUri = await uploadToRunway(inputTmp);
-    console.log(`[upload] Runway URI: ${runwayUri}`);
+    const isBeebleMode = mode === 'background' || mode === 'relight';
+
+    // For bg/relight: upload to Beeble (SwitchX source video)
+    // For style/vfx (or unknown): upload to Runway as before
+    let assetUrl: string;
+    const jobUpdate: Record<string, unknown> = { mediaInSec, clipDurSec };
+
+    if (isBeebleMode) {
+      console.log(`[upload] Mode="${mode}" → uploading to Beeble…`);
+      const beebleUri = await uploadToBeeble(buffer, `clip-${params.id}.mp4`);
+      console.log(`[upload] Beeble URI: ${beebleUri}`);
+      assetUrl = beebleUri;
+      jobUpdate.beebleVideoUri = beebleUri;
+    } else {
+      console.log(`[upload] Mode="${mode || 'unknown'}" → uploading to Runway…`);
+      const runwayUri = await uploadToRunway(inputTmp);
+      console.log(`[upload] Runway URI: ${runwayUri}`);
+      assetUrl = runwayUri;
+    }
 
     await updateJob(userId, params.id, {
-      assetUrl:  runwayUri,
-      mediaInSec,
-      clipDurSec,
-    });
+      ...jobUpdate,
+      assetUrl,
+    } as any);
 
     return NextResponse.json({ success: true });
 

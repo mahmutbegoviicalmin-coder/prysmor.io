@@ -8,6 +8,10 @@ import {
   createVideoToVideoTask,
   pickRunwayRatio,
 }                                      from '@/lib/motionforge/runway';
+import {
+  uploadToBeeble,
+  createSwitchXTask,
+}                                      from '@/lib/motionforge/beeble';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
@@ -102,36 +106,72 @@ export async function POST(
   // Sanitize prompt for Runway moderation
   let prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
 
-  // Auto-apply BG template when user skips AI Enhance
-  if (mode === 'background' && !prompt.startsWith('Replace the background with')) {
-    prompt = `Replace the background with ${prompt}. Keep all people, faces, clothing and positions completely unchanged.`;
-    console.log('[generate] BG template auto-applied:', prompt);
-  }
+  // Route background and relight to Beeble SwitchX; style and vfx stay on Runway
+  const isBeebleMode = mode === 'background' || mode === 'relight';
 
-  log(TAG, `Mode: ${mode} — using pre-uploaded runway URI: ${assetUrl}`);
+  log(TAG, `Mode: ${mode} → ${isBeebleMode ? 'Beeble SwitchX' : 'Runway'} | asset: ${assetUrl}`);
+
+  // User-uploaded reference image (optional) — sent from panel as base64 JPEG.
+  const referenceImageB64 = (body.referenceImage ?? '').trim() || null;
 
   try {
+
+    // ════════════════════════════════════════════════════════════════════════
+    // BEEBLE PATH — background + relight
+    // ════════════════════════════════════════════════════════════════════════
+    if (isBeebleMode) {
+      // assetUrl is a beeble:// URI stored by /upload-complete (from beebleVideoUri)
+      const beebleVideoUri = job.beebleVideoUri ?? assetUrl;
+
+      // Upload reference image to Beeble if provided
+      let beebleRefImageUri: string | undefined;
+      if (referenceImageB64) {
+        try {
+          const refBuf = Buffer.from(referenceImageB64, 'base64');
+          beebleRefImageUri = await uploadToBeeble(refBuf, `ref-image-${params.id}.jpg`);
+          log(TAG, `[beeble] Reference image uploaded: ${beebleRefImageUri}`);
+        } catch (e) {
+          warn(TAG, '[beeble] Reference image upload failed', { err: (e as Error).message });
+        }
+      }
+
+      console.log(`[beeble] Starting SwitchX — source=${beebleVideoUri} refImage=${beebleRefImageUri ?? 'none'} prompt="${prompt.slice(0, 80)}"`);
+
+      const beebleJobId = await createSwitchXTask({
+        sourceUri:          beebleVideoUri,
+        referenceImageUri:  beebleRefImageUri,
+        prompt,
+        alphaMode:          'auto',
+        maxResolution:      720,
+      });
+
+      log(TAG, `Beeble SwitchX task started: ${beebleJobId}`);
+
+      await updateJob(userId, params.id, {
+        status:       'generating',
+        prompt,
+        mode,
+        beebleTaskId: beebleJobId,
+        progress:     0,
+      } as any);
+
+      return NextResponse.json({ success: true, taskId: beebleJobId });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RUNWAY PATH — style + vfx
+    // ════════════════════════════════════════════════════════════════════════
     const runwayUri = assetUrl;
     const refUris: string[] = [];
 
-    // User-uploaded reference image (optional) — sent from panel as base64 JPEG.
-    const referenceImageB64 = (body.referenceImage ?? '').trim() || null;
-
-    // Panel sends reference frames as base64 JPEG strings (captured at clip-load time via ffmpeg).
-    const rawFrames: string[] = Array.isArray(body.referenceFrames) && body.referenceFrames.length > 0
-      ? body.referenceFrames
-      : (body.referenceFrameBase64 ?? '').trim()
-        ? [body.referenceFrameBase64!.trim()]
-        : [];
-
-    // ── Upload user referenceImage first (always, if provided) ────────────────
+    // Upload reference image to Runway if provided
     let referenceImageUri: string | null = null;
     if (referenceImageB64) {
       const refImgTmpPath = tmpPath(`ref-image-${params.id}.jpg`);
       try {
         fs.writeFileSync(refImgTmpPath, Buffer.from(referenceImageB64, 'base64'));
         referenceImageUri = await uploadImageToRunway(refImgTmpPath);
-        log(TAG, `Reference image uploaded: ${referenceImageUri}`);
+        log(TAG, `Reference image uploaded to Runway: ${referenceImageUri}`);
       } catch (e) {
         warn(TAG, 'Reference image upload failed', { err: (e as Error).message });
       } finally {
@@ -139,19 +179,22 @@ export async function POST(
       }
     }
 
-    // ── Upload video reference frames (relight/style only) ────────────────────
-    // background + vfx: skip video frames — only use referenceImage if provided
-    const isIdentityMode = mode === 'relight' || mode === 'style';
-    const framesToUpload = isIdentityMode
+    // Upload video reference frames for style mode identity conditioning
+    const rawFrames: string[] = Array.isArray(body.referenceFrames) && body.referenceFrames.length > 0
+      ? body.referenceFrames
+      : (body.referenceFrameBase64 ?? '').trim()
+        ? [body.referenceFrameBase64!.trim()]
+        : [];
+
+    const framesToUpload = mode === 'style'
       ? rawFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5)
       : [];
 
     console.log('[runway-refs] Total raw frames from panel:', rawFrames.length);
-    console.log('[runway-refs] Frames to upload (identity mode only):', framesToUpload.length);
-    console.log('[runway] referenceFrames received:', framesToUpload.length);
+    console.log('[runway-refs] Frames to upload:', framesToUpload.length, '(mode:', mode + ')');
 
     if (framesToUpload.length > 0) {
-      log(TAG, `Uploading ${framesToUpload.length} reference frame(s) for identity conditioning`);
+      log(TAG, `Uploading ${framesToUpload.length} reference frame(s)`);
       const uploadPromises = framesToUpload.map((frameB64, i) => {
         const frameTmpPath = tmpPath(`ref-frame-${params.id}-${i}.jpg`);
         return (async () => {
@@ -172,26 +215,13 @@ export async function POST(
       uploaded.forEach(uri => { if (uri) refUris.push(uri); });
     }
 
-    console.log('[runway-refs] Video frame URIs uploaded:', refUris.length);
+    // Assemble refs: style gets referenceImage + video frames; vfx gets referenceImage only
+    const refsToSend: string[] = mode === 'style'
+      ? (referenceImageUri ? [referenceImageUri, ...refUris] : refUris)
+      : (referenceImageUri ? [referenceImageUri] : []);
 
-    // ── Assemble final refs array ─────────────────────────────────────────────
-    // relight/style: referenceImage first, then video frames
-    // background/vfx: referenceImage only (no video frames)
-    let refsToSend: string[];
-    if (isIdentityMode) {
-      refsToSend = referenceImageUri
-        ? [referenceImageUri, ...refUris]
-        : refUris;
-    } else {
-      // background/vfx — send ONLY the user reference image if provided
-      refsToSend = referenceImageUri ? [referenceImageUri] : [];
-    }
     console.log('[runway-refs] refsToSend:', refsToSend.length, '(mode:', mode + ')');
-    console.log('[runway-refs] Final refs array:', JSON.stringify(refsToSend));
-    console.log('[MotionForge] Mode:', mode, '— refs sent:', refsToSend.length > 0);
-    console.log('[runway] refUris uploaded:', refUris.length);
     console.log('[runway] prompt being sent:', prompt);
-    console.log('[runway] mode:', mode);
     console.log('[runway] videoUri:', runwayUri);
 
     const task = await createVideoToVideoTask(runwayUri, prompt, refsToSend, clipDuration, runwayRatio);
