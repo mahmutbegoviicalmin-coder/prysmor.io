@@ -16,17 +16,17 @@ export default authMiddleware({
     // Panel API — own auth via validatePanelToken, must not require Clerk session
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
-    "/api/panel/auth/confirm",
     "/api/panel/heartbeat",
     "/api/panel/version",
     "/api/v1/motionforge(.*)",
+    // NOTE: /api/panel/auth/confirm is NOT here — it calls currentUser() and needs Clerk session.
   ],
   // ignoredRoutes bypass ALL Clerk processing (incl. bot detection).
   // CEP browser requests can be fingerprinted as bots — ignore them entirely.
+  // NOTE: confirm is NOT here — it calls currentUser() and needs Clerk context.
   ignoredRoutes: [
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
-    "/api/panel/auth/confirm",
     "/api/panel/heartbeat",
     "/api/panel/version",
     "/api/v1/motionforge(.*)",
