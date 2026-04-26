@@ -23,7 +23,7 @@ export default function SignInPage() {
         </span>
       </div>
 
-      <SignIn />
+      <SignIn afterSignInUrl="/dashboard" />
     </div>
   );
 }

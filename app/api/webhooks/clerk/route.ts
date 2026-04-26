@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook }                   from 'svix';
+import { db }                        from '@/lib/firebaseAdmin';
 import { createUser, syncUserProfile } from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
@@ -74,6 +75,24 @@ export async function POST(req: NextRequest) {
         lastName:  data.last_name   ?? undefined,
       });
       console.log(`[clerk-webhook] user.updated synced: ${userId}`);
+
+    } else if (type === 'user.deleted') {
+      if (userId) {
+        // Delete devices subcollection first (Firestore doesn't cascade)
+        const devices = await db.collection('users')
+          .doc(userId).collection('devices').get();
+        for (const doc of devices.docs) await doc.ref.delete();
+
+        // Delete user doc
+        await db.collection('users').doc(userId).delete();
+
+        // Delete all panel sessions for this user
+        const sessions = await db.collection('panel_sessions')
+          .where('userId', '==', userId).get();
+        for (const doc of sessions.docs) await doc.ref.delete();
+
+        console.log(`[clerk-webhook] user.deleted cleaned up: ${userId}`);
+      }
     }
   } catch (err) {
     console.error('[clerk-webhook] Firestore sync failed:', err);
