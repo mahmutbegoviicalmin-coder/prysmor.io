@@ -150,10 +150,12 @@ export default function PricingSection({
           tiers.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"
         )}>
           {tiers.map((tier, i) => {
-            const isYearly = yearly && !!tier.yearlyPrice;
-            const price    = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
-            const suffix   = isYearly ? "/yr" : "/mo";
-            const origYr   = tier.monthlyPrice * 12; // e.g. $348
+            const isYearly  = yearly && !!tier.yearlyPrice;
+            const price     = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
+            const suffix    = isYearly ? "/yr" : "/mo";
+            const origYr    = tier.monthlyPrice * 12; // e.g. $358.80
+            const fmtPrice  = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
+            const fmtOrigYr = Number.isInteger(origYr) ? String(origYr) : origYr.toFixed(2);
             // Append billing interval to checkout links so the server knows which variant to use
             const resolvedHref = tier.ctaHref.startsWith('/checkout')
               ? `${tier.ctaHref}&billing=${isYearly ? 'yearly' : 'monthly'}`
@@ -205,7 +207,7 @@ export default function PricingSection({
                       <div key={isYearly ? "yr" : "mo"}>
                         <div className="flex items-end gap-1.5">
                           <span className="font-heading text-[42px] font-bold text-white leading-none tracking-tight tabular-nums">
-                            ${price}
+                            ${fmtPrice(price)}
                           </span>
                           <span className="text-ink-muted pb-1 text-[14px]">{suffix}</span>
                         </div>
@@ -216,7 +218,7 @@ export default function PricingSection({
                             <span className="text-[12px] text-ink-faint">${tier.yearlyPerDay}/day</span>
                             {isYearly && (
                               <>
-                                <span className="text-[12px] text-ink-faint line-through">${origYr}</span>
+                                <span className="text-[12px] text-ink-faint line-through">${fmtOrigYr}</span>
                                 {tier.yearlySave && (
                                   <span className="text-[11px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-md">
                                     Save ${tier.yearlySave}

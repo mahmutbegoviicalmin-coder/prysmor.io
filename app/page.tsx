@@ -281,7 +281,7 @@ const steps: Step[] = [
 ];
 
 const compRows: ComparisonRow[] = [
-  { feature: "Cost", ours: "from $29/month", theirs: "$500–2,000/project" },
+  { feature: "Cost", ours: "from $29.90/month", theirs: "$500–2,000/project" },
   { feature: "Time per effect", ours: "2–5 minutes", theirs: "1–3 days" },
   { feature: "Learning curve", ours: "None", theirs: "6+ months" },
   { feature: "Works in your editor", ours: true, theirs: false },
@@ -293,12 +293,12 @@ const pricingTiers: PriceTier[] = [
   {
     id: "starter",
     name: "Starter",
-    monthlyPrice: 29,
+    monthlyPrice: 29.90,
     yearlyPrice: 299,   // $299/yr — save $49 vs monthly ($348)
-    yearlyPerDay: "0.87",
+    yearlyPerDay: "0.99",
     yearlySave: 49,
     description: "Perfect for individual creators",
-    unit: "250s of AI VFX ≈ 4 min",
+    unit: "90s of AI VFX ≈ 1.5 min",
     yearlyUnit: "3000s of AI VFX ≈ 48 min",
     bullets: [
       "Premiere Pro & After Effects plugin",
@@ -315,12 +315,12 @@ const pricingTiers: PriceTier[] = [
   {
     id: "pro",
     name: "Pro",
-    monthlyPrice: 49,
+    monthlyPrice: 49.90,
     yearlyPrice: 499,   // $499/yr — save $89 vs monthly ($588)
-    yearlyPerDay: "1.37",
+    yearlyPerDay: "1.66",
     yearlySave: 89,
     description: "For serious creators",
-    unit: "500s of AI VFX ≈ 8 min",
+    unit: "200s of AI VFX ≈ 3 min",
     yearlyUnit: "6000s of AI VFX ≈ 98 min",
     featured: true,
     badge: "Most Popular",
@@ -339,12 +339,12 @@ const pricingTiers: PriceTier[] = [
   {
     id: "exclusive",
     name: "Exclusive",
-    monthlyPrice: 129,
+    monthlyPrice: 99.90,
     yearlyPrice: 1299,  // $1299/yr — save $249 vs monthly ($1548)
-    yearlyPerDay: "3.56",
+    yearlyPerDay: "3.33",
     yearlySave: 249,
     description: "For studios & teams",
-    unit: "1000s of AI VFX ≈ 17 min",
+    unit: "500s of AI VFX ≈ 8 min",
     yearlyUnit: "12000s of AI VFX ≈ 204 min",
     bullets: [
       "Premiere Pro & After Effects plugin",
@@ -413,7 +413,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Is VFXPilot worth it if I only edit occasionally?",
-    a: "Absolutely. Even occasional editors save hours per project. The Starter plan at $29/month gives you enough VFX credits for most part-time workflows, and you can cancel anytime.",
+    a: "Absolutely. Even occasional editors save hours per project. The Starter plan at $29.90/month gives you enough VFX credits for most part-time workflows, and you can cancel anytime.",
   },
   {
     q: "What if I'm not satisfied?",
