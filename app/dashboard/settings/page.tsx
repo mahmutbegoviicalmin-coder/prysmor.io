@@ -1,6 +1,8 @@
 import { currentUser } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { mockSecurity } from "@/lib/mockData";
+import { getUser } from "@/lib/firestore/users";
 
 export const metadata = { title: "Settings — Dashboard" };
 
@@ -15,6 +17,10 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default async function SettingsPage() {
   const user = await currentUser();
+  if (!user) redirect("/sign-in");
+
+  const userDoc = await getUser(user.id).catch(() => null);
+  if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
   const fields = [
     { label: "First name",    value: user?.firstName ?? "" },
     { label: "Last name",     value: user?.lastName  ?? "" },

@@ -31,11 +31,11 @@ export const PLAN_ALLOWANCE: Record<string, number> = {
 
 /** Credits granted per plan per billing cycle */
 export const PLAN_CREDITS: Record<string, number> = {
-  starter:         1000,  // 250 s × 4 cr/s
-  pro:             2000,  // 500 s × 4 cr/s
-  exclusive:       4000,  // 1000 s × 4 cr/s
-  creator:         2000,
-  "creator-suite": 4000,
+  starter:         360,   // 90s × 4 cr/s
+  pro:             800,   // 200s × 4 cr/s
+  exclusive:       2000,  // 500s × 4 cr/s
+  creator:         800,
+  "creator-suite": 2000,
 };
 
 /** Credits cost per second of generated video */

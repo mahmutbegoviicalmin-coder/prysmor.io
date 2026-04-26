@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     hostAppVersion?: string;
     cepVersion?: string;
     deviceName?: string;
+    machineFingerprint?: string;
   } = {};
   try { body = await req.json(); } catch (_) {}
 
@@ -41,11 +42,12 @@ export async function POST(req: NextRequest) {
     createdAt: now,
     expiresAt,
     // Store device diagnostics so confirm route can register the device
-    ...(body.platform        && { platform: body.platform }),
-    ...(body.hostApp         && { hostApp: body.hostApp }),
-    ...(body.hostAppVersion  && { hostAppVersion: body.hostAppVersion }),
-    ...(body.cepVersion      && { cepVersion: body.cepVersion }),
-    ...(body.deviceName      && { deviceName: body.deviceName }),
+    ...(body.platform            && { platform: body.platform }),
+    ...(body.hostApp             && { hostApp: body.hostApp }),
+    ...(body.hostAppVersion      && { hostAppVersion: body.hostAppVersion }),
+    ...(body.cepVersion          && { cepVersion: body.cepVersion }),
+    ...(body.deviceName          && { deviceName: body.deviceName }),
+    ...(body.machineFingerprint  && { machineFingerprint: body.machineFingerprint }),
   });
 
   const base =

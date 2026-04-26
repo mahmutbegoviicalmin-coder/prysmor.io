@@ -2,12 +2,16 @@ import { currentUser } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import { Monitor, Laptop, CheckCircle2, Circle, WifiOff, ShieldAlert } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";
+import { getUser } from "@/lib/firestore/users";
 
 export const metadata = { title: "Devices — Dashboard" };
 
 export default async function DevicesPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
+
+  const userDoc = await getUser(user.id).catch(() => null);
+  if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
 
   let data;
   try {

@@ -33,6 +33,47 @@ const LS_USER_ID        = 'prysmor_user_id';
 const LS_PLAN           = 'prysmor_plan';
 const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
+const LS_MACHINE_ID     = 'prysmor_machine_id';
+
+// ─── Machine Fingerprint ──────────────────────────────────────────────────────
+
+function getMachineFingerprint() {
+  var stored = localStorage.getItem(LS_MACHINE_ID);
+  if (stored) return stored;
+  try {
+    var os  = require('os');
+    var raw = [
+      os.hostname(),
+      os.platform(),
+      os.cpus()[0].model,
+      os.totalmem(),
+    ].join('|');
+    var hash = 0;
+    for (var i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    var id = 'mfp-' + Math.abs(hash).toString(36) + '-' + Date.now().toString(36);
+    localStorage.setItem(LS_MACHINE_ID, id);
+    return id;
+  } catch (e) {
+    var raw2 = [
+      navigator.platform || 'unknown',
+      navigator.hardwareConcurrency || '0',
+      screen.width + 'x' + screen.height,
+      navigator.language || 'unknown',
+      new Date().getTimezoneOffset(),
+    ].join('|');
+    var hash2 = 0;
+    for (var j = 0; j < raw2.length; j++) {
+      hash2 = ((hash2 << 5) - hash2) + raw2.charCodeAt(j);
+      hash2 |= 0;
+    }
+    var id2 = 'mfp-' + Math.abs(hash2).toString(36) + '-' + Date.now().toString(36);
+    localStorage.setItem(LS_MACHINE_ID, id2);
+    return id2;
+  }
+}
 
 // ─── Generation Progress State ────────────────────────────────────────────────
 var _genStartTime    = null;   // Date.now() when Generate was clicked
@@ -228,7 +269,7 @@ async function validateSessionThenEnter() {
 }
 
 function saveSession(token, userId, plan, planLabel) {
-  const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  const exp = Date.now() + 5 * 24 * 60 * 60 * 1000; // 5 days
   try {
     localStorage.setItem(LS_TOKEN,      token);
     localStorage.setItem(LS_USER_ID,    userId);
@@ -292,11 +333,12 @@ async function startLogin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        platform:       osName,
-        hostApp:        appName,
-        hostAppVersion: appVersion,
-        cepVersion:     cepVer,
-        deviceName:     deviceLabel,
+        platform:           osName,
+        hostApp:            appName,
+        hostAppVersion:     appVersion,
+        cepVersion:         cepVer,
+        deviceName:         deviceLabel,
+        machineFingerprint: getMachineFingerprint(),
       }),
     });
     var data = null;
@@ -389,9 +431,18 @@ function setLoginStatus(msg, isError) {
 function sendHeartbeat() {
   if (!state.auth.token) return;
   fetch(API_BASE + '/api/panel/heartbeat', {
-    method: 'POST',
+    method:  'POST',
     headers: apiHeaders(),
-  }).catch(function () {}); // fire-and-forget
+  }).then(function (res) {
+    if (res.status === 401) {
+      res.json().then(function (data) {
+        if (data && data.code === 'machine_mismatch') {
+          logout();
+          showToast('Session invalid on this device. Please sign in again.', 'error');
+        }
+      }).catch(function () {});
+    }
+  }).catch(function () {});
 }
 
 function startHeartbeat() {
@@ -596,9 +647,9 @@ function showClipInfo(info) {
 function apiHeaders(extra) {
   var headers = {};
   var token = state.auth.token;
-  if (token) {
-    headers['Authorization'] = 'Bearer ' + token;
-  }
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  var machineId = getMachineFingerprint();
+  if (machineId) headers['X-Machine-ID'] = machineId;
   return Object.assign(headers, extra || {});
 }
 

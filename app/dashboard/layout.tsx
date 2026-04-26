@@ -7,7 +7,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  BookOpen, Settings, Download, Lock, ShieldCheck,
+  BookOpen, Settings, Download, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,10 +16,10 @@ const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
 const navItems = [
   { label: "Overview",        href: "/dashboard",           icon: LayoutDashboard, requiresPlan: false },
   { label: "Download Plugin", href: "/dashboard/downloads", icon: Download,        requiresPlan: true  },
-  { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: false },
+  { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: true  },
   { label: "Billing",         href: "/dashboard/billing",   icon: CreditCard,      requiresPlan: false },
-  { label: "Docs",            href: "/dashboard/docs",      icon: BookOpen,        requiresPlan: false },
-  { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: false },
+  { label: "Docs",            href: "/dashboard/docs",      icon: BookOpen,        requiresPlan: true  },
+  { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: true  },
 ];
 
 function NavLink({
@@ -39,19 +39,8 @@ function NavLink({
 
   const locked = item.requiresPlan && !isSubscribed;
 
-  if (locked) {
-    return (
-      <Link
-        href="/dashboard/billing"
-        title="Requires an active plan"
-        className="relative flex items-center gap-3 px-3 py-2 rounded-[8px] text-[13px] font-medium transition-colors text-[#374151] cursor-pointer hover:bg-white/[0.02] group"
-      >
-        <Icon className="w-[15px] h-[15px] flex-shrink-0 text-[#2D2D35]" />
-        <span className="flex-1">{item.label}</span>
-        <Lock className="w-3 h-3 text-[#2D2D35] group-hover:text-[#4B5563] transition-colors flex-shrink-0" />
-      </Link>
-    );
-  }
+  // Hide plan-gated items entirely for unpaid users
+  if (locked) return null;
 
   return (
     <Link
@@ -190,28 +179,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile nav */}
         <nav className="lg:hidden flex items-center gap-1 px-3 py-2 border-b border-white/[0.05] overflow-x-auto" style={{ background: "#09090B" }}>
           {navItems.map((item) => {
-            const Icon  = item.icon;
+            const Icon   = item.icon;
+            const locked = item.requiresPlan && !isSubscribed;
+            if (locked) return null; // hide plan-gated items for unpaid users
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
                 : pathname.startsWith(item.href);
-            const locked = item.requiresPlan && !isSubscribed;
             return (
               <Link
                 key={item.href}
-                href={locked ? "/dashboard/billing" : item.href}
+                href={item.href}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-colors flex-shrink-0",
-                  locked
-                    ? "text-[#2D2D35]"
-                    : active
+                  active
                     ? "bg-white/[0.06] text-white"
                     : "text-[#6B7280] hover:text-[#D1D5DB]"
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {item.label}
-                {locked && <Lock className="w-3 h-3 ml-0.5" />}
               </Link>
             );
           })}

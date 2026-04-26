@@ -163,12 +163,10 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'subscription_expired':
-        // Billing period ended — revoke access, zero credits, downgrade to free.
-        // All fields written atomically in one setUserPlan call via `extra`.
+        // Billing period ended — revoke access, downgrade to free.
+        // Credits are preserved so the user can still see their balance history.
         await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
-          credits:      0,
-          creditsTotal: 0,
-          renewalDate:  null,
+          renewalDate: null,
         });
         console.log(`[ls-webhook] subscription expired, access revoked: userId=${userId}`);
         break;

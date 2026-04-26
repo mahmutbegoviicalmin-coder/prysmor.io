@@ -15,11 +15,12 @@ export function validatePanelKey(req: NextRequest): boolean {
 // ─── Panel session token ───────────────────────────────────────────────────────
 
 export interface PanelSession {
-  userId:    string;
-  plan:      string;
-  planLabel: string;
-  expiresAt: Date;
-  deviceId?: string;
+  userId:             string;
+  plan:               string;
+  planLabel:          string;
+  expiresAt:          Date;
+  deviceId?:          string;
+  machineFingerprint?: string;
 }
 
 /**
@@ -42,11 +43,12 @@ export async function validatePanelToken(
     if (Date.now() > expiresAt.getTime()) return null;
 
     return {
-      userId:    data.userId,
-      plan:      data.plan,
-      planLabel: data.planLabel,
+      userId:             data.userId,
+      plan:               data.plan,
+      planLabel:          data.planLabel,
       expiresAt,
-      deviceId:  data.deviceId ?? undefined,
+      deviceId:           data.deviceId           ?? undefined,
+      machineFingerprint: data.machineFingerprint ?? undefined,
     };
   } catch {
     return null;

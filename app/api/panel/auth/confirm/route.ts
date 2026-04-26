@@ -4,7 +4,7 @@ import { db } from "@/lib/firebaseAdmin";
 import { getUser, PLAN_LABELS, syncUserProfile } from "@/lib/firestore/users";
 import { registerDevice, DeviceLimitError } from "@/lib/firestore/devices";
 
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_TTL_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 function generateToken(): string {
   const arr = new Uint8Array(32);
@@ -70,9 +70,12 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const sessionExpiry = new Date(now.getTime() + SESSION_TTL_MS);
 
-  // Stable per-user deviceId — same slot on every login so re-auth never
-  // hits the device limit when the previous session wasn't explicitly logged out.
-  const deviceId = `panel-${user.id}`;
+  // Machine-locked deviceId — ties the session to the machine that initiated auth.
+  // Falls back to user-only id if fingerprint wasn't sent (older panel versions).
+  const machineFingerprint = codeData.machineFingerprint as string | undefined;
+  const deviceId = machineFingerprint
+    ? `panel-${user.id}-${machineFingerprint.slice(0, 12)}`
+    : `panel-${user.id}`;
 
   await db.collection("panel_sessions").doc(token).set({
     userId: user.id,
@@ -80,6 +83,7 @@ export async function POST(req: NextRequest) {
     planLabel,
     deviceCode: code.toUpperCase(),
     deviceId,
+    ...(machineFingerprint && { machineFingerprint }),
     createdAt: now,
     expiresAt: sessionExpiry,
   });

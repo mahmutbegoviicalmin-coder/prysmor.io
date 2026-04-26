@@ -48,19 +48,21 @@ export async function registerDevice(
     }
   }
 
-  await deviceRef.set(
-    {
+  if (existing.exists) {
+    // Device already registered — only refresh lastActive timestamp
+    await deviceRef.update({ lastActive: new Date() });
+  } else {
+    // First time seeing this device — write all fields
+    await deviceRef.set({
       platform,
-      name: name ?? deviceId,
-      lastActive: new Date(),
-      // Only write firstSeen on first registration
-      ...(!existing.exists && { firstSeen: new Date() }),
+      name:           name ?? deviceId,
+      firstConnected: new Date(),
+      lastActive:     new Date(),
       ...(extra?.hostApp        && { hostApp: extra.hostApp }),
       ...(extra?.hostAppVersion && { hostAppVersion: extra.hostAppVersion }),
       ...(extra?.cepVersion     && { cepVersion: extra.cepVersion }),
-    },
-    { merge: true }
-  );
+    });
+  }
 }
 
 export async function getDevices(userId: string): Promise<DeviceDoc[]> {

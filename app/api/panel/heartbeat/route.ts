@@ -26,7 +26,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { userId, deviceId } = session;
+  const { userId, deviceId, machineFingerprint } = session;
+
+  // Machine binding check — if the session was issued with a fingerprint,
+  // the request must come from the same machine.
+  if (machineFingerprint) {
+    const incomingMachineId = req.headers.get('x-machine-id') ?? '';
+    if (incomingMachineId !== machineFingerprint) {
+      return NextResponse.json(
+        { error: 'Machine mismatch', code: 'machine_mismatch' },
+        { status: 401 },
+      );
+    }
+  }
 
   if (deviceId) {
     // Fire-and-forget — don't block the response on the write

@@ -1,5 +1,8 @@
+import { currentUser } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 import { BookOpen, PanelLeft, Zap, Sparkles, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { getUser } from "@/lib/firestore/users";
 
 export const metadata = { title: "Docs — Dashboard" };
 
@@ -24,7 +27,13 @@ const sections = [
   },
 ];
 
-export default function DashboardDocsPage() {
+export default async function DashboardDocsPage() {
+  const user = await currentUser();
+  if (!user) redirect("/sign-in");
+
+  const userDoc = await getUser(user.id).catch(() => null);
+  if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
+
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[800px]">
       <div className="mb-8">
