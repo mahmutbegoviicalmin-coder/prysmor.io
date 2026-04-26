@@ -162,6 +162,12 @@ window.addEventListener('DOMContentLoaded', function () {
       .replace(/\/$/, '');   // strip trailing slash
   } catch (_) {}
   bindEvents();
+  // Display local panel version in login stats row
+  try {
+    var localVer = readLocalVersion();
+    var verEl = document.getElementById('lv-panel-version');
+    if (verEl && localVer) verEl.textContent = 'v' + localVer;
+  } catch (_) {}
   // Check for OTA panel update in background — does not block login flow
   checkForUpdates();
   // Try to restore saved session — validate against server before showing main view
@@ -2112,23 +2118,33 @@ function showUpdateBanner(version) {
     banner.id = 'prysmor-update-banner';
     banner.style.cssText = [
       'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
-      'background:#1a2e1a', 'border-bottom:1px solid rgba(0,230,118,0.3)',
-      'padding:10px 16px', 'display:flex', 'align-items:center',
-      'justify-content:space-between', 'gap:12px',
+      'background:rgba(0,20,10,0.92)',
+      'border-bottom:1px solid rgba(0,230,118,0.25)',
+      'backdrop-filter:blur(12px)',
+      'padding:9px 14px', 'display:flex', 'align-items:center',
+      'justify-content:space-between', 'gap:10px',
     ].join(';');
 
+    var dot = document.createElement('span');
+    dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#00e676;box-shadow:0 0 6px rgba(0,230,118,0.7);flex-shrink:0;';
+
     var msg = document.createElement('span');
-    msg.style.cssText = 'font-size:12px;color:#00E676;font-weight:500;letter-spacing:-0.01em;';
+    msg.style.cssText = 'flex:1;font-size:11.5px;color:rgba(0,230,118,0.9);font-weight:500;letter-spacing:-0.01em;';
     msg.textContent = 'Panel updated to v' + version + ' — restart Premiere to apply.';
 
     var close = document.createElement('button');
     close.textContent = '✕';
     close.style.cssText = [
-      'background:none', 'border:none', 'color:rgba(245,245,247,0.5)',
-      'cursor:pointer', 'font-size:12px', 'padding:0', 'line-height:1',
+      'background:none', 'border:none', 'color:rgba(240,240,240,0.35)',
+      'cursor:pointer', 'font-size:13px', 'padding:0 2px', 'line-height:1',
+      'transition:color .15s',
     ].join(';');
-    close.onclick = function () { banner.remove(); };
+    close.onmouseover = function () { close.style.color = 'rgba(240,240,240,0.75)'; };
+    close.onmouseout  = function () { close.style.color = 'rgba(240,240,240,0.35)'; };
+    close.onclick = function () { banner.style.opacity = '0'; setTimeout(function () { banner.remove(); }, 150); };
+    banner.style.transition = 'opacity .15s';
 
+    banner.appendChild(dot);
     banner.appendChild(msg);
     banner.appendChild(close);
     document.body.appendChild(banner);
