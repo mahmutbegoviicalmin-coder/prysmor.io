@@ -79,6 +79,25 @@ rm -f "$ROOT/.debug" 2>/dev/null || true
 SCRIPTS_DIR="$WORKDIR/scripts"
 mkdir -p "$SCRIPTS_DIR"
 
+# preinstall — clears CEP Local Storage to force re-authentication on install/reinstall
+cat > "$SCRIPTS_DIR/preinstall" << 'PREINSTALL'
+#!/usr/bin/env bash
+log() { echo "[prysmor-preinstall] $*"; logger -t "prysmor-preinstall" "$*" 2>/dev/null || true; }
+
+log "=== Prysmor CEP Panel preinstall START ==="
+CEP_EXT="$HOME/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel"
+
+log "Clearing Local Storage: $CEP_EXT/Local Storage"
+rm -rf "$CEP_EXT/Local Storage"
+
+log "Clearing Session Storage: $CEP_EXT/Session Storage"
+rm -rf "$CEP_EXT/Session Storage"
+
+log "=== Prysmor CEP Panel preinstall DONE ==="
+exit 0
+PREINSTALL
+chmod +x "$SCRIPTS_DIR/preinstall"
+
 # postinstall — runs as the current user (not root) because distribution.xml
 # uses enable_currentUserHome="true". Files are already installed by pkgbuild
 # to ~/Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel.

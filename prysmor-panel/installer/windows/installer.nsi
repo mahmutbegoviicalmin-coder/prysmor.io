@@ -40,6 +40,10 @@ RequestExecutionLevel user
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Prysmor Panel" SecMain
+  ; Clear CEP Local Storage to force re-authentication on install/reinstall
+  RMDir /r "$APPDATA\Adobe\CEP\extensions\${BUNDLE_ID}\Local Storage"
+  RMDir /r "$APPDATA\Adobe\CEP\extensions\${BUNDLE_ID}\Session Storage"
+
   RMDir /r "$INSTDIR"
 
   SetOutPath "$INSTDIR\CSXS"

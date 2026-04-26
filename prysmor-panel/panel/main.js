@@ -2921,6 +2921,23 @@ function bindEvents() {
     e.preventDefault();
     cs.openURLInDefaultBrowser(SITE_URL + '/terms');
   });
+
+  // Clear auth tokens when the panel page unloads (Premiere closes or panel reloads).
+  // Machine fingerprint is intentionally preserved so it is not regenerated each session.
+  window.addEventListener('beforeunload', function () {
+    localStorage.removeItem(LS_TOKEN);
+    localStorage.removeItem(LS_USER_ID);
+    localStorage.removeItem(LS_PLAN);
+    localStorage.removeItem(LS_PLAN_LABEL);
+    localStorage.removeItem(LS_TOKEN_EXP);
+    // LS_MACHINE_ID is intentionally kept — no need to regenerate on every open.
+  });
+
+  // CEP application lifecycle note:
+  // com.adobe.csxs.events.ApplicationDeactivate fires when the user switches *away*
+  // from Premiere Pro (focus loss), not on app close — so it is not suitable for
+  // clearing tokens. The beforeunload event above reliably fires on panel unload /
+  // host-app shutdown and is the correct hook for session cleanup.
 }
 
 
