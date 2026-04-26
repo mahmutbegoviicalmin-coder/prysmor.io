@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Parse body ──────────────────────────────────────────────────────────────
-  let body: { prompt?: string; frames?: unknown; frameBase64?: string; mode?: string; referenceImage?: string };
+  let body: { prompt?: string; mode?: string };
   try {
-    body = await req.json() as { prompt?: string; frames?: unknown; frameBase64?: string; mode?: string; referenceImage?: string };
+    body = await req.json() as { prompt?: string; mode?: string };
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -55,32 +55,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Validate frames (optional) ──────────────────────────────────────────────
-  // Accepts both frames[] array and single frameBase64 string for compatibility.
-  // referenceImage (user-uploaded) is always prepended as the FIRST frame.
-  const referenceImage = typeof body.referenceImage === 'string' && body.referenceImage.length > 0
-    ? body.referenceImage
-    : null;
-  const singleFrame = typeof body.frameBase64 === 'string' && body.frameBase64.length > 0
-    ? [body.frameBase64]
-    : [];
-  const rawFrames = Array.isArray(body.frames)
-    ? (body.frames as unknown[])
-        .filter((f): f is string => typeof f === 'string' && f.length > 0)
-        .slice(0, 5)
-    : singleFrame;
-  // Prepend referenceImage as first frame so Claude sees it first (most important)
-  const frames = referenceImage
-    ? [referenceImage, ...rawFrames].slice(0, 5)
-    : rawFrames;
-
   const mode = (body.mode ?? 'background').trim();
-  log(TAG, `Enhance request — frames=${frames.length} mode=${mode}`, { promptLen: cleanPrompt.length });
+  log(TAG, `Enhance request — mode=${mode}`, { promptLen: cleanPrompt.length });
 
   // ── Enhance ─────────────────────────────────────────────────────────────────
   let result: Awaited<ReturnType<typeof enhanceMotionForgePrompt>>;
   try {
-    result = await enhanceMotionForgePrompt(cleanPrompt, frames, mode);
+    result = await enhanceMotionForgePrompt(cleanPrompt, mode);
   } catch (err) {
     // enhanceMotionForgePrompt is designed never to throw, but be defensive
     logError(TAG, 'Unexpected error from enhanceMotionForgePrompt', err);

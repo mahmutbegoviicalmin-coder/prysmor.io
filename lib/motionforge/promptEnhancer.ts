@@ -2,16 +2,10 @@
  * MotionForge Prompt Enhancer
  *
  * Transforms short user prompts into identity-safe, cinematic prompts
- * optimised for Runway Gen-4 video-to-video generation.
+ * optimised for Runway Gen-4 / Beeble SwitchX generation.
  *
- * Primary path: Claude Haiku (text-only) or Claude Opus with vision (when frames provided).
- *
- * Fallback path: lightweight rule-based enhancement that prepends the
- *   identity-preservation header and strips transformation verbs.
- *   Activated only when Claude is unavailable.
- *
- * Output: plain text, under 60 words, sentence-based.
- *   Always begins with "with [subject description] maintaining identical appearance,"
+ * Primary path: Claude Haiku (text-only).
+ * Fallback path: lightweight rule-based enhancement.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,9 +15,8 @@ const TAG = 'promptEnhancer';
 
 // ─── Claude config ────────────────────────────────────────────────────────────
 
-const MODEL_TEXT   = 'claude-haiku-4-5-20251001';  // fast + cheap for text-only
-const MODEL_VISION = 'claude-haiku-4-5-20251001';  // vision-capable for frame analysis
-const MAX_TOKENS   = 220;
+const MODEL_TEXT = 'claude-haiku-4-5-20251001';
+const MAX_TOKENS = 220;
 
 export const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -67,21 +60,6 @@ Rules:
 - Max 12 words total
 - Plain text only. No quotes. No markdown.`,
 
-  style: `You are a Runway Gen-4 Aleph prompt writer for clothing transformation.
-The user wants to change what a person is wearing in a video clip.
-Aleph already sees the video — do NOT describe faces, body, or background.
-
-OUTPUT FORMAT (strict):
-"Re-style the clothing into [3-5 word description]. Keep the person's face and body unchanged."
-
-Rules:
-- Always start with "Re-style the clothing into"
-- Describe only: garment type, fabric texture, color, fit in 3-5 words
-- Never mention face, skin, hair, or background
-- Always end with "Keep the person's face and body unchanged."
-- Max 15 words total
-- Plain text only. No quotes. No markdown.`,
-
   vfx: `You are a Runway Gen-4 Aleph prompt writer for visual effects.
 The user wants to add a cinematic visual effect to a video clip.
 Analyse the user intent and write a single Runway prompt.
@@ -105,7 +83,7 @@ const DEFAULT_MODE = 'background';
 
 export interface EnhancementResult {
   enhancedPrompt: string;
-  method: 'claude' | 'claude-vision' | 'fallback';
+  method: 'claude' | 'fallback';
   sceneAnalysed: boolean;
 }
 
@@ -145,8 +123,6 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
       return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person unchanged.`;
     case 'relight':
       return `Change the lighting to ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep everything else the same.`;
-    case 'style':
-      return `Re-style the clothing into ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person's face and body unchanged.`;
     case 'vfx':
       return `Add ${stmt.charAt(0).toLowerCase() + stmt.slice(1)} to the scene. Keep all people unchanged.`;
     default:
@@ -157,66 +133,29 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
 // ─── Claude call ──────────────────────────────────────────────────────────────
 
 /**
- * Calls Claude with the system prompt and optional scene frames (vision mode).
- * Uses Haiku for text-only, Opus for vision. Returns the raw completion string.
- *
- * Throws on API error so the caller can decide whether to fallback.
+ * Calls Claude (text-only) with the mode system prompt.
+ * Throws on API error so the caller can fall back to rule-based enhancement.
  */
 async function callClaude(
   userPrompt: string,
-  sceneFrames: string[],
   mode: string = DEFAULT_MODE,
 ): Promise<string> {
-  const hasFrames  = sceneFrames.length > 0;
-  const model      = hasFrames ? MODEL_VISION : MODEL_TEXT;
   const systemPrompt = MODE_PROMPTS[mode] ?? MODE_PROMPTS[DEFAULT_MODE];
 
-  type ContentBlock =
-    | { type: 'text'; text: string }
-    | { type: 'image'; source: { type: 'base64'; media_type: 'image/jpeg'; data: string } };
-
-  let userContent: string | ContentBlock[];
-
-  if (hasFrames) {
-    const parts: ContentBlock[] = [
-      {
-        type: 'text',
-        text:
-          `You have ${sceneFrames.length} frame(s) from the actual video clip. ` +
-          `Analyse the scene lighting, environment, and atmosphere, then write the best possible ` +
-          `MotionForge prompt for: "${userPrompt}"`,
-      },
-    ];
-    for (const frame of sceneFrames) {
-      parts.push({
-        type:   'image',
-        source: { type: 'base64', media_type: 'image/jpeg', data: frame },
-      });
-    }
-    userContent = parts;
-  } else {
-    userContent = `Write the best possible MotionForge prompt for: "${userPrompt}"`;
-  }
-
-  console.log('[claude-vision] callClaude — model:', model, '— frames sent:', sceneFrames.length);
-
-  console.log('[claude] mode:', mode, '— system prompt length:', systemPrompt.length);
+  console.log('[claude] callClaude — model:', MODEL_TEXT, '— mode:', mode);
 
   const response = await client.messages.create({
-    model,
+    model:      MODEL_TEXT,
     max_tokens: MAX_TOKENS,
     system:     systemPrompt,
-    messages:   [{ role: 'user', content: userContent as Anthropic.MessageParam['content'] }],
+    messages:   [{ role: 'user', content: `Write the best possible MotionForge prompt for: "${userPrompt}"` }],
   });
 
   const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
   if (!raw) throw new Error('Claude returned empty completion');
 
   const cleaned = raw.replace(/^["']|["']$/g, '').trim();
-
-  console.log('[claude-vision] Full response:', JSON.stringify(response, null, 2));
-  console.log('[claude-vision] What it sees:', raw);
-  console.log('[claude-vision] Final compiled prompt:', cleaned);
+  console.log('[claude] Final compiled prompt:', cleaned);
 
   return cleaned;
 }
@@ -226,44 +165,35 @@ async function callClaude(
 /**
  * Enhances a user prompt into a production-ready MotionForge prompt.
  *
- * @param userPrompt  - Short user input ("add fireworks", "make it snowy", etc.)
- * @param sceneFrames - Optional base64 JPEG frames for scene-aware enhancement.
- *                      Pass [] or omit for text-only mode.
- * @returns           - EnhancementResult with the enhanced prompt and method used.
+ * @param userPrompt - Short user input ("add fireworks", "make it snowy", etc.)
+ * @param mode       - Generation mode: background | relight | vfx
+ * @returns          - EnhancementResult with the enhanced prompt and method used.
  *
- * Never throws: on any failure the fallback result is returned so the caller
- * can always proceed with generation.
+ * Never throws: on any failure the fallback result is returned.
  */
 export async function enhanceMotionForgePrompt(
-  userPrompt:  string,
-  sceneFrames: string[] = [],
+  userPrompt: string,
   mode: string = DEFAULT_MODE,
 ): Promise<EnhancementResult> {
-  const prompt    = validatePrompt(userPrompt);
-  const frames    = sceneFrames.filter(f => typeof f === 'string' && f.length > 0).slice(0, 5);
-  const hasFrames = frames.length > 0;
+  const prompt = validatePrompt(userPrompt);
 
-  log(TAG, `Enhancing prompt (frames=${frames.length}, mode=${mode})`, { promptLen: prompt.length });
+  log(TAG, `Enhancing prompt (mode=${mode})`, { promptLen: prompt.length });
 
   try {
-    const enhanced = await callClaude(prompt, frames, mode);
+    const enhanced = await callClaude(prompt, mode);
 
     const wordCount = enhanced.split(/\s+/).length;
-    if (wordCount < 15) {
+    if (wordCount < 3) {
       warn(TAG, `Unusually short Claude output (${wordCount} words) — may be degraded`, {
         output: enhanced.slice(0, 100),
       });
     }
 
-    const method: EnhancementResult['method'] = hasFrames ? 'claude-vision' : 'claude';
-    log(TAG, `Enhancement complete via ${method}`, { wordCount });
-
-    return { enhancedPrompt: enhanced, method, sceneAnalysed: hasFrames };
+    log(TAG, `Enhancement complete via claude`, { wordCount });
+    return { enhancedPrompt: enhanced, method: 'claude', sceneAnalysed: false };
 
   } catch (err) {
-    warn(TAG, 'Claude enhancement failed — using fallback', {
-      err: (err as Error).message,
-    });
+    warn(TAG, 'Claude enhancement failed — using fallback', { err: (err as Error).message });
 
     const enhanced = fallbackEnhance(prompt, mode);
     log(TAG, 'Fallback enhancement used', { wordCount: enhanced.split(/\s+/).length });

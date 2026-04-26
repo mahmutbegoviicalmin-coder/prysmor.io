@@ -73,11 +73,17 @@ export async function GET(
       log(TAG, `[beeble] Task ${beebleTaskId} → ${result.status}`);
 
       if (result.status === 'generating') {
+        // Use real Beeble progress if provided; otherwise simulate a slow ramp-up
+        // (each poll +5%, starting at 10, capped at 90 until completion).
+        const prevProgress = job.runwayProgress ?? 0;
+        const nextProgress = typeof result.progress === 'number'
+          ? Math.min(result.progress, 90)
+          : Math.min(prevProgress < 10 ? 10 : prevProgress + 5, 90);
         await updateJob(userId, params.id, {
           beeblePolledAt: new Date(),
-          runwayProgress: 50,   // Beeble doesn't return fine-grained progress
+          runwayProgress: nextProgress,
         } as any);
-        return NextResponse.json({ status: 'generating', progress: 50 });
+        return NextResponse.json({ status: 'generating', progress: nextProgress });
       }
 
       if (result.status === 'failed') {
@@ -99,7 +105,8 @@ export async function GET(
         return NextResponse.json({ status: 'completed', progress: 100, outputUrl: result.outputUrl });
       }
 
-      // Completed but outputUrl not yet available — wait
+      // Completed but outputUrl not yet populated — wait one more poll
+      warn(TAG, `[beeble] Task ${beebleTaskId} completed but outputUrl missing — waiting`);
       await updateJob(userId, params.id, { beeblePolledAt: new Date(), runwayProgress: 95 } as any);
       return NextResponse.json({ status: 'generating', progress: 95 });
 

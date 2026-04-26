@@ -129,6 +129,7 @@ export async function createSwitchXTask(params: SwitchXParams): Promise<string> 
 export interface BeebleJobResult {
   status:     string;
   outputUrl?: string;
+  progress?:  number;   // 0-100 if Beeble returns it, otherwise undefined
 }
 
 /**
@@ -150,8 +151,16 @@ export async function pollSwitchXJob(jobId: string): Promise<BeebleJobResult> {
   const data = await res.json() as {
     status: string;
     output?: { render?: string };
+    progress?: number;
     error?:  string;
   };
+
+  console.log(`[beeble] pollSwitchXJob raw response:`, JSON.stringify({
+    status:    data.status,
+    progress:  data.progress,
+    outputRender: data.output?.render?.slice(0, 80) ?? null,
+    error:     data.error ?? null,
+  }));
 
   const raw = (data.status ?? '').toLowerCase();
 
@@ -164,5 +173,6 @@ export async function pollSwitchXJob(jobId: string): Promise<BeebleJobResult> {
   return {
     status,
     outputUrl: data.output?.render ?? undefined,
+    progress:  typeof data.progress === 'number' ? data.progress : undefined,
   };
 }

@@ -72,8 +72,6 @@ function startClipAutoSelect() {
         if (_lastAutoSelectKey !== null) {
           _lastAutoSelectKey    = null;
           state.mf.selInfo      = null;
-          storedReferenceFrame  = null;
-          storedReferenceFrames = [];
           storedVideoInfo       = null;
           showClipEmpty();
           updateCostPreview();
@@ -98,13 +96,9 @@ function stopClipAutoSelect() {
   _lastAutoSelectKey = null;
 }
 
-// ─── Reference Frame Store ────────────────────────────────────────────────────
-// Up to 3 frames captured at different timecodes when a clip is loaded.
-// storedReferenceFrame is always storedReferenceFrames[0] for backward compat.
-var storedReferenceFrames = [];   // primary — array of base64 JPEG strings
-var storedReferenceFrame  = null; // alias → storedReferenceFrames[0] || null
-var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG)
-var selectedMode = 'background';  // active generation mode: background | relight | style | vfx
+// ─── Reference Image Store ────────────────────────────────────────────────────
+var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG), BG mode only
+var selectedMode = 'background';  // active generation mode: background | relight | vfx
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -461,8 +455,6 @@ function logout() {
   }
 
   clearSession();
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
   storedReferenceImage  = null;
   storedVideoInfo = null;
   state.mf = {
@@ -486,8 +478,6 @@ function logout() {
  */
 function refreshClip(silent) {
   // Clear immediately so Generate is blocked while the async refresh is in progress.
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
   storedVideoInfo = null;
 
   el('btn-refresh-clip').disabled = true;
@@ -502,8 +492,6 @@ function refreshClip(silent) {
 
     if (!parsed || parsed.error) {
       state.mf.selInfo      = null;
-      storedReferenceFrame  = null;
-      storedReferenceFrames = [];
       storedVideoInfo = null;
       showClipEmpty();
       if (!silent) {
@@ -623,8 +611,7 @@ async function apiFetch(path, options) {
 // ─── Compile Prompt ───────────────────────────────────────────────────────────
 
 async function compilePrompt() {
-  console.log('[Prysmor:enhance] ENHANCE CLICKED - storedReferenceFrames:', storedReferenceFrames.length,
-    'frames, primary:', storedReferenceFrame ? 'YES length=' + storedReferenceFrame.length : 'NO');
+  console.log('[Prysmor:enhance] ENHANCE CLICKED');
   var textarea = el('mf-prompt');
   var raw      = textarea.value.trim();
   var btn      = el('btn-compile-prompt');
@@ -639,11 +626,7 @@ async function compilePrompt() {
       // Use whatever the user typed as intent, or ask for one if empty
       var intent = raw || 'make it cinematic and dramatic';
 
-      console.log('[Prysmor:enhance] storedReferenceFrames:', storedReferenceFrames.length, 'frames available');
       var enhanceBody = { intent: intent, mode: selectedMode };
-      if (storedReferenceFrame)             enhanceBody.frameBase64 = storedReferenceFrame;
-      if (storedReferenceFrames.length > 0) enhanceBody.frames      = storedReferenceFrames;
-      if (storedReferenceImage)             enhanceBody.referenceImage = storedReferenceImage;
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
         method:  'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
@@ -688,11 +671,7 @@ async function compilePrompt() {
 
   try {
     var enhanceBody2 = { prompt: raw, mode: selectedMode };
-    if (storedReferenceFrames.length > 0) enhanceBody2.frames = storedReferenceFrames;
-    else if (storedReferenceFrame)        enhanceBody2.frames = [storedReferenceFrame];
-    if (storedReferenceImage)             enhanceBody2.referenceImage = storedReferenceImage;
-    console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0,
-      'referenceImage:', !!storedReferenceImage);
+    console.log('[Prysmor:enhance] no-job path — mode:', selectedMode);
 
     var res2 = await fetch(API_BASE + '/api/v1/motionforge/enhance-prompt', {
       method:  'POST',
@@ -958,12 +937,9 @@ async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
   return top.map(function (f) { return f.b64; });
 }
 
-// Captures a reference frame + sequence dimensions when a clip is loaded.
-// Uses ffmpeg (reliable) instead of canvas (fails on wide/unusual codecs).
-// Runs silently in the background — errors leave storedReferenceFrame null.
+// Captures a thumbnail for display and reads sequence dimensions when a clip is loaded.
+// Frame capture for AI is removed — only used for UI thumbnail now.
 async function captureClipReferenceFrame(sourcePath) {
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
   storedVideoInfo = null;
 
   // Normalise path early — handles macOS file:// URLs and %20 encoding
@@ -972,20 +948,11 @@ async function captureClipReferenceFrame(sourcePath) {
   var mediaIn  = (state.mf.selInfo && state.mf.selInfo.mediaInSec)  || 0;
   var duration = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
 
-  // ── Multi-frame capture via ffmpeg ──────────────────────────────────────
-  console.log('[Prysmor:frame] captureClipReferenceFrame: mediaInSec=' + mediaIn +
-    ' durationSec=' + duration + ' sourcePath=' + sourcePath);
-  console.log('[Prysmor:frame] selInfo startTimeSec:', (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 'n/a');
+  // ── Capture one frame just for the thumbnail ─────────────────────────────
   try {
     var frames = await captureMultipleFrames(sourcePath, mediaIn, duration);
     if (frames.length > 0) {
-      storedReferenceFrames = frames;
-      storedReferenceFrame  = frames[0];
-      showClipThumbnail(frames[0]); // display first frame as thumbnail
-      console.log('[Prysmor:frame] captureClipReferenceFrame: stored ' + frames.length +
-        ' frames, primary length=' + frames[0].length);
-    } else {
-      console.warn('[Prysmor:frame] captureClipReferenceFrame: all ffmpeg frames returned null');
+      showClipThumbnail(frames[0]);
     }
   } catch (frameErr) {
     console.error('[Prysmor:frame] captureClipReferenceFrame threw:', frameErr.message);
@@ -1111,7 +1078,7 @@ async function mfGenerate() {
   console.log('[Prysmor:selInfo] sourcePath (norm):', sourcePath);
   console.log('[Prysmor:selInfo] full        :', JSON.stringify(state.mf.selInfo));
 
-  // ── Step 2: Get pre-signed upload URL (Beeble for bg/relight, Runway for style/vfx) ──
+  // ── Step 2: Get pre-signed upload URL (Beeble for bg/relight, Runway for vfx) ──
   setStatus('Preparing upload…', 12);
   var uploadSlot;
   try {
@@ -1139,14 +1106,8 @@ async function mfGenerate() {
       console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath +
         '  dims=' + preparedVideoWidth + 'x' + preparedVideoHeight);
       setStatus('Reading clip…', 20);
-      // Read prepared clip as base64 for upload.
-      // Reference frames were already captured at full quality from the original
-      // clip when it was loaded (storedReferenceFrames). Re-use them directly —
-      // they are the same 5 frames sent to Claude for Enhance.
       fileBase64 = await readFileBase64(preparedTmpPath);
       extractionSucceeded = true;
-      console.log('[Prysmor:frame] using ' + (storedReferenceFrames ? storedReferenceFrames.length : 0) +
-        ' pre-captured reference frames from original clip (full resolution)');
       try { require('fs').unlinkSync(preparedTmpPath); } catch (_) {
         try { window.cep.fs.deleteFile(preparedTmpPath); } catch (_) {}
       }
@@ -1165,9 +1126,6 @@ async function mfGenerate() {
         return fail('Cannot read clip: ' + readErr.message);
       }
     }
-
-    // Reference frames were already captured above via captureMultipleFrames.
-    // (captureReferenceFrame / canvas-based capture is no longer needed here)
 
     setStatus('Uploading clip…', 28);
     try {
@@ -1216,18 +1174,11 @@ async function mfGenerate() {
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
   setStatus('Starting effect generation…', 38);
-  console.log('[Prysmor:frame] sending ' + storedReferenceFrames.length + ' reference frame(s) to generate endpoint');
   try {
     var genBody = { prompt: prompt, mode: selectedMode };
-    // Send clip duration so Runway can match output length to the original clip
     genBody.clipDuration = clipDurSec;
-    // Send user-uploaded reference image if available
-    if (storedReferenceImage) genBody.referenceImage = storedReferenceImage;
-    // Send all captured reference frames (primary + extras for identity conditioning)
-    if (storedReferenceFrames.length > 0) {
-      genBody.referenceFrameBase64 = storedReferenceFrames[0];      // primary (backward compat)
-      genBody.referenceFrames      = storedReferenceFrames;          // all frames
-    }
+    // Send user-uploaded reference image only for background mode
+    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
@@ -2711,8 +2662,6 @@ function bindEvents() {
   el('btn-refresh-clip').addEventListener('click', function () {
     // Clear stale state immediately so Generate stays blocked until the
     // full refresh + frame capture cycle completes.
-    storedReferenceFrame  = null;
-    storedReferenceFrames = [];
     storedVideoInfo = null;
     refreshClip(false);
   });

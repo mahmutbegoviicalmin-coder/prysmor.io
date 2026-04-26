@@ -884,14 +884,6 @@
         Light
       </button>
 
-      <button class="mode-tab mode-pill" data-mode="style" onclick="prysmorSetMode('style')">
-        <!-- Clothing / hanger icon -->
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-.95 2.97L6 11l0 10h12V11l3.33-4.57a2 2 0 00-.95-2.97z"/>
-        </svg>
-        Style
-      </button>
-
       <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
         <!-- Sparkles / magic icon -->
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -902,8 +894,8 @@
 
     </div>
 
-    <!-- ─ REFERENCE IMAGE UPLOAD ─── -->
-    <div class="v2-ref-img-zone">
+    <!-- ─ REFERENCE IMAGE UPLOAD — visible only in BG mode ─── -->
+    <div class="v2-ref-img-zone" id="ref-img-zone">
       <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
         <span class="v2-ref-img-icon">＋</span>
         <span>Reference image</span>
@@ -1002,7 +994,6 @@
       <select id="mf-mode-select">
         <option value="background">Background</option>
         <option value="relight">Relight</option>
-        <option value="style">Style</option>
         <option value="vfx">VFX</option>
       </select>
       <a id="link-docs"  href="#"></a>
@@ -1083,7 +1074,6 @@
     var _modePromptMap = {
       background: 'Describe the new background...',
       relight:    'Describe the lighting mood...',
-      style:      'Describe the new outfit...',
       vfx:        'Describe the visual effect...',
     };
     function prysmorSetMode(mode) {
@@ -1100,6 +1090,9 @@
       /* update prompt placeholder */
       var prompt = document.getElementById('mf-prompt');
       if (prompt) prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+      /* show reference image zone only for background mode */
+      var refZone = document.getElementById('ref-img-zone');
+      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
     }
 
     /* ── Login grain canvas ────────────────────────────────────── */
