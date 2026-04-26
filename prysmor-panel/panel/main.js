@@ -168,6 +168,8 @@ window.addEventListener('DOMContentLoaded', function () {
     var verEl = document.getElementById('lv-panel-version');
     if (verEl && localVer) verEl.textContent = 'v' + localVer;
   } catch (_) {}
+  // Set initial enhance chip label
+  updateEnhanceLabel();
   // Check for OTA panel update in background — does not block login flow
   checkForUpdates();
   // Try to restore saved session — validate against server before showing main view
@@ -614,6 +616,27 @@ async function apiFetch(path, options) {
   return json;
 }
 
+// ─── Enhance chip label helpers ───────────────────────────────────────────────
+
+var _enhanceSuggestMap = {
+  background: 'Suggest BG',
+  relight:    'Suggest lighting',
+  vfx:        'Suggest effect',
+};
+
+/** Returns the correct chip label based on textarea content and current mode. */
+function getEnhanceLabel() {
+  var ta = el('mf-prompt');
+  if (ta && ta.value.trim()) return 'Enhance';
+  return _enhanceSuggestMap[selectedMode] || 'Suggest';
+}
+
+/** Updates the chip label to match textarea content + mode. */
+function updateEnhanceLabel() {
+  var lbl = el('compile-label');
+  if (lbl) lbl.textContent = getEnhanceLabel();
+}
+
 // ─── Compile Prompt ───────────────────────────────────────────────────────────
 
 async function compilePrompt() {
@@ -625,8 +648,9 @@ async function compilePrompt() {
 
   // If a job exists (video uploaded), use scene-aware enhance
   if (state.mf.jobId) {
-    btn.disabled    = true;
-    lbl.textContent = 'Analysing…';
+    btn.disabled = true;
+    btn.classList.add('enhancing');
+    lbl.textContent = 'Checking…';
 
     try {
       // Use whatever the user typed as intent, or ask for one if empty
@@ -651,28 +675,28 @@ async function compilePrompt() {
 
       textarea.value = json.prompt;
       el('mf-char-count').textContent = json.prompt.length;
-
       flashEnhanceSuccess();
       textarea.focus();
 
     } catch (err) {
       showToast('Scene enhance failed: ' + (err.message || 'unknown error'), 'error');
+      lbl.textContent = getEnhanceLabel();
     } finally {
-      btn.disabled    = false;
-      lbl.textContent = 'AI Enhance';
+      btn.disabled = false;
+      btn.classList.remove('enhancing');
     }
     return;
   }
 
   // No job yet — use the top-level enhance-prompt endpoint (no job ID required).
-  // Sends the stored reference frame if available so Claude uses vision.
   if (!raw) {
     showToast('Enter a prompt first', 'error');
     textarea.focus();
     return;
   }
 
-  btn.disabled    = true;
+  btn.disabled = true;
+  btn.classList.add('enhancing');
   lbl.textContent = 'Enhancing…';
 
   try {
@@ -703,9 +727,10 @@ async function compilePrompt() {
 
   } catch (err) {
     showToast(err.message || 'Failed to enhance prompt', 'error');
+    lbl.textContent = getEnhanceLabel();
   } finally {
-    btn.disabled    = false;
-    lbl.textContent = 'AI Enhance';
+    btn.disabled = false;
+    btn.classList.remove('enhancing');
   }
 }
 
@@ -2636,18 +2661,17 @@ function flashEnhanceSuccess() {
   if (!btn) return;
 
   var prevIcon = icon ? icon.innerHTML : '';
-  var prevLbl  = lbl  ? lbl.textContent : 'Enhance';
 
   if (icon) icon.innerHTML =
-    '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M2 7L5.5 10.5L12 3.5"/>' +
     '</svg>';
   if (lbl) lbl.textContent = 'Done';
   btn.classList.add('ai-btn--done');
 
   setTimeout(function () {
     if (icon) icon.innerHTML = prevIcon;
-    if (lbl)  lbl.textContent = prevLbl;
+    if (lbl)  lbl.textContent = getEnhanceLabel();
     btn.classList.remove('ai-btn--done');
   }, 1600);
 }
@@ -2692,9 +2716,10 @@ function bindEvents() {
     });
   });
 
-  // Prompt char count
+  // Prompt char count + enhance chip label sync
   el('mf-prompt').addEventListener('input', function () {
     el('mf-char-count').textContent = this.value.length;
+    updateEnhanceLabel();
   });
 
   // Compile prompt

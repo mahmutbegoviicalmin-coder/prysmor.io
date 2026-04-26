@@ -8,13 +8,13 @@ import {
   ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "2.8.0";
+const PANEL_VERSION = "3.0.3";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.8.0/PrysmrSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.3/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v2.8.0/Prysmor-2.8.0.pkg";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.3/Prysmor-3.0.3.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -126,7 +126,7 @@ export default function DownloadsContent() {
         </h1>
         <p className="text-[14px] text-[#6B7280] leading-relaxed max-w-[560px]">
           Install the Prysmor CEP extension into Adobe Premiere Pro.
-          AI-powered VFX with Claude vision for intelligent prompt enhancement and automatic video optimisation — no configuration needed.
+          AI-powered background replacement, relighting, and VFX — with intelligent prompt enhancement and automatic video preprocessing. No configuration needed.
         </p>
       </div>
 
@@ -166,9 +166,9 @@ export default function DownloadsContent() {
 
             <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
               {[
-                "CEP panel installed automatically to correct Premiere Pro folder",
+                "CEP panel installed automatically to the correct Premiere Pro folder",
                 "ffmpeg bundled — auto-crops and scales wide videos before AI processing",
-                "Claude AI vision for intelligent scene analysis and prompt enhancement",
+                "AI prompt enhancement built-in — smarter results with one click",
                 "PlayerDebugMode set for CSXS.10, 11, 12, 13 automatically",
                 "CEP caches cleared — panel loads immediately on next Premiere launch",
                 "One-click setup — no configuration, no admin rights needed",
@@ -208,7 +208,7 @@ export default function DownloadsContent() {
 
             <a
               href={DOWNLOAD_MAC}
-              download="Prysmor-2.8.0.pkg"
+              download="Prysmor-3.0.3.pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
@@ -270,15 +270,15 @@ export default function DownloadsContent() {
               AI-powered VFX directly in Adobe Premiere Pro
             </p>
             <p className="text-[12px] text-[#6B7280] leading-relaxed mb-3">
-              The panel connects to Claude AI for intelligent prompt enhancement and Runway Gen-4 for
-              video-to-video AI generation — all from inside Premiere Pro. No extra software running
-              in the background, no startup services.
+              The panel brings AI background replacement, relighting, and VFX effects directly into
+              your Premiere Pro timeline — no extra software, no startup services, no configuration.
+              Just select a clip, describe the effect, and generate.
             </p>
             <div className="grid sm:grid-cols-3 gap-2">
               {[
-                ["Claude Vision", "Scene analysis & prompt enhancement"],
+                ["AI Enhance", "Smart prompt suggestions per mode"],
                 ["Auto Preprocessing", "ffmpeg crops wide video to 720p"],
-                ["Runway Gen-4", "Video-to-video AI generation"],
+                ["3 AI Modes", "Background, Relight, VFX"],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-[7px] bg-[#0D0D0F] border border-white/[0.05] px-3 py-2">
                   <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>
@@ -313,7 +313,7 @@ export default function DownloadsContent() {
         <Accordion title="Video too wide — generation blocked" icon={AlertTriangle}>
           <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
             {[
-              <>Runway Gen-4 requires a video width/height ratio of at most <strong className="text-[#D1D5DB]">2.358:1</strong>. The panel automatically detects and crops wide videos using bundled ffmpeg.</>,
+              <>The AI engine requires a video width/height ratio of at most <strong className="text-[#D1D5DB]">2.358:1</strong>. The panel automatically detects and crops wide videos using bundled ffmpeg.</>,
               <>If ffmpeg is not found (macOS without system ffmpeg), the panel will show an error. Install ffmpeg via Homebrew: <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">brew install ffmpeg</code></>,
               <>If the source clip is still blocked, export your Premiere sequence as a 1920×1080 H.264 file and generate from that file instead.</>,
             ].map((s, i) => (

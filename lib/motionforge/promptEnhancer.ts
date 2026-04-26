@@ -16,48 +16,56 @@ const TAG = 'promptEnhancer';
 // ─── Claude config ────────────────────────────────────────────────────────────
 
 const MODEL_TEXT = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 220;
+const MAX_TOKENS = 300; // Beeble prompts can be up to 60 words
 
 export const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 /**
- * The system prompt controls identity safety, realism, and output format.
- * It is intentionally strict to prevent common Runway generation failures
- * (distorted faces, warped anatomy, changed clothing).
+ * Mode-specific system prompts.
+ * background + relight → Beeble SwitchX (descriptive scene/lighting prompts).
+ * vfx → Runway Gen-4 Aleph (short action verb format).
  */
 // ─── Mode-specific system prompts ────────────────────────────────────────────
 
 const MODE_PROMPTS: Record<string, string> = {
-  background: `You are a Runway Gen-4 Aleph prompt writer.
-The user wants to change the background or environment of a video clip.
-Analyse the user intent and write a single Runway prompt.
+  background: `You are a Beeble SwitchX prompt writer for background replacement.
+Beeble SwitchX requires highly specific, descriptive prompts — NOT short action verbs.
+The user wants to replace the background/environment of a video clip.
 
-OUTPUT FORMAT (strict):
-"Replace the background with [3-5 word environment]. Keep the person unchanged."
+OUTPUT FORMAT:
+Write a detailed scene description with environment, lighting, atmosphere and mood.
+Example format: "A [location description], [lighting details], [atmosphere/mood details], [specific environmental props/elements]."
 
 Rules:
-- Always start with "Replace the background with"
-- Describe only the new environment in 3-5 words: location, time of day, weather, atmosphere
-- Never mention people, faces, clothing, or body in the transformation part
-- Always end with "Keep the person unchanged."
-- Max 15 words total
+- Be highly specific about the environment: location type, time of day, weather
+- Describe the lighting: direction, color temperature, intensity, shadows
+- Include atmospheric details: fog, particles, reflections, etc.
+- Describe specific props or environmental elements
+- Do NOT mention the subject/person at all
+- No action verbs like "replace", "change", "transform"
+- Just a rich descriptive scene — as if describing a movie set
+- Max 60 words
 - Plain text only. No quotes. No markdown.`,
 
-  relight: `You are a Runway Gen-4 Aleph prompt writer.
-The user wants to change the lighting or atmosphere of a video clip.
-Analyse the user intent and write a single Runway prompt.
+  relight: `You are a Beeble SwitchX prompt writer for relighting footage.
+Beeble SwitchX requires highly specific, descriptive prompts — NOT short action verbs.
+The user wants to change the lighting and atmosphere of a video clip.
 
-OUTPUT FORMAT (strict):
-"Change the lighting to [3-5 word description]. Keep everything else the same."
+OUTPUT FORMAT:
+Write a detailed lighting and mood description.
+Example format: "[Lighting setup description], [color temperature], [shadow quality], [mood/atmosphere], [specific light sources]."
 
 Rules:
-- Always start with "Change the lighting to"
-- Describe only: light quality, direction, color temperature, mood in 3-5 words
-- Never mention people, clothing or changing any subjects
-- Always end with "Keep everything else the same."
-- Max 12 words total
+- Be highly specific about: light direction, color temperature, intensity
+- Describe shadow quality: hard/soft, depth, direction
+- Include color grading mood: warm/cool, contrast, saturation
+- Mention specific light sources if relevant: golden sun, neon signs, fire, etc.
+- Do NOT mention changing the background or scene elements
+- No action verbs like "relight", "change", "transform"
+- Just a rich descriptive lighting atmosphere
+- Max 50 words
 - Plain text only. No quotes. No markdown.`,
 
   vfx: `You are a Runway Gen-4 Aleph prompt writer for visual effects.
@@ -106,8 +114,8 @@ const TRANSFORMATION_VERBS = /\b(replace|change|make it|turn into|convert|transf
 
 /**
  * Mode-aware rule-based fallback. Activated only when Claude is unavailable.
- * Mirrors the output format of each mode's system prompt so the result is
- * structurally consistent with what Claude would have produced.
+ * background/relight (Beeble): pass cleaned prompt through as-is — descriptive format.
+ * vfx (Runway): wrap in Runway's short action format.
  */
 export function fallbackEnhance(userPrompt: string, mode?: string): string {
   const cleaned = userPrompt
@@ -116,17 +124,17 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
     .trim();
 
   const body = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  const stmt = body.endsWith('.') ? body.slice(0, -1) : body;
+  const stmt = body.endsWith('.') ? body : body + '.';
 
   switch (mode) {
     case 'background':
-      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person unchanged.`;
+      return stmt;
     case 'relight':
-      return `Change the lighting to ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep everything else the same.`;
+      return stmt;
     case 'vfx':
-      return `Add ${stmt.charAt(0).toLowerCase() + stmt.slice(1)} to the scene. Keep all people unchanged.`;
+      return `Add ${cleaned.charAt(0).toLowerCase() + cleaned.slice(1)} to the scene. Keep all people unchanged.`;
     default:
-      return `Replace the background with ${stmt.charAt(0).toLowerCase() + stmt.slice(1)}. Keep the person unchanged.`;
+      return stmt;
   }
 }
 
