@@ -3,7 +3,8 @@
 import { useUser, SignIn } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
-import { Sparkles, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import Image from "next/image";
 
 function PanelAuthContent() {
   const { user, isLoaded } = useUser();
@@ -47,18 +48,13 @@ function PanelAuthContent() {
       {/* Background glow */}
       <div
         className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full blur-[120px] opacity-20"
-        style={{ background: "radial-gradient(ellipse, #A3FF12 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse, #39FF6A 0%, transparent 70%)" }}
       />
 
       <div className="relative w-full max-w-[400px]">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div
-            className="w-8 h-8 rounded-[10px] flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #A3FF12 0%, #22FFB0 100%)" }}
-          >
-            <Sparkles className="w-4 h-4 text-[#050505]" />
-          </div>
+          <Image src="/logo/logo-icon.png" alt="Prysmor" width={32} height={32} className="rounded-[8px]" />
           <span className="text-[18px] font-semibold text-white tracking-tight">Prysmor</span>
         </div>
 
@@ -74,7 +70,7 @@ function PanelAuthContent() {
                 variables: {
                   colorBackground: "#111113",
                   colorText: "#F9FAFB",
-                  colorPrimary: "#A3FF12",
+                  colorPrimary: "#39FF6A",
                   colorInputBackground: "#1A1A1C",
                   colorInputText: "#F9FAFB",
                   borderRadius: "10px",
@@ -83,17 +79,17 @@ function PanelAuthContent() {
                   card: "border border-white/[0.07] shadow-none",
                   headerTitle: "text-white",
                   headerSubtitle: "text-[#6B7280]",
-                  formButtonPrimary: "bg-[#A3FF12] text-[#050505] hover:bg-[#B6FF3C] font-semibold",
-                  footerActionLink: "text-[#A3FF12] hover:text-[#B6FF3C]",
+                  formButtonPrimary: "bg-[#39FF6A] text-[#050505] hover:bg-[#4fff7e] font-semibold",
+                  footerActionLink: "text-[#39FF6A] hover:text-[#4fff7e]",
                 },
               }}
             />
           </div>
         ) : status === "success" ? (
           /* ── Success ── */
-          <div className="rounded-[18px] border border-[#A3FF12]/20 bg-[#111113] p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-[#A3FF12]/[0.08] border border-[#A3FF12]/20 flex items-center justify-center mx-auto mb-5">
-              <CheckCircle2 className="w-7 h-7 text-[#A3FF12]" />
+          <div className="rounded-[18px] border border-[#39FF6A]/20 bg-[#111113] p-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#39FF6A]/[0.08] border border-[#39FF6A]/20 flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="w-7 h-7 text-[#39FF6A]" />
             </div>
             <h2 className="text-[20px] font-semibold text-white mb-2">Panel authorized!</h2>
             <p className="text-[13px] text-[#6B7280] leading-relaxed">
@@ -111,7 +107,7 @@ function PanelAuthContent() {
             <p className="text-[13px] text-red-400 mb-5">{errorMsg}</p>
             <button
               onClick={() => { setStatus("idle"); setErrorMsg(""); }}
-              className="text-[13px] text-[#A3FF12] hover:underline"
+              className="text-[13px] text-[#39FF6A] hover:underline"
             >
               Try again
             </button>
@@ -122,8 +118,8 @@ function PanelAuthContent() {
             {/* Code display */}
             {code && (
               <div className="flex items-center justify-center mb-6">
-                <div className="rounded-[10px] border border-[#A3FF12]/20 bg-[#A3FF12]/[0.05] px-5 py-2.5">
-                  <span className="font-mono text-[22px] font-bold text-[#A3FF12] tracking-[0.2em]">
+                <div className="rounded-[10px] border border-[#39FF6A]/20 bg-[#39FF6A]/[0.05] px-5 py-2.5">
+                  <span className="font-mono text-[22px] font-bold text-[#39FF6A] tracking-[0.2em]">
                     {code}
                   </span>
                 </div>
@@ -145,13 +141,11 @@ function PanelAuthContent() {
             <button
               onClick={handleAuthorize}
               disabled={status === "loading" || !code}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-[10px] bg-[#A3FF12] text-[#050505] text-[14px] font-bold hover:bg-[#B6FF3C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-[10px] bg-[#39FF6A] text-[#050505] text-[14px] font-bold hover:bg-[#4fff7e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === "loading" ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
+              ) : null}
               {status === "loading" ? "Authorizing…" : "Authorize Panel"}
             </button>
 
