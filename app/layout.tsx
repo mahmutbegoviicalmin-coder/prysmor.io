@@ -122,7 +122,11 @@ const clerkAppearance = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={clerkAppearance}>
+    <ClerkProvider
+      afterSignInUrl="https://prysmor.io/dashboard"
+      afterSignUpUrl="https://prysmor.io/dashboard"
+      appearance={clerkAppearance}
+    >
       <html lang="en" className={outfit.variable}>
         <body className="bg-background text-ink antialiased">
           <ConditionalShell>{children}</ConditionalShell>
