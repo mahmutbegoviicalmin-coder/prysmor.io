@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.NODE_ENV === "development"
       ? "http://localhost:3000"
-      : "https://prysmor.com");
+      : "https://prysmor.io");
 
   return new NextResponse(
     JSON.stringify({ deviceCode: code, pairingUrl: `${base}/panel-auth?code=${code}`, expiresIn: 300 }),
