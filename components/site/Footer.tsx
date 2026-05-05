@@ -64,7 +64,7 @@ export default function Footer() {
 
             <p style={{
               fontSize: "13px",
-              color: "#555",
+              color: "#777",
               fontWeight: 300,
               marginTop: "14px",
               lineHeight: 1.6,
@@ -77,13 +77,13 @@ export default function Footer() {
               style={{
                 display: "block",
                 fontSize: "12px",
-                color: "#444",
+                color: "#666",
                 marginTop: "16px",
                 textDecoration: "none",
                 transition: "color 200ms",
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#39FF6A"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#444"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#666"; }}
             >
               support@prysmor.io
             </a>
@@ -129,37 +129,37 @@ export default function Footer() {
           {/* Nav columns */}
           {Object.entries(footerLinks).map(([group, items]) => (
             <div key={group}>
-              <p style={{
-                fontSize: "10px",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "2px",
-                color: "#444",
-                marginBottom: "18px",
-              }}>
-                {group}
-              </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {items.map((item) => (
-                  <li key={item.label}>
-                    <Link
-                      href={item.href}
-                      style={{
-                        fontSize: "13px",
-                        color: "#555",
-                        fontWeight: 300,
-                        display: "block",
-                        padding: "5px 0",
-                        textDecoration: "none",
-                        transition: "color 200ms",
-                      }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#aaa"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#555"; }}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+            <p style={{
+              fontSize: "10px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "2px",
+              color: "#666",
+              marginBottom: "18px",
+            }}>
+              {group}
+            </p>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {items.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    style={{
+                      fontSize: "13px",
+                      color: "#999",
+                      fontWeight: 300,
+                      display: "block",
+                      padding: "5px 0",
+                      textDecoration: "none",
+                      transition: "color 200ms",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "white"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#999"; }}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
               </ul>
             </div>
           ))}
@@ -175,10 +175,10 @@ export default function Footer() {
             gap: "8px",
           }}
         >
-          <p style={{ fontSize: "12px", color: "#3a3a3a" }}>
+          <p style={{ fontSize: "12px", color: "#555" }}>
             © {new Date().getFullYear()} Prysmor. All rights reserved.
           </p>
-          <p style={{ fontSize: "12px", color: "#3a3a3a" }}>
+          <p style={{ fontSize: "12px", color: "#555" }}>
             Built for creators who ship.
           </p>
         </div>

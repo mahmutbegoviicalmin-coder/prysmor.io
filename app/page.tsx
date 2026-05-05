@@ -811,8 +811,15 @@ export default function PrysmorPage() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, ease: "easeOut", delay: 0.66 }}
-            className="flex items-center justify-center flex-wrap"
-            style={{ marginTop: "64px" }}
+            style={{
+              marginTop: "64px",
+              display: "grid",
+              gridTemplateColumns: "1fr 1px 1fr 1px 1fr",
+              alignItems: "center",
+              width: "100%",
+              maxWidth: "480px",
+              margin: "64px auto 0",
+            }}
           >
             {heroStats.map(({ value, label }, idx) => (
               <Fragment key={value}>
@@ -821,28 +828,29 @@ export default function PrysmorPage() {
                     width: "1px",
                     height: "32px",
                     background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.07), transparent)",
-                    flexShrink: 0,
-                    alignSelf: "center",
-                    margin: "0 8px",
+                    justifySelf: "center",
                   }} />
                 )}
-                <div className="flex flex-col items-center" style={{ padding: "0 24px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 8px" }}>
                   <span style={{
-                    fontSize: "22px",
+                    fontSize: "clamp(16px, 4vw, 22px)",
                     fontWeight: 700,
                     color: "white",
                     letterSpacing: "-0.8px",
                     lineHeight: 1,
+                    whiteSpace: "nowrap",
                   }}>
                     {value}
                   </span>
                   <span style={{
-                    fontSize: "9px",
+                    fontSize: "clamp(7px, 1.8vw, 9px)",
                     fontWeight: 500,
                     color: "#333",
                     textTransform: "uppercase",
-                    letterSpacing: "1.6px",
+                    letterSpacing: "1.4px",
                     marginTop: "6px",
+                    whiteSpace: "nowrap",
+                    textAlign: "center",
                   }}>
                     {label}
                   </span>

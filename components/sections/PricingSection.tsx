@@ -76,8 +76,11 @@ export default function PricingSection({
 
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent) => {
     e.preventDefault();
-    const userId = user?.id ?? "";
-    const url = `${baseUrl}?embed=1&dark=1${userId ? `&checkout[custom][user_id]=${userId}` : ""}`;
+    if (!user) {
+      window.location.href = `/sign-in?redirect_url=${encodeURIComponent("/pricing")}`;
+      return;
+    }
+    const url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
     if (window.LemonSqueezy?.Url?.Open) {
       window.LemonSqueezy.Url.Open(url);
     } else if (window.createLemonSqueezy) {
@@ -86,7 +89,7 @@ export default function PricingSection({
     } else {
       window.location.href = url;
     }
-  }, [user?.id]);
+  }, [user]);
 
   return (
     <section
