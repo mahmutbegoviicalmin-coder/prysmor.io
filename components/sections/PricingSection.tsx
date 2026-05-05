@@ -77,7 +77,7 @@ export default function PricingSection({
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) {
-      window.location.href = `/sign-in?redirect_url=${encodeURIComponent("/pricing")}`;
+      window.location.href = "/sign-in?redirect_url=/pricing";
       return;
     }
     const url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;

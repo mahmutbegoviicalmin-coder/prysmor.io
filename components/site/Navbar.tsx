@@ -27,8 +27,8 @@ export default function Navbar() {
   const { isSignedIn } = useAuth();
   const { openSignIn, openSignUp } = useClerk();
 
-  const handleSignIn = () => openSignIn({ afterSignInUrl: "https://prysmor.io/dashboard" });
-  const handleSignUp = () => openSignUp({ afterSignUpUrl: "https://prysmor.io/dashboard" });
+  const handleSignIn = () => openSignIn({ afterSignInUrl: "/dashboard" });
+  const handleSignUp = () => openSignUp({ afterSignUpUrl: "/dashboard" });
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
