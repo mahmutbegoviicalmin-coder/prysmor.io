@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useUser } from '@clerk/nextjs';
 import {
   Users, Zap, AlertCircle, Search, ChevronDown,
   RefreshCw, X, Check, Loader2, Edit2, CreditCard, ShieldOff,
@@ -194,10 +195,11 @@ function StatCard({
 
 // ─── Plan Modal ───────────────────────────────────────────────────────────────
 
-function PlanModal({ user, onClose, onSave }: {
+function PlanModal({ user, onClose, onSave, isSelf }: {
   user: AdminUser;
   onClose: () => void;
   onSave: (u: AdminUser) => void;
+  isSelf?: boolean;
 }) {
   const [plan,         setPlan]         = useState(user.plan);
   const [status,       setStatus]       = useState(user.licenseStatus);
@@ -288,12 +290,19 @@ function PlanModal({ user, onClose, onSave }: {
 
       {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
 
+      {isSelf && (
+        <div className="mb-3 flex items-center gap-2 rounded-[8px] border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2.5">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <p className="text-[11px] text-amber-400">You cannot change your own plan from the admin panel.</p>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button onClick={onClose} className="flex-1 py-2 rounded-[8px] border border-white/[0.08] text-[12px] text-[#6B7280] hover:text-white transition-colors">Cancel</button>
         <button
           onClick={save}
-          disabled={loading}
-          className="flex-1 py-2 rounded-[8px] bg-[#A3FF12] text-[#050505] text-[12px] font-semibold hover:bg-[#B6FF3C] transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
+          disabled={loading || isSelf}
+          className="flex-1 py-2 rounded-[8px] bg-[#A3FF12] text-[#050505] text-[12px] font-semibold hover:bg-[#B6FF3C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
         >
           {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
           {loading ? 'Saving…' : 'Save'}
@@ -845,6 +854,9 @@ function RevenueSection() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AdminPanel() {
+  const { user: clerkUser } = useUser();
+  const currentUserId = clerkUser?.id ?? '';
+
   const [users,         setUsers]         = useState<AdminUser[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [search,        setSearch]        = useState('');
@@ -1269,6 +1281,7 @@ export function AdminPanel() {
           user={modal.user}
           onClose={() => setModal(null)}
           onSave={(u) => { updateUser(u); setModal(null); }}
+          isSelf={modal.user.id === currentUserId}
         />
       )}
       {modal?.type === 'credits' && (

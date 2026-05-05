@@ -35,6 +35,12 @@ export async function PATCH(
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
+  // Prevent admin from modifying their own account via admin panel
+  const self = await currentUser();
+  if (self?.id === params.id && body.action === 'set_plan') {
+    return NextResponse.json({ error: 'You cannot change your own plan via the admin panel.' }, { status: 403 });
+  }
+
   const ref = db.collection('users').doc(params.id);
   const doc = await ref.get();
   if (!doc.exists) {
