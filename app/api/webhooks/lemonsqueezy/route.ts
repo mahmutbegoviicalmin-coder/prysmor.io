@@ -116,11 +116,25 @@ export async function POST(req: NextRequest) {
     ?? ''
   );
   const subscriptionId = String(data?.id ?? '');
-  const plan           = VARIANT_TO_PLAN[variantId] ?? 'starter';
+  const isMapped       = variantId in VARIANT_TO_PLAN;
   const renewsAt       = attrs?.renews_at as string | undefined;
 
   // Log variant ID to help debug plan mapping issues
-  console.log(`[ls-webhook] variantId="${variantId}" → plan="${plan}" (mapped=${variantId in VARIANT_TO_PLAN})`);
+  console.log(`[ls-webhook] variantId="${variantId}" → mapped=${isMapped}`);
+
+  // If variant is unknown, resolve plan from existing Firestore doc to avoid
+  // incorrectly downgrading the user to 'starter' (e.g. subscription_payment_success
+  // events sometimes arrive without a variant_id on attrs).
+  let plan: string;
+  if (isMapped) {
+    plan = VARIANT_TO_PLAN[variantId];
+  } else {
+    const existingDoc = await db.collection('users').doc(userId).get();
+    plan = (existingDoc.exists ? (existingDoc.data()?.plan as string) : undefined) ?? 'starter';
+    console.log(`[ls-webhook] variantId unknown — using existing plan="${plan}" for userId=${userId}`);
+  }
+
+  console.log(`[ls-webhook] resolved plan="${plan}" for event=${eventName}`);
 
   try {
     switch (eventName) {

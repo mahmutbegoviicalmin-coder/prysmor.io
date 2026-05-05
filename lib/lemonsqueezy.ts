@@ -86,7 +86,7 @@ function lsHeaders() {
  * Embeds userId in custom_data so the webhook can map the payment to a user.
  */
 export async function createCheckout(variantId: string, userId: string, overrideRedirect?: string): Promise<string> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor-io.vercel.app';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
   const redirectUrl = overrideRedirect ?? `${appUrl}/dashboard/billing?upgraded=true`;
 
   const res = await fetch(`${LS_API_BASE}/v1/checkouts`, {
@@ -133,7 +133,7 @@ export async function createCheckout(variantId: string, userId: string, override
  * No API call needed — just constructs the URL with query parameters.
  */
 export function createTopUpCheckout(pack: CreditPack, userId: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor-io.vercel.app';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
   const base   = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${pack.checkoutUuid}`;
   // Build query string manually — URLSearchParams encodes brackets (%5B%5D) which
   // LemonSqueezy does not recognise. We need literal brackets for custom_data to
