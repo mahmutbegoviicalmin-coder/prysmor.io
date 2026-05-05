@@ -29,8 +29,7 @@ export default function FeatureGrid({
 }: FeatureGridProps) {
   return (
     <section className="relative py-24 overflow-hidden">
-      {/* haze */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.06]" />
       <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -39,11 +38,11 @@ export default function FeatureGrid({
           transition={{ duration: 0.5 }}
           className="mb-12"
         >
-          <h2 className="font-heading text-[28px] sm:text-[36px] font-bold text-white tracking-tight">
+          <h2 className="font-heading text-[32px] sm:text-[42px] font-bold text-white tracking-[-0.03em]">
             {title}
           </h2>
           {subtitle && (
-            <p className="mt-2.5 text-ink-muted text-[15px] max-w-lg">{subtitle}</p>
+            <p className="mt-3 text-ink-muted text-[15px] max-w-lg font-light">{subtitle}</p>
           )}
         </motion.div>
 
@@ -62,22 +61,13 @@ export default function FeatureGrid({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.45, delay: i * 0.07, ease }}
-                whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                className="group rounded-[18px] border border-white/[0.07] bg-surface p-6 hover:border-white/[0.13] hover:shadow-card-hover transition-shadow duration-300"
+                className="group rounded-[14px] border border-white/[0.07] bg-surface p-6 hover:border-white/[0.12] transition-colors duration-200"
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 border"
-                  style={{
-                    background: `rgba(163,255,18,0.07)`,
-                    borderColor: `rgba(163,255,18,0.20)`,
-                  }}
-                >
-                  <Icon className="w-5 h-5" style={{ color: accentColor }} />
+                <div className="w-10 h-10 rounded-[10px] flex items-center justify-center mb-4 border border-white/[0.09] bg-white/[0.04]">
+                  <Icon className="w-5 h-5 text-accent" />
                 </div>
-                <h3 className="font-heading text-[15px] font-semibold text-white mb-2">
-                  {f.title}
-                </h3>
-                <p className="text-[13px] text-ink-muted leading-relaxed">{f.desc}</p>
+                <h3 className="font-heading text-[15px] font-bold text-white mb-2">{f.title}</h3>
+                <p className="text-[13px] text-ink-muted leading-relaxed font-light">{f.desc}</p>
               </motion.div>
             );
           })}

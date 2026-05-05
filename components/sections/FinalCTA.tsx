@@ -1,75 +1,136 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface FinalCTAProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   primaryLabel?: string;
   primaryHref?: string;
   onPrimaryClick?: () => void;
-  secondaryLabel?: string;
-  secondaryHref?: string;
 }
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const GREEN = "#39FF6A";
 
 export default function FinalCTA({
-  title,
-  subtitle,
   primaryLabel = "Get Started",
-  primaryHref = "/sign-up",
   onPrimaryClick,
-  secondaryLabel,
-  secondaryHref = "/pricing",
 }: FinalCTAProps) {
   return (
-    <section className="relative py-28 overflow-hidden">
+    <section
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        padding: "120px 40px",
+        borderTop: "1px solid #0f0f0f",
+        background: [
+          "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(57,255,106,0.08) 0%, rgba(57,255,106,0.02) 40%, transparent 70%)",
+          "#080808",
+        ].join(", "),
+        textAlign: "center",
+      }}
+    >
+      {/* Grid lines */}
       <div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[700px] h-[400px] rounded-full blur-[120px]"
-        style={{ background: "radial-gradient(ellipse,rgba(163,255,18,0.09) 0%,transparent 65%)" }}
         aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: [
+            "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)",
+            "linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+          ].join(", "),
+          backgroundSize: "80px 80px",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
       />
-      <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8 text-center relative">
+
+      {/* Edge fade */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: [
+            "linear-gradient(to right, #080808 0%, transparent 20%, transparent 80%, #080808 100%)",
+            "linear-gradient(to bottom, #080808 0%, transparent 20%, transparent 80%, #080808 100%)",
+          ].join(", "),
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+
+      {/* Content */}
+      <div style={{ position: "relative", zIndex: 10 }}>
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, ease }}
-          className="flex flex-col items-center gap-6"
+          className="flex flex-col items-center"
         >
-          <h2 className="font-heading text-[36px] sm:text-[50px] lg:text-[58px] font-bold tracking-tight leading-[1.07]">
-            <span className="text-white">{title.split("today")[0]}</span>
-            {title.includes("today") && (
-              <span className="text-gradient-lime">today.</span>
-            )}
+          <h2
+            style={{
+              fontSize: "clamp(40px, 5.5vw, 72px)",
+              fontWeight: 800,
+              letterSpacing: "-2.5px",
+              lineHeight: 1.05,
+              textAlign: "center",
+              margin: 0,
+            }}
+          >
+            <span style={{ color: "white", display: "block" }}>
+              Stop hiring VFX artists.
+            </span>
+            <span style={{ color: GREEN, display: "block" }}>
+              Start typing.
+            </span>
           </h2>
-          {subtitle && (
-            <p className="text-ink-muted text-[15px] max-w-sm">{subtitle}</p>
-          )}
-          <div className="flex flex-wrap justify-center gap-3">
-            {onPrimaryClick ? (
-              <Button size="lg" onClick={onPrimaryClick}>
-                {primaryLabel}
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button size="lg" asChild>
-                <Link href={primaryHref}>
-                  {primaryLabel}
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </Button>
-            )}
-            {secondaryLabel && (
-              <Button size="lg" variant="outline" asChild>
-                <Link href={secondaryHref}>{secondaryLabel}</Link>
-              </Button>
-            )}
-          </div>
+
+          {onPrimaryClick ? (
+            <button
+              onClick={onPrimaryClick}
+              style={{
+                background: GREEN,
+                color: "#000",
+                borderRadius: "8px",
+                padding: "14px 36px",
+                fontSize: "15px",
+                fontWeight: 700,
+                border: "none",
+                cursor: "pointer",
+                marginTop: "36px",
+                boxShadow: "0 0 40px rgba(57,255,106,0.25)",
+                transition: "box-shadow 200ms, transform 200ms",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.boxShadow = "0 0 60px rgba(57,255,106,0.4)";
+                el.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.boxShadow = "0 0 40px rgba(57,255,106,0.25)";
+                el.style.transform = "translateY(0)";
+              }}
+            >
+              {primaryLabel} →
+            </button>
+          ) : null}
+
+          <p style={{
+            fontSize: "12px",
+            color: "#2a2a2a",
+            marginTop: "14px",
+            fontWeight: 300,
+          }}>
+            7-day money-back guarantee · Cancel anytime
+          </p>
         </motion.div>
       </div>
     </section>

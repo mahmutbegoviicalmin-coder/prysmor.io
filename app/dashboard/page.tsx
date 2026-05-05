@@ -7,21 +7,46 @@ import {
 } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";
 
-export const dynamic  = 'force-dynamic';
+export const dynamic  = "force-dynamic";
 export const metadata = { title: "Overview — Dashboard" };
+
+const GREEN = "#39FF6A";
 
 /* ─── primitives ─── */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">
+    <p
+      style={{
+        fontSize: "10px",
+        fontWeight: 600,
+        textTransform: "uppercase" as const,
+        letterSpacing: "2px",
+        color: "#333",
+        marginBottom: "16px",
+      }}
+    >
       {children}
     </p>
   );
 }
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Card({
+  children,
+  style = {},
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
-    <div className={`rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 ${className}`}>
+    <div
+      style={{
+        background: "#0c0c0c",
+        border: "1px solid #161616",
+        borderRadius: "12px",
+        padding: "24px",
+        ...style,
+      }}
+    >
       {children}
     </div>
   );
@@ -29,12 +54,29 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 function StatusPill({ active, label }: { active: boolean; label: string }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${
-      active
-        ? "text-[#A3FF12] border-[#A3FF12]/20 bg-[#A3FF12]/[0.07]"
-        : "text-[#6B7280] border-white/[0.08] bg-white/[0.03]"
-    }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[#A3FF12]" : "bg-[#4B5563]"}`} />
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        fontSize: "11px",
+        fontWeight: 500,
+        padding: "3px 10px",
+        borderRadius: "100px",
+        background: active ? "rgba(57,255,106,0.08)" : "rgba(255,255,255,0.04)",
+        border: active ? "1px solid rgba(57,255,106,0.2)" : "1px solid #1e1e1e",
+        color: active ? GREEN : "#444",
+      }}
+    >
+      <span
+        style={{
+          width: "5px",
+          height: "5px",
+          borderRadius: "50%",
+          background: active ? GREEN : "#333",
+          flexShrink: 0,
+        }}
+      />
       {label}
     </span>
   );
@@ -42,9 +84,17 @@ function StatusPill({ active, label }: { active: boolean; label: string }) {
 
 function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-0">
-      <span className="text-[12px] text-[#6B7280]">{label}</span>
-      <span className="text-[12px] font-medium text-[#D1D5DB]">{value}</span>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 0",
+        borderBottom: "1px solid #111",
+      }}
+    >
+      <span style={{ fontSize: "13px", color: "#444", fontWeight: 300 }}>{label}</span>
+      <span style={{ fontSize: "13px", color: "#888", fontWeight: 400 }}>{value}</span>
     </div>
   );
 }
@@ -59,7 +109,6 @@ export default async function DashboardOverviewPage() {
     data = await getDashboardData(user.id, user);
   } catch (err) {
     console.error("[dashboard] getDashboardData failed:", err);
-    // Fallback data when Firebase is unavailable
     data = {
       license: { planName: "Starter", status: "active" as const, renewalDate: "—", lastVerifiedAt: "—" },
       panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
@@ -68,6 +117,7 @@ export default async function DashboardOverviewPage() {
       activity: [],
     };
   }
+
   const { license, panel, limits, security, activity } = data;
   const pct = limits.creditsTotal > 0
     ? Math.min(100, Math.round((limits.credits / limits.creditsTotal) * 100))
@@ -75,206 +125,373 @@ export default async function DashboardOverviewPage() {
   const creditSeconds = Math.floor(limits.credits / 4);
 
   return (
-    <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[1100px]">
+    <div
+      style={{
+        padding: "40px 24px",
+        maxWidth: "1100px",
+        fontFamily: "var(--font-outfit), system-ui, sans-serif",
+      }}
+      className="lg:px-10 lg:py-10"
+    >
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-[28px] sm:text-[34px] font-semibold text-white tracking-tight leading-tight mb-1.5">
+      <div style={{ marginBottom: "40px" }}>
+        <h1
+          style={{
+            fontSize: "clamp(24px, 3vw, 28px)",
+            fontWeight: 700,
+            color: "white",
+            letterSpacing: "-1px",
+            lineHeight: 1.15,
+            margin: "0 0 8px 0",
+          }}
+        >
           Account Overview
         </h1>
-        <p className="text-[14px] text-[#6B7280] leading-relaxed">
+        <p style={{ fontSize: "14px", color: "#555", fontWeight: 300, margin: 0, lineHeight: 1.6 }}>
           Manage your license, panel access, devices, and billing.
         </p>
       </div>
 
       {/* ── No plan banner ── */}
       {license.status !== "active" && (
-        <div className="mb-8 rounded-[14px] border border-[#A3FF12]/20 bg-gradient-to-r from-[#A3FF12]/[0.06] to-transparent p-5 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-[10px] bg-[#A3FF12]/10 border border-[#A3FF12]/20 flex items-center justify-center flex-shrink-0">
-              <Lock className="w-5 h-5 text-[#A3FF12]" />
+        <div
+          style={{
+            marginBottom: "40px",
+            borderRadius: "14px",
+            border: `1px solid rgba(57,255,106,0.2)`,
+            background: "linear-gradient(to right, rgba(57,255,106,0.05), transparent)",
+            padding: "20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            flexWrap: "wrap" as const,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                background: "rgba(57,255,106,0.1)",
+                border: "1px solid rgba(57,255,106,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Lock style={{ width: "18px", height: "18px", color: GREEN }} />
             </div>
             <div>
-              <p className="text-[15px] font-semibold text-white mb-0.5">
+              <p style={{ fontSize: "15px", fontWeight: 600, color: "white", margin: "0 0 4px 0" }}>
                 Activate your plan to get started
               </p>
-              <p className="text-[13px] text-[#6B7280] max-w-[420px] leading-relaxed">
-                Subscribe to unlock the Prysmor Premiere panel, AI VFX generation, and Identity Lock. No device connected until you have an active plan.
+              <p style={{ fontSize: "13px", color: "#555", maxWidth: "420px", lineHeight: 1.6, margin: 0 }}>
+                Subscribe to unlock the Prysmor Premiere panel, AI VFX generation, and Identity Lock.
               </p>
             </div>
           </div>
           <Link
             href="/#pricing"
-            className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors whitespace-nowrap"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              background: GREEN,
+              color: "#000",
+              fontSize: "13px",
+              fontWeight: 700,
+              textDecoration: "none",
+              flexShrink: 0,
+              whiteSpace: "nowrap" as const,
+            }}
           >
-            <Zap className="w-4 h-4" />
+            <Zap style={{ width: "16px", height: "16px" }} />
             Buy a plan
           </Link>
         </div>
       )}
 
-      {/* ── Primary row ── */}
+      {/* ── STATUS ROW ── */}
       <SectionLabel>Status</SectionLabel>
-      <div className="grid lg:grid-cols-3 gap-4 mb-8">
-
+      <div
+        className="grid lg:grid-cols-3"
+        style={{ gap: "12px", marginBottom: "40px" }}
+      >
         {/* License */}
         <Card>
-          <div className="flex items-start justify-between mb-4">
-            <p className="text-[13px] font-medium text-[#9CA3AF]">License</p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
+            <p style={{ fontSize: "12px", color: "#444", textTransform: "uppercase" as const, letterSpacing: "1px", margin: 0 }}>
+              License
+            </p>
             <StatusPill active={license.status === "active"} label={license.status === "active" ? "Active" : "Inactive"} />
           </div>
-          <p className="text-[20px] font-semibold text-white mb-4">{license.planName}</p>
-          <div className="space-y-0">
+          <p
+            style={{
+              fontSize: "22px",
+              fontWeight: 700,
+              color: "white",
+              letterSpacing: "-0.5px",
+              margin: "0 0 16px 0",
+            }}
+          >
+            {license.planName}
+          </p>
+          <div>
             <DataRow label="Renewal date" value={license.renewalDate} />
-            <DataRow label="Last verified"
+            <DataRow
+              label="Last verified"
               value={
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3 h-3 text-[#A3FF12]" />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <CheckCircle2 style={{ width: "12px", height: "12px", color: GREEN }} />
                   {license.lastVerifiedAt}
                 </span>
               }
             />
           </div>
-          <Link href="/dashboard/billing"
-            className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#A3FF12] hover:underline underline-offset-2">
-            View billing <ChevronRight className="w-3 h-3" />
+          <Link
+            href="/dashboard/billing"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              marginTop: "16px",
+              fontSize: "13px",
+              color: GREEN,
+              textDecoration: "none",
+            }}
+          >
+            View billing <ChevronRight style={{ width: "12px", height: "12px" }} />
           </Link>
         </Card>
 
         {/* Panel */}
         <Card>
-          <div className="flex items-start justify-between mb-4">
-            <p className="text-[13px] font-medium text-[#9CA3AF]">Premiere Panel</p>
-            {panel.connected
-              ? <StatusPill active label="Connected" />
-              : <StatusPill active={false} label="Not connected" />
-            }
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
+            <p style={{ fontSize: "12px", color: "#444", textTransform: "uppercase" as const, letterSpacing: "1px", margin: 0 }}>
+              Premiere Panel
+            </p>
+            <StatusPill active={panel.connected} label={panel.connected ? "Connected" : "Not connected"} />
           </div>
-          <div className="flex items-center gap-2 mb-4">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
             {panel.connected
-              ? <Wifi className="w-4 h-4 text-[#A3FF12] flex-shrink-0" />
-              : <WifiOff className="w-4 h-4 text-[#4B5563] flex-shrink-0" />
+              ? <Wifi style={{ width: "16px", height: "16px", color: GREEN, flexShrink: 0 }} />
+              : <WifiOff style={{ width: "16px", height: "16px", color: "#333", flexShrink: 0 }} />
             }
-            <p className="text-[14px] font-medium text-white truncate">{panel.deviceName}</p>
+            <p style={{ fontSize: "14px", fontWeight: 500, color: "white", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+              {panel.deviceName}
+            </p>
           </div>
-          <div className="space-y-0">
-            <DataRow label="Host app"     value={panel.hostApp !== "—" ? `${panel.hostApp} ${panel.hostAppVersion}`.trim() : "—"} />
-            <DataRow label="Platform"     value={panel.platform} />
-            <DataRow label="CEP version"  value={panel.cepVersion} />
+          <div>
+            <DataRow label="Host app"        value={panel.hostApp !== "—" ? `${panel.hostApp} ${panel.hostAppVersion}`.trim() : "—"} />
+            <DataRow label="Platform"        value={panel.platform} />
+            <DataRow label="CEP version"     value={panel.cepVersion} />
             <DataRow label="First connected" value={panel.firstConnectedAt} />
-            <DataRow label="Last active"  value={panel.lastActiveAt} />
+            <DataRow label="Last active"     value={panel.lastActiveAt} />
           </div>
-          <Link href="/dashboard/downloads"
-            className="mt-4 inline-flex items-center justify-center w-full gap-2 px-4 py-2 rounded-[8px] bg-[#A3FF12] text-[#050505] text-[12px] font-semibold hover:bg-[#B6FF3C] transition-colors">
+          <Link
+            href="/dashboard/downloads"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              marginTop: "16px",
+              padding: "12px",
+              borderRadius: "8px",
+              background: GREEN,
+              color: "#000",
+              fontSize: "13px",
+              fontWeight: 700,
+              textDecoration: "none",
+              textAlign: "center" as const,
+            }}
+          >
             {panel.connected ? "Manage Panel" : "Download Plugin"}
           </Link>
         </Card>
 
         {/* Credits */}
         <Card>
-          <div className="flex items-start justify-between mb-4">
-            <p className="text-[13px] font-medium text-[#9CA3AF]">Credits</p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
+            <p style={{ fontSize: "12px", color: "#444", textTransform: "uppercase" as const, letterSpacing: "1px", margin: 0 }}>
+              Credits
+            </p>
             {license.status === "active"
-              ? <span className="text-[11px] text-[#6B7280]">This cycle</span>
-              : <span className="inline-flex items-center gap-1 text-[11px] text-[#374151]">
-                  <Lock className="w-3 h-3" /> Inactive
+              ? <span style={{ fontSize: "11px", color: "#444" }}>This cycle</span>
+              : <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#333" }}>
+                  <Lock style={{ width: "11px", height: "11px" }} /> Inactive
                 </span>
             }
           </div>
 
           {license.status !== "active" ? (
-            /* ── Locked state ── */
-            <div className="flex flex-col items-center justify-center py-5 gap-2 mb-4">
-              <div className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center mb-1">
-                <Lock className="w-4 h-4 text-[#374151]" />
+            <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", padding: "20px 0", gap: "8px", marginBottom: "16px" }}>
+              <div
+                style={{
+                  width: "36px", height: "36px", borderRadius: "50%",
+                  background: "rgba(255,255,255,0.03)", border: "1px solid #1e1e1e",
+                  display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "4px",
+                }}
+              >
+                <Lock style={{ width: "16px", height: "16px", color: "#333" }} />
               </div>
-              <p className="text-[13px] font-medium text-[#374151]">Credits locked</p>
-              <p className="text-[11px] text-[#2D2D35] text-center">Requires an active plan</p>
+              <p style={{ fontSize: "13px", fontWeight: 500, color: "#333", margin: 0 }}>Credits locked</p>
+              <p style={{ fontSize: "11px", color: "#2a2a2a", margin: 0, textAlign: "center" as const }}>Requires an active plan</p>
             </div>
           ) : (
-            /* ── Active state ── */
-            <div className="mb-4">
-              <div className="flex items-end justify-between mb-2">
-                <p className="text-[28px] font-semibold text-white leading-none">
-                  {limits.credits.toLocaleString()}
-                  <span className="text-[16px] font-normal text-[#4B5563] ml-1">
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "8px" }}>
+                <p style={{ margin: 0, lineHeight: 1 }}>
+                  <span style={{ fontSize: "32px", fontWeight: 800, color: "white", letterSpacing: "-1px" }}>
+                    {limits.credits.toLocaleString()}
+                  </span>
+                  <span style={{ fontSize: "15px", fontWeight: 300, color: "#333", marginLeft: "4px" }}>
                     / {limits.creditsTotal.toLocaleString()}
                   </span>
                 </p>
-                <span className={`text-[12px] font-medium ${pct < 20 ? "text-orange-400" : "text-[#6B7280]"}`}>
-                  {pct}%
-                </span>
+                <span style={{ fontSize: "12px", color: pct < 20 ? "#fb923c" : "#555" }}>{pct}%</span>
               </div>
-              <div className="h-[3px] w-full rounded-full bg-white/[0.07] overflow-hidden">
+              <div style={{ height: "3px", width: "100%", borderRadius: "2px", background: "#1a1a1a", overflow: "hidden" }}>
                 <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, opacity: 0.9, background: pct < 20 ? "#fb923c" : "#A3FF12" }}
+                  style={{
+                    height: "100%",
+                    borderRadius: "2px",
+                    width: `${pct}%`,
+                    background: pct < 20 ? "#fb923c" : GREEN,
+                    transition: "width 600ms ease",
+                  }}
                 />
               </div>
-              <p className="mt-1.5 text-[11px] text-[#4B5563]">≈ {creditSeconds}s of AI VFX remaining</p>
+              <p style={{ marginTop: "6px", fontSize: "12px", color: "#444" }}>
+                ≈ {creditSeconds}s of AI VFX remaining
+              </p>
             </div>
           )}
 
-          <div className="space-y-0">
+          <div>
             <DataRow label="Device seats" value={`${limits.devicesUsed} / ${limits.deviceLimit}`} />
             <DataRow label="Resets on"    value={limits.resetDate} />
           </div>
           {license.status === "active" && (
-            <Link href="/dashboard/billing"
-              className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#A3FF12] hover:underline underline-offset-2">
-              Manage credits <ChevronRight className="w-3 h-3" />
+            <Link
+              href="/dashboard/billing"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                marginTop: "16px",
+                fontSize: "13px",
+                color: GREEN,
+                textDecoration: "none",
+              }}
+            >
+              Manage credits <ChevronRight style={{ width: "12px", height: "12px" }} />
             </Link>
           )}
         </Card>
       </div>
 
-      {/* ── Secondary row ── */}
+      {/* ── SECURITY & ACTIVITY ── */}
       <SectionLabel>Security &amp; Activity</SectionLabel>
-      <div className="grid lg:grid-cols-2 gap-4 mb-8">
+      <div className="grid lg:grid-cols-2" style={{ gap: "12px", marginBottom: "40px" }}>
 
         {/* Security */}
         <Card>
-          <p className="text-[13px] font-medium text-[#9CA3AF] mb-4">Security</p>
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-[8px] border border-white/[0.05] bg-white/[0.02]">
+          <p style={{ fontSize: "15px", fontWeight: 600, color: "white", margin: "0 0 16px 0" }}>
+            Security
+          </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "16px",
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px solid #161616",
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
             {security.mfaEnabled
-              ? <ShieldCheck className="w-5 h-5 text-[#A3FF12] flex-shrink-0" />
-              : <ShieldAlert className="w-5 h-5 text-[#F59E0B] flex-shrink-0" />
+              ? <ShieldCheck style={{ width: "20px", height: "20px", color: GREEN, flexShrink: 0 }} />
+              : <ShieldAlert style={{ width: "20px", height: "20px", color: "#F59E0B", flexShrink: 0 }} />
             }
             <div>
-              <p className="text-[13px] font-medium text-white">
+              <p style={{ fontSize: "13px", fontWeight: 500, color: "white", margin: "0 0 2px 0" }}>
                 {security.mfaEnabled ? "Two-factor authentication enabled" : "Two-factor authentication disabled"}
               </p>
-              <p className="text-[11px] text-[#6B7280] mt-0.5">
+              <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>
                 {security.mfaEnabled
                   ? "Your account has an extra layer of protection."
                   : "Enable 2FA to secure your account."}
               </p>
             </div>
           </div>
-          <div className="space-y-0">
-            <DataRow label="Last sign in" value={security.lastLoginAt} />
-            <DataRow label="Active sessions" value={`${security.activeSessions} session`} />
+          <div>
+            <DataRow label="Last sign in"     value={security.lastLoginAt} />
+            <DataRow label="Active sessions"  value={`${security.activeSessions} session`} />
           </div>
-          <Link href="/dashboard/settings"
-            className="mt-4 inline-flex items-center gap-1 text-[12px] text-[#6B7280] hover:text-white transition-colors">
-            Manage settings <ChevronRight className="w-3 h-3" />
+          <Link
+            href="/dashboard/settings"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              marginTop: "16px",
+              fontSize: "13px",
+              color: "#444",
+              textDecoration: "none",
+            }}
+          >
+            Manage settings <ChevronRight style={{ width: "12px", height: "12px" }} />
           </Link>
         </Card>
 
         {/* Activity */}
         <Card>
-          <p className="text-[13px] font-medium text-[#9CA3AF] mb-4">Recent activity</p>
+          <p style={{ fontSize: "15px", fontWeight: 600, color: "white", margin: "0 0 16px 0" }}>
+            Recent activity
+          </p>
           {activity.length === 0 ? (
-            <p className="text-[13px] text-[#4B5563] py-4 text-center">No activity yet</p>
+            <p style={{ fontSize: "13px", color: "#333", padding: "16px 0", textAlign: "center" as const }}>
+              No activity yet
+            </p>
           ) : (
-            <ul className="space-y-0 divide-y divide-white/[0.04]">
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {activity.map((item, i) => (
-                <li key={i} className="flex items-start justify-between py-2.5">
+                <li
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    padding: "10px 0",
+                    borderBottom: i < activity.length - 1 ? "1px solid #111" : "none",
+                  }}
+                >
                   <div>
-                    <p className="text-[13px] font-medium text-[#D1D5DB]">{item.title}</p>
-                    <p className="text-[11px] text-[#4B5563] mt-0.5">{item.detail}</p>
+                    <p style={{ fontSize: "13px", fontWeight: 500, color: "#aaa", margin: "0 0 2px 0" }}>{item.title}</p>
+                    <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>{item.detail}</p>
                   </div>
-                  <span className="flex items-center gap-1 text-[11px] text-[#4B5563] whitespace-nowrap ml-4 mt-0.5 flex-shrink-0">
-                    <Clock className="w-3 h-3" />
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      fontSize: "11px",
+                      color: "#333",
+                      whiteSpace: "nowrap" as const,
+                      marginLeft: "16px",
+                      marginTop: "2px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Clock style={{ width: "11px", height: "11px" }} />
                     {item.timestamp}
                   </span>
                 </li>
@@ -284,37 +501,52 @@ export default async function DashboardOverviewPage() {
         </Card>
       </div>
 
-      {/* ── All registered devices ── */}
+      {/* ── DEVICES ── */}
       {panel.allDevices.length > 0 && (
         <>
           <SectionLabel>Registered devices</SectionLabel>
-          <div className="grid gap-3 mb-8">
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: "8px", marginBottom: "40px" }}>
             {panel.allDevices.map((device) => (
-              <div key={device.id}
-                className="flex items-center justify-between rounded-[12px] border border-white/[0.07] bg-[#111113] px-4 py-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-8 h-8 rounded-[8px] flex-shrink-0 flex items-center justify-center border ${
-                    device.connected
-                      ? "bg-[#A3FF12]/[0.08] border-[#A3FF12]/20"
-                      : "bg-white/[0.03] border-white/[0.07]"
-                  }`}>
+              <div
+                key={device.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderRadius: "12px",
+                  border: "1px solid #161616",
+                  background: "#0c0c0c",
+                  padding: "12px 16px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      background: device.connected ? "rgba(57,255,106,0.08)" : "rgba(255,255,255,0.03)",
+                      border: device.connected ? "1px solid rgba(57,255,106,0.2)" : "1px solid #1e1e1e",
+                    }}
+                  >
                     {device.connected
-                      ? <Wifi className="w-4 h-4 text-[#A3FF12]" />
-                      : <WifiOff className="w-4 h-4 text-[#4B5563]" />
+                      ? <Wifi style={{ width: "15px", height: "15px", color: GREEN }} />
+                      : <WifiOff style={{ width: "15px", height: "15px", color: "#333" }} />
                     }
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white truncate">{device.name}</p>
-                    <p className="text-[11px] text-[#4B5563] mt-0.5 truncate">
-                      {device.hostApp !== "—" ? `${device.hostApp} ${device.hostAppVersion} · `.trimEnd() : ""}
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 500, color: "white", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                      {device.name}
+                    </p>
+                    <p style={{ fontSize: "11px", color: "#444", margin: "2px 0 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                      {device.hostApp !== "—" ? `${device.hostApp} ${device.hostAppVersion} · ` : ""}
                       {device.platform}
                       {device.cepVersion !== "—" ? ` · CEP ${device.cepVersion}` : ""}
                     </p>
                   </div>
                 </div>
-                <div className="flex-shrink-0 ml-4 text-right">
+                <div style={{ flexShrink: 0, marginLeft: "16px", textAlign: "right" as const }}>
                   <StatusPill active={device.connected} label={device.connected ? "Online" : "Offline"} />
-                  <p className="text-[10px] text-[#374151] mt-1">{device.lastActiveAt}</p>
+                  <p style={{ fontSize: "10px", color: "#333", margin: "4px 0 0 0" }}>{device.lastActiveAt}</p>
                 </div>
               </div>
             ))}
@@ -322,19 +554,35 @@ export default async function DashboardOverviewPage() {
         </>
       )}
 
-      {/* ── Quick links ── */}
+      {/* ── QUICK LINKS ── */}
       <SectionLabel>Quick access</SectionLabel>
-      <div className="flex flex-wrap gap-2">
+      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "8px" }}>
         {[
           { label: "Download Plugin",   href: "/dashboard/downloads" },
           { label: "Connected Devices", href: "/dashboard/devices" },
           { label: "Billing",           href: "/dashboard/billing" },
           { label: "Documentation",     href: "/dashboard/docs" },
         ].map((l) => (
-          <Link key={l.href} href={l.href}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] border border-white/[0.07] bg-white/[0.02] text-[12px] font-medium text-[#6B7280] hover:text-[#D1D5DB] hover:border-white/[0.12] transition-colors">
+          <Link
+            key={l.href}
+            href={l.href}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 14px",
+              borderRadius: "8px",
+              border: "1px solid #161616",
+              background: "#0c0c0c",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "#555",
+              textDecoration: "none",
+              transition: "border-color 150ms, color 150ms",
+            }}
+          >
             {l.label}
-            <ChevronRight className="w-3 h-3" />
+            <ChevronRight style={{ width: "12px", height: "12px" }} />
           </Link>
         ))}
       </div>

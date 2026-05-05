@@ -1,8 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, X, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export interface ComparisonRow {
   feature: string;
@@ -18,142 +16,216 @@ interface ComparisonProps {
   rows: ComparisonRow[];
 }
 
-function OursCell({ value }: { value: boolean | string }) {
-  if (typeof value === "boolean") {
-    return value ? (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-accent/15 ring-1 ring-accent/30">
-        <Check className="w-3.5 h-3.5 text-accent" strokeWidth={2.5} />
-      </span>
-    ) : (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.04]">
-        <X className="w-3 h-3 text-ink-faint" strokeWidth={2} />
-      </span>
-    );
-  }
+const GREEN = "#39FF6A";
+const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
+
+const THEIR_PAINS = [
+  "$500–2,000 per shot",
+  "1–3 days turnaround",
+  "6+ months to learn",
+  "Revision emails, back and forth",
+  "Out of your timeline",
+  "No guarantee",
+];
+
+const OUR_WINS = [
+  "From $29.90/month",
+  "Done in 3 minutes",
+  "Zero learning curve",
+  "Unlimited revisions",
+  "Stays inside Premiere",
+  "7-day money-back guarantee",
+];
+
+export default function Comparison({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  title, subtitle, ourLabel, theirLabel, rows,
+}: ComparisonProps) {
   return (
-    <span className="text-[13px] font-semibold text-accent tabular-nums">{value}</span>
-  );
-}
+    <section
+      style={{
+        background: [
+          "radial-gradient(ellipse 70% 60% at 100% 50%, rgba(57,255,106,0.05) 0%, transparent 60%)",
+          "radial-gradient(ellipse 40% 40% at 0% 50%, rgba(57,255,106,0.02) 0%, transparent 60%)",
+          "#080808",
+        ].join(", "),
+        padding: "80px 20px",
+        borderTop: "1px solid #111",
+      }}
+    >
+      <div className="mx-auto" style={{ maxWidth: "860px", padding: "0 4px" }}>
 
-function TheirsCell({ value }: { value: boolean | string }) {
-  if (typeof value === "boolean") {
-    return value ? (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06]">
-        <Check className="w-3.5 h-3.5 text-ink-muted" strokeWidth={2.5} />
-      </span>
-    ) : (
-      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.04]">
-        <X className="w-3 h-3 text-ink-faint/50" strokeWidth={2} />
-      </span>
-    );
-  }
-  return (
-    <span className="text-[13px] text-ink-faint tabular-nums">{value}</span>
-  );
-}
-
-export default function Comparison({ title, subtitle, ourLabel, theirLabel, rows }: ComparisonProps) {
-  return (
-    <section className="relative py-24 overflow-hidden">
-      {/* Top separator */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
-
-      {/* Subtle bg glow */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-accent/[0.03] blur-[120px]" />
-
-      <div className="relative mx-auto max-w-container-sm px-4 sm:px-6 lg:px-8">
-
-        {/* Heading */}
+        {/* Section label + heading */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5 }}
-          className="mb-12 text-center"
+          style={{ marginBottom: "56px" }}
         >
-          <h2 className="font-heading text-[28px] sm:text-[36px] font-bold text-white tracking-tight leading-tight">
-            {title}
+          <div className="flex items-center gap-3" style={{ marginBottom: "20px" }}>
+            <div style={{ width: "4px", height: "16px", borderRadius: "100px", background: GREEN }} />
+            <span
+              className="font-bold uppercase"
+              style={{ fontSize: "11px", letterSpacing: "0.14em", color: GREEN }}
+            >
+              // WHY PRYSMOR
+            </span>
+          </div>
+          <h2
+            className="font-extrabold"
+            style={{
+              fontSize: "clamp(28px, 3vw, 42px)",
+              letterSpacing: "-1.5px",
+              lineHeight: 1.1,
+              background: "linear-gradient(135deg, #ffffff 0%, #888 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            The math is obvious.
           </h2>
-          {subtitle && (
-            <p className="mt-3 text-ink-muted text-[15px] max-w-md mx-auto">{subtitle}</p>
-          )}
         </motion.div>
 
-        {/* Table */}
+        {/* Two-column layout with vertical divider */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="overflow-x-auto rounded-2xl border border-white/[0.08] shadow-[0_0_80px_-20px_rgba(0,0,0,0.6)]"
+          transition={{ duration: 0.5, delay: 0.1, ease }}
+          className="comparison-grid"
+          style={{ display: "flex", flexDirection: "row", position: "relative" }}
         >
-          <div className="min-w-[480px]">
-          {/* Column headers */}
-          <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-white/[0.03] border-b border-white/[0.08]">
-            {/* Empty feature col */}
-            <div className="px-4 py-4" />
+          {/* Vertical divider — hidden on mobile via CSS */}
+          <div
+            className="comparison-divider"
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: 0,
+              bottom: 0,
+              width: "1px",
+              background: "linear-gradient(to bottom, transparent, rgba(57,255,106,0.15) 20%, rgba(57,255,106,0.15) 80%, transparent)",
+            }}
+          />
 
-            {/* Our col header — highlighted */}
-            <div className="relative px-3 py-4 flex flex-col items-center justify-center border-x border-accent/20 bg-accent/[0.06]">
-              <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
-              <p className="text-[12px] sm:text-[13px] font-bold text-accent tracking-wide">{ourLabel}</p>
-              <span className="text-[10px] text-accent/50 font-medium hidden sm:block">what our users use</span>
-            </div>
-
-            {/* Their col header */}
-            <div className="px-3 py-4 flex items-center justify-center">
-              <p className="text-[12px] sm:text-[13px] font-semibold text-ink-faint text-center">{theirLabel}</p>
-            </div>
-          </div>
-
-          {/* Rows */}
-          {rows.map((row, i) => (
-            <motion.div
-              key={row.feature}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.3, delay: 0.05 * i }}
-              className={cn(
-                "grid grid-cols-[1.4fr_1fr_1fr] group",
-                i < rows.length - 1 && "border-b border-white/[0.05]",
-                "hover:bg-white/[0.02] transition-colors duration-150"
-              )}
+          {/* LEFT — Hiring a VFX Artist */}
+          <div className="comparison-col" style={{ paddingRight: "48px", flex: 1 }}>
+            <p
+              className="font-medium uppercase"
+              style={{
+                fontSize: "12px",
+                color: "#444",
+                letterSpacing: "2px",
+                paddingBottom: "20px",
+                borderBottom: "1px solid #1a1a1a",
+                marginBottom: "24px",
+              }}
             >
-              {/* Feature name */}
-              <div className="px-4 py-3.5 flex items-center">
-                <span className="text-[12px] sm:text-[13px] text-ink-subtle group-hover:text-ink-muted transition-colors">
-                  {row.feature}
-                </span>
-              </div>
+              Hiring a VFX Artist
+            </p>
 
-              {/* Our value */}
-              <div className="px-3 py-3.5 flex items-center justify-center border-x border-accent/10 bg-accent/[0.04]">
-                <OursCell value={row.ours} />
-              </div>
-
-              {/* Their value */}
-              <div className="px-3 py-3.5 flex items-center justify-center">
-                <TheirsCell value={row.theirs} />
-              </div>
-            </motion.div>
-          ))}
-
-          {/* Footer CTA strip */}
-          <div className="grid grid-cols-[1.4fr_1fr_1fr] border-t border-white/[0.07] bg-white/[0.02]">
-            <div className="px-4 py-3.5 flex items-center">
-              <span className="text-[11px] sm:text-[12px] text-ink-faint">7-day money-back guarantee</span>
-            </div>
-            <div className="px-3 py-3.5 flex items-center justify-center border-x border-accent/10 bg-accent/[0.05]">
-              <span className="text-[12px] font-semibold text-accent">✓ Included</span>
-            </div>
-            <div className="px-3 py-3.5 flex items-center justify-center">
-              <span className="text-[12px] text-ink-faint">✗ No</span>
-            </div>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {THEIR_PAINS.map((item, i) => (
+                <li
+                  key={item}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "13px 0",
+                    borderBottom: i < THEIR_PAINS.length - 1 ? "1px solid #111" : "none",
+                    lineHeight: 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "rgba(255,68,68,0.4)",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      width: "16px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ×
+                  </span>
+                  <span style={{ fontSize: "14px", color: "#555", fontWeight: 300 }}>
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
+
+          {/* RIGHT — Prysmor, subtle green panel */}
+          <div
+            className="comparison-col comparison-col-right"
+            style={{
+              paddingLeft: "48px",
+              position: "relative",
+              flex: 1,
+            }}
+          >
+            <div
+              className="comparison-col-bg"
+              style={{
+                position: "absolute",
+                inset: "-20px 0 -20px 24px",
+                background: "rgba(57,255,106,0.03)",
+                border: "1px solid rgba(57,255,106,0.08)",
+                borderRadius: "12px",
+                pointerEvents: "none",
+              }}
+            />
+            <div style={{ position: "relative" }}>
+              <p
+                className="font-medium uppercase"
+                style={{
+                  fontSize: "12px",
+                  color: GREEN,
+                  letterSpacing: "2px",
+                  paddingBottom: "20px",
+                  borderBottom: "1px solid rgba(57,255,106,0.1)",
+                  marginBottom: "24px",
+                }}
+              >
+                Prysmor
+              </p>
+
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {OUR_WINS.map((item, i) => (
+                  <li
+                    key={item}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "13px 0",
+                      borderBottom: i < OUR_WINS.length - 1 ? "1px solid rgba(57,255,106,0.06)" : "none",
+                      lineHeight: 1,
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: GREEN,
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        width: "16px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✓
+                    </span>
+                    <span style={{ fontSize: "14px", color: "#aaa", fontWeight: 300 }}>
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </motion.div>
-
       </div>
     </section>
   );

@@ -9,6 +9,8 @@ import { useAuth, useClerk, UserButton } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+const GREEN = "#39FF6A";
+
 const navLinks = [
   { label: "Features", href: "/#features" },
   { label: "Examples", href: "/#examples" },
@@ -21,7 +23,7 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export default function Navbar() {
   const [scrolled,   setScrolled]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname  = usePathname();
   const { isSignedIn } = useAuth();
   const { openSignIn, openSignUp } = useClerk();
 
@@ -29,7 +31,8 @@ export default function Navbar() {
   const handleSignUp = () => openSignUp({ afterSignUpUrl: "/dashboard" });
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 16);
+    const fn = () => setScrolled(window.scrollY > 40);
+    fn();
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
@@ -39,76 +42,162 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={cn(
-          "fixed top-0 inset-x-0 z-50 transition-all duration-300",
-          scrolled
-            ? "bg-[rgba(4,4,6,0.90)] backdrop-blur-2xl border-b border-white/[0.06]"
-            : "bg-transparent",
-        )}
+        className="fixed top-0 inset-x-0 z-[100] transition-all duration-[250ms] ease"
+        style={scrolled ? {
+          background: "rgba(8,8,8,0.9)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid #111",
+        } : {
+          background: "transparent",
+        }}
       >
-        <div className="mx-auto flex h-[68px] max-w-container items-center justify-between px-5 sm:px-8 lg:px-10">
-
-          {/* ── Logo ── */}
-          <Link href="/" className="flex items-center focus-visible:outline-none">
+        <div
+          className="flex items-center justify-between w-full"
+          style={{ padding: "20px 40px" }}
+        >
+          {/* Logo — icon + text */}
+          <Link href="/" className="flex items-center gap-2 focus-visible:outline-none flex-shrink-0">
             <Image
-              src="/logo/vecilogo.png"
+              src="/logo/logo-icon.png"
               alt="Prysmor"
-              width={150}
-              height={150}
-              className="h-[52px] w-auto object-contain"
+              width={28}
+              height={28}
+              className="w-7 h-7 object-contain"
               priority
             />
+            <span
+              className="font-bold text-white"
+              style={{ fontSize: "18px", letterSpacing: "-0.5px" }}
+            >
+              Prysmor
+            </span>
           </Link>
 
-          {/* ── Desktop nav ── */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  "px-4 py-2 text-[14px] font-medium transition-colors rounded-lg",
-                  pathname === l.href ? "text-white" : "text-[#8A9BB0] hover:text-white",
-                )}
-              >
-                {l.label}
-              </Link>
-            ))}
+          {/* Desktop nav — floating pill */}
+          <nav
+            className="hidden lg:inline-flex items-center"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              borderRadius: "100px",
+              padding: "5px",
+              gap: "2px",
+            }}
+          >
+            {navLinks.map((l) => {
+              const isActive = pathname === l.href;
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="transition-all duration-200"
+                  style={{
+                    color: isActive ? "white" : "#555",
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    padding: "7px 16px",
+                    borderRadius: "100px",
+                    background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)";
+                      (e.currentTarget as HTMLElement).style.color = "white";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLElement).style.background = "transparent";
+                      (e.currentTarget as HTMLElement).style.color = "#555";
+                    }
+                  }}
+                >
+                  {l.label}
+                </Link>
+              );
+            })}
           </nav>
 
-          {/* ── Right: auth ── */}
-          <div className="hidden lg:flex items-center gap-3">
+          {/* Right side */}
+          <div className="hidden lg:flex items-center flex-shrink-0" style={{ gap: "20px" }}>
             {isSignedIn ? (
               <>
-                <Link href="/dashboard"
-                  className="group/dash relative flex items-center gap-2 px-4 py-2 rounded-[11px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-[#A3FF12]/25 transition-all duration-200">
-                  <span className="flex items-center justify-center w-5 h-5 rounded-[6px] bg-gradient-to-br from-[#A3FF12]/20 to-[#22FFB0]/10 border border-[#A3FF12]/25 group-hover/dash:from-[#A3FF12]/30 group-hover/dash:to-[#22FFB0]/20 transition-all">
-                    <LayoutDashboard className="w-3 h-3 text-[#A3FF12]" />
-                  </span>
-                  <span className="text-[13.5px] font-semibold text-white/80 group-hover/dash:text-white transition-colors">Dashboard</span>
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 transition-all duration-200"
+                  style={{
+                    padding: "7px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    fontSize: "13px",
+                    color: "rgba(255,255,255,0.7)",
+                    textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
+                    (e.currentTarget as HTMLElement).style.color = "white";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
+                    (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.7)";
+                  }}
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5" style={{ color: GREEN }} />
+                  Dashboard
                 </Link>
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
                     elements: {
-                      avatarBox: "w-8 h-8 rounded-[9px] ring-1 ring-white/[0.10] hover:ring-[#A3FF12]/40 transition-all",
+                      avatarBox: "w-8 h-8 rounded-[9px] ring-1 ring-white/[0.10] hover:ring-[#39FF6A]/40 transition-all",
                     },
                   }}
                 />
               </>
             ) : (
               <>
+                {/* Sign in */}
                 <button
                   onClick={handleSignIn}
-                  className="px-4 py-2 text-[14px] font-medium text-[#8A9BB0] hover:text-white transition-colors">
+                  className="transition-colors duration-200 cursor-pointer"
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 400,
+                    color: "#3a3a3a",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#888"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#3a3a3a"; }}
+                >
                   Sign in
                 </button>
+
+                {/* Get Started CTA */}
                 <button
                   onClick={handleSignUp}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-bold text-background transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+                  className="inline-flex items-center gap-1.5 font-bold cursor-pointer transition-colors duration-200"
                   style={{
-                    background: "linear-gradient(135deg,#A3FF12 0%,#22FFB0 100%)",
-                    boxShadow: "0 0 20px rgba(163,255,18,0.30)",
+                    background: GREEN,
+                    color: "#000",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "#52ff7e";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = GREEN;
                   }}
                 >
                   Get Started
@@ -118,23 +207,28 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* ── Mobile toggle ── */}
+          {/* Mobile toggle */}
           <button
-            className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.08] text-[#8A9BB0] hover:text-white transition-colors"
+            className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.08] transition-colors"
+            style={{ color: "#666" }}
             onClick={() => setMobileOpen((o) => !o)}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "white"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#666"; }}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
             <AnimatePresence mode="wait" initial={false}>
               {mobileOpen ? (
                 <motion.span key="x"
                   initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.14 }} className="flex">
+                  exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.14 }}
+                  className="flex">
                   <X className="w-4 h-4" />
                 </motion.span>
               ) : (
                 <motion.span key="menu"
                   initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.14 }} className="flex">
+                  exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.14 }}
+                  className="flex">
                   <Menu className="w-4 h-4" />
                 </motion.span>
               )}
@@ -143,60 +237,62 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* ── Mobile drawer ── */}
+      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
               onClick={() => setMobileOpen(false)}
             />
-
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.22, ease }}
-              className="fixed top-[76px] inset-x-3 z-40 lg:hidden rounded-[22px] border border-white/[0.09] bg-[rgba(5,5,8,0.99)] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)] overflow-hidden"
+              className="fixed top-[76px] inset-x-3 z-40 lg:hidden rounded-[20px] border border-white/[0.09] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)] overflow-hidden"
+              style={{ background: "rgba(8,8,8,0.99)" }}
             >
-              <div className="h-px" style={{ background: "linear-gradient(90deg,transparent,rgba(163,255,18,0.5) 40%,rgba(34,255,176,0.5) 60%,transparent)" }} />
-
+              <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GREEN}50 40%,${GREEN}50 60%,transparent)` }} />
               <div className="p-5 space-y-1">
                 {navLinks.map((l) => (
-                  <Link key={l.href} href={l.href}
+                  <Link
+                    key={l.href}
+                    href={l.href}
                     className={cn(
                       "block px-3 py-3 rounded-[12px] text-[14px] font-medium transition-colors",
-                      pathname === l.href ? "text-white bg-white/[0.06]" : "text-[#8A9BB0] hover:text-white hover:bg-white/[0.04]",
-                    )}>
+                      pathname === l.href
+                        ? "text-white bg-white/[0.06]"
+                        : "text-[#666] hover:text-white hover:bg-white/[0.04]",
+                    )}
+                  >
                     {l.label}
                   </Link>
                 ))}
-
                 <div className="!mt-5 flex flex-col gap-2.5">
                   {isSignedIn ? (
-                    <Link href="/dashboard"
-                      className="group/mdash flex items-center gap-3 px-4 py-3 rounded-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-[#A3FF12]/25 transition-all">
-                      <span className="flex items-center justify-center w-7 h-7 rounded-[8px] bg-gradient-to-br from-[#A3FF12]/20 to-[#22FFB0]/10 border border-[#A3FF12]/25">
-                        <LayoutDashboard className="w-3.5 h-3.5 text-[#A3FF12]" />
-                      </span>
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-3 px-4 py-3 rounded-[14px] border border-white/[0.08] hover:border-white/[0.16] transition-all"
+                    >
+                      <LayoutDashboard className="w-4 h-4" style={{ color: GREEN }} />
                       <span className="text-[14px] font-semibold text-white">Dashboard</span>
                     </Link>
                   ) : (
                     <>
                       <button
                         onClick={() => { setMobileOpen(false); handleSignIn(); }}
-                        className="flex items-center justify-center px-4 py-3 rounded-[13px] border border-white/[0.10] text-[14px] font-medium text-[#8A9BB0] hover:text-white hover:bg-white/[0.05] transition-colors w-full">
+                        className="w-full py-3 rounded-[12px] text-[14px] font-medium border border-white/[0.08] text-[#666] hover:text-white hover:border-white/[0.16] transition-all"
+                      >
                         Sign in
                       </button>
                       <button
                         onClick={() => { setMobileOpen(false); handleSignUp(); }}
-                        className="flex items-center justify-center gap-2 px-4 py-3.5 rounded-full text-[14px] font-bold text-background w-full"
-                        style={{
-                          background: "linear-gradient(135deg,#A3FF12 0%,#22FFB0 100%)",
-                          boxShadow: "0 0 24px rgba(163,255,18,0.30)",
-                        }}>
+                        className="w-full py-3 rounded-[12px] text-[14px] font-bold flex items-center justify-center gap-2 transition-all"
+                        style={{ background: GREEN, color: "#000" }}
+                      >
                         Get Started <ArrowRight className="w-4 h-4" />
                       </button>
                     </>

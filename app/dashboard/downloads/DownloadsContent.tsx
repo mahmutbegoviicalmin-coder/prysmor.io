@@ -20,7 +20,7 @@ const DOWNLOAD_MAC =
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3">
       {children}
     </p>
   );
@@ -28,7 +28,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[12px] border border-white/[0.07] bg-[#111113] ${className}`}>
+    <div className={`rounded-[12px] border border-[#161616] bg-[#0c0c0c] ${className}`}>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="mt-2 rounded-[8px] bg-[#0D0D0F] border border-white/[0.05] px-4 py-3 text-[12px] font-mono text-[#A3FF12] overflow-x-auto whitespace-pre-wrap break-all">
+    <pre className="mt-2 rounded-[8px] bg-[#080808] border border-[#111] px-4 py-3 text-[12px] font-mono text-[#39FF6A] overflow-x-auto whitespace-pre-wrap break-all">
       {children}
     </pre>
   );
@@ -45,8 +45,8 @@ function CodeBlock({ children }: { children: string }) {
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#A3FF12]/10 border border-[#A3FF12]/20 flex items-center justify-center mt-0.5">
-        <span className="text-[11px] font-bold text-[#A3FF12]">{n}</span>
+      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#39FF6A]/10 border border-[#39FF6A]/20 flex items-center justify-center mt-0.5">
+        <span className="text-[11px] font-bold text-[#39FF6A]">{n}</span>
       </div>
       <div className="flex-1 text-[13px] text-[#9CA3AF] leading-relaxed">{children}</div>
     </div>
@@ -56,7 +56,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 function FeatureRow({ children }: { children: string }) {
   return (
     <div className="flex items-center gap-2">
-      <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/70 flex-shrink-0" />
+      <CheckCircle2 className="w-3 h-3 text-[#39FF6A]/70 flex-shrink-0" />
       <p className="text-[11px] text-[#4B5563]">{children}</p>
     </div>
   );
@@ -72,16 +72,16 @@ function Accordion({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-white/[0.07] rounded-[10px] overflow-hidden">
+    <div className="border border-[#161616] rounded-[10px] overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-[#111113] hover:bg-white/[0.02] transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-[#0c0c0c] hover:bg-white/[0.02] transition-colors text-left"
       >
         <div className="flex items-center gap-2.5">
           <Icon className="w-4 h-4 text-[#6B7280] flex-shrink-0" />
           <span className="text-[13px] font-medium text-[#D1D5DB]">{title}</span>
           {badge && (
-            <span className="px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.07] text-[10px] text-[#6B7280]">
+            <span className="px-2 py-0.5 rounded-full bg-white/[0.05] border border-[#161616] text-[10px] text-[#6B7280]">
               {badge}
             </span>
           )}
@@ -89,7 +89,7 @@ function Accordion({
         <ChevronDown className={`w-4 h-4 text-[#4B5563] transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1 bg-[#0D0D0F] border-t border-white/[0.05] space-y-3">
+        <div className="px-4 pb-4 pt-1 bg-[#080808] border-t border-[#111] space-y-3">
           {children}
         </div>
       )}
@@ -116,7 +116,7 @@ export default function DownloadsContent() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#A3FF12]/[0.08] border border-[#A3FF12]/20 text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#39FF6A]/[0.08] border border-[#39FF6A]/20 text-[10px] font-bold uppercase tracking-widest text-[#39FF6A]">
             <Zap className="w-3 h-3" />
             v{PANEL_VERSION}
           </span>
@@ -134,13 +134,13 @@ export default function DownloadsContent() {
       <SectionLabel>Windows Installer (.exe)</SectionLabel>
       <Card className="p-5 mb-6">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-[10px] bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0">
-            <Package className="w-6 h-6 text-[#A3FF12]" />
+          <div className="w-12 h-12 rounded-[10px] bg-[#39FF6A]/[0.07] border border-[#39FF6A]/15 flex items-center justify-center flex-shrink-0">
+            <Package className="w-6 h-6 text-[#39FF6A]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-[15px] font-semibold text-white">Prysmor Panel for Windows</p>
-              <span className="px-2 py-0.5 rounded-full bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 text-[10px] font-bold text-[#A3FF12]">
+              <span className="px-2 py-0.5 rounded-full bg-[#39FF6A]/[0.07] border border-[#39FF6A]/15 text-[10px] font-bold text-[#39FF6A]">
                 v{PANEL_VERSION}
               </span>
             </div>
@@ -154,7 +154,7 @@ export default function DownloadsContent() {
               download="PrysmrSetup.exe"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#39FF6A] text-[#050505] text-[13px] font-bold hover:bg-[#4fff7e] transition-colors"
             >
               <Download className="w-4 h-4" />
               Download for Windows
@@ -164,7 +164,7 @@ export default function DownloadsContent() {
               After installing: restart Premiere Pro → Window → Extensions → Prysmor
             </p>
 
-            <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
+            <div className="mt-4 pt-4 border-t border-[#111] space-y-1.5">
               {[
                 "CEP panel installed automatically to the correct Premiere Pro folder",
                 "ffmpeg bundled — auto-crops and scales wide videos before AI processing",
@@ -177,10 +177,10 @@ export default function DownloadsContent() {
           </div>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="mt-5 pt-4 border-t border-[#111] flex flex-wrap items-center gap-x-5 gap-y-2">
           {["Windows 10 / 11", "Premiere Pro 2022–2025", "CEP 11, 12, 13", "No admin rights needed"].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
-              <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
+              <CheckCircle2 className="w-3 h-3 text-[#39FF6A]/60" />
               {tag}
             </span>
           ))}
@@ -191,18 +191,18 @@ export default function DownloadsContent() {
       <SectionLabel>macOS Installer</SectionLabel>
       <Card className="p-5 mb-6">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-[10px] bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0">
-            <MacIcon className="w-6 h-6 text-[#A3FF12]" />
+          <div className="w-12 h-12 rounded-[10px] bg-[#39FF6A]/[0.07] border border-[#39FF6A]/15 flex items-center justify-center flex-shrink-0">
+            <MacIcon className="w-6 h-6 text-[#39FF6A]" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-[15px] font-semibold text-white">Prysmor Panel for macOS</p>
-              <span className="px-2 py-0.5 rounded-full bg-[#A3FF12]/[0.07] border border-[#A3FF12]/15 text-[10px] font-bold text-[#A3FF12]">
+              <span className="px-2 py-0.5 rounded-full bg-[#39FF6A]/[0.07] border border-[#39FF6A]/15 text-[10px] font-bold text-[#39FF6A]">
                 v{PANEL_VERSION}
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              One-click installer — download the <code className="text-[#A3FF12]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>, open it,
+              One-click installer — download the <code className="text-[#39FF6A]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code>, open it,
               and follow the wizard. Sets up the CEP panel with bundled ffmpeg. No configuration needed.
             </p>
 
@@ -211,7 +211,7 @@ export default function DownloadsContent() {
               download="Prysmor-3.0.3.pkg"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#39FF6A] text-[#050505] text-[13px] font-bold hover:bg-[#4fff7e] transition-colors"
             >
               <Download className="w-4 h-4" />
               Download for macOS
@@ -221,7 +221,7 @@ export default function DownloadsContent() {
               After installing: restart Premiere Pro → Window → Extensions → Prysmor
             </p>
 
-            <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-1.5">
+            <div className="mt-4 pt-4 border-t border-[#111] space-y-1.5">
               {[
                 "CEP panel installed to ~/Library/Application Support/Adobe/CEP/extensions",
                 "ffmpeg bundled for automatic video preprocessing",
@@ -233,10 +233,10 @@ export default function DownloadsContent() {
           </div>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-white/[0.05] flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="mt-5 pt-4 border-t border-[#111] flex flex-wrap items-center gap-x-5 gap-y-2">
           {["macOS 12+", "Premiere Pro 2022–2025", "CEP 11, 12, 13", "No admin rights needed"].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
-              <CheckCircle2 className="w-3 h-3 text-[#A3FF12]/60" />
+              <CheckCircle2 className="w-3 h-3 text-[#39FF6A]/60" />
               {tag}
             </span>
           ))}
@@ -262,8 +262,8 @@ export default function DownloadsContent() {
       <SectionLabel>What&apos;s included</SectionLabel>
       <Card className="p-5 mb-8">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-[8px] bg-[#A3FF12]/[0.08] border border-[#A3FF12]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Cpu className="w-4 h-4 text-[#A3FF12]" />
+          <div className="w-8 h-8 rounded-[8px] bg-[#39FF6A]/[0.08] border border-[#39FF6A]/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Cpu className="w-4 h-4 text-[#39FF6A]" />
           </div>
           <div>
             <p className="text-[13px] font-semibold text-white mb-1.5">
@@ -280,7 +280,7 @@ export default function DownloadsContent() {
                 ["Auto Preprocessing", "ffmpeg crops wide video to 720p"],
                 ["3 AI Modes", "Background, Relight, VFX"],
               ].map(([k, v]) => (
-                <div key={k} className="rounded-[7px] bg-[#0D0D0F] border border-white/[0.05] px-3 py-2">
+                <div key={k} className="rounded-[7px] bg-[#080808] border border-[#111] px-3 py-2">
                   <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>
                   <p className="text-[12px] font-medium text-[#D1D5DB]">{v}</p>
                 </div>
@@ -297,13 +297,13 @@ export default function DownloadsContent() {
         <Accordion title="Panel not visible in Window → Extensions" icon={AlertTriangle}>
           <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
             {[
-              <>Confirm <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">PlayerDebugMode = 1</code> is set for the correct CSXS version. Premiere 2022+ uses CSXS.11. The installer sets all versions automatically.</>,
-              <>The extension folder must be named exactly <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">com.prysmor.panel</code> inside the CEP extensions directory. Remove any older <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">prysmor-panel</code> folder if present — two folders with the same bundle ID cause conflicts.</>,
+              <>Confirm <code className="text-[#39FF6A] bg-white/[0.04] px-1 rounded">PlayerDebugMode = 1</code> is set for the correct CSXS version. Premiere 2022+ uses CSXS.11. The installer sets all versions automatically.</>,
+              <>The extension folder must be named exactly <code className="text-[#39FF6A] bg-white/[0.04] px-1 rounded">com.prysmor.panel</code> inside the CEP extensions directory. Remove any older <code className="text-[#39FF6A] bg-white/[0.04] px-1 rounded">prysmor-panel</code> folder if present — two folders with the same bundle ID cause conflicts.</>,
               <>Fully <strong className="text-[#D1D5DB]">quit and relaunch</strong> Premiere Pro after installation.</>,
-              <>Check that <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">CSXS/manifest.xml</code> is present inside the extension folder.</>,
+              <>Check that <code className="text-[#39FF6A] bg-white/[0.04] px-1 rounded">CSXS/manifest.xml</code> is present inside the extension folder.</>,
             ].map((s, i) => (
               <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
+                <span className="text-[#39FF6A] font-bold flex-shrink-0">→</span>
                 <span>{s}</span>
               </div>
             ))}
@@ -314,11 +314,11 @@ export default function DownloadsContent() {
           <div className="space-y-3 pt-2 text-[12px] text-[#9CA3AF] leading-relaxed">
             {[
               <>The AI engine requires a video width/height ratio of at most <strong className="text-[#D1D5DB]">2.358:1</strong>. The panel automatically detects and crops wide videos using bundled ffmpeg.</>,
-              <>If ffmpeg is not found (macOS without system ffmpeg), the panel will show an error. Install ffmpeg via Homebrew: <code className="text-[#A3FF12] bg-white/[0.04] px-1 rounded">brew install ffmpeg</code></>,
+              <>If ffmpeg is not found (macOS without system ffmpeg), the panel will show an error. Install ffmpeg via Homebrew: <code className="text-[#39FF6A] bg-white/[0.04] px-1 rounded">brew install ffmpeg</code></>,
               <>If the source clip is still blocked, export your Premiere sequence as a 1920×1080 H.264 file and generate from that file instead.</>,
             ].map((s, i) => (
               <div key={i} className="flex gap-2">
-                <span className="text-[#A3FF12] font-bold flex-shrink-0">→</span>
+                <span className="text-[#39FF6A] font-bold flex-shrink-0">→</span>
                 <span>{s}</span>
               </div>
             ))}
@@ -346,7 +346,7 @@ export default function DownloadsContent() {
                     <tr key={v}>
                       <td className="py-2 pr-6 text-[#D1D5DB]">{v}</td>
                       <td className="py-2 pr-6">{cep}</td>
-                      <td className="py-2 font-mono text-[#A3FF12]/80">{key}</td>
+                      <td className="py-2 font-mono text-[#39FF6A]/80">{key}</td>
                     </tr>
                   ))}
                 </tbody>

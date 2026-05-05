@@ -54,7 +54,7 @@ function CreditsBar({ credits, total }: { credits: number; total: number }) {
       </div>
       <div className="h-[4px] w-full rounded-full bg-white/[0.07] overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${low ? 'bg-orange-400' : 'bg-[#A3FF12]'}`}
+          className={`h-full rounded-full transition-all duration-500 ${low ? 'bg-orange-400' : 'bg-[#39FF6A]'}`}
           style={{ width: `${pct}%`, opacity: 0.9 }}
         />
       </div>
@@ -103,10 +103,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
       {/* ── Success banner (plan upgrade) ── */}
       {showUpgraded && (
-        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#A3FF12]/20 bg-[#A3FF12]/[0.06] px-4 py-3">
-          <CheckCircle2 className="w-4 h-4 text-[#A3FF12] flex-shrink-0 mt-0.5" />
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#39FF6A]/20 bg-[#39FF6A]/[0.06] px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-[#39FF6A] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-semibold text-[#A3FF12]">Payment received — thank you!</p>
+            <p className="text-[13px] font-semibold text-[#39FF6A]">Payment received — thank you!</p>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
               Your plan is being activated. If it doesn&apos;t appear as active within 30 seconds,{' '}
               <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
@@ -119,10 +119,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
       {/* ── Success banner (credit top-up) ── */}
       {showTopUp && (
-        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#A3FF12]/20 bg-[#A3FF12]/[0.06] px-4 py-3">
-          <CheckCircle2 className="w-4 h-4 text-[#A3FF12] flex-shrink-0 mt-0.5" />
+        <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#39FF6A]/20 bg-[#39FF6A]/[0.06] px-4 py-3">
+          <CheckCircle2 className="w-4 h-4 text-[#39FF6A] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-semibold text-[#A3FF12]">Credits added — thank you!</p>
+            <p className="text-[13px] font-semibold text-[#39FF6A]">Credits added — thank you!</p>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
               Your credits are being added. If your balance doesn&apos;t update within 30 seconds,{' '}
               <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
@@ -157,8 +157,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
       )}
 
       {/* Current plan */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Current plan</p>
-      <div className="rounded-[12px] border border-[#A3FF12]/[0.14] bg-[#111113] p-5 mb-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3">Current plan</p>
+      <div className="rounded-[12px] border border-[#39FF6A]/[0.14] bg-[#0c0c0c] p-5 mb-4">
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-[20px] font-semibold text-white">{planName}</p>
@@ -172,10 +172,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
           </div>
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${
             isActive
-              ? 'text-[#A3FF12] border-[#A3FF12]/20 bg-[#A3FF12]/[0.07]'
+              ? 'text-[#39FF6A] border-[#39FF6A]/20 bg-[#39FF6A]/[0.07]'
               : 'text-[#6B7280] border-white/[0.08] bg-white/[0.03]'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#A3FF12]' : 'bg-[#4B5563]'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#39FF6A]' : 'bg-[#4B5563]'}`} />
             {isActive ? 'Active' : 'Inactive'}
           </span>
         </div>
@@ -192,7 +192,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           ) : !isActive ? (
             <Link
               href="/#pricing"
-              className="px-3.5 py-2 rounded-[8px] text-[12px] font-semibold bg-[#A3FF12] text-[#050505] hover:bg-[#B6FF3C] transition-colors"
+              className="px-3.5 py-2 rounded-[8px] text-[12px] font-semibold bg-[#39FF6A] text-[#050505] hover:bg-[#4fff7e] transition-colors"
             >
               Subscribe now →
             </Link>
@@ -208,12 +208,12 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
       {/* Credits */}
       <div className="flex items-center justify-between mt-8 mb-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151]">Credits</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333]">Credits</p>
         {isActive && <TopUpButton />}
       </div>
-      <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-4">
+      <div className="rounded-[12px] border border-[#161616] bg-[#0c0c0c] p-5 mb-4">
         <CreditsBar credits={credits} total={creditsTotal} />
-        <div className="mt-4 pt-4 border-t border-white/[0.05] text-[12px] text-[#4B5563]">
+        <div className="mt-4 pt-4 border-t border-[#111] text-[12px] text-[#4B5563]">
           1 second of AI VFX = 4 credits · Credits reset on each billing date
         </div>
       </div>
@@ -221,38 +221,38 @@ export default async function BillingPage({ searchParams }: PageProps) {
       {/* Upgrade CTAs — only for active subscribers not yet on Exclusive */}
       {isActive && plan !== 'exclusive' && (
         <>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3 mt-8">Upgrade for more credits</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Upgrade for more credits</p>
           <div className="grid sm:grid-cols-2 gap-3">
             {plan === 'starter' && (
               <Link
                 href="/checkout?plan=pro&billing=monthly"
-                className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#111113] hover:border-[#A3FF12]/30 hover:bg-[#A3FF12]/[0.03] transition-all group"
+                className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
               >
                 <span className="text-[14px] font-semibold text-white">Pro — $49/mo</span>
                 <span className="text-[12px] text-[#6B7280]">2 000 credits · 500s of AI VFX</span>
-                <span className="mt-2 text-[12px] text-[#A3FF12] group-hover:underline">Upgrade →</span>
+                <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
               </Link>
             )}
             <Link
               href="/checkout?plan=exclusive&billing=monthly"
-              className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#111113] hover:border-[#A3FF12]/30 hover:bg-[#A3FF12]/[0.03] transition-all group"
+              className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
             >
               <span className="text-[14px] font-semibold text-white">Exclusive — $149/mo</span>
               <span className="text-[12px] text-[#6B7280]">4 000 credits · 1 000s of AI VFX</span>
-              <span className="mt-2 text-[12px] text-[#A3FF12] group-hover:underline">Upgrade →</span>
+              <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
             </Link>
           </div>
         </>
       )}
 
       {/* Plan comparison */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3 mt-8">Plan comparison</p>
-      <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Plan comparison</p>
+      <div className="rounded-[12px] border border-[#161616] bg-[#0c0c0c] overflow-hidden">
         <table className="w-full text-[12px]">
           <thead>
-            <tr className="border-b border-white/[0.05]">
+            <tr className="border-b border-[#111]">
               {['Plan', 'Credits/mo', 'AI VFX time', 'Price/mo', ''].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-[#374151] uppercase tracking-[0.07em]">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-[#333] uppercase tracking-[0.07em]">{h}</th>
               ))}
             </tr>
           </thead>
@@ -262,11 +262,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
               { name: 'Pro',       credits: 2000, seconds: '500s',  price: '$49',  planKey: 'pro'       },
               { name: 'Exclusive', credits: 4000, seconds: '1000s', price: '$149', planKey: 'exclusive' },
             ].map((row) => (
-              <tr key={row.name} className={`hover:bg-white/[0.02] transition-colors ${plan === row.planKey ? 'bg-[#A3FF12]/[0.03]' : ''}`}>
+              <tr key={row.name} className={`hover:bg-white/[0.02] transition-colors ${plan === row.planKey ? 'bg-[#39FF6A]/[0.03]' : ''}`}>
                 <td className="px-4 py-3 font-medium text-[#D1D5DB]">
                   {row.name}
                   {plan === row.planKey && (
-                    <span className="ml-2 text-[10px] text-[#A3FF12] bg-[#A3FF12]/10 px-1.5 py-0.5 rounded-full">Current</span>
+                    <span className="ml-2 text-[10px] text-[#39FF6A] bg-[#39FF6A]/10 px-1.5 py-0.5 rounded-full">Current</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-[#9CA3AF]">{row.credits.toLocaleString()}</td>
@@ -276,7 +276,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                   {(!isActive || plan !== row.planKey) && (
                     <Link
                       href={`/checkout?plan=${row.planKey}&billing=monthly`}
-                      className="text-[11px] text-[#A3FF12] hover:underline underline-offset-2"
+                      className="text-[11px] text-[#39FF6A] hover:underline underline-offset-2"
                     >
                       {!isActive
                         ? 'Subscribe'
@@ -293,8 +293,8 @@ export default async function BillingPage({ searchParams }: PageProps) {
       </div>
 
       {/* Payment */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3 mt-8">Payment</p>
-      <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Payment</p>
+      <div className="rounded-[12px] border border-[#161616] bg-[#0c0c0c] p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <CreditCard className="w-4 h-4 text-[#4B5563]" />
@@ -307,7 +307,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
               href={portalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[12px] text-[#A3FF12] hover:underline underline-offset-2"
+              className="text-[12px] text-[#39FF6A] hover:underline underline-offset-2"
             >
               Manage ↗
             </a>

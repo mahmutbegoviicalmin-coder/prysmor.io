@@ -16,51 +16,153 @@ interface HowItWorksProps {
 }
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const GREEN = "#39FF6A";
 
-export default function HowItWorks({ title = "How it works", steps }: HowItWorksProps) {
+const STEP_TITLES = [
+  "Pick the clip.",
+  "Type the shot.",
+  "It's on your timeline.",
+];
+
+const STEP_DESCS = [
+  "Select your in/out point on the Premiere timeline. One click sends the clip to the Prysmor panel. Nothing else moves.",
+  "Write the effect in plain language. Hard to describe? Drop a reference image and Prysmor matches the light, color, and mood exactly.",
+  "Your effect renders at 4K and lands back on the timeline automatically. No exporting, no round-trips, no lost progress.",
+];
+
+const STEP_NUMBERS = ["01", "02", "03"];
+
+export default function HowItWorks({ steps }: HowItWorksProps) {
   return (
-    <section className="relative py-24 overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
-      <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8">
+    <section
+      className="hiw-section"
+      style={{
+        background: "radial-gradient(ellipse 60% 40% at 50% 50%, rgba(57,255,106,0.04) 0%, transparent 65%), #080808",
+        padding: "100px 0px 100px 40px",
+        borderTop: "1px solid #0f0f0f",
+        borderLeft: "2px solid rgba(57,255,106,0.15)",
+        paddingLeft: "40px",
+      }}
+    >
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+
+        {/* Section label + heading */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5 }}
-          className="mb-14 text-center"
+          className="hiw-heading"
+          style={{ marginBottom: "64px" }}
         >
-          <h2 className="font-heading text-[28px] sm:text-[36px] font-bold text-white tracking-tight">{title}</h2>
+          <div className="flex items-center gap-3" style={{ marginBottom: "20px" }}>
+            <div style={{ width: "4px", height: "16px", borderRadius: "100px", background: GREEN }} />
+            <span
+              className="font-bold uppercase"
+              style={{ fontSize: "11px", letterSpacing: "0.14em", color: GREEN }}
+            >
+              // THREE STEPS
+            </span>
+          </div>
+          <h2
+            className="font-extrabold text-white"
+            style={{
+              fontSize: "clamp(32px, 4vw, 52px)",
+              letterSpacing: "-1.5px",
+              lineHeight: 1.1,
+            }}
+          >
+            Simple by design.
+          </h2>
         </motion.div>
 
-        <div className="grid sm:grid-cols-3 gap-6 relative">
-          {/* connector line */}
-          <div className="hidden sm:block absolute top-10 left-1/6 right-1/6 h-px"
-            style={{ background: "linear-gradient(90deg,transparent,rgba(163,255,18,0.18),rgba(163,255,18,0.18),transparent)" }} />
+        {/* Step rows */}
+        <div className="hiw-cards-wrap">
+        {steps.map((step, i) => (
+          <motion.div key={step.number}>
+            {/* Gradient divider */}
+            <div className="hiw-divider" style={{
+              height: "1px",
+              background: "linear-gradient(90deg, rgba(57,255,106,0.08) 0%, #111 30%, #111 70%, transparent 100%)",
+            }} />
 
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <motion.div
-                key={step.title}
-                initial={{ opacity: 0, y: 22 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.5, delay: i * 0.1, ease }}
-                className="flex flex-col items-center text-center gap-4 relative"
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.45, delay: i * 0.08, ease }}
+              className="group step-row"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "80px 1fr 1fr",
+                alignItems: "start",
+                padding: "36px 0",
+              }}
+            >
+              {/* Step number + green dot */}
+              <span
+                className="step-number"
+                style={{
+                  fontSize: "12px",
+                  color: "#555",
+                  fontWeight: 600,
+                  letterSpacing: "2px",
+                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                  paddingTop: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
               >
-                {/* Step circle */}
-                <div className="relative z-10 w-14 h-14 rounded-full border border-accent/25 bg-accent/[0.08] flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-6 h-6 text-accent" />
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent text-background text-[10px] font-bold flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                </div>
-                <h3 className="font-heading text-[16px] font-semibold text-white">{step.title}</h3>
-                <p className="text-[13px] text-ink-muted leading-relaxed max-w-[220px]">{step.desc}</p>
-              </motion.div>
-            );
-          })}
+                <span style={{
+                  width: "4px",
+                  height: "4px",
+                  borderRadius: "50%",
+                  background: "rgba(57,255,106,0.5)",
+                  display: "inline-block",
+                  flexShrink: 0,
+                }} />
+                {STEP_NUMBERS[i]}
+              </span>
+
+              {/* Title — green on hover */}
+              <h3
+                className="transition-colors duration-200 group-hover:text-[#39FF6A] step-title"
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 600,
+                  color: "white",
+                  letterSpacing: "-0.5px",
+                  lineHeight: 1.2,
+                  paddingRight: "40px",
+                  margin: 0,
+                }}
+              >
+                {STEP_TITLES[i]}
+              </h3>
+
+              {/* Description */}
+              <p
+                className="step-desc"
+                style={{
+                  fontSize: "14px",
+                  color: "#777",
+                  fontWeight: 300,
+                  lineHeight: 1.75,
+                  margin: 0,
+                }}
+              >
+                {STEP_DESCS[i]}
+              </p>
+            </motion.div>
+          </motion.div>
+        ))}
         </div>
+        {/* Final bottom divider */}
+        <div className="hiw-divider" style={{
+          height: "1px",
+          background: "linear-gradient(90deg, rgba(57,255,106,0.08) 0%, #111 30%, #111 70%, transparent 100%)",
+        }} />
       </div>
     </section>
   );

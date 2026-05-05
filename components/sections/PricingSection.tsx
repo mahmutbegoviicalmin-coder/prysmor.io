@@ -4,10 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Info, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/Badge";
-import { cn } from "@/lib/utils";
+import { X, Check, ShieldCheck } from "lucide-react";
 
 declare global {
   interface Window {
@@ -23,19 +20,18 @@ export interface PriceTier {
   id: string;
   name: string;
   monthlyPrice: number;
-  yearlyPrice?: number;      // total yearly price (e.g. 299)
-  yearlyPerDay?: string;     // e.g. "0.87"
-  yearlySave?: number;       // e.g. 49
+  yearlyPrice?: number;
+  yearlyPerDay?: string;
+  yearlySave?: number;
   description: string;
-  unit?: string;             // monthly units label
-  yearlyUnit?: string;       // yearly units label (bigger allowance)
+  unit?: string;
+  yearlyUnit?: string;
   featured?: boolean;
   badge?: string;
   bullets: string[];
   cta: string;
   ctaHref: string;
   onCtaClick?: () => void;
-  /** Lemon Squeezy embed checkout URLs — opens as popup overlay */
   lsMonthlyUrl?: string;
   lsYearlyUrl?: string;
 }
@@ -51,9 +47,22 @@ interface PricingSectionProps {
 }
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const GREEN = "#39FF6A";
+
+const CTA_LABELS: Record<string, string> = {
+  starter: "Start creating",
+  pro: "Choose Pro",
+  exclusive: "Choose Exclusive",
+};
+
+const FEATURES_LABEL: Record<string, string> = {
+  starter: "Plan includes",
+  pro: "All Starter features, plus",
+  exclusive: "All Pro features, plus",
+};
 
 export default function PricingSection({
-  title = "Pick your plan",
+  title = "Pick a plan",
   subtitle,
   tiers,
   showToggle = false,
@@ -67,215 +76,444 @@ export default function PricingSection({
 
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent) => {
     e.preventDefault();
-    const userId = user?.id ?? '';
-    const url = `${baseUrl}?embed=1&dark=1${userId ? `&checkout[custom][user_id]=${userId}` : ''}`;
-
+    const userId = user?.id ?? "";
+    const url = `${baseUrl}?embed=1&dark=1${userId ? `&checkout[custom][user_id]=${userId}` : ""}`;
     if (window.LemonSqueezy?.Url?.Open) {
       window.LemonSqueezy.Url.Open(url);
     } else if (window.createLemonSqueezy) {
       window.createLemonSqueezy();
       window.LemonSqueezy?.Url?.Open(url);
     } else {
-      // Fallback: lemon.js not yet loaded, open in same tab
       window.location.href = url;
     }
   }, [user?.id]);
 
   return (
-    <section className="relative py-24 overflow-hidden" id="pricing">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
-      <div
-        className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-[800px] h-[400px] rounded-full blur-[130px]"
-        style={{ background: "radial-gradient(ellipse,rgba(163,255,18,0.05) 0%,transparent 65%)" }}
-        aria-hidden="true"
-      />
-      <div className="mx-auto max-w-container px-4 sm:px-6 lg:px-8 relative">
+    <section
+      id="pricing"
+      style={{
+        background: "#0a0a0a",
+        padding: "100px 20px 120px",
+        borderTop: "1px solid #111",
+        textAlign: "center",
+      }}
+    >
+      <div className="mx-auto" style={{ maxWidth: "1060px" }}>
+
+        {/* ── Heading ───────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5 }}
-          className="mb-12 flex flex-col items-start gap-5"
+          style={{ marginBottom: "56px" }}
         >
-          <div className="flex items-center gap-4 flex-wrap">
-            <h2 className="font-heading text-[28px] sm:text-[36px] font-bold text-white tracking-tight">{title}</h2>
-            {infoContent && (
-              <button
-                onClick={() => setInfoOpen(true)}
-                className="flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-accent transition-colors border border-white/[0.10] rounded-full px-3 py-1.5 hover:border-accent/30"
-              >
-                <Info className="w-3.5 h-3.5" />
-                What are seconds?
-              </button>
-            )}
-          </div>
-          {subtitle && <p className="text-ink-muted text-[14px] max-w-lg">{subtitle}</p>}
+          <p style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "3px",
+            color: GREEN,
+            marginBottom: "20px",
+          }}>
+            Pricing
+          </p>
+          <h2 style={{
+            fontSize: "clamp(32px, 4.5vw, 56px)",
+            fontWeight: 800,
+            color: "white",
+            letterSpacing: "-2px",
+            lineHeight: 1.08,
+            margin: "0 0 16px",
+          }}>
+            {title}
+          </h2>
+          {subtitle && (
+            <p style={{ fontSize: "15px", color: "#666", fontWeight: 400, lineHeight: 1.6, margin: 0 }}>
+              {subtitle}
+            </p>
+          )}
 
+          {/* Radio toggle */}
           {showToggle && (
-            <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.05] border border-white/[0.08]">
-              <button
-                onClick={() => setYearly(false)}
-                className={cn(
-                  "relative px-5 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
-                  !yearly
-                    ? "bg-white text-black shadow-sm"
-                    : "text-ink-muted hover:text-white"
-                )}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setYearly(true)}
-                className={cn(
-                  "relative flex items-center gap-2 px-5 py-2 rounded-lg text-[13px] font-medium transition-all duration-200",
-                  yearly
-                    ? "bg-white text-black shadow-sm"
-                    : "text-ink-muted hover:text-white"
-                )}
-              >
-                Yearly
-                <span className={cn(
-                  "text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-all duration-200",
-                  yearly ? "bg-accent text-black" : "bg-accent/20 text-accent"
-                )}>
-                  Save 30%
-                </span>
-              </button>
+            <div className="inline-flex items-center gap-6" style={{ marginTop: "36px" }}>
+              {([false, true] as const).map((isYr) => (
+                <label
+                  key={String(isYr)}
+                  className="inline-flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => setYearly(isYr)}
+                >
+                  <span style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    border: `2px solid ${yearly === isYr ? GREEN : "#333"}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    transition: "border-color 0.15s",
+                  }}>
+                    {yearly === isYr && (
+                      <span style={{
+                        width: "9px",
+                        height: "9px",
+                        borderRadius: "50%",
+                        background: GREEN,
+                      }} />
+                    )}
+                  </span>
+                  <span style={{
+                    fontSize: "14px",
+                    fontWeight: yearly === isYr ? 600 : 400,
+                    color: yearly === isYr ? "white" : "#555",
+                    transition: "color 0.15s",
+                  }}>
+                    {isYr ? "Annually" : "Monthly"}
+                  </span>
+                  {isYr && (
+                    <span style={{
+                      background: "rgba(57,255,106,0.12)",
+                      border: "1px solid rgba(57,255,106,0.2)",
+                      color: GREEN,
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                    }}>
+                      Save 30%
+                    </span>
+                  )}
+                </label>
+              ))}
             </div>
           )}
         </motion.div>
 
-        <div className={cn(
-          "grid gap-5",
-          tiers.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"
-        )}>
+        {/* ── Cards ─────────────────────────────────────────────────────── */}
+        <div
+          className={tiers.length === 2 ? "grid sm:grid-cols-2" : "grid sm:grid-cols-2 lg:grid-cols-3"}
+          style={{ gap: "16px", alignItems: "stretch" }}
+        >
           {tiers.map((tier, i) => {
-            const isYearly  = yearly && !!tier.yearlyPrice;
-            const price     = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
-            const suffix    = isYearly ? "/yr" : "/mo";
-            const origYr    = tier.monthlyPrice * 12; // e.g. $358.80
-            const fmtPrice  = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
-            const fmtOrigYr = Number.isInteger(origYr) ? String(origYr) : origYr.toFixed(2);
-            // Append billing interval to checkout links so the server knows which variant to use
-            const resolvedHref = tier.ctaHref.startsWith('/checkout')
-              ? `${tier.ctaHref}&billing=${isYearly ? 'yearly' : 'monthly'}`
+            const isYearly    = yearly && !!tier.yearlyPrice;
+            const price       = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
+            const origYr      = tier.monthlyPrice * 12;
+            const fmtPrice    = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
+            const fmtOrigYr   = Number.isInteger(origYr) ? String(origYr) : origYr.toFixed(2);
+            const resolvedHref = tier.ctaHref.startsWith("/checkout")
+              ? `${tier.ctaHref}&billing=${isYearly ? "yearly" : "monthly"}`
               : tier.ctaHref;
+            const lsBaseUrl   = isYearly ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl) : tier.lsMonthlyUrl;
+            const activeUnit  = isYearly && tier.yearlyUnit ? tier.yearlyUnit : tier.unit;
+            const ctaLabel    = CTA_LABELS[tier.id] ?? tier.cta;
+            const featLabel   = FEATURES_LABEL[tier.id] ?? "Plan includes";
 
-            // Pick the right LS base URL based on billing toggle
-            const lsBaseUrl = isYearly ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl) : tier.lsMonthlyUrl;
+            const [unitMain, unitSub] = activeUnit
+              ? activeUnit.split("≈").map((s) => s.trim())
+              : ["", ""];
+
+            /* CTA button */
+            const renderBtn = () => {
+              const btnStyle: React.CSSProperties = {
+                width: "100%",
+                padding: "13px 20px",
+                fontSize: "14px",
+                fontWeight: 600,
+                borderRadius: "8px",
+                cursor: "pointer",
+                letterSpacing: "0.01em",
+                transition: "background 0.15s, box-shadow 0.15s",
+                // All cards: white button with dark text — matches reference exactly
+                background: "rgba(255,255,255,0.92)",
+                color: "#0a0a0a",
+                border: "none",
+                boxShadow: tier.featured
+                  ? "0 0 28px rgba(57,255,106,0.25)"
+                  : "none",
+              };
+
+              const enter = (e: React.MouseEvent) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.background = "white";
+                if (tier.featured) el.style.boxShadow = "0 0 40px rgba(57,255,106,0.4)";
+              };
+              const leave = (e: React.MouseEvent) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.background = "rgba(255,255,255,0.92)";
+                if (tier.featured) el.style.boxShadow = "0 0 28px rgba(57,255,106,0.25)";
+              };
+
+              if (lsBaseUrl) {
+                return (
+                  <button
+                    onClick={(e) => openLSOverlay(lsBaseUrl, e)}
+                    className="inline-flex items-center justify-center"
+                    style={btnStyle}
+                    onMouseEnter={enter}
+                    onMouseLeave={leave}
+                  >
+                    {ctaLabel}
+                  </button>
+                );
+              }
+              if (tier.onCtaClick ?? onCtaClick) {
+                return (
+                  <button
+                    onClick={tier.onCtaClick ?? onCtaClick}
+                    className="inline-flex items-center justify-center"
+                    style={btnStyle}
+                    onMouseEnter={enter}
+                    onMouseLeave={leave}
+                  >
+                    {ctaLabel}
+                  </button>
+                );
+              }
+              return (
+                <Link
+                  href={resolvedHref}
+                  className="inline-flex items-center justify-center"
+                  style={{ ...btnStyle, textDecoration: "none" }}
+                >
+                  {ctaLabel}
+                </Link>
+              );
+            };
+
             return (
               <motion.div
                 key={tier.id}
-                initial={{ opacity: 0, y: 22 }}
+                initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.5, delay: i * 0.09, ease }}
-                className="relative h-full"
+                transition={{ duration: 0.55, delay: i * 0.08, ease }}
+                className={`pricing-card${tier.featured ? " pricing-card--featured" : ""}`}
+                style={{
+                  position: "relative",
+                  borderRadius: "14px",
+                  padding: tier.featured ? "36px 28px" : "32px 24px",
+                  textAlign: "left",
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  background: tier.featured
+                    ? "linear-gradient(145deg, #0f2e14 0%, #0a1f0d 35%, #061409 65%, #040e06 100%)"
+                    : "#111213",
+                  border: tier.featured
+                    ? `1px solid rgba(57,255,106,0.28)`
+                    : "1px solid #1c1c1c",
+                  borderTop: tier.featured
+                    ? `1px solid rgba(57,255,106,0.28)`
+                    : "1px solid #1c1c1c",
+                  transform: tier.featured ? "translateY(-14px)" : "none",
+                  boxShadow: tier.featured
+                    ? `0 0 0 1px rgba(57,255,106,0.1), 0 20px 60px rgba(57,255,106,0.12), 0 40px 80px rgba(0,0,0,0.5)`
+                    : "0 8px 32px rgba(0,0,0,0.4)",
+                }}
               >
-                {tier.featured && (
-                  <div
-                    className="pointer-events-none absolute -inset-px rounded-[20px] blur-lg"
-                    style={{ background: "rgba(163,255,18,0.06)" }}
-                  />
-                )}
-                <div className={cn(
-                  "relative h-full rounded-[18px] border flex flex-col overflow-hidden transition-all duration-300",
-                  "hover:-translate-y-0.5",
-                  tier.featured
-                    ? "border-accent/25 bg-[linear-gradient(160deg,rgba(163,255,18,0.07)_0%,rgba(15,16,18,1)_55%)] shadow-glow-card"
-                    : "border-white/[0.08] bg-surface hover:border-white/[0.14]"
-                )}>
+
+                {/* ── Content (above overlays) ─────────────────────────── */}
+                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
+
+                  {/* ① Badge — featured only */}
                   {tier.featured && (
-                    <div
-                      className="absolute top-0 inset-x-0 h-[1.5px]"
-                      style={{ background: "linear-gradient(90deg,transparent,#A3FF12 40%,#22FFB0 60%,transparent)" }}
-                    />
+                    <div style={{ marginBottom: "12px" }}>
+                      <span style={{
+                        display: "inline-block",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        letterSpacing: "0.5px",
+                        color: GREEN,
+                        background: "rgba(57,255,106,0.08)",
+                        border: "1px solid rgba(57,255,106,0.2)",
+                        borderRadius: "4px",
+                        padding: "3px 8px",
+                      }}>
+                        Most popular
+                      </span>
+                    </div>
                   )}
-                  <div className="p-7 flex flex-col gap-6 flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className={cn("text-[14px] font-semibold", tier.featured ? "text-accent" : "text-ink-muted")}>
-                          {tier.name}
-                        </p>
-                        {tier.badge && (
-                          <Badge variant="accent" className="mt-1 text-[10px]">{tier.badge}</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      {/* Price — all elements grouped under same key so they switch atomically */}
-                      <div key={isYearly ? "yr" : "mo"}>
-                        <div className="flex items-end gap-1.5">
-                          <span className="font-heading text-[42px] font-bold text-white leading-none tracking-tight tabular-nums">
-                            ${fmtPrice(price)}
-                          </span>
-                          <span className="text-ink-muted pb-1 text-[14px]">{suffix}</span>
-                        </div>
 
-                        {/* Per-day always visible as a teaser; Save + strikethrough only on yearly */}
-                        {tier.yearlyPerDay && (
-                          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                            <span className="text-[12px] text-ink-faint">${tier.yearlyPerDay}/day</span>
-                            {isYearly && (
-                              <>
-                                <span className="text-[12px] text-ink-faint line-through">${fmtOrigYr}</span>
-                                {tier.yearlySave && (
-                                  <span className="text-[11px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-md">
-                                    Save ${tier.yearlySave}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                  {/* Plan name */}
+                  <p style={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: tier.featured ? "rgba(57,255,106,0.9)" : "#888",
+                    letterSpacing: "0.02em",
+                    margin: "0 0 20px",
+                  }}>
+                    {tier.name}
+                  </p>
 
-                      {(() => {
-                        const activeUnit = isYearly && tier.yearlyUnit ? tier.yearlyUnit : tier.unit;
-                        return activeUnit ? (
-                          <div key={isYearly ? "unit-yr" : "unit-mo"} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.07]">
-                            <span className="text-[13px] font-semibold text-white">{activeUnit.split(" ")[0]}</span>
-                            <span className="text-[11px] text-ink-faint">{activeUnit.split(" ").slice(1).join(" ")}</span>
-                          </div>
-                        ) : null;
-                      })()}
-                      <p className="mt-2.5 text-[13px] text-ink-subtle leading-relaxed">{tier.description}</p>
+                  {/* ② Price */}
+                  <div key={isYearly ? "yr" : "mo"} style={{ marginBottom: "6px" }}>
+                    <div className="flex items-baseline" style={{ gap: "4px" }}>
+                      <span style={{
+                        fontSize: "16px",
+                        fontWeight: 500,
+                        color: "white",
+                        lineHeight: 1,
+                        alignSelf: "flex-start",
+                        marginTop: "6px",
+                        opacity: 0.7,
+                      }}>$</span>
+                      <span style={{
+                        fontSize: "clamp(40px, 10vw, 52px)",
+                        fontWeight: 800,
+                        color: "white",
+                        letterSpacing: "-2px",
+                        lineHeight: 1,
+                      }}>
+                        {fmtPrice(price)}
+                      </span>
+                      <span style={{
+                        fontSize: "13px",
+                        color: "#555",
+                        fontWeight: 400,
+                        marginLeft: "2px",
+                      }}>
+                        {isYearly ? "per year" : "per month"}
+                      </span>
                     </div>
-                    <ul className="space-y-2.5 flex-1">
-                      {tier.bullets.map((b) => (
-                        <li key={b} className="flex items-start gap-2.5">
-                          <Check className={cn("w-3.5 h-3.5 mt-0.5 flex-shrink-0", tier.featured ? "text-accent" : "text-ink-subtle")} />
-                          <span className="text-[13px] text-ink-subtle">{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    {lsBaseUrl ? (
-                      /* Lemon Squeezy overlay checkout — onClick forces popup, never navigates */
-                      <button
-                        onClick={(e) => openLSOverlay(lsBaseUrl, e)}
-                        className={cn(
-                          "w-full mt-auto inline-flex items-center justify-center rounded-lg text-[13px] font-semibold h-10 px-4 transition-all duration-200 cursor-pointer",
-                          tier.featured
-                            ? "bg-accent text-black hover:bg-accent/90"
-                            : "border border-white/[0.15] text-white hover:bg-white/[0.06] hover:border-white/25"
-                        )}
-                      >
-                        {tier.cta}
-                      </button>
-                    ) : (tier.onCtaClick ?? onCtaClick) ? (
-                      <Button
-                        variant={tier.featured ? "default" : "outline"}
-                        className="w-full mt-auto"
-                        onClick={tier.onCtaClick ?? onCtaClick}
-                      >
-                        {tier.cta}
-                      </Button>
-                    ) : (
-                      <Button variant={tier.featured ? "default" : "outline"} className="w-full mt-auto" asChild>
-                        <Link href={resolvedHref}>{tier.cta}</Link>
-                      </Button>
+
+                    {/* Per-day */}
+                    {tier.yearlyPerDay && (
+                      <p style={{ fontSize: "12px", color: "#555", margin: "6px 0 0" }}>
+                        ${tier.yearlyPerDay}/day
+                      </p>
+                    )}
+                    {isYearly && tier.yearlySave && (
+                      <p style={{ fontSize: "11px", color: "#555", margin: "4px 0 0" }}>
+                        <span style={{ textDecoration: "line-through", color: "#3a3a3a", marginRight: "4px" }}>${fmtOrigYr}</span>
+                        Save ${tier.yearlySave}
+                      </p>
                     )}
                   </div>
+
+                  {/* ③ Description */}
+                  <p style={{
+                    fontSize: "13px",
+                    color: tier.featured ? "rgba(200,255,210,0.55)" : "#888",
+                    fontWeight: 400,
+                    lineHeight: 1.5,
+                    margin: "12px 0 20px",
+                  }}>
+                    {tier.description}
+                  </p>
+
+                  {/* ④ Credits badge */}
+                  {unitMain && (
+                    <div
+                      key={isYearly ? "unit-yr" : "unit-mo"}
+                      style={{
+                        display: "inline-flex",
+                        flexDirection: "column",
+                        background: tier.featured
+                          ? "rgba(57,255,106,0.07)"
+                          : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${tier.featured ? "rgba(57,255,106,0.2)" : "rgba(255,255,255,0.08)"}`,
+                        borderRadius: "7px",
+                        padding: "7px 14px",
+                        marginBottom: "20px",
+                        gap: "2px",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      <span style={{ fontSize: "13px", fontWeight: 600 }}>
+                        {unitMain.split(" ").map((word, wi) => {
+                          const isNum = /^\d+s$/.test(word);
+                          return (
+                            <span key={wi} style={{
+                              color: isNum ? "white" : "#555",
+                              fontWeight: isNum ? 700 : 400,
+                              marginRight: wi < unitMain.split(" ").length - 1 ? "4px" : "0",
+                            }}>
+                              {word}
+                            </span>
+                          );
+                        })}
+                      </span>
+                      {unitSub && (
+                        <span style={{ fontSize: "11px", color: "#444", fontWeight: 300 }}>
+                          ≈ {unitSub}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ⑤ CTA button */}
+                  {renderBtn()}
+
+                  {/* ⑥ Divider */}
+                  <div style={{
+                    height: "1px",
+                    background: tier.featured ? "rgba(57,255,106,0.15)" : "rgba(255,255,255,0.07)",
+                    margin: "22px 0 18px",
+                  }} />
+
+                  {/* ⑦ Features label */}
+                  <p style={{
+                    fontSize: "12px",
+                    color: tier.featured ? "rgba(200,255,210,0.5)" : "#777",
+                    fontWeight: 400,
+                    margin: "0 0 14px",
+                  }}>
+                    {featLabel}
+                  </p>
+
+                  {/* ⑧ Features list */}
+                  <ul style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: "0 0 auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}>
+                    {tier.bullets.map((b) => (
+                      <li key={b} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                        <span style={{
+                          width: "17px",
+                          height: "17px",
+                          borderRadius: "50%",
+                          background: "rgba(57,255,106,0.12)",
+                          border: "1px solid rgba(57,255,106,0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginTop: "1px",
+                        }}>
+                          <Check size={9} color={GREEN} strokeWidth={3.5} />
+                        </span>
+                        <span style={{
+                          fontSize: "13px",
+                          color: tier.featured ? "rgba(220,255,228,0.75)" : "#999",
+                          fontWeight: 400,
+                          lineHeight: 1.5,
+                        }}>
+                          {b}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* ⑨ Billed note — pinned to bottom */}
+                  <p style={{
+                    fontSize: "11px",
+                    color: tier.featured ? "rgba(200,255,210,0.4)" : "#555",
+                    textAlign: "center",
+                    margin: "24px 0 0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                  }}>
+                    <ShieldCheck size={12} color={GREEN} strokeWidth={2} style={{ opacity: 0.7 }} />
+                    Billed {isYearly ? "annually" : "monthly"}. Cancel anytime.
+                  </p>
+
                 </div>
               </motion.div>
             );
@@ -283,7 +521,21 @@ export default function PricingSection({
         </div>
 
         {footerNote && (
-          <p className="mt-6 text-center text-[12px] text-ink-faint">{footerNote}</p>
+          <div style={{
+            marginTop: "40px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13px",
+            color: "#aaa",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "8px",
+            padding: "10px 18px",
+          }}>
+            <ShieldCheck size={15} color={GREEN} strokeWidth={2} />
+            {footerNote}
+          </div>
         )}
       </div>
 
@@ -291,9 +543,7 @@ export default function PricingSection({
       <AnimatePresence>
         {infoOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             onClick={() => setInfoOpen(false)}
           >
@@ -303,14 +553,23 @@ export default function PricingSection({
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative max-w-sm w-full rounded-[20px] border border-white/[0.12] bg-surface-1 p-7 shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
+              className="relative max-w-sm w-full p-7"
+              style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: "16px" }}
             >
-              <button onClick={() => setInfoOpen(false)} className="absolute top-4 right-4 text-ink-muted hover:text-white transition-colors">
+              <button
+                onClick={() => setInfoOpen(false)}
+                className="absolute top-4 right-4"
+                style={{ color: "#444" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "white"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#444"; }}
+              >
                 <X className="w-4 h-4" />
               </button>
-              <h3 className="font-heading text-[18px] font-bold text-white mb-3">What are seconds?</h3>
-              <p className="text-[13px] text-ink-muted leading-relaxed">
-                {infoContent ?? "In MotionForge, \"seconds\" refers to the total duration of video effects you can generate per month. A 5-second particle explosion = 5 seconds used. Credits reset on your billing date."}
+              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "white", marginBottom: "12px" }}>
+                What are seconds?
+              </h3>
+              <p style={{ fontSize: "13px", color: "#555", lineHeight: 1.7 }}>
+                {infoContent ?? 'In Prysmor, "seconds" refers to the total duration of video effects you can generate per month. Credits reset on your billing date.'}
               </p>
             </motion.div>
           </motion.div>

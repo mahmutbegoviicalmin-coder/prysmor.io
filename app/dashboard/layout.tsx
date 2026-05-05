@@ -7,18 +7,19 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  BookOpen, Settings, Download, ShieldCheck,
+  Settings, Download, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
+
+const GREEN = "#39FF6A";
 
 const navItems = [
   { label: "Overview",        href: "/dashboard",           icon: LayoutDashboard, requiresPlan: false },
   { label: "Download Plugin", href: "/dashboard/downloads", icon: Download,        requiresPlan: true  },
   { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: true  },
   { label: "Billing",         href: "/dashboard/billing",   icon: CreditCard,      requiresPlan: false },
-  { label: "Docs",            href: "/dashboard/docs",      icon: BookOpen,        requiresPlan: true  },
   { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: true  },
 ];
 
@@ -38,24 +39,47 @@ function NavLink({
       : pathname.startsWith(item.href);
 
   const locked = item.requiresPlan && !isSubscribed;
-
-  // Hide plan-gated items entirely for unpaid users
   if (locked) return null;
 
   return (
     <Link
       href={item.href}
-      className={cn(
-        "relative flex items-center gap-3 px-3 py-2 rounded-[8px] text-[13px] font-medium transition-colors",
-        active
-          ? "text-white bg-white/[0.05]"
-          : "text-[#6B7280] hover:text-[#D1D5DB] hover:bg-white/[0.03]"
-      )}
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "9px 16px",
+        borderRadius: "8px",
+        fontSize: "13px",
+        fontWeight: active ? 500 : 400,
+        color: active ? "white" : "#555",
+        background: active ? "#111" : "transparent",
+        borderLeft: active ? `2px solid ${GREEN}` : "2px solid transparent",
+        textDecoration: "none",
+        transition: "background 150ms, color 150ms",
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          (e.currentTarget as HTMLElement).style.background = "#111";
+          (e.currentTarget as HTMLElement).style.color = "#888";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+          (e.currentTarget as HTMLElement).style.color = "#555";
+        }
+      }}
     >
-      {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r-full bg-[#A3FF12]" />
-      )}
-      <Icon className={cn("w-[15px] h-[15px] flex-shrink-0", active ? "text-white" : "text-[#4B5563]")} />
+      <Icon
+        style={{
+          width: "15px",
+          height: "15px",
+          flexShrink: 0,
+          color: active ? GREEN : "#444",
+        }}
+      />
       {item.label}
     </Link>
   );
@@ -82,7 +106,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {});
 
-    // Fire-and-forget — saves country from IP once per user (idempotent server-side)
     fetch("/api/sync-location", { method: "POST" }).catch(() => {});
   }, []);
 
@@ -92,46 +115,120 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
       )?.label ?? "Dashboard";
 
+  const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
+  const adminActive = pathname.startsWith("/dashboard/admin");
+
   return (
-    <div className="flex min-h-screen" style={{ background: "#09090B" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "#080808",
+        fontFamily: "var(--font-outfit), system-ui, sans-serif",
+      }}
+    >
       {/* ── Sidebar ── */}
-      <aside className="hidden lg:flex flex-col w-[216px] flex-shrink-0 border-r border-white/[0.06]" style={{ background: "#09090B" }}>
+      <aside
+        className="hidden lg:flex flex-col"
+        style={{
+          width: "220px",
+          flexShrink: 0,
+          background: "#0a0a0a",
+          borderRight: "1px solid #111",
+        }}
+      >
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/[0.05]">
-          <Image src="/logo/vecilogo.png" alt="Prysmor" width={28} height={28} className="object-contain flex-shrink-0" />
-          <span className="text-[14px] font-semibold text-white tracking-tight">Prysmor</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "0 16px",
+            height: "58px",
+            borderBottom: "1px solid #111",
+          }}
+        >
+          <Image
+            src="/logo/vecilogo.png"
+            alt="Prysmor"
+            width={26}
+            height={26}
+            style={{ objectFit: "contain", flexShrink: 0 }}
+          />
+          <span
+            style={{
+              fontSize: "17px",
+              fontWeight: 700,
+              color: "white",
+              letterSpacing: "-0.5px",
+            }}
+          >
+            Prysmor
+          </span>
         </div>
 
-        {/* Nav group */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
-          <p className="px-3 mb-2 text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em]">
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: "16px 8px", display: "flex", flexDirection: "column", gap: "2px" }}>
+          <p
+            style={{
+              fontSize: "10px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "2px",
+              color: "#333",
+              padding: "0 16px",
+              marginBottom: "10px",
+            }}
+          >
             Portal
           </p>
+
           {navItems.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} isActive={isSubscribed} />
           ))}
 
-          {/* Admin link — only for admin email */}
-          {user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL && (
-            <div className="pt-3 mt-2 border-t border-white/[0.04]">
+          {/* Admin link */}
+          {isAdmin && (
+            <div style={{ paddingTop: "12px", marginTop: "8px", borderTop: "1px solid #161616" }}>
               <Link
                 href="/dashboard/admin"
-                className={cn(
-                  "relative flex items-center gap-3 px-3 py-2 rounded-[8px] text-[13px] font-medium transition-all",
-                  pathname.startsWith("/dashboard/admin")
-                    ? "text-[#F59E0B] bg-[#F59E0B]/[0.10]"
-                    : "text-[#78716C] hover:text-[#F59E0B] hover:bg-[#F59E0B]/[0.06]"
-                )}
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: adminActive ? 500 : 400,
+                  color: adminActive ? "#F59E0B" : "#555",
+                  background: adminActive ? "rgba(245,158,11,0.08)" : "transparent",
+                  borderLeft: adminActive ? "2px solid #F59E0B" : "2px solid transparent",
+                  textDecoration: "none",
+                  transition: "background 150ms, color 150ms",
+                }}
               >
-                {pathname.startsWith("/dashboard/admin") && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r-full bg-[#F59E0B]" />
-                )}
-                <ShieldCheck className={cn(
-                  "w-[15px] h-[15px] flex-shrink-0",
-                  pathname.startsWith("/dashboard/admin") ? "text-[#F59E0B]" : "text-[#57534E]"
-                )} />
+                <ShieldCheck
+                  style={{
+                    width: "15px",
+                    height: "15px",
+                    flexShrink: 0,
+                    color: adminActive ? "#F59E0B" : "#444",
+                  }}
+                />
                 Admin
-                <span className="ml-auto text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/20">
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    background: "rgba(57,255,106,0.1)",
+                    border: "1px solid rgba(57,255,106,0.2)",
+                    color: GREEN,
+                  }}
+                >
                   STAFF
                 </span>
               </Link>
@@ -139,49 +236,78 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        {/* User */}
-        <div className="px-3 py-3 border-t border-white/[0.05]">
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-[8px]">
+        {/* User area */}
+        <div style={{ padding: "12px 8px", borderTop: "1px solid #111" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "8px 12px",
+              borderRadius: "8px",
+            }}
+          >
             <UserButton afterSignOutUrl="/" />
-            <div className="min-w-0">
-              <p className="text-[12px] font-medium text-[#D1D5DB] truncate">{firstName}</p>
-              <p className="text-[11px] text-[#4B5563]">{planLabel}</p>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: "12px", fontWeight: 500, color: "#aaa", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {firstName}
+              </p>
+              <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>{planLabel}</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* ── Main ── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Topbar */}
-        <header className="flex items-center h-[58px] px-6 border-b border-white/[0.05] flex-shrink-0" style={{ background: "#09090B" }}>
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            height: "58px",
+            padding: "0 24px",
+            borderBottom: "1px solid #111",
+            flexShrink: 0,
+            background: "#080808",
+          }}
+        >
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden mr-4">
-            <Image src="/logo/vecilogo.png" alt="Prysmor" width={22} height={22} className="object-contain" />
-            <span className="text-[14px] font-semibold text-white">Prysmor</span>
+            <Image src="/logo/vecilogo.png" alt="Prysmor" width={22} height={22} style={{ objectFit: "contain" }} />
+            <span style={{ fontSize: "15px", fontWeight: 700, color: "white", letterSpacing: "-0.5px" }}>Prysmor</span>
           </div>
 
           {/* Breadcrumb */}
-          <div className="hidden lg:flex items-center gap-2">
-            <span className="text-[13px] text-[#374151]">Portal</span>
-            <span className="text-[13px] text-[#1F2937]">/</span>
-            <span className="text-[13px] font-medium text-[#9CA3AF]">{currentLabel}</span>
+          <div className="hidden lg:flex items-center" style={{ gap: "8px" }}>
+            <span style={{ fontSize: "13px", color: "#444" }}>Portal</span>
+            <span style={{ fontSize: "13px", color: "#222" }}>/</span>
+            <span style={{ fontSize: "13px", fontWeight: 500, color: "white" }}>{currentLabel}</span>
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
             {firstName && (
-              <span className="hidden sm:block text-[13px] text-[#6B7280]">{firstName}</span>
+              <span className="hidden sm:block" style={{ fontSize: "13px", color: "#666" }}>
+                {firstName}
+              </span>
             )}
             <UserButton afterSignOutUrl="/" />
           </div>
         </header>
 
         {/* Mobile nav */}
-        <nav className="lg:hidden flex items-center gap-1 px-3 py-2 border-b border-white/[0.05] overflow-x-auto" style={{ background: "#09090B" }}>
+        <nav
+          className="lg:hidden flex items-center gap-1 overflow-x-auto"
+          style={{
+            padding: "8px 12px",
+            borderBottom: "1px solid #111",
+            background: "#0a0a0a",
+          }}
+        >
           {navItems.map((item) => {
             const Icon   = item.icon;
             const locked = item.requiresPlan && !isSubscribed;
-            if (locked) return null; // hide plan-gated items for unpaid users
+            if (locked) return null;
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -192,35 +318,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-colors flex-shrink-0",
-                  active
-                    ? "bg-white/[0.06] text-white"
-                    : "text-[#6B7280] hover:text-[#D1D5DB]"
+                  active ? "text-white" : "text-[#555]"
                 )}
+                style={{ background: active ? "#111" : "transparent" }}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon style={{ width: "14px", height: "14px", color: active ? GREEN : "#444" }} />
                 {item.label}
               </Link>
             );
           })}
-          {/* Admin mobile link */}
-          {user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL && (
+
+          {isAdmin && (
             <Link
               href="/dashboard/admin"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-colors flex-shrink-0 border",
-                pathname.startsWith("/dashboard/admin")
-                  ? "bg-[#F59E0B]/[0.12] text-[#F59E0B] border-[#F59E0B]/20"
-                  : "text-[#78716C] hover:text-[#F59E0B] border-[#F59E0B]/10 hover:border-[#F59E0B]/20"
-              )}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap flex-shrink-0"
+              style={{
+                color: adminActive ? "#F59E0B" : "#555",
+                background: adminActive ? "rgba(245,158,11,0.08)" : "transparent",
+                border: "1px solid",
+                borderColor: adminActive ? "rgba(245,158,11,0.2)" : "rgba(245,158,11,0.1)",
+              }}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck style={{ width: "14px", height: "14px" }} />
               Admin
             </Link>
           )}
         </nav>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto bg-[#09090B]">
+        <main style={{ flex: 1, overflow: "auto", background: "#080808" }}>
           {children}
         </main>
       </div>

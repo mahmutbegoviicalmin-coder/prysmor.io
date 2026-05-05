@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface VideoCardProps {
   src: string;
   prompt: string;
+  label: string;
   index: number;
   featured?: boolean;
 }
 
-export default function VideoCard({ src, prompt, index, featured }: VideoCardProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const wrapRef  = useRef<HTMLDivElement>(null);
-  const [loaded, setLoaded] = useState(false);
+export default function VideoCard({ src, prompt, label, index }: VideoCardProps) {
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const wrapRef   = useRef<HTMLDivElement>(null);
+  const [loaded, setLoaded]   = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -34,38 +35,44 @@ export default function VideoCard({ src, prompt, index, featured }: VideoCardPro
       },
       { threshold: 0.2 },
     );
-
     observer.observe(wrap);
     return () => observer.disconnect();
   }, []);
 
+  /* reveal line position: 45% default → 55% on hover */
+  const revealX = hovered ? "55%" : "45%";
+
   return (
     <motion.div
       ref={wrapRef}
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true, margin: "-30px" }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
-      className="relative rounded-[18px] overflow-hidden border border-white/[0.08] bg-[#080a0d] hover:border-white/[0.18] transition-colors duration-200"
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.5, delay: index * 0.07 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        width: "100%",
-        height: "100%",
-        /* isolate this card's paint from the rest of the page */
+        position: "relative",
+        borderRadius: "20px",
+        overflow: "hidden",
+        border: hovered
+          ? "1px solid rgba(255,255,255,0.14)"
+          : "1px solid rgba(255,255,255,0.07)",
+        background: "#080808",
+        height: "clamp(240px, 30vw, 340px)",
         contain: "layout style paint",
+        transition: "border-color 200ms ease",
+        cursor: "default",
       }}
     >
-      {/* skeleton — static, no animation = zero repaint cost */}
-      {!loaded && (
-        <div className="absolute inset-0 bg-white/[0.03]" />
-      )}
+      {/* Skeleton */}
+      {!loaded && <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.02)" }} />}
 
+      {/* Video */}
       <video
         ref={videoRef}
         src={src}
-        loop
-        muted
-        playsInline
-        preload="none"
+        loop muted playsInline preload="none"
         onCanPlay={() => setLoaded(true)}
         style={{
           position: "absolute",
@@ -74,33 +81,102 @@ export default function VideoCard({ src, prompt, index, featured }: VideoCardPro
           height: "100%",
           objectFit: "cover",
           opacity: loaded ? 1 : 0,
-          transition: "opacity 0.4s ease",
-          /* single compositing layer, no layout recalc */
-          transform: "translateZ(0)",
-          willChange: "opacity",
+          transition: "opacity 0.4s ease, transform 0.5s ease",
+          transform: hovered ? "scale(1.025)" : "scale(1)",
+          transformOrigin: "center center",
+          willChange: hovered ? "transform" : "auto",
         }}
       />
 
-      {/* bottom vignette */}
+      {/* Bottom gradient */}
       <div
-        className="pointer-events-none absolute inset-0"
+        aria-hidden
         style={{
-          background: "linear-gradient(to top, rgba(4,5,9,0.88) 0%, rgba(4,5,9,0.15) 45%, transparent 70%)",
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to top, rgba(5,5,8,0.92) 0%, rgba(5,5,8,0.3) 40%, transparent 70%)",
+          pointerEvents: "none",
         }}
       />
 
-      {/* AI Generated badge */}
-      <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 bg-black/50 backdrop-blur-md border border-white/[0.09]">
-        <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-        <span className="text-[10px] font-semibold text-white/60 tracking-wide">AI Generated</span>
+      {/* Reveal line */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: "15%",
+          bottom: "28%",
+          left: revealX,
+          width: "1px",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.18) 80%, transparent 100%)",
+          transition: "left 500ms cubic-bezier(0.22,1,0.36,1)",
+          pointerEvents: "none",
+          zIndex: 2,
+        }}
+      />
+
+      {/* INPUT / OUTPUT labels */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: "18%",
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "space-around",
+          pointerEvents: "none",
+          zIndex: 3,
+          padding: "0 10%",
+        }}
+      >
+        {["INPUT", "OUTPUT"].map((t) => (
+          <span
+            key={t}
+            style={{
+              fontSize: "8px",
+              fontWeight: 600,
+              letterSpacing: "2px",
+              color: "rgba(255,255,255,0.18)",
+              textTransform: "uppercase",
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            }}
+          >
+            {t}
+          </span>
+        ))}
       </div>
 
-      {/* prompt label */}
-      <div className="absolute bottom-0 inset-x-0 px-4 py-3 flex items-center gap-2.5">
-        <div className="w-6 h-6 rounded-[8px] bg-accent/[0.14] border border-accent/25 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-3 h-3 text-accent" />
-        </div>
-        <p className="text-[12.5px] text-white/80 font-mono truncate">
+      {/* Caption */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "16px 18px",
+          zIndex: 4,
+        }}
+      >
+        <span style={{
+          display: "block",
+          fontSize: "9px",
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "2px",
+          color: "rgba(57,255,106,0.65)",
+          marginBottom: "5px",
+          fontFamily: "ui-monospace, SFMono-Regular, monospace",
+        }}>
+          {label}
+        </span>
+        <p style={{
+          fontSize: "12px",
+          color: "rgba(255,255,255,0.65)",
+          fontFamily: "ui-monospace, SFMono-Regular, monospace",
+          margin: 0,
+          lineHeight: 1.4,
+        }}>
           &ldquo;{prompt}&rdquo;
         </p>
       </div>
