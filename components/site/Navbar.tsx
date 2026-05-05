@@ -27,8 +27,8 @@ export default function Navbar() {
   const { isSignedIn } = useAuth();
   const { openSignIn, openSignUp } = useClerk();
 
-  const handleSignIn = () => openSignIn({ afterSignInUrl: "/dashboard" });
-  const handleSignUp = () => openSignUp({ afterSignUpUrl: "/dashboard" });
+  const handleSignIn = () => openSignIn({ afterSignInUrl: "https://www.prysmor.io/dashboard" });
+  const handleSignUp = () => openSignUp({ afterSignUpUrl: "https://www.prysmor.io/dashboard" });
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
@@ -128,7 +128,7 @@ export default function Navbar() {
             {isSignedIn ? (
               <>
                 <Link
-                  href="https://prysmor.io/dashboard"
+                  href="https://www.prysmor.io/dashboard"
                   className="flex items-center gap-2 transition-all duration-200"
                   style={{
                     padding: "7px 16px",
@@ -274,7 +274,7 @@ export default function Navbar() {
                 <div className="!mt-5 flex flex-col gap-2.5">
                   {isSignedIn ? (
                     <Link
-                      href="https://prysmor.io/dashboard"
+                      href="https://www.prysmor.io/dashboard"
                       className="flex items-center gap-3 px-4 py-3 rounded-[14px] border border-white/[0.08] hover:border-white/[0.16] transition-all"
                     >
                       <LayoutDashboard className="w-4 h-4" style={{ color: GREEN }} />

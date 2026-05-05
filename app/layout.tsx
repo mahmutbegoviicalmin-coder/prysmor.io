@@ -123,8 +123,8 @@ const clerkAppearance = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
-      afterSignInUrl="/dashboard"
-      afterSignUpUrl="/dashboard"
+      afterSignInUrl="https://www.prysmor.io/dashboard"
+      afterSignUpUrl="https://www.prysmor.io/dashboard"
       appearance={clerkAppearance}
     >
       <html lang="en" className={outfit.variable}>
