@@ -939,6 +939,23 @@ export function AdminPanel() {
     } finally { setActionLoading(null); }
   }
 
+  const [purging, setPurging] = useState(false);
+
+  async function purgeOrphans() {
+    if (!confirm('Delete all Firestore users with no Clerk account? This cannot be undone.')) return;
+    setPurging(true);
+    try {
+      const res  = await fetch('/api/admin/users', { method: 'DELETE' });
+      const json = await res.json();
+      alert(json.message ?? 'Done.');
+      await load();
+    } catch {
+      alert('Purge failed.');
+    } finally {
+      setPurging(false);
+    }
+  }
+
   function exportCsv() {
     const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Credits', 'Credits Total', 'Country', 'Renewal Date', 'Joined', 'Last Sign-in'];
     const rows = filtered.map(u => [
@@ -1039,14 +1056,25 @@ export function AdminPanel() {
           <h1 className="text-[28px] font-semibold text-white tracking-tight mb-1">Admin Panel</h1>
           <p className="text-[13px] text-[#6B7280]">Users, revenue, and platform overview.</p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          {new Date(lastRefresh).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={purgeOrphans}
+            disabled={purging || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-red-500/20 text-[11px] text-red-400/70 hover:text-red-400 hover:border-red-500/40 transition-colors disabled:opacity-50"
+            title="Delete Firestore users with no Clerk account"
+          >
+            {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+            Purge orphans
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            {new Date(lastRefresh).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </button>
+        </div>
       </div>
 
       {/* ── Tabs ── */}

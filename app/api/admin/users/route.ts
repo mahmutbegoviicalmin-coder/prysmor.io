@@ -44,7 +44,8 @@ export async function GET() {
     clerkMap.set(cu.id, cu);
   }
 
-  const users: AdminUser[] = snap.docs.map((doc) => {
+  // Only include Firestore users that exist in Clerk (filter out orphans)
+  const users: AdminUser[] = snap.docs.filter(doc => clerkMap.has(doc.id)).map((doc) => {
     const d  = doc.data();
     const cu = clerkMap.get(doc.id);
 
@@ -100,4 +101,37 @@ export async function GET() {
   });
 
   return NextResponse.json({ users });
+}
+
+/** DELETE /api/admin/users — purge all Firestore users with no Clerk account */
+export async function DELETE() {
+  const user  = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
+  if (!ADMIN_EMAILS.includes(email)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const [snap, clerkUsersRes] = await Promise.all([
+    db.collection('users').get(),
+    clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
+  ]);
+
+  const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : (clerkUsersRes as { data: { id: string }[] }).data ?? [];
+  const clerkIds = new Set(clerkUsers.map((cu: { id: string }) => cu.id));
+
+  const orphans = snap.docs.filter(doc => !clerkIds.has(doc.id));
+
+  if (orphans.length === 0) {
+    return NextResponse.json({ deleted: 0, message: 'No orphaned users found.' });
+  }
+
+  // Delete in batches of 500
+  const batch = db.batch();
+  for (const doc of orphans) {
+    batch.delete(doc.ref);
+  }
+  await batch.commit();
+
+  console.log(`[admin] Purged ${orphans.length} orphaned Firestore users`);
+  return NextResponse.json({ deleted: orphans.length, message: `Deleted ${orphans.length} orphaned user(s).` });
 }
