@@ -8,8 +8,9 @@ const outfit = Outfit({
   variable: "--font-outfit",
 });
 import Script from "next/script";
-import { FB_PIXEL_ID } from "@/lib/pixel";
 import "./globals.css";
+
+const FB_PIXEL_ID = '4285435231716551';
 import ConditionalShell from "@/components/site/ConditionalShell";
 
 export const metadata: Metadata = {
