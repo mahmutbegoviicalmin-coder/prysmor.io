@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
+import { initiateCheckout } from "@/lib/pixel";
 
 declare global {
   interface Window {
@@ -74,12 +75,18 @@ export default function PricingSection({
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
 
-  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent) => {
+  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
     if (!user) {
       window.location.href = "/sign-in?redirect_url=/pricing";
       return;
     }
+    // Fire Meta Pixel InitiateCheckout before opening overlay
+    try {
+      if (typeof window !== 'undefined' && window.fbq && tierName && tierPrice !== undefined) {
+        initiateCheckout(tierName, tierPrice);
+      }
+    } catch (_) {}
     const url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
     if (window.LemonSqueezy?.Url?.Open) {
       window.LemonSqueezy.Url.Open(url);
@@ -250,7 +257,7 @@ export default function PricingSection({
               if (lsBaseUrl) {
                 return (
                   <button
-                    onClick={(e) => openLSOverlay(lsBaseUrl, e)}
+                    onClick={(e) => openLSOverlay(lsBaseUrl, e, tier.name, price)}
                     className="inline-flex items-center justify-center"
                     style={btnStyle}
                     onMouseEnter={enter}

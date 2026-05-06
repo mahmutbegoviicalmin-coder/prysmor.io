@@ -6,6 +6,56 @@ import { topUpCredits, addCredits }  from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
+// ─── Meta CAPI ───────────────────────────────────────────────────────────────
+
+async function sendMetaPurchaseEvent(order: {
+  id: string;
+  total: number;
+  currency: string;
+  email: string;
+}) {
+  const token = process.env.META_CAPI_TOKEN;
+  if (!token) return;
+  try {
+    const hashBuffer = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(order.email.toLowerCase().trim()),
+    );
+    const hashedEmail = Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const res = await fetch(`https://graph.facebook.com/v19.0/4285435231716551/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [{
+          event_name:    'Purchase',
+          event_time:    Math.floor(Date.now() / 1000),
+          event_id:      `purchase_${order.id}`,
+          action_source: 'website',
+          user_data:     { em: [hashedEmail] },
+          custom_data: {
+            value:        order.total / 100,
+            currency:     order.currency.toUpperCase(),
+            order_id:     order.id,
+            content_type: 'product',
+          },
+        }],
+        access_token: token,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn('[meta-capi] Purchase event failed:', body);
+    } else {
+      console.log(`[meta-capi] Purchase event sent: order=${order.id}`);
+    }
+  } catch (e) {
+    console.warn('[meta-capi] Error sending purchase event:', e);
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function verifySignature(rawBody: string, signature: string, secret: string): boolean {
@@ -143,6 +193,13 @@ export async function POST(req: NextRequest) {
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
         console.log(`[ls-webhook] Credits topped up for new subscription: userId=${userId} plan=${plan}`);
+        // Meta CAPI Purchase event
+        await sendMetaPurchaseEvent({
+          id:       subscriptionId,
+          total:    (attrs?.total as number) ?? 0,
+          currency: (attrs?.currency as string) ?? 'USD',
+          email:    (attrs?.user_email as string) ?? '',
+        });
         break;
 
       case 'subscription_payment_success':
@@ -211,6 +268,13 @@ export async function POST(req: NextRequest) {
         }
         await addCredits(userId, creditsToAdd);
         console.log(`[ls-webhook] +${creditsToAdd} credits added: userId=${userId} pack=${packId}`);
+        // Meta CAPI Purchase event for one-time top-up
+        await sendMetaPurchaseEvent({
+          id:       String(data?.id ?? ''),
+          total:    (attrs?.total as number) ?? 0,
+          currency: (attrs?.currency as string) ?? 'USD',
+          email:    (attrs?.user_email as string) ?? '',
+        });
         break;
       }
 
