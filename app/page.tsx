@@ -594,7 +594,7 @@ export default function PrysmorPage() {
           paddingBottom: "80px",
           paddingLeft: "20px",
           paddingRight: "20px",
-          background: "#070707",
+          background: "#0c0c0c",
         }}
       >
         {/* Radial glow behind headline */}
@@ -605,7 +605,7 @@ export default function PrysmorPage() {
           transform: "translateX(-50%)",
           width: "700px",
           height: "500px",
-          background: "radial-gradient(ellipse at center, rgba(30,80,40,0.35) 0%, rgba(10,30,15,0.15) 45%, transparent 70%)",
+          background: "radial-gradient(ellipse at center, rgba(30,80,40,0.45) 0%, rgba(10,30,15,0.20) 45%, transparent 70%)",
           pointerEvents: "none",
           zIndex: 0,
         }} />
@@ -857,6 +857,57 @@ export default function PrysmorPage() {
                 </div>
               </Fragment>
             ))}
+          </motion.div>
+
+          {/* Scroll indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 1.1 }}
+            style={{
+              marginTop: "60px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+            }}
+            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            <span style={{
+              fontSize: "10px",
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.18)",
+              letterSpacing: "2px",
+              textTransform: "uppercase",
+            }}>
+              Scroll
+            </span>
+            <motion.div
+              animate={{ y: [0, 5, 0] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                width: "20px",
+                height: "32px",
+                borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.1)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                paddingTop: "5px",
+              }}
+            >
+              <motion.div
+                animate={{ y: [0, 8, 0], opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  width: "3px",
+                  height: "6px",
+                  borderRadius: "2px",
+                  background: "rgba(57,255,106,0.5)",
+                }}
+              />
+            </motion.div>
           </motion.div>
 
         </div>
