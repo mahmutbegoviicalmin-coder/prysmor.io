@@ -7,11 +7,12 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  Settings, Download, ShieldCheck,
+  Settings, Download, ShieldCheck, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
+const ADMIN_EMAIL      = "mahmutbegoviic.almin@gmail.com";
+const AFFILIATE_EMAILS = ["mahmutbegoviic.almin@gmail.com", "brzotrcipuska7@gmail.com"];
 
 const GREEN = "#39FF6A";
 
@@ -111,12 +112,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const currentLabel = pathname.startsWith("/dashboard/admin")
     ? "Admin"
+    : pathname.startsWith("/dashboard/affiliate")
+    ? "Affiliate"
     : navItems.find((n) =>
         n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
       )?.label ?? "Dashboard";
 
-  const isAdmin = user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
-  const adminActive = pathname.startsWith("/dashboard/admin");
+  const userEmail      = user?.primaryEmailAddress?.emailAddress ?? "";
+  const isAdmin        = userEmail === ADMIN_EMAIL;
+  const isAffiliate    = AFFILIATE_EMAILS.includes(userEmail);
+  const adminActive    = pathname.startsWith("/dashboard/admin");
+  const affiliateActive = pathname.startsWith("/dashboard/affiliate");
 
   return (
     <div
@@ -187,51 +193,83 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NavLink key={item.href} item={item} pathname={pathname} isActive={isSubscribed} />
           ))}
 
-          {/* Admin link */}
-          {isAdmin && (
-            <div style={{ paddingTop: "12px", marginTop: "8px", borderTop: "1px solid #161616" }}>
-              <Link
-                href="/dashboard/admin"
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "9px 16px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: adminActive ? 500 : 400,
-                  color: adminActive ? "#F59E0B" : "#555",
-                  background: adminActive ? "rgba(245,158,11,0.08)" : "transparent",
-                  borderLeft: adminActive ? "2px solid #F59E0B" : "2px solid transparent",
-                  textDecoration: "none",
-                  transition: "background 150ms, color 150ms",
-                }}
-              >
-                <ShieldCheck
+          {/* Affiliate + Admin links */}
+          {(isAffiliate || isAdmin) && (
+            <div style={{ paddingTop: "12px", marginTop: "8px", borderTop: "1px solid #161616", display: "flex", flexDirection: "column", gap: "2px" }}>
+              {isAffiliate && (
+                <Link
+                  href="/dashboard/affiliate"
                   style={{
-                    width: "15px",
-                    height: "15px",
-                    flexShrink: 0,
-                    color: adminActive ? "#F59E0B" : "#444",
-                  }}
-                />
-                Admin
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: "4px",
-                    background: "rgba(57,255,106,0.1)",
-                    border: "1px solid rgba(57,255,106,0.2)",
-                    color: GREEN,
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 16px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: affiliateActive ? 500 : 400,
+                    color: affiliateActive ? "white" : "#555",
+                    background: affiliateActive ? "#111" : "transparent",
+                    borderLeft: affiliateActive ? `2px solid ${GREEN}` : "2px solid transparent",
+                    textDecoration: "none",
+                    transition: "background 150ms, color 150ms",
                   }}
                 >
-                  STAFF
-                </span>
-              </Link>
+                  <TrendingUp
+                    style={{
+                      width: "15px",
+                      height: "15px",
+                      flexShrink: 0,
+                      color: affiliateActive ? GREEN : "#444",
+                    }}
+                  />
+                  Affiliate
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  href="/dashboard/admin"
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 16px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: adminActive ? 500 : 400,
+                    color: adminActive ? "#F59E0B" : "#555",
+                    background: adminActive ? "rgba(245,158,11,0.08)" : "transparent",
+                    borderLeft: adminActive ? "2px solid #F59E0B" : "2px solid transparent",
+                    textDecoration: "none",
+                    transition: "background 150ms, color 150ms",
+                  }}
+                >
+                  <ShieldCheck
+                    style={{
+                      width: "15px",
+                      height: "15px",
+                      flexShrink: 0,
+                      color: adminActive ? "#F59E0B" : "#444",
+                    }}
+                  />
+                  Admin
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      background: "rgba(57,255,106,0.1)",
+                      border: "1px solid rgba(57,255,106,0.2)",
+                      color: GREEN,
+                    }}
+                  >
+                    STAFF
+                  </span>
+                </Link>
+              )}
             </div>
           )}
         </nav>
@@ -328,6 +366,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             );
           })}
 
+          {isAffiliate && (
+            <Link
+              href="/dashboard/affiliate"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap flex-shrink-0"
+              style={{
+                color: affiliateActive ? "white" : "#555",
+                background: affiliateActive ? "#111" : "transparent",
+              }}
+            >
+              <TrendingUp style={{ width: "14px", height: "14px", color: affiliateActive ? GREEN : "#444" }} />
+              Affiliate
+            </Link>
+          )}
           {isAdmin && (
             <Link
               href="/dashboard/admin"

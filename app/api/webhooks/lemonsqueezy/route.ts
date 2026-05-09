@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
 import { topUpCredits, addCredits }  from '@/lib/firestore/users';
+import { recordReferral }            from '@/lib/affiliates';
 
 export const runtime = 'nodejs';
 
@@ -144,6 +145,7 @@ export async function POST(req: NextRequest) {
   const eventName  = (payload.meta as Record<string, unknown>)?.event_name as string;
   const customData = (payload.meta as Record<string, unknown>)?.custom_data as Record<string, string> | undefined;
   const userId     = customData?.user_id;
+  const refCode    = customData?.ref_code;
   const data       = payload.data as Record<string, unknown>;
   const attrs      = data?.attributes as Record<string, unknown>;
 
@@ -188,7 +190,7 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (eventName) {
-      case 'subscription_created':
+      case 'subscription_created': {
         // New subscription — set plan + top-up credits to plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
@@ -200,7 +202,19 @@ export async function POST(req: NextRequest) {
           currency: (attrs?.currency as string) ?? 'USD',
           email:    (attrs?.user_email as string) ?? '',
         });
+        // Affiliate referral tracking
+        if (refCode) {
+          await recordReferral({
+            affiliateCode:   refCode,
+            referredUserId:  userId,
+            referredEmail:   (attrs?.user_email as string) ?? '',
+            orderId:         subscriptionId,
+            plan,
+            commission:      15,
+          });
+        }
         break;
+      }
 
       case 'subscription_payment_success':
         // Monthly renewal — set plan + reset credits to plan cap

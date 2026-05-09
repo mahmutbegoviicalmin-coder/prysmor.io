@@ -6,6 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
+import { getRefCodeFromCookie } from "@/components/site/RefTracker";
 
 declare global {
   interface Window {
@@ -87,7 +88,9 @@ export default function PricingSection({
         initiateCheckout(tierName, tierPrice);
       }
     } catch (_) {}
-    const url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
+    const refCode = getRefCodeFromCookie();
+    let url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
+    if (refCode) url += `&checkout[custom][ref_code]=${encodeURIComponent(refCode)}`;
     if (window.LemonSqueezy?.Url?.Open) {
       window.LemonSqueezy.Url.Open(url);
     } else if (window.createLemonSqueezy) {

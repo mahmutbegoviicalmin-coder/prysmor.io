@@ -39,8 +39,9 @@ export async function GET() {
     clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
   ]);
 
-  const clerkUserList: { id: string; firstName: string | null; lastName: string | null; emailAddresses: { emailAddress: string }[]; lastSignInAt: number | null; createdAt: number }[] =
-    Array.isArray(clerkRes) ? clerkRes : ((clerkRes as { data: unknown[] }).data ?? []);
+  type ClerkUserShape = { id: string; firstName: string | null; lastName: string | null; emailAddresses: { emailAddress: string }[]; lastSignInAt: number | null; createdAt: number };
+  const rawList = Array.isArray(clerkRes) ? clerkRes : ((clerkRes as { data: unknown[] }).data ?? []);
+  const clerkUserList = rawList as ClerkUserShape[];
 
   // Build Firestore lookup map: userId → Firestore data
   const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
