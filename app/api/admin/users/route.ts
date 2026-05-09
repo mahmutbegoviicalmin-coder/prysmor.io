@@ -33,71 +33,83 @@ export async function GET() {
   }
 
   // Fetch Firestore docs + Clerk users in parallel
-  const [snap, clerkUsers] = await Promise.all([
+  // Clerk API v5+ returns { data: User[] }, older returns User[] — handle both
+  const [snap, clerkRes] = await Promise.all([
     db.collection('users').orderBy('createdAt', 'desc').limit(500).get(),
-    clerkClient.users.getUserList({ limit: 500 }).catch(() => []),
+    clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
   ]);
 
-  // Build Clerk lookup map: userId → Clerk user
-  const clerkMap = new Map<string, (typeof clerkUsers)[0]>();
-  for (const cu of clerkUsers) {
-    clerkMap.set(cu.id, cu);
+  const clerkUserList: { id: string; firstName: string | null; lastName: string | null; emailAddresses: { emailAddress: string }[]; lastSignInAt: number | null; createdAt: number }[] =
+    Array.isArray(clerkRes) ? clerkRes : ((clerkRes as { data: unknown[] }).data ?? []);
+
+  // Build Firestore lookup map: userId → Firestore data
+  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const doc of snap.docs) {
+    fsMap.set(doc.id, doc.data());
   }
 
-  // Only include Firestore users that exist in Clerk (filter out orphans)
-  const users: AdminUser[] = snap.docs.filter(doc => clerkMap.has(doc.id)).map((doc) => {
-    const d  = doc.data();
-    const cu = clerkMap.get(doc.id);
+  // Source of truth = Clerk users list — show ALL Clerk users
+  const users: AdminUser[] = clerkUserList.map((cu) => {
+    const d = fsMap.get(cu.id) ?? {};
 
     const plan         = d.plan ?? 'starter';
     const planCap      = PLAN_CREDITS[plan] ?? 1000;
     const credits      = typeof d.credits      === 'number' ? d.credits      : 0;
     const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 
+    // createdAt from Firestore if available, else from Clerk
     let createdAt: string | null = null;
     if (d.createdAt?.toDate) {
       createdAt = d.createdAt.toDate().toISOString();
     } else if (d.createdAt instanceof Date) {
       createdAt = d.createdAt.toISOString();
+    } else if (cu.createdAt) {
+      createdAt = new Date(cu.createdAt).toISOString();
     }
 
-    // Prefer Clerk data for name/email (always authoritative), fall back to Firestore
-    const firstName  = cu?.firstName  ?? d.firstName  ?? '';
-    const lastName   = cu?.lastName   ?? d.lastName   ?? '';
-    const clerkEmail = cu?.emailAddresses?.[0]?.emailAddress ?? '';
-    const fsEmail    = d.userEmail ?? d.email ?? '';
+    const firstName     = cu.firstName  ?? d.firstName  ?? '';
+    const lastName      = cu.lastName   ?? d.lastName   ?? '';
+    const clerkEmail    = cu.emailAddresses?.[0]?.emailAddress ?? '';
+    const fsEmail       = d.userEmail ?? d.email ?? '';
     const resolvedEmail = clerkEmail || fsEmail;
 
     let displayName = '';
     if (firstName || lastName) {
       displayName = [firstName, lastName].filter(Boolean).join(' ');
     } else {
-      displayName = d.displayName ?? '';
+      displayName = d.displayName ?? resolvedEmail.split('@')[0] ?? '';
     }
 
-    const lastSignInAt = cu?.lastSignInAt
+    const lastSignInAt = cu.lastSignInAt
       ? new Date(cu.lastSignInAt).toISOString()
       : null;
 
     return {
-      id:              doc.id,
-      email:           resolvedEmail,
+      id:               cu.id,
+      email:            resolvedEmail,
       displayName,
       firstName,
       lastName,
       plan,
-      planLabel:       PLAN_LABELS[plan] ?? plan,
-      licenseStatus:   d.licenseStatus   ?? 'inactive',
+      planLabel:        PLAN_LABELS[plan] ?? plan,
+      licenseStatus:    d.licenseStatus   ?? 'inactive',
       credits,
       creditsTotal,
-      renewalDate:     d.renewalDate     ?? null,
-      deviceLimit:     d.deviceLimit     ?? 1,
+      renewalDate:      d.renewalDate     ?? null,
+      deviceLimit:      d.deviceLimit     ?? 1,
       createdAt,
       lastSignInAt,
-      country:         d.country         ?? null,
-      countryCode:     d.countryCode     ?? null,
+      country:          d.country         ?? null,
+      countryCode:      d.countryCode     ?? null,
       lsSubscriptionId: d.lsSubscriptionId,
     };
+  });
+
+  // Sort by createdAt desc
+  users.sort((a, b) => {
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return b.createdAt.localeCompare(a.createdAt);
   });
 
   return NextResponse.json({ users });
