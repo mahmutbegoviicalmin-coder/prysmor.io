@@ -53,17 +53,28 @@ export async function getAffiliateByCode(code: string): Promise<AffiliateProfile
 
 /** Get all affiliates */
 export async function getAllAffiliates(): Promise<AffiliateProfile[]> {
-  const snap = await db.collection('affiliates').orderBy('createdAt', 'desc').get();
-  return snap.docs.map(docToAffiliate);
+  const snap = await db.collection('affiliates').get();
+  const list = snap.docs.map(docToAffiliate);
+  return list.sort((a, b) => {
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 }
 
 /** Get referrals for a specific affiliate */
 export async function getReferralsByCode(code: string): Promise<AffiliateReferral[]> {
+  // No orderBy here — avoids requiring a composite Firestore index
   const snap = await db.collection('affiliateReferrals')
     .where('affiliateCode', '==', code)
-    .orderBy('createdAt', 'desc')
     .get();
-  return snap.docs.map(docToReferral);
+  const referrals = snap.docs.map(docToReferral);
+  // Sort in memory by createdAt desc
+  return referrals.sort((a, b) => {
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 }
 
 /** Record a new referral when a purchase is made */

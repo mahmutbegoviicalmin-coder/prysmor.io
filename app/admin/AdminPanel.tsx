@@ -45,12 +45,14 @@ type Modal = { type: 'plan';    user: AdminUser }
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PLAN_COLORS: Record<string, string> = {
+  unpaid:    'text-[#6B7280] bg-white/[0.03] border-white/[0.05]',
   starter:   'text-[#9CA3AF] bg-white/[0.06] border-white/[0.08]',
   pro:       'text-[#60A5FA] bg-blue-500/[0.08] border-blue-500/20',
   exclusive: 'text-[#F59E0B] bg-amber-500/[0.08] border-amber-500/20',
 };
 
 const PLAN_DOT: Record<string, string> = {
+  unpaid:    'bg-[#374151]',
   starter:   'bg-[#6B7280]',
   pro:       'bg-[#60A5FA]',
   exclusive: 'bg-[#F59E0B]',

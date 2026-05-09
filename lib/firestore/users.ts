@@ -14,6 +14,7 @@ export interface UserDoc {
 }
 
 export const PLAN_LABELS: Record<string, string> = {
+  unpaid:          "Unpaid",
   starter:         "Starter",
   pro:             "Pro",
   exclusive:       "Exclusive",
@@ -31,6 +32,7 @@ export const PLAN_ALLOWANCE: Record<string, number> = {
 
 /** Credits granted per plan per billing cycle */
 export const PLAN_CREDITS: Record<string, number> = {
+  unpaid:          0,
   starter:         360,   // 90s × 4 cr/s
   pro:             800,   // 200s × 4 cr/s
   exclusive:       2000,  // 500s × 4 cr/s
