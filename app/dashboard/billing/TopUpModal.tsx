@@ -13,9 +13,9 @@ interface CreditPack {
 }
 
 const PACKS: CreditPack[] = [
-  { id: 'boost',   label: 'Boost',   credits: 500,  seconds: 125,  price: '$9.99'  },
-  { id: 'creator', label: 'Creator', credits: 1500, seconds: 375,  price: '$24.99', popular: true },
-  { id: 'power',   label: 'Power',   credits: 4000, seconds: 1000, price: '$59.99' },
+  { id: 'boost',   label: 'Boost',   credits: 160,  seconds: 40,  price: '$14.99'  },
+  { id: 'creator', label: 'Creator', credits: 375,  seconds: 94,  price: '$34.90', popular: true },
+  { id: 'power',   label: 'Power',   credits: 1000, seconds: 250, price: '$89.90' },
 ];
 
 const PACK_ICONS = {
@@ -121,22 +121,22 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
                   key={pack.id}
                   className={`relative rounded-[12px] border p-4 flex items-center gap-4 transition-colors ${
                     pack.popular
-                      ? 'border-[#A3FF12]/30 bg-[#A3FF12]/[0.04]'
+                      ? 'border-[#39FF6A]/30 bg-[#39FF6A]/[0.04]'
                       : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12]'
                   }`}
                 >
                   {/* Popular badge */}
                   {pack.popular && (
-                    <span className="absolute -top-2.5 left-4 text-[10px] font-semibold text-[#050505] bg-[#A3FF12] px-2 py-0.5 rounded-full">
+                    <span className="absolute -top-2.5 left-4 text-[10px] font-semibold text-[#050505] bg-[#39FF6A] px-2 py-0.5 rounded-full">
                       Most Popular
                     </span>
                   )}
 
                   {/* Icon */}
                   <div className={`w-9 h-9 rounded-[8px] flex items-center justify-center flex-shrink-0 ${
-                    pack.popular ? 'bg-[#A3FF12]/[0.12]' : 'bg-white/[0.05]'
+                    pack.popular ? 'bg-[#39FF6A]/[0.12]' : 'bg-white/[0.05]'
                   }`}>
-                    <Icon className={`w-4 h-4 ${pack.popular ? 'text-[#A3FF12]' : 'text-[#9CA3AF]'}`} />
+                    <Icon className={`w-4 h-4 ${pack.popular ? 'text-[#39FF6A]' : 'text-[#9CA3AF]'}`} />
                   </div>
 
                   {/* Info */}
@@ -146,7 +146,7 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
                       <span className="text-[12px] text-[#6B7280]">— {pack.credits.toLocaleString()} credits</span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <Check className="w-3 h-3 text-[#A3FF12] flex-shrink-0" />
+                      <Check className="w-3 h-3 text-[#39FF6A] flex-shrink-0" />
                       <span className="text-[11px] text-[#4B5563]">
                         ~{pack.seconds}s of AI VFX · Never expires
                       </span>
@@ -161,7 +161,7 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
                       disabled={loading !== null}
                       className={`flex items-center gap-1.5 px-3.5 py-2 rounded-[8px] text-[12px] font-semibold transition-all ${
                         pack.popular
-                          ? 'bg-[#A3FF12] text-[#050505] hover:bg-[#B6FF3C] disabled:opacity-60'
+                          ? 'bg-[#39FF6A] text-[#050505] hover:bg-[#4fff7e] disabled:opacity-60'
                           : 'border border-white/[0.12] text-white hover:bg-white/[0.05] disabled:opacity-60'
                       }`}
                     >

@@ -37,38 +37,38 @@ export const CREDIT_PACKS: CreditPack[] = [
   {
     id:           'boost',
     label:        'Boost',
-    credits:      500,
-    seconds:      125,
-    price:        '$9.99',
-    priceUsd:     9.99,
+    credits:      160,
+    seconds:      40,
+    price:        '$14.99',
+    priceUsd:     14.99,
     checkoutUuid: '89842d4b-16c8-4c37-a404-1afad2526f9e',
   },
   {
     id:           'creator',
     label:        'Creator',
-    credits:      1500,
-    seconds:      375,
-    price:        '$24.99',
-    priceUsd:     24.99,
+    credits:      375,
+    seconds:      94,
+    price:        '$34.90',
+    priceUsd:     34.90,
     checkoutUuid: 'c0a7f9cf-4453-4cc3-9e7e-6448b4699b98',
     popular:      true,
   },
   {
     id:           'power',
     label:        'Power',
-    credits:      4000,
-    seconds:      1000,
-    price:        '$59.99',
-    priceUsd:     59.99,
+    credits:      1000,
+    seconds:      250,
+    price:        '$89.90',
+    priceUsd:     89.90,
     checkoutUuid: '4eafc2a9-a73d-4a3f-8f66-c6dd24699e3d',
   },
 ];
 
 /** Pack ID → credits granted (used by webhook to validate order_created payloads). */
 export const CREDIT_PACK_ID_TO_CREDITS: Record<string, number> = {
-  boost:   500,
-  creator: 1500,
-  power:   4000,
+  boost:   160,
+  creator: 375,
+  power:   1000,
 };
 
 function lsHeaders() {
@@ -101,7 +101,7 @@ export async function createCheckout(variantId: string, userId: string, override
           },
           checkout_options: {
             dark:         true,
-            button_color: '#A3FF12',
+            button_color: '#39FF6A',
           },
           product_options: {
             redirect_url:         redirectUrl,
