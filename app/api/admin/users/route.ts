@@ -53,9 +53,9 @@ export async function GET() {
   const users: AdminUser[] = clerkUserList.map((cu) => {
     const d = fsMap.get(cu.id) ?? {};
 
-    const hasFirestoreDoc = fsMap.has(cu.id);
-    const plan            = d.plan ?? (hasFirestoreDoc ? 'starter' : 'unpaid');
-    const planCap         = PLAN_CREDITS[plan] ?? 1000;
+    // Only show a real plan if it was explicitly set — otherwise "unpaid"
+    const plan    = d.plan ?? 'unpaid';
+    const planCap = PLAN_CREDITS[plan] ?? 1000;
     const credits      = typeof d.credits      === 'number' ? d.credits      : 0;
     const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 
