@@ -5,10 +5,14 @@ export interface AffiliateProfile {
   email: string;
   userId: string;
   code: string;
-  commissionPerSale: number;
-  totalEarnings: number;
-  paidEarnings: number;
-  pendingEarnings: number;
+  commissionPercent: number;    // e.g. 15 = 15%
+  // Manual fields set by admin — what the affiliate sees
+  manualTotalEarnings: number;
+  manualPendingEarnings: number;
+  manualPaidEarnings: number;
+  manualActiveMembers: number;
+  manualInactiveMembers: number;
+  note: string;
   status: 'active' | 'inactive';
   createdAt: string | null;
 }
@@ -98,11 +102,9 @@ export async function recordReferral(params: {
     createdAt:        new Date(),
   });
 
-  // Update affiliate totals
+  // Note: earnings are managed manually by admin — only log the referral
   await db.collection('affiliates').doc(affiliate.id).update({
-    totalEarnings:   (affiliate.totalEarnings || 0) + params.commission,
-    pendingEarnings: (affiliate.pendingEarnings || 0) + params.commission,
-    updatedAt:       new Date(),
+    updatedAt: new Date(),
   });
 
   console.log(`[affiliate] Referral recorded: code=${params.affiliateCode} order=${params.orderId} commission=$${params.commission}`);
@@ -114,15 +116,18 @@ function docToAffiliate(doc: FirebaseFirestore.QueryDocumentSnapshot): Affiliate
   if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().toISOString();
   else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
   return {
-    id:                doc.id,
-    email:             d.email ?? '',
-    userId:            d.userId ?? '',
-    code:              d.code ?? '',
-    commissionPerSale: d.commissionPerSale ?? 15,
-    totalEarnings:     d.totalEarnings ?? 0,
-    paidEarnings:      d.paidEarnings ?? 0,
-    pendingEarnings:   d.pendingEarnings ?? 0,
-    status:            d.status ?? 'active',
+    id:                    doc.id,
+    email:                 d.email ?? '',
+    userId:                d.userId ?? '',
+    code:                  d.code ?? '',
+    commissionPercent:     d.commissionPercent ?? d.commissionPerSale ?? 15,
+    manualTotalEarnings:   d.manualTotalEarnings ?? 0,
+    manualPendingEarnings: d.manualPendingEarnings ?? 0,
+    manualPaidEarnings:    d.manualPaidEarnings ?? 0,
+    manualActiveMembers:   d.manualActiveMembers ?? 0,
+    manualInactiveMembers: d.manualInactiveMembers ?? 0,
+    note:                  d.note ?? '',
+    status:                d.status ?? 'active',
     createdAt,
   };
 }

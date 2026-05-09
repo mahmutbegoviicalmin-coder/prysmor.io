@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
   if (!isAdmin(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const body: { email: string; userId: string; code?: string; commissionPerSale?: number } = await req.json();
+  const body: { email: string; userId: string; code?: string; commissionPercent?: number } = await req.json();
   if (!body.email || !body.userId) {
     return NextResponse.json({ error: 'email and userId are required' }, { status: 400 });
   }
@@ -50,16 +50,19 @@ export async function POST(req: NextRequest) {
   const code = body.code?.toUpperCase() || generateCode(body.email);
   const ref  = db.collection('affiliates').doc();
   await ref.set({
-    email:             body.email,
-    userId:            body.userId,
+    email:                 body.email,
+    userId:                body.userId,
     code,
-    commissionPerSale: body.commissionPerSale ?? 15,
-    totalEarnings:     0,
-    paidEarnings:      0,
-    pendingEarnings:   0,
-    status:            'active',
-    createdAt:         new Date(),
-    updatedAt:         new Date(),
+    commissionPercent:     body.commissionPercent ?? 15,
+    manualTotalEarnings:   0,
+    manualPendingEarnings: 0,
+    manualPaidEarnings:    0,
+    manualActiveMembers:   0,
+    manualInactiveMembers: 0,
+    note:                  '',
+    status:                'active',
+    createdAt:             new Date(),
+    updatedAt:             new Date(),
   });
 
   return NextResponse.json({ id: ref.id, code }, { status: 201 });

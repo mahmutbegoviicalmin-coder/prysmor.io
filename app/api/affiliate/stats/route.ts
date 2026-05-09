@@ -18,20 +18,15 @@ export async function GET() {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });
   }
 
-  const referrals = await getReferralsByCode(affiliate.code);
-  const active    = referrals.filter(r => r.status === 'pending').length;
-  const paid      = referrals.filter(r => r.status === 'paid').length;
-
   return NextResponse.json({
     affiliate,
-    referrals,
+    // All values shown to affiliate are manually set by admin
     stats: {
-      totalReferrals:    referrals.length,
-      activeReferrals:   active,
-      paidReferrals:     paid,
-      totalEarnings:     affiliate.totalEarnings,
-      pendingEarnings:   affiliate.pendingEarnings,
-      paidEarnings:      affiliate.paidEarnings,
+      totalEarnings:    affiliate.manualTotalEarnings,
+      pendingEarnings:  affiliate.manualPendingEarnings,
+      paidEarnings:     affiliate.manualPaidEarnings,
+      activeMembers:    affiliate.manualActiveMembers,
+      inactiveMembers:  affiliate.manualInactiveMembers,
     },
   });
 }

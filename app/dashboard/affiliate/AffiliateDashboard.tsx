@@ -3,70 +3,63 @@
 import { useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import {
-  Copy, Check, Users, DollarSign, TrendingUp, Clock,
-  Plus, Trash2, Edit2, RefreshCw, Loader2, X, CheckCircle,
+  Copy, Check, Users, DollarSign, Clock,
+  Plus, Trash2, Edit2, RefreshCw, Loader2, X,
+  CheckCircle, UserMinus,
 } from "lucide-react";
 
 const GREEN        = "#39FF6A";
 const ADMIN_EMAIL  = "mahmutbegoviic.almin@gmail.com";
-const CARD_STYLE   = {
+const CARD: React.CSSProperties = {
   background:   "#0c0c0c",
   border:       "1px solid #161616",
   borderRadius: "12px",
   padding:      "24px",
-} as const;
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Referral {
-  id: string;
-  referredEmail: string;
-  plan: string;
-  commission: number;
-  status: "pending" | "paid";
-  createdAt: string | null;
-}
-
-interface AffiliateWithStats {
+interface AffiliateProfile {
   id: string;
   email: string;
   userId: string;
   code: string;
-  commissionPerSale: number;
-  totalEarnings: number;
-  paidEarnings: number;
-  pendingEarnings: number;
+  commissionPercent: number;
+  manualTotalEarnings: number;
+  manualPendingEarnings: number;
+  manualPaidEarnings: number;
+  manualActiveMembers: number;
+  manualInactiveMembers: number;
+  note: string;
   status: "active" | "inactive";
   createdAt: string | null;
-  referralCount: number;
-  activeCount: number;
-  paidCount: number;
-  referrals: Referral[];
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
+interface Stats {
+  totalEarnings:   number;
+  pendingEarnings: number;
+  paidEarnings:    number;
+  activeMembers:   number;
+  inactiveMembers: number;
+}
 
-function StatCard({
-  label, value, sub, icon: Icon, accent,
-}: {
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, icon: Icon, accent }: {
   label: string; value: string; sub?: string;
   icon: React.ElementType; accent?: string;
 }) {
   return (
-    <div style={CARD_STYLE}>
+    <div style={CARD}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "10px" }}>
-            {label}
-          </p>
-          <p style={{ fontSize: "28px", fontWeight: 800, color: accent ?? "white", letterSpacing: "-1px", margin: 0 }}>
-            {value}
-          </p>
+          <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "10px" }}>{label}</p>
+          <p style={{ fontSize: "28px", fontWeight: 800, color: accent ?? "white", letterSpacing: "-1px", margin: 0 }}>{value}</p>
           {sub && <p style={{ fontSize: "12px", color: "#444", marginTop: "4px" }}>{sub}</p>}
         </div>
         <div style={{
           width: "36px", height: "36px", borderRadius: "8px",
-          background: `rgba(57,255,106,0.08)`, border: "1px solid rgba(57,255,106,0.12)",
+          background: "rgba(57,255,106,0.08)", border: "1px solid rgba(57,255,106,0.12)",
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>
           <Icon style={{ width: "16px", height: "16px", color: GREEN }} />
@@ -75,8 +68,6 @@ function StatCard({
     </div>
   );
 }
-
-// ─── Copy button ──────────────────────────────────────────────────────────────
 
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -91,6 +82,7 @@ function CopyBtn({ text }: { text: string }) {
       padding: "6px 12px", borderRadius: "6px", cursor: "pointer",
       background: "rgba(255,255,255,0.04)", border: "1px solid #1e1e1e",
       fontSize: "12px", color: copied ? GREEN : "#666", transition: "all 150ms",
+      whiteSpace: "nowrap",
     }}>
       {copied ? <Check style={{ width: "12px", height: "12px" }} /> : <Copy style={{ width: "12px", height: "12px" }} />}
       {copied ? "Copied!" : "Copy link"}
@@ -98,75 +90,17 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-// ─── Referral table ───────────────────────────────────────────────────────────
-
-function ReferralTable({ referrals }: { referrals: Referral[] }) {
-  if (referrals.length === 0) {
-    return (
-      <div style={{ textAlign: "center", padding: "40px", color: "#333", fontSize: "13px" }}>
-        No referrals yet. Share your link to start earning.
-      </div>
-    );
-  }
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-        <thead>
-          <tr>
-            {["Email", "Plan", "Commission", "Status", "Date"].map(h => (
-              <th key={h} style={{
-                textAlign: "left", padding: "10px 12px",
-                color: "#333", fontSize: "10px", textTransform: "uppercase",
-                letterSpacing: "1.5px", borderBottom: "1px solid #161616",
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {referrals.map((r) => (
-            <tr key={r.id} style={{ borderBottom: "1px solid #0f0f0f" }}>
-              <td style={{ padding: "12px", color: "#888" }}>{r.referredEmail || "—"}</td>
-              <td style={{ padding: "12px" }}>
-                <span style={{
-                  fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px",
-                  padding: "2px 8px", borderRadius: "4px",
-                  background: "rgba(57,255,106,0.08)", border: "1px solid rgba(57,255,106,0.15)", color: GREEN,
-                }}>{r.plan}</span>
-              </td>
-              <td style={{ padding: "12px", color: "white", fontWeight: 600 }}>${r.commission}</td>
-              <td style={{ padding: "12px" }}>
-                <span style={{
-                  fontSize: "11px", padding: "2px 8px", borderRadius: "4px",
-                  background: r.status === "paid" ? "rgba(57,255,106,0.08)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${r.status === "paid" ? "rgba(57,255,106,0.2)" : "#1e1e1e"}`,
-                  color: r.status === "paid" ? GREEN : "#555",
-                }}>{r.status === "paid" ? "Paid" : "Pending"}</span>
-              </td>
-              <td style={{ padding: "12px", color: "#444" }}>
-                {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Affiliate View (brzotrcipuska7) ─────────────────────────────────────────
+// ─── Affiliate View (what brzotrcipuska7 sees) ────────────────────────────────
 
 function AffiliateView() {
-  const [data, setData]     = useState<{ affiliate: AffiliateWithStats; stats: { totalEarnings: number; pendingEarnings: number; paidEarnings: number; totalReferrals: number; activeReferrals: number }; referrals: Referral[] } | null>(null);
+  const [data, setData]       = useState<{ affiliate: AffiliateProfile; stats: Stats } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [error, setError]     = useState("");
 
   useEffect(() => {
     fetch("/api/affiliate/stats")
       .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.error);
-        else setData(d);
-      })
+      .then(d => { if (d.error) setError(d.error); else setData(d); })
       .catch(() => setError("Failed to load data"))
       .finally(() => setLoading(false));
   }, []);
@@ -174,94 +108,96 @@ function AffiliateView() {
   if (loading) return (
     <div style={{ display: "flex", justifyContent: "center", padding: "80px" }}>
       <Loader2 style={{ width: "20px", height: "20px", color: "#333", animation: "spin 1s linear infinite" }} />
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   );
 
   if (error === "No affiliate profile found") return (
-    <div style={{ textAlign: "center", padding: "80px", color: "#555", fontSize: "14px" }}>
-      <p>Your affiliate profile has not been set up yet.</p>
-      <p style={{ fontSize: "12px", color: "#333", marginTop: "8px" }}>Contact the admin to get your referral link activated.</p>
+    <div style={{ padding: "60px 28px", color: "#555", fontSize: "14px" }}>
+      <p style={{ margin: 0 }}>Your affiliate profile has not been set up yet.</p>
+      <p style={{ fontSize: "12px", color: "#333", marginTop: "8px" }}>Contact the admin to activate your referral link.</p>
     </div>
   );
 
-  if (error) return <div style={{ padding: "40px", color: "#F87171", fontSize: "13px" }}>{error}</div>;
-  if (!data) return null;
+  if (error || !data) return <div style={{ padding: "40px", color: "#F87171", fontSize: "13px" }}>{error || "No data"}</div>;
 
-  const { affiliate, stats, referrals } = data;
+  const { affiliate, stats } = data;
   const refLink = `https://prysmor.io/?ref=${affiliate.code}`;
 
   return (
-    <div style={{ padding: "32px 28px", maxWidth: "900px" }}>
-      {/* Header */}
+    <div style={{ padding: "32px 28px", maxWidth: "860px" }}>
       <div style={{ marginBottom: "28px" }}>
-        <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>
-          // AFFILIATE
-        </p>
-        <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>
-          Your Referral Stats
-        </h1>
+        <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>// AFFILIATE</p>
+        <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>Your Referral Stats</h1>
         <p style={{ fontSize: "14px", color: "#555", marginTop: "6px" }}>
-          Earn ${affiliate.commissionPerSale} for every subscription you refer.
+          You earn <span style={{ color: GREEN, fontWeight: 600 }}>{affiliate.commissionPercent}%</span> commission on each referred sale.
         </p>
       </div>
 
-      {/* Referral Link */}
-      <div style={{ ...CARD_STYLE, marginBottom: "24px" }}>
-        <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "12px" }}>
-          Your Referral Link
-        </p>
+      {/* Referral link card */}
+      <div style={{ ...CARD, marginBottom: "24px" }}>
+        <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "12px" }}>Your Referral Link</p>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <code style={{
             flex: 1, minWidth: 0, padding: "10px 14px", borderRadius: "8px",
             background: "#111", border: "1px solid #1e1e1e",
             fontSize: "13px", color: "#888", fontFamily: "monospace",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {refLink}
-          </code>
+          }}>{refLink}</code>
           <CopyBtn text={refLink} />
         </div>
         <p style={{ fontSize: "11px", color: "#333", marginTop: "10px" }}>
-          Code: <span style={{ color: GREEN, fontWeight: 600 }}>{affiliate.code}</span>
+          Code: <span style={{ color: GREEN, fontWeight: 600, fontFamily: "monospace" }}>{affiliate.code}</span>
         </p>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", marginBottom: "28px" }}>
-        <StatCard label="Total Earnings" value={`$${stats.totalEarnings}`} icon={DollarSign} accent={GREEN} />
-        <StatCard label="Pending Payout" value={`$${stats.pendingEarnings}`} sub="Not yet paid" icon={Clock} />
-        <StatCard label="Paid Out" value={`$${stats.paidEarnings}`} icon={CheckCircle} />
-        <StatCard label="Total Referrals" value={String(stats.totalReferrals)} sub={`${stats.activeReferrals} active`} icon={Users} />
+      {/* Stats grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px", marginBottom: "24px" }}>
+        <StatCard label="Total Earned"    value={`$${stats.totalEarnings}`}   icon={DollarSign} accent={GREEN} />
+        <StatCard label="Pending Payout"  value={`$${stats.pendingEarnings}`} sub="Awaiting payment" icon={Clock} />
+        <StatCard label="Paid Out"        value={`$${stats.paidEarnings}`}    icon={CheckCircle} />
+        <StatCard label="Active Members"  value={String(stats.activeMembers)} icon={Users} />
+        <StatCard label="Inactive"        value={String(stats.inactiveMembers)} icon={UserMinus} />
       </div>
 
-      {/* Referrals table */}
-      <div style={CARD_STYLE}>
-        <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "16px" }}>
-          Referral History
-        </p>
-        <ReferralTable referrals={referrals} />
-      </div>
+      {/* Note from admin */}
+      {affiliate.note && (
+        <div style={{ ...CARD, borderColor: "rgba(57,255,106,0.1)" }}>
+          <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "8px" }}>Note from Admin</p>
+          <p style={{ fontSize: "13px", color: "#888", margin: 0, lineHeight: 1.6 }}>{affiliate.note}</p>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   );
 }
 
 // ─── Admin View ───────────────────────────────────────────────────────────────
 
+type EditState = {
+  commissionPercent:     string;
+  status:                "active" | "inactive";
+  manualTotalEarnings:   string;
+  manualPendingEarnings: string;
+  manualPaidEarnings:    string;
+  manualActiveMembers:   string;
+  manualInactiveMembers: string;
+  note:                  string;
+};
+
 function AdminAffiliateView() {
-  const [affiliates, setAffiliates] = useState<AffiliateWithStats[]>([]);
+  const [affiliates, setAffiliates] = useState<AffiliateProfile[]>([]);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
-  const [markingId, setMarkingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editId, setEditId]         = useState<string | null>(null);
-  const [editCommission, setEditCommission] = useState("");
-  const [editStatus, setEditStatus] = useState<"active" | "inactive">("active");
+  const [editState, setEditState]   = useState<EditState | null>(null);
   const [showAdd, setShowAdd]       = useState(false);
   const [newEmail, setNewEmail]     = useState("");
   const [newUserId, setNewUserId]   = useState("");
   const [newCode, setNewCode]       = useState("");
   const [newCommission, setNewCommission] = useState("15");
-  const [expanded, setExpanded]     = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -280,7 +216,7 @@ function AdminAffiliateView() {
     await fetch("/api/admin/affiliates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: newEmail, userId: newUserId, code: newCode || undefined, commissionPerSale: Number(newCommission) }),
+      body: JSON.stringify({ email: newEmail, userId: newUserId, code: newCode || undefined, commissionPercent: Number(newCommission) }),
     });
     setSaving(false);
     setShowAdd(false);
@@ -288,34 +224,57 @@ function AdminAffiliateView() {
     load();
   };
 
+  const openEdit = (aff: AffiliateProfile) => {
+    setEditId(aff.id);
+    setEditState({
+      commissionPercent:     String(aff.commissionPercent),
+      status:                aff.status,
+      manualTotalEarnings:   String(aff.manualTotalEarnings),
+      manualPendingEarnings: String(aff.manualPendingEarnings),
+      manualPaidEarnings:    String(aff.manualPaidEarnings),
+      manualActiveMembers:   String(aff.manualActiveMembers),
+      manualInactiveMembers: String(aff.manualInactiveMembers),
+      note:                  aff.note,
+    });
+  };
+
   const saveEdit = async (id: string) => {
+    if (!editState) return;
     setSaving(true);
     await fetch(`/api/admin/affiliates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commissionPerSale: Number(editCommission), status: editStatus }),
+      body: JSON.stringify({
+        commissionPercent:     Number(editState.commissionPercent),
+        status:                editState.status,
+        manualTotalEarnings:   Number(editState.manualTotalEarnings),
+        manualPendingEarnings: Number(editState.manualPendingEarnings),
+        manualPaidEarnings:    Number(editState.manualPaidEarnings),
+        manualActiveMembers:   Number(editState.manualActiveMembers),
+        manualInactiveMembers: Number(editState.manualInactiveMembers),
+        note:                  editState.note,
+      }),
     });
     setSaving(false);
     setEditId(null);
     load();
   };
 
-  const markPaid = async (id: string) => {
-    if (!confirm("Mark all pending referrals as paid?")) return;
-    setMarkingId(id);
-    const res = await fetch(`/api/admin/affiliates/${id}`, { method: "POST" });
-    const json = await res.json();
-    alert(json.message ?? `Marked ${json.marked} referrals as paid ($${json.amount})`);
-    setMarkingId(null);
-    load();
-  };
-
   const deleteAffiliate = async (id: string) => {
-    if (!confirm("Delete this affiliate profile? Their referral records remain.")) return;
+    if (!confirm("Delete this affiliate profile?")) return;
     setDeletingId(id);
     await fetch(`/api/admin/affiliates/${id}`, { method: "DELETE" });
     setDeletingId(null);
     load();
+  };
+
+  const set = (key: keyof EditState, val: string) =>
+    setEditState(prev => prev ? { ...prev, [key]: val } : prev);
+
+  const inputStyle: React.CSSProperties = {
+    padding: "7px 10px", borderRadius: "6px", background: "#111",
+    border: "1px solid #1e1e1e", color: "white", fontSize: "13px",
+    outline: "none", width: "100%", boxSizing: "border-box",
   };
 
   return (
@@ -323,12 +282,8 @@ function AdminAffiliateView() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "28px" }}>
         <div>
-          <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>
-            // AFFILIATE MANAGEMENT
-          </p>
-          <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>
-            Affiliates
-          </h1>
+          <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>// AFFILIATE MANAGEMENT</p>
+          <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>Affiliates</h1>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <button onClick={load} disabled={loading} style={{
@@ -350,13 +305,13 @@ function AdminAffiliateView() {
         </div>
       </div>
 
-      {/* Add affiliate modal */}
+      {/* Add modal */}
       {showAdd && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
         }}>
-          <div style={{ ...CARD_STYLE, width: "420px", maxWidth: "calc(100vw - 32px)" }}>
+          <div style={{ ...CARD, width: "420px", maxWidth: "calc(100vw - 32px)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ fontSize: "16px", fontWeight: 600, color: "white", margin: 0 }}>Add Affiliate</h2>
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#444" }}>
@@ -367,22 +322,11 @@ function AdminAffiliateView() {
               { label: "Affiliate Email", value: newEmail, set: setNewEmail, placeholder: "email@example.com" },
               { label: "Clerk User ID", value: newUserId, set: setNewUserId, placeholder: "user_2abc..." },
               { label: "Custom Code (optional)", value: newCode, set: setNewCode, placeholder: "Auto-generated" },
-              { label: "Commission per Sale ($)", value: newCommission, set: setNewCommission, placeholder: "15" },
+              { label: "Commission %", value: newCommission, set: setNewCommission, placeholder: "15" },
             ].map(f => (
               <div key={f.label} style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
-                  {f.label}
-                </label>
-                <input
-                  value={f.value}
-                  onChange={e => f.set(e.target.value)}
-                  placeholder={f.placeholder}
-                  style={{
-                    width: "100%", padding: "9px 12px", borderRadius: "7px",
-                    background: "#111", border: "1px solid #1e1e1e",
-                    color: "white", fontSize: "13px", outline: "none", boxSizing: "border-box",
-                  }}
-                />
+                <label style={{ display: "block", fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>{f.label}</label>
+                <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={inputStyle} />
               </div>
             ))}
             <button onClick={addAffiliate} disabled={saving || !newEmail || !newUserId} style={{
@@ -396,22 +340,21 @@ function AdminAffiliateView() {
         </div>
       )}
 
-      {/* Affiliate list */}
+      {/* List */}
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: "60px" }}>
           <Loader2 style={{ width: "20px", height: "20px", color: "#333", animation: "spin 1s linear infinite" }} />
         </div>
       ) : affiliates.length === 0 ? (
-        <div style={{ ...CARD_STYLE, textAlign: "center", padding: "60px", color: "#444", fontSize: "13px" }}>
+        <div style={{ ...CARD, textAlign: "center", padding: "60px", color: "#444", fontSize: "13px" }}>
           No affiliates yet. Add one to get started.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {affiliates.map(aff => (
-            <div key={aff.id} style={CARD_STYLE}>
-              {/* Main row */}
+            <div key={aff.id} style={CARD}>
+              {/* Top row */}
               <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-                {/* Identity */}
                 <div style={{ flex: 1, minWidth: 200 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>{aff.email}</span>
@@ -422,19 +365,20 @@ function AdminAffiliateView() {
                       color: aff.status === "active" ? GREEN : "#444",
                     }}>{aff.status}</span>
                   </div>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                     <code style={{ fontSize: "11px", color: GREEN, fontFamily: "monospace" }}>CODE: {aff.code}</code>
-                    <span style={{ fontSize: "11px", color: "#333" }}>·</span>
-                    <span style={{ fontSize: "11px", color: "#444" }}>${aff.commissionPerSale}/sale</span>
+                    <span style={{ fontSize: "11px", color: "#444" }}>·</span>
+                    <span style={{ fontSize: "11px", color: "#444" }}>{aff.commissionPercent}% commission</span>
                   </div>
                 </div>
 
-                {/* Stats */}
-                <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+                {/* Quick stats */}
+                <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
                   {[
-                    { label: "Total", value: `$${aff.totalEarnings}` },
-                    { label: "Pending", value: `$${aff.pendingEarnings}` },
-                    { label: "Referrals", value: String(aff.referralCount) },
+                    { label: "Total", value: `$${aff.manualTotalEarnings}` },
+                    { label: "Pending", value: `$${aff.manualPendingEarnings}` },
+                    { label: "Active", value: String(aff.manualActiveMembers) },
+                    { label: "Inactive", value: String(aff.manualInactiveMembers) },
                   ].map(s => (
                     <div key={s.label} style={{ textAlign: "center" }}>
                       <p style={{ fontSize: "16px", fontWeight: 700, color: "white", margin: 0 }}>{s.value}</p>
@@ -445,74 +389,103 @@ function AdminAffiliateView() {
 
                 {/* Actions */}
                 <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                  <button onClick={() => setExpanded(expanded === aff.id ? null : aff.id)} style={{
+                  <button onClick={() => openEdit(aff)} style={{
+                    display: "flex", alignItems: "center", gap: "6px",
                     padding: "6px 12px", borderRadius: "6px", border: "1px solid #1e1e1e",
-                    background: "transparent", fontSize: "11px", color: "#555", cursor: "pointer",
-                  }}>
-                    {expanded === aff.id ? "Hide" : "View Referrals"}
-                  </button>
-                  <button onClick={() => { setEditId(aff.id); setEditCommission(String(aff.commissionPerSale)); setEditStatus(aff.status); }} style={{
-                    padding: "6px 10px", borderRadius: "6px", border: "1px solid #1e1e1e",
-                    background: "transparent", cursor: "pointer", color: "#555",
+                    background: "transparent", fontSize: "12px", color: "#555", cursor: "pointer",
                   }}>
                     <Edit2 style={{ width: "12px", height: "12px" }} />
-                  </button>
-                  <button onClick={() => markPaid(aff.id)} disabled={markingId === aff.id || aff.pendingEarnings === 0} style={{
-                    padding: "6px 12px", borderRadius: "6px", border: "none",
-                    background: aff.pendingEarnings > 0 ? GREEN : "#111",
-                    fontSize: "11px", fontWeight: 600, color: aff.pendingEarnings > 0 ? "#000" : "#333",
-                    cursor: aff.pendingEarnings > 0 ? "pointer" : "default", whiteSpace: "nowrap",
-                  }}>
-                    {markingId === aff.id ? "..." : "Mark Paid"}
+                    Edit
                   </button>
                   <button onClick={() => deleteAffiliate(aff.id)} disabled={deletingId === aff.id} style={{
                     padding: "6px 10px", borderRadius: "6px", border: "1px solid rgba(239,68,68,0.2)",
                     background: "transparent", cursor: "pointer", color: "rgba(239,68,68,0.6)",
                   }}>
-                    {deletingId === aff.id ? <Loader2 style={{ width: "12px", height: "12px", animation: "spin 1s linear infinite" }} /> : <Trash2 style={{ width: "12px", height: "12px" }} />}
+                    {deletingId === aff.id
+                      ? <Loader2 style={{ width: "12px", height: "12px", animation: "spin 1s linear infinite" }} />
+                      : <Trash2 style={{ width: "12px", height: "12px" }} />}
                   </button>
                 </div>
               </div>
 
-              {/* Edit inline */}
-              {editId === aff.id && (
-                <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #161616", display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>Commission ($)</label>
-                    <input
-                      type="number" value={editCommission} onChange={e => setEditCommission(e.target.value)}
-                      style={{ padding: "7px 10px", borderRadius: "6px", background: "#111", border: "1px solid #1e1e1e", color: "white", fontSize: "13px", width: "100px", outline: "none" }}
-                    />
+              {aff.note && (
+                <p style={{ margin: "12px 0 0", fontSize: "12px", color: "#444", paddingTop: "12px", borderTop: "1px solid #161616" }}>
+                  Note: {aff.note}
+                </p>
+              )}
+
+              {/* Edit panel */}
+              {editId === aff.id && editState && (
+                <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #161616" }}>
+                  <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "16px" }}>
+                    Edit — changes are visible to the affiliate immediately
+                  </p>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "12px" }}>
+                    {([
+                      { key: "commissionPercent",     label: "Commission %" },
+                      { key: "manualTotalEarnings",   label: "Total Earnings ($)" },
+                      { key: "manualPendingEarnings", label: "Pending ($)" },
+                      { key: "manualPaidEarnings",    label: "Paid ($)" },
+                      { key: "manualActiveMembers",   label: "Active Members" },
+                      { key: "manualInactiveMembers", label: "Inactive Members" },
+                    ] as { key: keyof EditState; label: string }[]).map(f => (
+                      <div key={f.key}>
+                        <label style={{ display: "block", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
+                          {f.label}
+                        </label>
+                        <input
+                          type="number"
+                          value={editState[f.key]}
+                          onChange={e => set(f.key, e.target.value)}
+                          style={inputStyle}
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <div>
+
+                  {/* Status */}
+                  <div style={{ marginBottom: "12px" }}>
                     <label style={{ display: "block", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>Status</label>
                     <select
-                      value={editStatus} onChange={e => setEditStatus(e.target.value as "active" | "inactive")}
-                      style={{ padding: "7px 10px", borderRadius: "6px", background: "#111", border: "1px solid #1e1e1e", color: "white", fontSize: "13px", outline: "none" }}
+                      value={editState.status}
+                      onChange={e => set("status", e.target.value)}
+                      style={{ ...inputStyle, width: "auto" }}
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
-                  <button onClick={() => saveEdit(aff.id)} disabled={saving} style={{
-                    padding: "7px 16px", borderRadius: "6px", border: "none",
-                    background: GREEN, color: "#000", fontWeight: 600, fontSize: "12px", cursor: "pointer",
-                  }}>
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                  <button onClick={() => setEditId(null)} style={{ padding: "7px 12px", borderRadius: "6px", border: "1px solid #1e1e1e", background: "transparent", color: "#555", fontSize: "12px", cursor: "pointer" }}>
-                    Cancel
-                  </button>
-                </div>
-              )}
 
-              {/* Expanded referrals */}
-              {expanded === aff.id && (
-                <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #161616" }}>
-                  <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "12px" }}>
-                    Referral History
-                  </p>
-                  <ReferralTable referrals={aff.referrals} />
+                  {/* Note */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <label style={{ display: "block", fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>
+                      Note (visible to affiliate)
+                    </label>
+                    <textarea
+                      value={editState.note}
+                      onChange={e => set("note", e.target.value)}
+                      rows={2}
+                      placeholder="Optional message visible to the affiliate..."
+                      style={{ ...inputStyle, resize: "vertical" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={() => saveEdit(aff.id)} disabled={saving} style={{
+                      padding: "8px 20px", borderRadius: "7px", border: "none",
+                      background: saving ? "#1a1a1a" : GREEN, color: saving ? "#555" : "#000",
+                      fontWeight: 600, fontSize: "12px", cursor: saving ? "default" : "pointer",
+                    }}>
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button onClick={() => setEditId(null)} style={{
+                      padding: "8px 14px", borderRadius: "7px", border: "1px solid #1e1e1e",
+                      background: "transparent", color: "#555", fontSize: "12px", cursor: "pointer",
+                    }}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -520,18 +493,16 @@ function AdminAffiliateView() {
         </div>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
     </div>
   );
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AffiliateDashboard() {
   const { user } = useUser();
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
-  const isAdmin = email === ADMIN_EMAIL;
-
   if (!email) return null;
-  return isAdmin ? <AdminAffiliateView /> : <AffiliateView />;
+  return email === ADMIN_EMAIL ? <AdminAffiliateView /> : <AffiliateView />;
 }

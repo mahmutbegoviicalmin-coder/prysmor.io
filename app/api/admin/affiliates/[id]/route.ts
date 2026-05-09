@@ -12,13 +12,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!ADMIN_EMAILS.includes(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body: Partial<{
-    commissionPerSale: number;
-    status: 'active' | 'inactive';
-    code: string;
-    note: string;
+    commissionPercent:     number;
+    status:                'active' | 'inactive';
+    code:                  string;
+    note:                  string;
+    manualTotalEarnings:   number;
+    manualPendingEarnings: number;
+    manualPaidEarnings:    number;
+    manualActiveMembers:   number;
+    manualInactiveMembers: number;
   }> = await req.json();
 
-  const allowed = ['commissionPerSale', 'status', 'code', 'note'];
+  const allowed = [
+    'commissionPercent', 'status', 'code', 'note',
+    'manualTotalEarnings', 'manualPendingEarnings', 'manualPaidEarnings',
+    'manualActiveMembers', 'manualInactiveMembers',
+  ];
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowed) {
     if (key in body) update[key] = (body as Record<string, unknown>)[key];
