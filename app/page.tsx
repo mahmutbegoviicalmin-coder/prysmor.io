@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, Fragment } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { ArrowRight, Film, Wand2, Download } from "lucide-react";
+import { ArrowRight, Film, Wand2, Download, Sparkles, Clock } from "lucide-react";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
 import HowItWorks, { type Step } from "@/components/sections/HowItWorks";
 import Comparison, { type ComparisonRow } from "@/components/sections/Comparison";
@@ -98,76 +98,236 @@ function PanelMockup() {
   );
 }
 
-/* ── Examples grid ──────────────────────────────────────────────────────────── */
-const vfxExamples = [
-  { src: "/editovani/1.mp4",   prompt: "add cinematic neon club lighting",        label: "Relight"    },
-  { src: "/editovani/1_1.mp4", prompt: "add dramatic volumetric god rays",         label: "Atmosphere" },
-  { src: "/editovani/1_3.mp4", prompt: "surround with fire and embers",            label: "VFX"        },
-  { src: "/editovani/1_5.mp4", prompt: "replace sky with galaxy and full moon",    label: "Background" },
+/* ── Examples slider ─────────────────────────────────────────────────────────── */
+const EXAMPLES = [
+  { src: "/primjeri/relight.mp4",       prompt: "warm golden hour light, cinematic amber glow", label: "Relight"    },
+  { src: "/primjeri/relight2.mp4",      prompt: "moonlit room, deep blue cinematic relight",     label: "Relight"    },
+  { src: "/primjeri/backgorund2.mp4",   prompt: "luxury penthouse, city skyline at dusk",         label: "Background" },
+  { src: "/primjeri/backgorundmp4.mp4", prompt: "replace background with NYC penthouse at night", label: "Background" },
+  { src: "/primjeri/vfx1.mp4",          prompt: "add glowing ice energy aura around body",        label: "VFX"        },
 ];
 
 function ExamplesGrid() {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const total = EXAMPLES.length;
+
+  function goTo(idx: number) {
+    const track = trackRef.current;
+    if (!track) return;
+    const card = track.children[idx] as HTMLElement;
+    if (!card) return;
+    track.scrollTo({ left: card.offsetLeft - track.offsetLeft, behavior: "smooth" });
+    setActive(idx);
+  }
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    function onScroll() {
+      if (!track) return;
+      const scrollLeft = track.scrollLeft;
+      let closest = 0, minDist = Infinity;
+      (Array.from(track.children) as HTMLElement[]).forEach((c, i) => {
+        const d = Math.abs(c.offsetLeft - track.offsetLeft - scrollLeft);
+        if (d < minDist) { minDist = d; closest = i; }
+      });
+      setActive(closest);
+    }
+    track.addEventListener("scroll", onScroll, { passive: true });
+    return () => track.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
   return (
-    <section
-      id="examples"
-      style={{
-        background: "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(57,255,106,0.03) 0%, transparent 60%), #070707",
-        borderTop: "1px solid #111",
-        padding: "100px 20px",
-      }}
-    >
-      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
+    <section id="examples" style={{ background: "#080808", borderTop: "1px solid #111" }}>
 
-        {/* Heading */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.5 }}
-          style={{ marginBottom: "56px" }}
-        >
+      {/* ── Header ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.45 }}
+        style={{
+          maxWidth: "1200px", margin: "0 auto",
+          padding: "80px 40px 44px",
+          display: "flex", alignItems: "center",
+          justifyContent: "space-between", gap: "20px", flexWrap: "wrap",
+        }}
+      >
+        {/* Left — label + headline */}
+        <div>
           <p style={{
-            fontSize: "11px",
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "3px",
-            color: "#39FF6A",
-            marginBottom: "20px",
-          }}>
-            // REAL OUTPUTS
-          </p>
+            fontSize: "10px", fontWeight: 500, color: "#39FF6A",
+            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
+          }}>Real outputs</p>
           <h2 style={{
-            fontSize: "clamp(28px, 4vw, 48px)",
-            fontWeight: 800,
-            color: "white",
-            letterSpacing: "-1.5px",
-            lineHeight: 1.08,
-            marginBottom: "14px",
+            fontSize: "clamp(24px, 2.8vw, 40px)",
+            fontWeight: 700, color: "white",
+            letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
           }}>
-            Prompt in. Cinematic shot out.
+            Prompt in.<br />Cinematic shot out.
           </h2>
-          <p style={{ fontSize: "15px", color: "#555", lineHeight: 1.6, maxWidth: "480px" }}>
-            Four examples created from simple prompts, rendered back to the Premiere timeline in minutes.
-          </p>
-        </motion.div>
-
-        {/* 2×2 grid */}
-        <div
-          className="grid grid-cols-1 sm:grid-cols-2"
-          style={{ gap: "16px" }}
-        >
-          {vfxExamples.map((ex, i) => (
-            <VideoCard
-              key={ex.src}
-              src={ex.src}
-              prompt={ex.prompt}
-              label={ex.label}
-              index={i}
-            />
-          ))}
         </div>
 
-      </div>
+        {/* Right — counter + arrows in one row */}
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <span style={{
+            fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            fontSize: "12px", color: "#2e2e2e", letterSpacing: "1px",
+          }}>
+            <span style={{ color: "#888", fontWeight: 600 }}>{pad(active + 1)}</span>
+            <span style={{ margin: "0 4px" }}>/</span>
+            {pad(total)}
+          </span>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {[
+              { dir: -1, label: "←", disabled: active === 0 },
+              { dir: +1, label: "→", disabled: active === total - 1 },
+            ].map(({ dir, label, disabled }) => (
+              <button
+                key={label}
+                onClick={() => goTo(active + dir)}
+                disabled={disabled}
+                style={{
+                  width: "38px", height: "38px", borderRadius: "50%",
+                  background: "transparent",
+                  border: `1px solid ${disabled ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)"}`,
+                  color: disabled ? "#252525" : "rgba(255,255,255,0.75)",
+                  cursor: disabled ? "default" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "15px", lineHeight: 1,
+                  transition: "border-color 200ms, color 200ms",
+                }}
+                aria-label={label === "←" ? "Previous" : "Next"}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── Slider ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-20px" }}
+        transition={{ duration: 0.55, delay: 0.08 }}
+        style={{ position: "relative", paddingBottom: "56px" }}
+      >
+        {/* right edge fade */}
+        <div aria-hidden style={{
+          position: "absolute", right: 0, top: 0, bottom: "56px", width: "120px",
+          background: "linear-gradient(to left, #080808 30%, transparent)",
+          zIndex: 2, pointerEvents: "none",
+        }} />
+
+        {/* track */}
+        <div
+          ref={trackRef}
+          className="eg-track"
+          style={{
+            display: "flex", gap: "16px",
+            overflowX: "auto", scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+            padding: "0 40px",
+          }}
+        >
+          {EXAMPLES.map((ex, i) => (
+            <div
+              key={i}
+              onClick={() => goTo(i)}
+              style={{
+                flex: "0 0 auto",
+                width: "min(62vw, 720px)",
+                height: "clamp(220px, 32vw, 400px)",
+                borderRadius: "14px",
+                overflow: "hidden",
+                border: `1px solid ${i === active ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"}`,
+                background: "#0c0c0c",
+                scrollSnapAlign: "start",
+                cursor: i === active ? "default" : "pointer",
+                transition: "border-color 400ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1), opacity 500ms ease",
+                transform: i === active ? "scale(1)" : "scale(0.96)",
+                opacity: i === active ? 1 : 0.4,
+                position: "relative",
+              }}
+            >
+              <VideoCard src={ex.src} label={ex.label} />
+            </div>
+          ))}
+          {/* trailing spacer */}
+          <div style={{ flex: "0 0 24px" }} />
+        </div>
+
+        {/* Caption bar */}
+        <div style={{
+          maxWidth: "1200px", margin: "0 auto",
+          padding: "0 40px",
+        }}>
+          {/* Divider */}
+          <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "24px 0 0" }} />
+
+          {/* Prompt row */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between",
+            padding: "18px 0 20px",
+            gap: "16px",
+          }}>
+            {/* Prompt text — animates on change */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <p
+                key={active}
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.45)",
+                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                  letterSpacing: "0.01em",
+                  lineHeight: 1.5,
+                  animation: "egFadeUp 350ms cubic-bezier(0.22,1,0.36,1) both",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ color: "#39ff6e", marginRight: "8px" }}>&gt;</span>
+                {EXAMPLES[active].prompt}
+              </p>
+            </div>
+
+            {/* Progress segments */}
+            <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+              {EXAMPLES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  style={{
+                    width: "28px", height: "2px", padding: 0, border: "none",
+                    borderRadius: "1px", cursor: "pointer",
+                    background: i === active ? "#39FF6A" : "rgba(255,255,255,0.1)",
+                    transition: "background 350ms ease",
+                  }}
+                  aria-label={`Slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      <style>{`
+        @keyframes egFadeUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .eg-track::-webkit-scrollbar { display: none; }
+        .eg-track { -ms-overflow-style: none; }
+        @media (max-width: 600px) {
+          .eg-track { padding: 0 20px !important; gap: 10px !important; }
+        }
+      `}</style>
     </section>
   );
 }
@@ -464,118 +624,515 @@ const PARTICLES = [
 ];
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
-function MobileFloatingCTA() {
-  const [visible, setVisible]   = useState(false);
-  const [magX, setMagX]         = useState(0);
-  const [magY, setMagY]         = useState(0);
-  const [pressed, setPressed]   = useState(false);
-  const btnRef                  = useRef<HTMLButtonElement>(null);
-  const reducedMotion           = useRef(
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
+/* ── Exit intent popup ──────────────────────────────────────────────────────── */
+function ExitIntentPopup() {
+  const [open, setOpen]       = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [copied, setCopied]   = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 250);
+    // Desktop only — mobile has no mouse leave toward top
+    if (window.innerWidth < 768) return;
+    if (sessionStorage.getItem("prysmor_exit_seen")) return;
+
+    function onMouseLeave(e: MouseEvent) {
+      if (e.clientY <= 8) {
+        setOpen(true);
+        requestAnimationFrame(() => setMounted(true));
+        sessionStorage.setItem("prysmor_exit_seen", "1");
+        document.removeEventListener("mouseleave", onMouseLeave);
+      }
+    }
+    document.addEventListener("mouseleave", onMouseLeave);
+    return () => document.removeEventListener("mouseleave", onMouseLeave);
+  }, []);
+
+  function close() {
+    setMounted(false);
+    setTimeout(() => setOpen(false), 340);
+  }
+
+  function copy() {
+    navigator.clipboard.writeText("WELCOME20").catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (!open) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={close} style={{
+        position: "fixed", inset: 0, zIndex: 1050,
+        background: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        opacity: mounted ? 1 : 0,
+        transition: "opacity 340ms ease",
+      }} />
+
+      {/* Card */}
+      <div style={{
+        position: "fixed", zIndex: 1051,
+        top: "50%", left: "50%",
+        width: "min(500px, calc(100vw - 24px))",
+        background: "#0d0d0d",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: "24px",
+        overflow: "hidden",
+        boxShadow: "0 40px 100px rgba(0,0,0,0.8)",
+        opacity: mounted ? 1 : 0,
+        transform: mounted
+          ? "translate(-50%, -50%) scale(1)"
+          : "translate(-50%, calc(-50% + 28px)) scale(0.95)",
+        transition: "opacity 380ms cubic-bezier(0.22,1,0.36,1), transform 380ms cubic-bezier(0.22,1,0.36,1)",
+      }}>
+        {/* Header strip */}
+        <div style={{
+          background: "linear-gradient(135deg, #0c1a0c 0%, #111 100%)",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          padding: "32px 32px 28px",
+          position: "relative",
+        }}>
+          {/* Glow */}
+          <div aria-hidden style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 70% 90% at 50% 130%, rgba(57,255,106,0.1) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+
+          <p style={{
+            fontSize: "10px", fontWeight: 600, color: "#39FF6A",
+            letterSpacing: "2.5px", textTransform: "uppercase",
+            margin: "0 0 12px",
+          }}>
+            Wait — before you go
+          </p>
+          <h2 style={{
+            fontSize: "clamp(22px, 4vw, 30px)",
+            fontWeight: 700, color: "white",
+            letterSpacing: "-1px", lineHeight: 1.15, margin: 0,
+          }}>
+            Here&apos;s 20% off,<br />on us.
+          </h2>
+        </div>
+
+        {/* Close */}
+        <button
+          onClick={close}
+          style={{
+            position: "absolute", top: "14px", right: "14px",
+            width: "30px", height: "30px", borderRadius: "50%",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "rgba(255,255,255,0.3)", fontSize: "13px",
+            cursor: "pointer", display: "flex",
+            alignItems: "center", justifyContent: "center",
+            transition: "background 150ms",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.1)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+
+        <div style={{ padding: "28px 32px 28px" }}>
+          <p style={{
+            fontSize: "13px", color: "#444", lineHeight: 1.65,
+            margin: "0 0 22px",
+          }}>
+            Generate cinematic VFX directly inside Premiere Pro. Use this code at checkout — no expiry.
+          </p>
+
+          {/* Code */}
+          <button
+            onClick={copy}
+            style={{
+              width: "100%", display: "flex",
+              alignItems: "center", justifyContent: "space-between",
+              background: "#141414",
+              border: `1px solid ${copied ? "rgba(57,255,106,0.45)" : "rgba(57,255,106,0.15)"}`,
+              borderRadius: "12px", padding: "14px 18px",
+              cursor: "pointer", marginBottom: "14px",
+              transition: "border-color 200ms",
+            }}
+          >
+            <span style={{
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+              fontSize: "18px", fontWeight: 700,
+              color: "white", letterSpacing: "4px",
+            }}>
+              WELCOME20
+            </span>
+            <span style={{
+              fontSize: "11px", fontWeight: 600,
+              color: copied ? "#39FF6A" : "#3a3a3a",
+              letterSpacing: "0.5px",
+              transition: "color 200ms",
+              whiteSpace: "nowrap",
+            }}>
+              {copied ? "Copied ✓" : "Tap to copy"}
+            </span>
+          </button>
+
+          {/* CTA */}
+          <button
+            onClick={() => {
+              close();
+              setTimeout(() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }), 320);
+            }}
+            style={{
+              width: "100%", height: "50px", borderRadius: "12px",
+              background: "#39FF6A", color: "#000",
+              fontSize: "14px", fontWeight: 700, border: "none",
+              cursor: "pointer", letterSpacing: "-0.2px",
+              boxShadow: "0 4px 24px rgba(57,255,106,0.2)",
+              transition: "background 150ms, transform 120ms",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#4fff7e"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#39FF6A"; }}
+            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+            onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+          >
+            Claim discount →
+          </button>
+
+          <p style={{
+            fontSize: "11px", color: "#252525",
+            textAlign: "center", margin: "12px 0 0",
+          }}>
+            Cancel anytime · Works on all plans
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ── Floating CTA — bottom right ───────────────────────────────────────────── */
+function FloatingCTA() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.6);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (reducedMotion.current) return;
-    const rect = btnRef.current!.getBoundingClientRect();
-    const cx = rect.left + rect.width  / 2;
-    const cy = rect.top  + rect.height / 2;
-    const dx = (e.clientX - cx) / (rect.width  / 2);
-    const dy = (e.clientY - cy) / (rect.height / 2);
-    setMagX(dx * 6);
-    setMagY(dy * 4);
-  };
+  return (
+    <div style={{
+        position: "fixed",
+        bottom: "calc(24px + env(safe-area-inset-bottom))",
+        right: "clamp(12px, 3vw, 24px)",
+        zIndex: 998,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        pointerEvents: visible ? "auto" : "none",
+        transition: "opacity 420ms ease, transform 420ms cubic-bezier(0.22,1,0.36,1)",
+      }}>
+        <button
+          onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+          onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.96)"; }}
+          onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+          onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "0",
+            borderRadius: "14px",
+            background: "rgba(10,10,10,0.92)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            border: "1px solid rgba(57,255,106,0.2)",
+            cursor: "pointer",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(57,255,106,0.06) inset",
+            transition: "transform 130ms ease, border-color 200ms ease, box-shadow 200ms ease",
+            overflow: "hidden",
+          }}
+          onMouseEnter={(e) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.borderColor = "rgba(57,255,106,0.4)";
+            el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(57,255,106,0.08)";
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLElement;
+            el.style.borderColor = "rgba(57,255,106,0.2)";
+            el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(57,255,106,0.06) inset";
+          }}
+        >
+          {/* Icon block */}
+          <span style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: "44px", height: "48px",
+            borderRight: "1px solid rgba(255,255,255,0.05)",
+            flexShrink: 0,
+          }}>
+            <Wand2 size={15} color="#39FF6A" strokeWidth={2} />
+          </span>
 
-  const handlePointerLeave = () => {
-    setMagX(0);
-    setMagY(0);
-    setPressed(false);
-  };
+          {/* Text */}
+          <span style={{
+            display: "flex", flexDirection: "column", alignItems: "flex-start",
+            padding: "0 14px 0 12px",
+          }}>
+            <span style={{
+              fontSize: "12px", fontWeight: 700, color: "white",
+              letterSpacing: "-0.1px", lineHeight: 1.3,
+            }}>
+              Generate VFX
+            </span>
+            <span style={{
+              fontSize: "10px", fontWeight: 400,
+              color: "rgba(255,255,255,0.28)",
+              lineHeight: 1.3,
+            }}>
+              Premiere Pro
+            </span>
+          </span>
 
-  const handleClick = () => {
-    document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
-  };
+          {/* Arrow pill */}
+          <span style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: "32px", height: "48px",
+            borderLeft: "1px solid rgba(255,255,255,0.05)",
+            flexShrink: 0,
+          }}>
+            <ArrowRight size={13} color="#39FF6A" strokeWidth={2.2} />
+          </span>
+        </button>
+      </div>
+  );
+}
 
-  const scale = pressed ? 0.97 : 1;
+/* ── Welcome discount popup ─────────────────────────────────────────────────── */
+const DISCOUNT_CODE = "WELCOME20";
+
+function WelcomePopup() {
+  const [open, setOpen]       = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [copied, setCopied]   = useState(false);
+  const [secs, setSecs]       = useState(10 * 60);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("prysmor_welcome_seen")) return;
+    const onScroll = () => {
+      const pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+      if (pct >= 0.20) {
+        setOpen(true);
+        // Small delay so CSS animation has a start state to animate from
+        requestAnimationFrame(() => setMounted(true));
+        sessionStorage.setItem("prysmor_welcome_seen", "1");
+        window.removeEventListener("scroll", onScroll);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setSecs(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  function close() {
+    setMounted(false);
+    setTimeout(() => setOpen(false), 350);
+  }
+
+  function copy() {
+    navigator.clipboard.writeText(DISCOUNT_CODE).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+  const urgent = secs < 120;
+
+  if (!open) return null;
 
   return (
-    <div
-      aria-hidden={!visible}
-      className="mobile-floating-cta"
-      style={{
-        position: "fixed",
-        right: "16px",
-        bottom: "calc(16px + env(safe-area-inset-bottom))",
-        opacity: visible ? 1 : 0,
-        pointerEvents: visible ? "auto" : "none",
-        transition: "opacity 300ms ease",
-        zIndex: 999,
-      }}
-    >
-      <button
-        ref={btnRef}
-        onClick={handleClick}
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerLeave}
-        onPointerDown={() => setPressed(true)}
-        onPointerUp={() => setPressed(false)}
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={close}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "6px",
-          height: "40px",
-          padding: "0 16px",
-          borderRadius: "20px",
-          background: "rgba(18,18,18,0.75)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          color: "rgba(255,255,255,0.82)",
-          fontSize: "13px",
-          fontWeight: 500,
-          border: "1px solid rgba(255,255,255,0.09)",
-          cursor: "pointer",
-          letterSpacing: "0px",
-          boxShadow: pressed
-            ? "0 2px 8px rgba(0,0,0,0.3)"
-            : "0 4px 16px rgba(0,0,0,0.35)",
-          transform: `translate3d(${magX}px, ${magY}px, 0) scale(${scale})`,
-          transition: pressed
-            ? "transform 80ms ease, box-shadow 80ms ease"
-            : "transform 320ms cubic-bezier(0.22,1,0.36,1), box-shadow 320ms ease",
-          willChange: "transform",
-          userSelect: "none",
-          WebkitUserSelect: "none",
-          touchAction: "manipulation",
+          position: "fixed", inset: 0, zIndex: 1000,
+          background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 350ms ease",
         }}
-        onMouseEnter={(e) => {
-          if (reducedMotion.current) return;
-          const el = e.currentTarget as HTMLElement;
-          el.style.borderColor = "rgba(57,255,106,0.25)";
-          el.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(57,255,106,0.08)";
-          el.style.transform = `translate3d(${magX}px,${magY}px,0) translateY(-2px) scale(1.02)`;
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.borderColor = "rgba(255,255,255,0.09)";
-          el.style.boxShadow = "0 4px 16px rgba(0,0,0,0.35)";
-          el.style.transform = `translate3d(${magX}px,${magY}px,0) scale(1)`;
-        }}
-      >
-        <span style={{
-          width: "5px", height: "5px", borderRadius: "50%",
-          background: "#39FF6A",
-          flexShrink: 0,
-        }} />
-        Generate VFX →
-      </button>
-    </div>
+      />
+
+      {/* Card */}
+      <div style={{
+        position: "fixed", zIndex: 1001,
+        top: "50%", left: "50%",
+        width: "min(460px, calc(100vw - 24px))",
+        background: "#0d0d0d",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: "24px",
+        overflow: "hidden",
+        boxShadow: "0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)",
+        opacity: mounted ? 1 : 0,
+        transform: mounted ? "translate(-50%, -50%) scale(1)" : "translate(-50%, calc(-50% + 24px)) scale(0.96)",
+        transition: "opacity 380ms cubic-bezier(0.22,1,0.36,1), transform 380ms cubic-bezier(0.22,1,0.36,1)",
+      }}>
+
+        {/* Top image area — dark gradient banner */}
+        <div style={{
+          height: "110px",
+          background: "linear-gradient(135deg, #0a1a0a 0%, #111 50%, #0d0d0d 100%)",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", overflow: "hidden",
+        }}>
+          {/* Radial glow */}
+          <div aria-hidden style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse 60% 80% at 50% 120%, rgba(57,255,106,0.12) 0%, transparent 70%)",
+          }} />
+          {/* Big discount text */}
+          <div style={{ position: "relative", textAlign: "center" }}>
+            <p style={{
+              fontSize: "52px", fontWeight: 800, color: "white",
+              letterSpacing: "-3px", lineHeight: 1, margin: 0,
+            }}>
+              20<span style={{ color: "#39FF6A" }}>%</span>
+            </p>
+            <p style={{
+              fontSize: "11px", fontWeight: 500, color: "rgba(255,255,255,0.3)",
+              letterSpacing: "2px", textTransform: "uppercase", margin: "4px 0 0",
+            }}>
+              off your first plan
+            </p>
+          </div>
+        </div>
+
+        {/* Close button */}
+        <button
+          onClick={close}
+          style={{
+            position: "absolute", top: "14px", right: "14px",
+            width: "30px", height: "30px", borderRadius: "50%",
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "rgba(255,255,255,0.35)", fontSize: "13px",
+            cursor: "pointer", display: "flex",
+            alignItems: "center", justifyContent: "center",
+            lineHeight: 1, transition: "background 150ms ease",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.1)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+
+        <div style={{ padding: "28px 28px 24px" }}>
+
+          {/* Headline */}
+          <h3 style={{
+            fontSize: "18px", fontWeight: 700, color: "white",
+            letterSpacing: "-0.5px", lineHeight: 1.3,
+            margin: "0 0 6px",
+          }}>
+            Welcome to Prysmor.
+          </h3>
+          <p style={{
+            fontSize: "13px", color: "#444", lineHeight: 1.6,
+            margin: "0 0 24px",
+          }}>
+            Use the code below at checkout — this offer expires soon.
+          </p>
+
+          {/* Code box */}
+          <button
+            onClick={copy}
+            style={{
+              width: "100%", display: "flex",
+              alignItems: "center", justifyContent: "space-between",
+              background: "#141414",
+              border: `1px solid ${copied ? "rgba(57,255,106,0.5)" : "rgba(57,255,106,0.15)"}`,
+              borderRadius: "12px", padding: "14px 18px",
+              cursor: "pointer", marginBottom: "14px",
+              transition: "border-color 200ms ease",
+            }}
+          >
+            <span style={{
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+              fontSize: "18px", fontWeight: 700,
+              color: "white", letterSpacing: "4px",
+            }}>
+              {DISCOUNT_CODE}
+            </span>
+            <span style={{
+              fontSize: "11px", fontWeight: 600, letterSpacing: "0.5px",
+              color: copied ? "#39FF6A" : "#3a3a3a",
+              transition: "color 200ms ease",
+              whiteSpace: "nowrap",
+            }}>
+              {copied ? "Copied ✓" : "Tap to copy"}
+            </span>
+          </button>
+
+          {/* Timer row */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "8px",
+            marginBottom: "20px",
+            padding: "10px 14px",
+            background: urgent ? "rgba(255,80,80,0.05)" : "rgba(255,255,255,0.02)",
+            border: `1px solid ${urgent ? "rgba(255,80,80,0.12)" : "rgba(255,255,255,0.05)"}`,
+            borderRadius: "8px",
+            transition: "all 500ms ease",
+          }}>
+            <Clock size={13} color={urgent ? "#ff6b6b" : "#444"} />
+            <span style={{
+              fontSize: "12px", color: urgent ? "#ff6b6b" : "#555",
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+              transition: "color 500ms ease",
+            }}>
+              Offer expires in{" "}
+              <span style={{ fontWeight: 700, color: urgent ? "#ff6b6b" : "rgba(255,255,255,0.7)" }}>
+                {mm}:{ss}
+              </span>
+            </span>
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => {
+              close();
+              setTimeout(() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" }), 300);
+            }}
+            style={{
+              width: "100%", height: "50px", borderRadius: "12px",
+              background: "#39FF6A", color: "#000",
+              fontSize: "14px", fontWeight: 700, border: "none",
+              cursor: "pointer", letterSpacing: "-0.2px",
+              boxShadow: "0 4px 24px rgba(57,255,106,0.2)",
+              transition: "background 150ms ease, transform 120ms ease",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#4fff7e"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#39FF6A"; }}
+            onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+            onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+          >
+            Claim 20% discount →
+          </button>
+
+          <p style={{
+            fontSize: "11px", color: "#2e2e2e",
+            textAlign: "center", margin: "12px 0 0",
+          }}>
+            Cancel anytime · No credit card required
+          </p>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -584,7 +1141,9 @@ export default function PrysmorPage() {
 
   return (
     <>
-      <MobileFloatingCTA />
+      <FloatingCTA />
+      <WelcomePopup />
+      <ExitIntentPopup />
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section
         className="relative overflow-hidden flex flex-col items-center"

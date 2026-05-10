@@ -42,13 +42,15 @@ export default function Navbar() {
   return (
     <>
       <header
-        className="fixed top-0 inset-x-0 z-[100] transition-all duration-[250ms] ease"
+        className="fixed inset-x-0 z-[100] transition-all duration-[250ms] ease"
         style={scrolled ? {
+          top: "var(--bar-h, 0px)",
           background: "rgba(8,8,8,0.9)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           borderBottom: "1px solid #111",
         } : {
+          top: "var(--bar-h, 0px)",
           background: "transparent",
         }}
       >
@@ -252,8 +254,8 @@ export default function Navbar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.22, ease }}
-              className="fixed top-[76px] inset-x-3 z-40 lg:hidden rounded-[20px] border border-white/[0.09] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)] overflow-hidden"
-              style={{ background: "rgba(8,8,8,0.99)" }}
+              className="fixed inset-x-3 z-40 lg:hidden rounded-[20px] border border-white/[0.09] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)] overflow-hidden"
+              style={{ background: "rgba(8,8,8,0.99)", top: "calc(76px + var(--bar-h, 0px))" }}
             >
               <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GREEN}50 40%,${GREEN}50 60%,transparent)` }} />
               <div className="p-5 space-y-1">

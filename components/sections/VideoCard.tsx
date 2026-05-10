@@ -1,185 +1,73 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
 
 interface VideoCardProps {
-  src: string;
-  prompt: string;
+  src:   string;
   label: string;
-  index: number;
-  featured?: boolean;
 }
 
-export default function VideoCard({ src, prompt, label, index }: VideoCardProps) {
-  const videoRef  = useRef<HTMLVideoElement>(null);
-  const wrapRef   = useRef<HTMLDivElement>(null);
-  const [loaded, setLoaded]   = useState(false);
+export default function VideoCard({ src, label }: VideoCardProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef  = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const video = videoRef.current;
-    const wrap  = wrapRef.current;
-    if (!video || !wrap) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            if (video.readyState === 0) video.load();
-            video.play().catch(() => {});
-          } else {
-            video.pause();
-          }
-        });
+    const v  = videoRef.current;
+    const el = wrapRef.current;
+    if (!v || !el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
       },
-      { threshold: 0.2 },
+      { threshold: 0.15 },
     );
-    observer.observe(wrap);
-    return () => observer.disconnect();
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
-  /* reveal line position: 45% default → 55% on hover */
-  const revealX = hovered ? "55%" : "45%";
-
   return (
-    <motion.div
+    <div
       ref={wrapRef}
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.5, delay: index * 0.07 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{
-        position: "relative",
-        borderRadius: "20px",
-        overflow: "hidden",
-        border: hovered
-          ? "1px solid rgba(255,255,255,0.14)"
-          : "1px solid rgba(255,255,255,0.07)",
-        background: "#080808",
-        height: "clamp(240px, 30vw, 340px)",
-        contain: "layout style paint",
-        transition: "border-color 200ms ease",
-        cursor: "default",
-      }}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
     >
-      {/* Skeleton */}
-      {!loaded && <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.02)" }} />}
-
-      {/* Video */}
       <video
         ref={videoRef}
         src={src}
-        loop muted playsInline preload="none"
-        onCanPlay={() => setLoaded(true)}
+        muted loop playsInline preload="metadata"
         style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          opacity: loaded ? 1 : 0,
-          transition: "opacity 0.4s ease, transform 0.5s ease",
+          position: "absolute", inset: 0,
+          width: "100%", height: "100%", objectFit: "cover", display: "block",
+          transition: "transform 900ms cubic-bezier(0.22,1,0.36,1)",
           transform: hovered ? "scale(1.025)" : "scale(1)",
-          transformOrigin: "center center",
-          willChange: hovered ? "transform" : "auto",
         }}
       />
 
-      {/* Bottom gradient */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(to top, rgba(5,5,8,0.92) 0%, rgba(5,5,8,0.3) 40%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Subtle vignette — no text overlay */}
+      <div aria-hidden style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)",
+        pointerEvents: "none",
+      }} />
 
-      {/* Reveal line */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: "15%",
-          bottom: "28%",
-          left: revealX,
-          width: "1px",
-          background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.18) 80%, transparent 100%)",
-          transition: "left 500ms cubic-bezier(0.22,1,0.36,1)",
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
-
-      {/* INPUT / OUTPUT labels */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: "18%",
-          left: 0,
-          right: 0,
-          display: "flex",
-          justifyContent: "space-around",
-          pointerEvents: "none",
-          zIndex: 3,
-          padding: "0 10%",
-        }}
-      >
-        {["INPUT", "OUTPUT"].map((t) => (
-          <span
-            key={t}
-            style={{
-              fontSize: "8px",
-              fontWeight: 600,
-              letterSpacing: "2px",
-              color: "rgba(255,255,255,0.18)",
-              textTransform: "uppercase",
-              fontFamily: "ui-monospace, SFMono-Regular, monospace",
-            }}
-          >
-            {t}
-          </span>
-        ))}
+      {/* Label — top left */}
+      <div aria-hidden style={{
+        position: "absolute", top: "14px", left: "14px",
+        background: "rgba(5,5,5,0.55)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: "5px", padding: "4px 10px",
+        fontSize: "9px", fontWeight: 600,
+        letterSpacing: "2px", textTransform: "uppercase",
+        color: "rgba(255,255,255,0.3)",
+        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+      }}>
+        {label}
       </div>
-
-      {/* Caption */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: "16px 18px",
-          zIndex: 4,
-        }}
-      >
-        <span style={{
-          display: "block",
-          fontSize: "9px",
-          fontWeight: 600,
-          textTransform: "uppercase",
-          letterSpacing: "2px",
-          color: "rgba(57,255,106,0.65)",
-          marginBottom: "5px",
-          fontFamily: "ui-monospace, SFMono-Regular, monospace",
-        }}>
-          {label}
-        </span>
-        <p style={{
-          fontSize: "12px",
-          color: "rgba(255,255,255,0.65)",
-          fontFamily: "ui-monospace, SFMono-Regular, monospace",
-          margin: 0,
-          lineHeight: 1.4,
-        }}>
-          &ldquo;{prompt}&rdquo;
-        </p>
-      </div>
-    </motion.div>
+    </div>
   );
 }

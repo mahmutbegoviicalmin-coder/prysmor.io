@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --bar-h:      0px;
   --green:      #39FF6A;
   --green-dim:  rgba(57, 255, 106, 0.06);
   --green-muted: rgba(57, 255, 106, 0.10);

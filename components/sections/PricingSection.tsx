@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -51,6 +51,39 @@ interface PricingSectionProps {
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const GREEN = "#39FF6A";
 
+/** Returns remaining seconds from a session-scoped 10-min countdown */
+function usePricingCountdown() {
+  const KEY = "prysmor_pricing_start";
+  const DURATION = 10 * 60;
+
+  function getRemaining() {
+    if (typeof window === "undefined") return DURATION;
+    const stored = sessionStorage.getItem(KEY);
+    if (!stored) {
+      sessionStorage.setItem(KEY, String(Date.now()));
+      return DURATION;
+    }
+    const elapsed = Math.floor((Date.now() - parseInt(stored)) / 1000);
+    return Math.max(0, DURATION - elapsed);
+  }
+
+  const [secs, setSecs] = useState(DURATION);
+  const ref = useRef(false);
+
+  useEffect(() => {
+    if (ref.current) return;
+    ref.current = true;
+    setSecs(getRemaining());
+    const id = setInterval(() => setSecs(getRemaining()), 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+  return { mm, ss, secs };
+}
+
 const CTA_LABELS: Record<string, string> = {
   starter: "Start creating",
   pro: "Choose Pro",
@@ -75,6 +108,7 @@ export default function PricingSection({
   const [yearly, setYearly] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
+  const { mm, ss, secs: timerSecs } = usePricingCountdown();
 
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
@@ -329,21 +363,35 @@ export default function PricingSection({
                 {/* ── Content (above overlays) ─────────────────────────── */}
                 <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
 
-                  {/* ① Badge — featured only */}
+                  {/* ① Badge + timer — featured only */}
                   {tier.featured && (
-                    <div style={{ marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
                       <span style={{
                         display: "inline-block",
-                        fontSize: "10px",
-                        fontWeight: 600,
-                        letterSpacing: "0.5px",
-                        color: GREEN,
+                        fontSize: "10px", fontWeight: 600,
+                        letterSpacing: "0.5px", color: GREEN,
                         background: "rgba(57,255,106,0.08)",
                         border: "1px solid rgba(57,255,106,0.2)",
-                        borderRadius: "4px",
-                        padding: "3px 8px",
+                        borderRadius: "4px", padding: "3px 8px",
                       }}>
                         Most popular
+                      </span>
+                      {/* Countdown */}
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: "5px",
+                        fontSize: "10px", fontWeight: 500,
+                        color: timerSecs < 120 ? "#ff8080" : "rgba(255,255,255,0.3)",
+                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                        letterSpacing: "0.5px",
+                        transition: "color 500ms ease",
+                      }}>
+                        <span style={{
+                          width: "5px", height: "5px", borderRadius: "50%",
+                          background: timerSecs < 120 ? "#ff6b6b" : "rgba(57,255,106,0.5)",
+                          display: "inline-block", flexShrink: 0,
+                          transition: "background 500ms ease",
+                        }} />
+                        {mm}:{ss}
                       </span>
                     </div>
                   )}
