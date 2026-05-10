@@ -176,9 +176,8 @@ export async function updateUserCountry(
   countryCode: string,
 ): Promise<void> {
   const ref = db.collection("users").doc(userId);
-  const doc = await ref.get();
-  if (!doc.exists) return;
-  await ref.update({ country, countryCode, updatedAt: new Date() });
+  // Use set+merge so it works even for users without a Firestore doc yet (Unpaid)
+  await ref.set({ country, countryCode, updatedAt: new Date() }, { merge: true });
 }
 
 /**
