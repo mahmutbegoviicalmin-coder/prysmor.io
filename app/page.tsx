@@ -11,7 +11,6 @@ import PricingSection, { type PriceTier } from "@/components/sections/PricingSec
 import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
 import FAQ, { type FAQItem } from "@/components/sections/FAQ";
 import FinalCTA from "@/components/sections/FinalCTA";
-import VideoCard from "@/components/sections/VideoCard";
 import BeforeAfterSlider from "@/components/sections/BeforeAfterSlider";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -99,257 +98,184 @@ function PanelMockup() {
   );
 }
 
-/* ── Examples slider ─────────────────────────────────────────────────────────── */
+/* ── Examples bento grid ─────────────────────────────────────────────────────── */
 const EXAMPLES = [
   { src: "/primjeri/re1.mp4",   prompt: "warm golden hour light, cinematic amber glow",   label: "Relight"    },
   { src: "/primjeri/re2.mp4",   prompt: "moonlit room, deep blue cinematic relight",       label: "Relight"    },
-  { src: "/primjeri/bg1.mp4",   prompt: "luxury penthouse, city skyline at dusk",           label: "Background" },
-  { src: "/primjeri/bg2.mp4",   prompt: "replace background with NYC penthouse at night",   label: "Background" },
-  { src: "/primjeri/vfx1.mp4",  prompt: "add glowing ice energy aura around body",          label: "VFX"        },
-  { src: "/primjeri/vfx2.mp4",  prompt: "add lightning strike and sparks",                  label: "VFX"        },
-  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",     label: "Relight"    },
+  { src: "/primjeri/bg1.mp4",   prompt: "luxury penthouse, city skyline at dusk",          label: "Background" },
+  { src: "/primjeri/bg2.mp4",   prompt: "replace background with NYC penthouse at night",  label: "Background" },
+  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",    label: "Relight"    },
+  { src: "/primjeri/vfx1.mp4",  prompt: "add glowing ice energy aura around body",         label: "VFX"        },
+  { src: "/primjeri/vfx2.mp4",  prompt: "add lightning strike and sparks",                 label: "VFX"        },
 ];
 
-function ExamplesGrid() {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(0);
-  const total = EXAMPLES.length;
-
-  function goTo(idx: number) {
-    const track = trackRef.current;
-    if (!track) return;
-    const card = track.children[idx] as HTMLElement;
-    if (!card) return;
-    track.scrollTo({ left: card.offsetLeft - track.offsetLeft, behavior: "smooth" });
-    setActive(idx);
-  }
+function BentoCard({ src, label, prompt }: { src: string; label: string; prompt: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef  = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    function onScroll() {
-      if (!track) return;
-      const scrollLeft = track.scrollLeft;
-      let closest = 0, minDist = Infinity;
-      (Array.from(track.children) as HTMLElement[]).forEach((c, i) => {
-        const d = Math.abs(c.offsetLeft - track.offsetLeft - scrollLeft);
-        if (d < minDist) { minDist = d; closest = i; }
-      });
-      setActive(closest);
-    }
-    track.addEventListener("scroll", onScroll, { passive: true });
-    return () => track.removeEventListener("scroll", onScroll);
+    const v  = videoRef.current;
+    const el = wrapRef.current;
+    if (!v || !el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
+      },
+      { threshold: 0.1 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
-  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <div
+      ref={wrapRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#0a0a0a" }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        muted loop playsInline preload="metadata"
+        style={{
+          position: "absolute", inset: 0,
+          width: "100%", height: "100%", objectFit: "cover", display: "block",
+          transform: hovered ? "scale(1.04)" : "scale(1)",
+          transition: "transform 900ms cubic-bezier(0.22,1,0.36,1)",
+          willChange: "transform",
+        }}
+      />
 
+      {/* gradient */}
+      <div aria-hidden style={{
+        position: "absolute", inset: 0, pointerEvents: "none",
+        background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.08) 45%, transparent 100%)",
+        opacity: hovered ? 1 : 0.65,
+        transition: "opacity 400ms ease",
+      }} />
+
+      {/* label top-left */}
+      <div style={{
+        position: "absolute", top: "13px", left: "13px", pointerEvents: "none",
+        background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.07)", borderRadius: "4px",
+        padding: "3px 9px", fontSize: "9px", fontWeight: 600,
+        letterSpacing: "2px", textTransform: "uppercase",
+        color: "rgba(255,255,255,0.28)", fontFamily: "ui-monospace,SFMono-Regular,monospace",
+      }}>
+        {label}
+      </div>
+
+      {/* prompt bottom — slides up on hover */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 14px",
+        transform: hovered ? "translateY(0)" : "translateY(5px)",
+        opacity: hovered ? 1 : 0,
+        transition: "transform 380ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease",
+        pointerEvents: "none",
+      }}>
+        <p style={{
+          margin: 0, fontSize: "11px", lineHeight: 1.45,
+          color: "rgba(255,255,255,0.52)",
+          fontFamily: "ui-monospace,SFMono-Regular,monospace",
+          overflow: "hidden", display: "-webkit-box",
+          WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+        }}>
+          <span style={{ color: "#39FF6A", marginRight: "6px" }}>&gt;</span>
+          {prompt}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ExamplesGrid() {
   return (
     <section id="examples" style={{ background: "#080808", borderTop: "1px solid #111" }}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-60px" }}
         transition={{ duration: 0.45 }}
-        style={{
-          maxWidth: "1200px", margin: "0 auto",
-          padding: "80px clamp(16px, 4vw, 40px) 44px",
-          display: "flex", alignItems: "center",
-          justifyContent: "space-between", gap: "20px", flexWrap: "wrap",
-        }}
+        style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px clamp(16px,4vw,32px) 32px" }}
       >
-        {/* Left — label + headline */}
-        <div>
-          <p style={{
-            fontSize: "10px", fontWeight: 500, color: "#39FF6A",
-            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
-          }}>Real outputs</p>
-          <h2 style={{
-            fontSize: "clamp(24px, 2.8vw, 40px)",
-            fontWeight: 700, color: "white",
-            letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
-          }}>
-            Prompt in.<br />Cinematic shot out.
-          </h2>
-        </div>
-
-        {/* Right — counter + arrows in one row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <span style={{
-            fontFamily: "ui-monospace, SFMono-Regular, monospace",
-            fontSize: "12px", color: "#2e2e2e", letterSpacing: "1px",
-          }}>
-            <span style={{ color: "#888", fontWeight: 600 }}>{pad(active + 1)}</span>
-            <span style={{ margin: "0 4px" }}>/</span>
-            {pad(total)}
-          </span>
-          <div style={{ display: "flex", gap: "6px" }}>
-            {[
-              { dir: -1, label: "←", disabled: active === 0 },
-              { dir: +1, label: "→", disabled: active === total - 1 },
-            ].map(({ dir, label, disabled }) => (
-              <button
-                key={label}
-                onClick={() => goTo(active + dir)}
-                disabled={disabled}
-                style={{
-                  width: "38px", height: "38px", borderRadius: "50%",
-                  background: "transparent",
-                  border: `1px solid ${disabled ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.12)"}`,
-                  color: disabled ? "#252525" : "rgba(255,255,255,0.75)",
-                  cursor: disabled ? "default" : "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "15px", lineHeight: 1,
-                  transition: "border-color 200ms, color 200ms",
-                }}
-                aria-label={label === "←" ? "Previous" : "Next"}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p style={{
+          fontSize: "10px", fontWeight: 500, color: "#39FF6A",
+          letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
+        }}>// Real outputs</p>
+        <h2 style={{
+          fontSize: "clamp(24px, 2.8vw, 40px)", fontWeight: 700,
+          color: "white", letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
+        }}>
+          Prompt in.<br />Cinematic shot out.
+        </h2>
       </motion.div>
 
-      {/* ── Slider ── */}
+      {/* Bento grid */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-20px" }}
         transition={{ duration: 0.55, delay: 0.08 }}
-        style={{ position: "relative", paddingBottom: "56px" }}
+        style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 clamp(16px,4vw,32px) 80px" }}
       >
-        {/* right edge fade */}
-        <div aria-hidden style={{
-          position: "absolute", right: 0, top: 0, bottom: "56px", width: "120px",
-          background: "linear-gradient(to left, #080808 30%, transparent)",
-          zIndex: 2, pointerEvents: "none",
-        }} />
-
-        {/* track */}
-        <div
-          ref={trackRef}
-          className="eg-track"
-          style={{
-            display: "flex", gap: "16px",
-            overflowX: "auto", scrollSnapType: "x mandatory",
-            WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
-            padding: "0 clamp(16px, 4vw, 40px)",
-          }}
-        >
+        <div className="eg-grid">
           {EXAMPLES.map((ex, i) => (
-            <div
-              key={i}
-              onClick={() => goTo(i)}
-              className="eg-card"
-              style={{
-                flex: "0 0 auto",
-                borderRadius: "14px",
-                overflow: "hidden",
-                border: `1px solid ${i === active ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"}`,
-                background: "#0c0c0c",
-                scrollSnapAlign: "start",
-                cursor: i === active ? "default" : "pointer",
-                transition: "border-color 400ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1), opacity 500ms ease",
-                transform: i === active ? "scale(1)" : "scale(0.96)",
-                opacity: i === active ? 1 : 0.4,
-                position: "relative",
-              }}
-            >
-              <VideoCard src={ex.src} label={ex.label} />
+            <div key={i} className={`eg-item eg-item-${i}`}>
+              <BentoCard src={ex.src} label={ex.label} prompt={ex.prompt} />
             </div>
           ))}
-          {/* trailing spacer */}
-          <div style={{ flex: "0 0 24px" }} />
-        </div>
-
-        {/* Caption bar */}
-        <div style={{
-          maxWidth: "1200px", margin: "0 auto",
-          padding: "0 clamp(16px, 4vw, 40px)",
-        }}>
-          {/* Divider */}
-          <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "24px 0 0" }} />
-
-          {/* Prompt row */}
-          <div style={{
-            display: "flex", alignItems: "center",
-            justifyContent: "space-between",
-            padding: "18px 0 20px",
-            gap: "16px",
-          }}>
-            {/* Prompt text — animates on change */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <p
-                key={active}
-                className="eg-prompt"
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                  color: "rgba(255,255,255,0.45)",
-                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                  letterSpacing: "0.01em",
-                  lineHeight: 1.5,
-                  animation: "egFadeUp 350ms cubic-bezier(0.22,1,0.36,1) both",
-                  overflow: "hidden", textOverflow: "ellipsis",
-                }}
-              >
-                <span style={{ color: "#39ff6e", marginRight: "8px" }}>&gt;</span>
-                {EXAMPLES[active].prompt}
-              </p>
-            </div>
-
-            {/* Progress segments */}
-            <div className="eg-dots" style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
-              {EXAMPLES.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => goTo(i)}
-                  style={{
-                    width: "28px", height: "2px", padding: 0, border: "none",
-                    borderRadius: "1px", cursor: "pointer",
-                    background: i === active ? "#39FF6A" : "rgba(255,255,255,0.1)",
-                    transition: "background 350ms ease",
-                  }}
-                  aria-label={`Slide ${i + 1}`}
-                />
-              ))}
-            </div>
-          </div>
         </div>
       </motion.div>
 
       <style>{`
-        @keyframes egFadeUp {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
+        /* ── Desktop: 3-col bento ── */
+        .eg-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          grid-template-rows: 320px 250px 270px;
+          gap: 3px;
+          border-radius: 14px;
+          overflow: hidden;
         }
-        .eg-track::-webkit-scrollbar { display: none; }
-        .eg-track { -ms-overflow-style: none; }
+        .eg-item { overflow: hidden; }
+        /* re1 wide (row1, col1-2) */
+        .eg-item-0 { grid-column: span 2; }
+        /* re2 normal (row1, col3) */
+        /* bg1, bg2, stock fill row2 (1 col each) */
+        /* vfx1 wide (row3, col1-2) */
+        .eg-item-5 { grid-column: span 2; }
+        /* vfx2 normal (row3, col3) */
 
-        /* Desktop */
-        .eg-card {
-          width: min(62vw, 720px);
-          height: clamp(220px, 32vw, 400px);
-        }
-
-        /* Tablet */
+        /* ── Tablet: 2-col ── */
         @media (max-width: 768px) {
-          .eg-track { padding: 0 20px !important; gap: 12px !important; }
-          .eg-card  { width: 78vw !important; height: 240px !important; }
+          .eg-grid {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto;
+            border-radius: 10px;
+          }
+          .eg-item              { aspect-ratio: 4/3; }
+          .eg-item-0            { grid-column: span 2; aspect-ratio: 16/9; }
+          .eg-item-5            { grid-column: span 2; aspect-ratio: 16/9; }
+          .eg-item-6            { grid-column: span 2; aspect-ratio: 16/9; }
         }
 
-        /* Mobile */
+        /* ── Mobile: single col ── */
         @media (max-width: 480px) {
-          .eg-track  { padding: 0 16px !important; gap: 10px !important; }
-          .eg-card   { width: 85vw !important; height: 210px !important; border-radius: 10px !important; }
-          .eg-prompt { white-space: normal !important; }
-          .eg-dots   { display: none !important; }
-        }
-
-        @media (min-width: 481px) {
-          .eg-prompt { white-space: nowrap !important; }
+          .eg-grid {
+            grid-template-columns: 1fr;
+            gap: 2px;
+            border-radius: 10px;
+          }
+          .eg-item   { aspect-ratio: 16/9 !important; }
+          .eg-item-0 { grid-column: 1 !important; }
+          .eg-item-5 { grid-column: 1 !important; }
+          .eg-item-6 { grid-column: 1 !important; }
         }
       `}</style>
     </section>
