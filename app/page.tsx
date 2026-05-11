@@ -12,6 +12,7 @@ import Testimonials, { type Testimonial } from "@/components/sections/Testimonia
 import FAQ, { type FAQItem } from "@/components/sections/FAQ";
 import FinalCTA from "@/components/sections/FinalCTA";
 import VideoCard from "@/components/sections/VideoCard";
+import BeforeAfterSlider from "@/components/sections/BeforeAfterSlider";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -100,11 +101,13 @@ function PanelMockup() {
 
 /* ── Examples slider ─────────────────────────────────────────────────────────── */
 const EXAMPLES = [
-  { src: "/primjeri/relight.mp4",       prompt: "warm golden hour light, cinematic amber glow", label: "Relight"    },
-  { src: "/primjeri/relight2.mp4",      prompt: "moonlit room, deep blue cinematic relight",     label: "Relight"    },
-  { src: "/primjeri/backgorund2.mp4",   prompt: "luxury penthouse, city skyline at dusk",         label: "Background" },
-  { src: "/primjeri/backgorundmp4.mp4", prompt: "replace background with NYC penthouse at night", label: "Background" },
-  { src: "/primjeri/vfx1.mp4",          prompt: "add glowing ice energy aura around body",        label: "VFX"        },
+  { src: "/primjeri/re1.mp4",   prompt: "warm golden hour light, cinematic amber glow",   label: "Relight"    },
+  { src: "/primjeri/re2.mp4",   prompt: "moonlit room, deep blue cinematic relight",       label: "Relight"    },
+  { src: "/primjeri/bg1.mp4",   prompt: "luxury penthouse, city skyline at dusk",           label: "Background" },
+  { src: "/primjeri/bg2.mp4",   prompt: "replace background with NYC penthouse at night",   label: "Background" },
+  { src: "/primjeri/vfx1.mp4",  prompt: "add glowing ice energy aura around body",          label: "VFX"        },
+  { src: "/primjeri/vfx2.mp4",  prompt: "add lightning strike and sparks",                  label: "VFX"        },
+  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",     label: "Relight"    },
 ];
 
 function ExamplesGrid() {
@@ -151,7 +154,7 @@ function ExamplesGrid() {
         transition={{ duration: 0.45 }}
         style={{
           maxWidth: "1200px", margin: "0 auto",
-          padding: "80px 40px 44px",
+          padding: "80px clamp(16px, 4vw, 40px) 44px",
           display: "flex", alignItems: "center",
           justifyContent: "space-between", gap: "20px", flexWrap: "wrap",
         }}
@@ -232,17 +235,16 @@ function ExamplesGrid() {
             display: "flex", gap: "16px",
             overflowX: "auto", scrollSnapType: "x mandatory",
             WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
-            padding: "0 40px",
+            padding: "0 clamp(16px, 4vw, 40px)",
           }}
         >
           {EXAMPLES.map((ex, i) => (
             <div
               key={i}
               onClick={() => goTo(i)}
+              className="eg-card"
               style={{
                 flex: "0 0 auto",
-                width: "min(62vw, 720px)",
-                height: "clamp(220px, 32vw, 400px)",
                 borderRadius: "14px",
                 overflow: "hidden",
                 border: `1px solid ${i === active ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"}`,
@@ -265,7 +267,7 @@ function ExamplesGrid() {
         {/* Caption bar */}
         <div style={{
           maxWidth: "1200px", margin: "0 auto",
-          padding: "0 40px",
+          padding: "0 clamp(16px, 4vw, 40px)",
         }}>
           {/* Divider */}
           <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "24px 0 0" }} />
@@ -281,6 +283,7 @@ function ExamplesGrid() {
             <div style={{ flex: 1, overflow: "hidden" }}>
               <p
                 key={active}
+                className="eg-prompt"
                 style={{
                   margin: 0,
                   fontSize: "13px",
@@ -289,7 +292,7 @@ function ExamplesGrid() {
                   letterSpacing: "0.01em",
                   lineHeight: 1.5,
                   animation: "egFadeUp 350ms cubic-bezier(0.22,1,0.36,1) both",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  overflow: "hidden", textOverflow: "ellipsis",
                 }}
               >
                 <span style={{ color: "#39ff6e", marginRight: "8px" }}>&gt;</span>
@@ -298,7 +301,7 @@ function ExamplesGrid() {
             </div>
 
             {/* Progress segments */}
-            <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+            <div className="eg-dots" style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
               {EXAMPLES.map((_, i) => (
                 <button
                   key={i}
@@ -324,8 +327,29 @@ function ExamplesGrid() {
         }
         .eg-track::-webkit-scrollbar { display: none; }
         .eg-track { -ms-overflow-style: none; }
-        @media (max-width: 600px) {
-          .eg-track { padding: 0 20px !important; gap: 10px !important; }
+
+        /* Desktop */
+        .eg-card {
+          width: min(62vw, 720px);
+          height: clamp(220px, 32vw, 400px);
+        }
+
+        /* Tablet */
+        @media (max-width: 768px) {
+          .eg-track { padding: 0 20px !important; gap: 12px !important; }
+          .eg-card  { width: 78vw !important; height: 240px !important; }
+        }
+
+        /* Mobile */
+        @media (max-width: 480px) {
+          .eg-track  { padding: 0 16px !important; gap: 10px !important; }
+          .eg-card   { width: 85vw !important; height: 210px !important; border-radius: 10px !important; }
+          .eg-prompt { white-space: normal !important; }
+          .eg-dots   { display: none !important; }
+        }
+
+        @media (min-width: 481px) {
+          .eg-prompt { white-space: nowrap !important; }
         }
       `}</style>
     </section>
@@ -1470,6 +1494,46 @@ export default function PrysmorPage() {
           </motion.div>
 
         </div>
+      </section>
+
+      {/* ── BEFORE / AFTER ──────────────────────────────────────────── */}
+      <section style={{ background: "#080808", padding: "0 24px 100px" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={{ duration: 0.6 }}
+          style={{ maxWidth: "960px", margin: "0 auto" }}
+        >
+          {/* Slider */}
+          <BeforeAfterSlider
+            beforeSrc="/hero/after.mp4"
+            afterSrc="/hero/before.mp4"
+            beforeLabel="ORIGINAL"
+            afterLabel="PRYSMOR"
+            initialPos={48}
+          />
+
+          {/* Footer row */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "14px", flexWrap: "wrap", gap: "8px",
+          }}>
+            <span style={{
+              fontSize: "11px", color: "#2a2a2a",
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            }}>
+              Generated inside Adobe Premiere Pro
+            </span>
+            <span style={{
+              fontSize: "11px", color: "#2a2a2a",
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            }}>
+              Render time: ~3 min
+            </span>
+          </div>
+        </motion.div>
       </section>
 
       {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
