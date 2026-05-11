@@ -104,15 +104,14 @@ const EXAMPLES = [
   { src: "/primjeri/re2.mp4",   prompt: "moonlit room, deep blue cinematic relight",       label: "Relight"    },
   { src: "/primjeri/bg1.mp4",   prompt: "luxury penthouse, city skyline at dusk",          label: "Background" },
   { src: "/primjeri/bg2.mp4",   prompt: "replace background with NYC penthouse at night",  label: "Background" },
-  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",    label: "Relight"    },
+  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",    label: "Background" },
   { src: "/primjeri/vfx1.mp4",  prompt: "add glowing ice energy aura around body",         label: "VFX"        },
   { src: "/primjeri/vfx2.mp4",  prompt: "add lightning strike and sparks",                 label: "VFX"        },
 ];
 
-function BentoCard({ src, label, prompt }: { src: string; label: string; prompt: string }) {
+function BentoCard({ src, label }: { src: string; label: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
-  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     const v  = videoRef.current;
@@ -132,8 +131,6 @@ function BentoCard({ src, label, prompt }: { src: string; label: string; prompt:
   return (
     <div
       ref={wrapRef}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#0a0a0a" }}
     >
       <video
@@ -143,18 +140,13 @@ function BentoCard({ src, label, prompt }: { src: string; label: string; prompt:
         style={{
           position: "absolute", inset: 0,
           width: "100%", height: "100%", objectFit: "cover", display: "block",
-          transform: hovered ? "scale(1.04)" : "scale(1)",
-          transition: "transform 900ms cubic-bezier(0.22,1,0.36,1)",
-          willChange: "transform",
         }}
       />
 
       {/* gradient */}
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.08) 45%, transparent 100%)",
-        opacity: hovered ? 1 : 0.65,
-        transition: "opacity 400ms ease",
+        background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)",
       }} />
 
       {/* label top-left */}
@@ -167,26 +159,6 @@ function BentoCard({ src, label, prompt }: { src: string; label: string; prompt:
         color: "rgba(255,255,255,0.28)", fontFamily: "ui-monospace,SFMono-Regular,monospace",
       }}>
         {label}
-      </div>
-
-      {/* prompt bottom — slides up on hover */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 14px",
-        transform: hovered ? "translateY(0)" : "translateY(5px)",
-        opacity: hovered ? 1 : 0,
-        transition: "transform 380ms cubic-bezier(0.22,1,0.36,1), opacity 300ms ease",
-        pointerEvents: "none",
-      }}>
-        <p style={{
-          margin: 0, fontSize: "11px", lineHeight: 1.45,
-          color: "rgba(255,255,255,0.52)",
-          fontFamily: "ui-monospace,SFMono-Regular,monospace",
-          overflow: "hidden", display: "-webkit-box",
-          WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-        }}>
-          <span style={{ color: "#39FF6A", marginRight: "6px" }}>&gt;</span>
-          {prompt}
-        </p>
       </div>
     </div>
   );
@@ -227,7 +199,7 @@ function ExamplesGrid() {
         <div className="eg-grid">
           {EXAMPLES.map((ex, i) => (
             <div key={i} className={`eg-item eg-item-${i}`}>
-              <BentoCard src={ex.src} label={ex.label} prompt={ex.prompt} />
+              <BentoCard src={ex.src} label={ex.label} />
             </div>
           ))}
         </div>
@@ -1170,23 +1142,28 @@ export default function PrysmorPage() {
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "8px",
-              background: "rgba(255,255,255,0.04)",
+              gap: "7px",
+              background: "rgba(255,255,255,0.03)",
               backdropFilter: "blur(10px)",
               WebkitBackdropFilter: "blur(10px)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "20px",
-              padding: "5px 16px 5px 12px",
-              marginBottom: "40px",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: "6px",
+              padding: "5px 12px",
+              marginBottom: "44px",
+              marginTop: "32px",
             }}
           >
             <span style={{
-              fontSize: "11px",
-              fontWeight: 400,
-              color: "rgba(255,255,255,0.38)",
-              letterSpacing: "0.2px",
+              width: "5px", height: "5px", borderRadius: "50%",
+              background: "#39FF6A", flexShrink: 0,
+            }} />
+            <span style={{
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+              fontSize: "10px", fontWeight: 500,
+              color: "rgba(255,255,255,0.3)",
+              letterSpacing: "1.5px", textTransform: "uppercase",
             }}>
-              Now available in Premiere Pro
+              Premiere Pro · Native plugin
             </span>
           </motion.div>
 
