@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, Fragment } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Clock } from "lucide-react";
+import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
 import Comparison, { type ComparisonRow } from "@/components/sections/Comparison";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
@@ -98,29 +98,44 @@ function PanelMockup() {
 }
 
 /* ── Examples bento grid ─────────────────────────────────────────────────────── */
-const EXAMPLES = [
-  { src: "/primjeri/re1.mp4",   prompt: "warm golden hour light, cinematic amber glow",   label: "Relight"    },
-  { src: "/primjeri/re2.mp4",   prompt: "moonlit room, deep blue cinematic relight",       label: "Relight"    },
-  { src: "/primjeri/bg1.mp4",   prompt: "luxury penthouse, city skyline at dusk",          label: "Background" },
-  { src: "/primjeri/bg2.mp4",   prompt: "replace background with NYC penthouse at night",  label: "Background" },
-  { src: "/primjeri/stock.mp4", prompt: "cinematic regrade, warm tones, shallow depth",    label: "Background" },
-  { src: "/primjeri/vfx1.mp4",  prompt: "add glowing ice energy aura around body",         label: "VFX"        },
-  { src: "/primjeri/vfx2.mp4",  prompt: "add lightning strike and sparks",                 label: "VFX"        },
+const EXAMPLE_CATEGORIES = [
+  {
+    name: "Relight",
+    color: "rgba(255,190,90,0.8)",
+    videos: [
+      "/primjeri/re1.mp4",
+      "/primjeri/re2.mp4",
+    ],
+  },
+  {
+    name: "Background",
+    color: "rgba(90,170,255,0.8)",
+    videos: [
+      "/primjeri/bg1.mp4",
+      "/primjeri/bg2.mp4",
+      "/primjeri/stock.mp4",
+    ],
+  },
+  {
+    name: "VFX",
+    color: "rgba(57,255,106,0.8)",
+    videos: [
+      "/primjeri/vfx1.mp4",
+      "/primjeri/vfx2.mp4",
+    ],
+  },
 ];
 
-function BentoCard({ src, label }: { src: string; label: string }) {
+function CategoryVideoCard({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v  = videoRef.current;
+    const v = videoRef.current;
     const el = wrapRef.current;
     if (!v || !el) return;
     const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) v.play().catch(() => {});
-        else v.pause();
-      },
+      ([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else v.pause(); },
       { threshold: 0.1 },
     );
     io.observe(el);
@@ -128,37 +143,25 @@ function BentoCard({ src, label }: { src: string; label: string }) {
   }, []);
 
   return (
-    <div
-      ref={wrapRef}
-      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#0a0a0a" }}
-    >
+    <div ref={wrapRef} className="eg-card-inner" style={{
+      position: "relative", width: "100%", height: "100%",
+      overflow: "hidden", background: "#0a0a0a", borderRadius: "10px",
+    }}>
       <video
         ref={videoRef}
         src={src}
         muted loop playsInline preload="metadata"
         style={{
-          position: "absolute", inset: 0,
-          width: "100%", height: "100%", objectFit: "cover", display: "block",
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          objectFit: "cover", display: "block",
+          transition: "transform 800ms cubic-bezier(0.22,1,0.36,1)",
+          willChange: "transform",
         }}
       />
-
-      {/* gradient */}
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)",
+        background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)",
       }} />
-
-      {/* label top-left */}
-      <div style={{
-        position: "absolute", top: "13px", left: "13px", pointerEvents: "none",
-        background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-        border: "1px solid rgba(255,255,255,0.07)", borderRadius: "4px",
-        padding: "3px 9px", fontSize: "9px", fontWeight: 600,
-        letterSpacing: "2px", textTransform: "uppercase",
-        color: "rgba(255,255,255,0.28)", fontFamily: "ui-monospace,SFMono-Regular,monospace",
-      }}>
-        {label}
-      </div>
     </div>
   );
 }
@@ -167,86 +170,102 @@ function ExamplesGrid() {
   return (
     <section id="examples" style={{ background: "#080808", borderTop: "1px solid #111" }}>
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.45 }}
-        style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px clamp(16px,4vw,32px) 32px" }}
-      >
-        <p style={{
-          fontSize: "10px", fontWeight: 500, color: "#39FF6A",
-          letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
-        }}>// Real outputs</p>
-        <h2 style={{
-          fontSize: "clamp(24px, 2.8vw, 40px)", fontWeight: 700,
-          color: "white", letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
-        }}>
-          Prompt in.<br />Cinematic shot out.
-        </h2>
-      </motion.div>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 clamp(16px,4vw,32px)" }}>
 
-      {/* Bento grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-20px" }}
-        transition={{ duration: 0.55, delay: 0.08 }}
-        style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 clamp(16px,4vw,32px) 80px" }}
-      >
-        <div className="eg-grid">
-          {EXAMPLES.map((ex, i) => (
-            <div key={i} className={`eg-item eg-item-${i}`}>
-              <BentoCard src={ex.src} label={ex.label} />
-            </div>
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45 }}
+          style={{ padding: "80px 0 56px" }}
+        >
+          <p style={{
+            fontSize: "10px", fontWeight: 500, color: "#39FF6A",
+            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
+          }}>// Real outputs</p>
+          <h2 style={{
+            fontSize: "clamp(24px, 2.8vw, 40px)", fontWeight: 700,
+            color: "white", letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
+          }}>
+            Prompt in.<br />Cinematic shot out.
+          </h2>
+        </motion.div>
+
+        {/* Category rows */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "48px", paddingBottom: "80px" }}>
+          {EXAMPLE_CATEGORIES.map((cat, ci) => (
+            <motion.div
+              key={cat.name}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.5, delay: ci * 0.08 }}
+            >
+              {/* Category label row */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: "14px",
+                marginBottom: "14px",
+              }}>
+                <span style={{
+                  fontSize: "10px", fontWeight: 600, letterSpacing: "2.5px",
+                  textTransform: "uppercase", color: cat.color,
+                  fontFamily: "ui-monospace,SFMono-Regular,monospace",
+                }}>
+                  {cat.name}
+                </span>
+                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.06)" }} />
+                <span style={{
+                  fontSize: "10px", color: "#333",
+                  fontFamily: "ui-monospace,SFMono-Regular,monospace",
+                }}>
+                  {cat.videos.length} clips
+                </span>
+              </div>
+
+              {/* Video row */}
+              <div className={`eg-row eg-row-${cat.videos.length}`}>
+                {cat.videos.map((src, vi) => (
+                  <div key={vi} className="eg-cell">
+                    <CategoryVideoCard src={src} />
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       <style>{`
-        /* ── Desktop: 3-col bento ── */
-        .eg-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: 320px 250px 270px;
-          gap: 3px;
-          border-radius: 14px;
-          overflow: hidden;
-        }
-        .eg-item { overflow: hidden; }
-        /* re1 wide (row1, col1-2) */
-        .eg-item-0 { grid-column: span 2; }
-        /* re2 normal (row1, col3) */
-        /* bg1, bg2, stock fill row2 (1 col each) */
-        /* vfx1 wide (row3, col1-2) */
-        .eg-item-5 { grid-column: span 2; }
-        /* vfx2 normal (row3, col3) */
+        .eg-card-inner:hover video { transform: scale(1.04); }
 
-        /* ── Tablet: 2-col ── */
+        /* ── Desktop ── */
+        .eg-row { display: grid; gap: 8px; }
+
+        /* 2-video row (Relight, VFX) — first card wider */
+        .eg-row-2 { grid-template-columns: 3fr 2fr; }
+        .eg-row-2 .eg-cell { height: 300px; }
+
+        /* 3-video row (Background) — equal thirds */
+        .eg-row-3 { grid-template-columns: repeat(3, 1fr); }
+        .eg-row-3 .eg-cell { height: 220px; }
+
+        /* ── Tablet ── */
         @media (max-width: 768px) {
-          .eg-grid {
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto;
-            border-radius: 10px;
-          }
-          .eg-item              { aspect-ratio: 4/3; }
-          .eg-item-0            { grid-column: span 2; aspect-ratio: 16/9; }
-          .eg-item-5            { grid-column: span 2; aspect-ratio: 16/9; }
-          .eg-item-6            { grid-column: span 2; aspect-ratio: 16/9; }
+          .eg-row-2 { grid-template-columns: 1fr 1fr; }
+          .eg-row-2 .eg-cell { height: 220px; }
+          .eg-row-3 { grid-template-columns: 1fr 1fr; }
+          .eg-row-3 .eg-cell { height: 180px; }
+          .eg-row-3 .eg-cell:last-child { grid-column: span 2; }
         }
 
-        /* ── Mobile: single col ── */
+        /* ── Mobile ── */
         @media (max-width: 480px) {
-          .eg-grid {
-            grid-template-columns: 1fr;
-            gap: 2px;
-            border-radius: 10px;
-          }
-          .eg-item   { aspect-ratio: 16/9 !important; }
-          .eg-item-0 { grid-column: 1 !important; }
-          .eg-item-5 { grid-column: 1 !important; }
-          .eg-item-6 { grid-column: 1 !important; }
+          .eg-row-2,
+          .eg-row-3 { grid-template-columns: 1fr; gap: 4px; }
+          .eg-row-2 .eg-cell,
+          .eg-row-3 .eg-cell { height: 190px; }
+          .eg-row-3 .eg-cell:last-child { grid-column: 1; }
         }
       `}</style>
     </section>
