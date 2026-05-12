@@ -3,9 +3,8 @@
 import { useRef, useEffect, useState, Fragment } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { ArrowRight, Film, Wand2, Download, Sparkles, Clock } from "lucide-react";
+import { ArrowRight, Sparkles, Clock } from "lucide-react";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
-import HowItWorks, { type Step } from "@/components/sections/HowItWorks";
 import Comparison, { type ComparisonRow } from "@/components/sections/Comparison";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
 import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
@@ -426,27 +425,6 @@ function ModesSection() {
 }
 
 /* ── Data ───────────────────────────────────────────────────────────────────── */
-const steps: Step[] = [
-  {
-    icon: Film,
-    number: "01",
-    title: "Send a clip to the panel.",
-    desc: "Select any clip from your Premiere timeline and open the Prysmor panel. One click.",
-  },
-  {
-    icon: Wand2,
-    number: "02",
-    title: "Type your prompt. Drop a reference.",
-    desc: "Describe the effect in plain language. Optionally attach a reference image for more control.",
-  },
-  {
-    icon: Download,
-    number: "03",
-    title: "Generate. Import. Done.",
-    desc: "Your effect renders in 2–5 minutes and drops directly onto your timeline. No export, no round-tripping.",
-  },
-];
-
 const compRows: ComparisonRow[] = [
   { feature: "Cost", ours: "from $29.90/month", theirs: "$500–2,000/project" },
   { feature: "Time per effect", ours: "2–5 minutes", theirs: "1–3 days" },
@@ -1439,8 +1417,6 @@ export default function PrysmorPage() {
         </motion.div>
       </section>
 
-      {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
-      <HowItWorks title="How Prysmor works" steps={steps} />
 
       {/* ── EXAMPLES ────────────────────────────────────────────────── */}
       <div id="examples">
