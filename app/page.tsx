@@ -1205,11 +1205,11 @@ export default function PrysmorPage() {
           </motion.div>
 
           {/* Headline */}
-          <motion.div
+          <motion.h1
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.85, ease: [0.22,1,0.36,1], delay: 0.2 }}
-            style={{ width: "100%", maxWidth: "720px" }}
+            style={{ width: "100%", maxWidth: "720px", margin: 0, padding: 0 }}
           >
             {/* Line 1 */}
             <div style={{
@@ -1240,7 +1240,7 @@ export default function PrysmorPage() {
                 minutes.
               </span>
             </div>
-          </motion.div>
+          </motion.h1>
 
           {/* Subheadline */}
           <motion.p
