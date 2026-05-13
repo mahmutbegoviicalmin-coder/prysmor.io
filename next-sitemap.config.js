@@ -2,20 +2,17 @@
 module.exports = {
   siteUrl: 'https://prysmor.io',
   generateRobotsTxt: true,
-  exclude: ['/dashboard', '/dashboard/*', '/sign-in', '/sign-up', '/api/*', '/panel-auth'],
+  generateIndexSitemap: false,
+  additionalPaths: async (config) => [
+    await config.transform(config, '/'),
+    await config.transform(config, '/docs'),
+    await config.transform(config, '/docs/install'),
+  ],
+  exclude: ['/dashboard', '/sign-in', '/sign-up', '/api/*', '/privacy', '/terms'],
   robotsTxtOptions: {
     policies: [
       { userAgent: '*', allow: '/' },
-      { userAgent: '*', disallow: ['/dashboard', '/sign-in', '/sign-up', '/api', '/panel-auth'] },
+      { userAgent: '*', disallow: ['/dashboard', '/sign-in', '/sign-up', '/api'] },
     ],
   },
-  additionalPaths: async (config) => [
-    await config.transform(config, '/'),
-    await config.transform(config, '/pricing'),
-    await config.transform(config, '/privacy'),
-    await config.transform(config, '/terms'),
-    await config.transform(config, '/docs'),
-    await config.transform(config, '/docs/install'),
-    await config.transform(config, '/docs/install-panel'),
-  ],
 };

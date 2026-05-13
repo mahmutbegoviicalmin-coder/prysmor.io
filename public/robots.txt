@@ -8,7 +8,6 @@ Disallow: /dashboard
 Disallow: /sign-in
 Disallow: /sign-up
 Disallow: /api
-Disallow: /panel-auth
 
 # Host
 Host: https://prysmor.io
