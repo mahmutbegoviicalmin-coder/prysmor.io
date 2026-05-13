@@ -113,7 +113,8 @@ export default function PricingSection({
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
     if (!user) {
-      window.location.href = "/sign-in?redirect_url=/pricing";
+      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search + "#pricing");
+      window.location.href = `/sign-in?redirect_url=${returnUrl}`;
       return;
     }
     // Fire Meta Pixel InitiateCheckout before opening overlay

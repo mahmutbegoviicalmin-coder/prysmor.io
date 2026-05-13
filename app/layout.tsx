@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     "Generate professional VFX from a text prompt, directly inside Adobe Premiere Pro. No After Effects. No VFX artists.",
   keywords: ["AI VFX", "Premiere Pro plugin", "AI video effects", "Prysmor", "text to VFX"],
   icons: {
-    icon: "/logo/logo-icon.png",
-    apple: "/logo/logo-icon.png",
+    icon: "/favicon.png",
+    apple: "/favicon.png",
   },
   openGraph: {
     title: "Prysmor — AI VFX for Premiere Pro",
