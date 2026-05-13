@@ -1055,11 +1055,51 @@ function WelcomePopup() {
   );
 }
 
+const JSON_LD_SOFTWARE = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Prysmor",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Windows 10, Windows 11, macOS 12, macOS 13, macOS 14",
+  "offers": { "@type": "AggregateOffer", "lowPrice": "29.90", "highPrice": "99.90", "priceCurrency": "USD", "offerCount": "3" },
+  "description": "Generate professional VFX from a text prompt, directly inside Adobe Premiere Pro. No After Effects. No VFX artists.",
+  "url": "https://prysmor.io",
+  "applicationSubCategory": "Video Editing Plugin",
+  "screenshot": "https://www.prysmor.io/logo/logo-full.png",
+};
+
+const JSON_LD_ORG = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Prysmor",
+  "url": "https://prysmor.io",
+  "logo": "https://www.prysmor.io/logo/logo-full.png",
+  "description": "Prysmor makes AI-powered VFX generation accessible to every video editor through a native Adobe Premiere Pro plugin.",
+  "email": "support@prysmor.io",
+  "sameAs": ["https://instagram.com/prysmor.ai"],
+};
+
+const JSON_LD_FAQ = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "What exactly is Prysmor?", "acceptedAnswer": { "@type": "Answer", "text": "Prysmor is an Adobe Premiere Pro plugin that generates professional VFX from a text prompt. Select a clip, describe the effect, and the result lands back on your timeline at 4K. No After Effects, no freelancer needed." } },
+    { "@type": "Question", "name": "How long does a render take?", "acceptedAnswer": { "@type": "Answer", "text": "Most effects render in 2–5 minutes depending on clip length and complexity. You'll see a progress indicator in the panel while it processes." } },
+    { "@type": "Question", "name": "Do my VFX credits expire?", "acceptedAnswer": { "@type": "Answer", "text": "Credits reset on your monthly billing date and don't roll over. We size the plans to match real editing workflows. Most users don't hit the limit." } },
+    { "@type": "Question", "name": "What if I'm not happy with the result?", "acceptedAnswer": { "@type": "Answer", "text": "7-day money-back guarantee, no questions asked. If your first three shots don't change how you work, email us and we'll refund the full amount." } },
+    { "@type": "Question", "name": "Which software does Prysmor support?", "acceptedAnswer": { "@type": "Answer", "text": "Prysmor works natively inside Adobe Premiere Pro on both macOS and Windows. After Effects support is on the roadmap." } },
+    { "@type": "Question", "name": "Why is this cheaper than hiring a VFX artist?", "acceptedAnswer": { "@type": "Answer", "text": "A single VFX shot from a freelancer runs $300–1,500 plus days of back-and-forth. Prysmor automates the generation at a fraction of that cost and stays inside your timeline." } },
+  ],
+};
+
 export default function PrysmorPage() {
   const { openSignUp } = useClerk();
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_SOFTWARE) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_ORG) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_FAQ) }} />
       <FloatingCTA />
       <WelcomePopup />
       <ExitIntentPopup />
