@@ -930,6 +930,36 @@ export function AdminPanel() {
     } finally { setActionLoading(null); }
   }
 
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
+
+  async function syncAllLocations() {
+    const missing = users.filter(u => !u.country);
+    if (missing.length === 0) { setSyncProgress('All users already have country data.'); return; }
+    setSyncingAll(true);
+    let done = 0;
+    for (const u of missing) {
+      setSyncProgress(`Syncing ${done + 1}/${missing.length}…`);
+      try {
+        const res = await fetch(`/api/admin/users/${u.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'refresh_location' }),
+        });
+        if (res.ok) {
+          const { data } = await res.json();
+          if (data?.country) {
+            updateUser({ ...u, country: data.country, countryCode: data.countryCode ?? u.countryCode });
+          }
+        }
+      } catch { /* skip */ }
+      done++;
+      // Small delay to avoid rate limits
+      await new Promise(r => setTimeout(r, 300));
+    }
+    setSyncProgress(`Done — synced ${done} users.`);
+    setSyncingAll(false);
+  }
+
   async function revokeDevices(user: AdminUser) {
     setActionLoading(user.id);
     try {
@@ -1059,6 +1089,20 @@ export function AdminPanel() {
           <p className="text-[13px] text-[#6B7280]">Users, revenue, and platform overview.</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={syncAllLocations}
+              disabled={syncingAll || loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-[#39FF6A]/20 text-[11px] text-[#39FF6A]/70 hover:text-[#39FF6A] hover:border-[#39FF6A]/40 transition-colors disabled:opacity-50"
+              title="Sync country for all users missing location data"
+            >
+              {syncingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[10px]">🌍</span>}
+              Sync countries
+            </button>
+            {syncProgress && (
+              <span className="text-[10px] text-[#555]">{syncProgress}</span>
+            )}
+          </div>
           <button
             onClick={purgeOrphans}
             disabled={purging || loading}
