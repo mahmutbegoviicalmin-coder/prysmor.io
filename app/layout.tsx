@@ -31,6 +31,9 @@ export const metadata: Metadata = {
     type: "website",
     images: [{ url: "/logo/logo-full.png", width: 800, height: 200 }],
   },
+  verification: {
+    google: "Iqoms-_KGTD4UQbvkIvjIXL3d6SZ89pab77TqDvzuCM",
+  },
 };
 
 const clerkAppearance = {
