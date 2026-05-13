@@ -4,37 +4,37 @@ import { updateUserCountry } from '@/lib/firestore/users';
 
 export const runtime = 'nodejs';
 
-const PRIVATE_PREFIXES = ['127.', '10.', '192.168.', '172.16.', '172.17.',
-  '172.18.', '172.19.', '172.20.', '172.21.', '172.22.', '172.23.', '172.24.',
-  '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.'];
+/* ISO 3166-1 alpha-2 → full name (most common) */
+const COUNTRY_NAMES: Record<string, string> = {
+  AF:"Afghanistan",AL:"Albania",DZ:"Algeria",AR:"Argentina",AM:"Armenia",
+  AU:"Australia",AT:"Austria",AZ:"Azerbaijan",BH:"Bahrain",BD:"Bangladesh",
+  BY:"Belarus",BE:"Belgium",BZ:"Belize",BJ:"Benin",BO:"Bolivia",
+  BA:"Bosnia and Herzegovina",BW:"Botswana",BR:"Brazil",BG:"Bulgaria",
+  KH:"Cambodia",CM:"Cameroon",CA:"Canada",CL:"Chile",CN:"China",
+  CO:"Colombia",CD:"Congo (DRC)",CR:"Costa Rica",HR:"Croatia",CU:"Cuba",
+  CY:"Cyprus",CZ:"Czech Republic",DK:"Denmark",DO:"Dominican Republic",
+  EC:"Ecuador",EG:"Egypt",SV:"El Salvador",EE:"Estonia",ET:"Ethiopia",
+  FI:"Finland",FR:"France",GE:"Georgia",DE:"Germany",GH:"Ghana",
+  GR:"Greece",GT:"Guatemala",HN:"Honduras",HK:"Hong Kong",HU:"Hungary",
+  IN:"India",ID:"Indonesia",IR:"Iran",IQ:"Iraq",IE:"Ireland",
+  IL:"Israel",IT:"Italy",JM:"Jamaica",JP:"Japan",JO:"Jordan",
+  KZ:"Kazakhstan",KE:"Kenya",KW:"Kuwait",LV:"Latvia",LB:"Lebanon",
+  LT:"Lithuania",LU:"Luxembourg",MY:"Malaysia",MX:"Mexico",MD:"Moldova",
+  MA:"Morocco",MZ:"Mozambique",MM:"Myanmar",NP:"Nepal",NL:"Netherlands",
+  NZ:"New Zealand",NI:"Nicaragua",NG:"Nigeria",KP:"North Korea",MK:"North Macedonia",
+  NO:"Norway",OM:"Oman",PK:"Pakistan",PS:"Palestine",PA:"Panama",
+  PY:"Paraguay",PE:"Peru",PH:"Philippines",PL:"Poland",PT:"Portugal",
+  QA:"Qatar",RO:"Romania",RU:"Russia",SA:"Saudi Arabia",SN:"Senegal",
+  RS:"Serbia",SG:"Singapore",SK:"Slovakia",SI:"Slovenia",ZA:"South Africa",
+  KR:"South Korea",ES:"Spain",LK:"Sri Lanka",SD:"Sudan",SE:"Sweden",
+  CH:"Switzerland",SY:"Syria",TW:"Taiwan",TZ:"Tanzania",TH:"Thailand",
+  TN:"Tunisia",TR:"Turkey",UG:"Uganda",UA:"Ukraine",AE:"United Arab Emirates",
+  GB:"United Kingdom",US:"United States",UY:"Uruguay",UZ:"Uzbekistan",
+  VE:"Venezuela",VN:"Vietnam",YE:"Yemen",ZM:"Zambia",ZW:"Zimbabwe",
+};
 
-function isPrivateIp(ip: string): boolean {
-  return ip === '::1' || ip === 'localhost' || PRIVATE_PREFIXES.some(p => ip.startsWith(p));
-}
-
-function extractIp(req: NextRequest): string | null {
-  // Try all common proxy/CDN headers (Vercel uses x-forwarded-for + x-vercel-forwarded-for)
-  const candidates = [
-    req.headers.get('x-vercel-forwarded-for'),  // Vercel-specific
-    req.headers.get('x-forwarded-for'),          // Standard proxy header
-    req.headers.get('x-real-ip'),                // nginx
-    req.headers.get('cf-connecting-ip'),         // Cloudflare
-  ];
-
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const ip = raw.split(',')[0].trim();
-    if (ip && !isPrivateIp(ip)) return ip;
-  }
-  return null;
-}
-
-interface IpApiResponse {
-  status:      string;
-  country:     string;
-  countryCode: string;
-  city?:       string;
-  query:       string;
+function getCountryName(code: string): string {
+  return COUNTRY_NAMES[code.toUpperCase()] ?? code;
 }
 
 export async function POST(req: NextRequest) {
@@ -43,28 +43,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const ip = extractIp(req);
-  if (!ip) {
-    // Localhost / private IP — skip silently
+  /* ── 1. Try Vercel built-in geo headers (fast, no external call) ── */
+  const vercelCountryCode = req.headers.get('x-vercel-ip-country');
+  if (vercelCountryCode && vercelCountryCode.length === 2) {
+    const countryName = getCountryName(vercelCountryCode);
+    await updateUserCountry(userId, countryName, vercelCountryCode.toUpperCase());
+    return NextResponse.json({ ok: true, country: countryName, source: 'vercel' });
+  }
+
+  /* ── 2. Fallback: ip-api.com (works on localhost / non-Vercel) ── */
+  const raw = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip');
+  const ip  = raw?.split(',')[0].trim();
+
+  const PRIVATE = ['127.','10.','192.168.','::1','localhost'];
+  if (!ip || PRIVATE.some(p => ip.startsWith(p))) {
     return NextResponse.json({ ok: false, reason: 'private_ip' });
   }
 
   try {
-    const geo = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,query`, {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!geo.ok) {
-      return NextResponse.json({ ok: false, reason: 'geo_api_error' });
-    }
-    const data: IpApiResponse = await geo.json();
+    const geo = await fetch(
+      `http://ip-api.com/json/${ip}?fields=status,country,countryCode`,
+      { signal: AbortSignal.timeout(4000) },
+    );
+    const data = await geo.json() as { status: string; country: string; countryCode: string };
     if (data.status !== 'success' || !data.country) {
       return NextResponse.json({ ok: false, reason: 'geo_failed' });
     }
-
     await updateUserCountry(userId, data.country, data.countryCode);
-    return NextResponse.json({ ok: true, country: data.country });
+    return NextResponse.json({ ok: true, country: data.country, source: 'ip-api' });
   } catch (err) {
-    // Non-fatal — country is optional
     console.warn('[sync-location] failed:', err);
     return NextResponse.json({ ok: false, reason: 'exception' });
   }
