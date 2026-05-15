@@ -9,11 +9,14 @@ export default authMiddleware({
     "/pricing",
     "/docs",
     "/docs/install",
+    "/autovfx",
     "/sign-in(.*)",
     "/sign-up(.*)",
     "/api/webhooks(.*)",
     "/api/firebase/test",
     "/panel-auth(.*)",
+    // Analytics — must be public so anonymous visitors can be tracked
+    "/api/track",
     // Panel API — own auth via validatePanelToken, must not require Clerk session
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
@@ -26,6 +29,7 @@ export default authMiddleware({
   // CEP browser requests can be fingerprinted as bots — ignore them entirely.
   // NOTE: confirm is NOT here — it calls currentUser() and needs Clerk context.
   ignoredRoutes: [
+    "/api/track",
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
     "/api/panel/heartbeat",
