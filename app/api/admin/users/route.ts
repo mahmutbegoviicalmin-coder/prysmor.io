@@ -67,7 +67,7 @@ export async function GET() {
 
   // Fetch Firestore docs + Clerk users in parallel
   const [snap, clerkRes] = await Promise.all([
-    db.collection('users').orderBy('createdAt', 'desc').limit(500).get(),
+    db.collection('users').limit(500).get(),
     clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
   ]);
 
@@ -134,7 +134,7 @@ export async function GET() {
     const d = fsMap.get(cu.id) ?? {};
 
     const plan         = d.plan ?? 'unpaid';
-    const planCap      = PLAN_CREDITS[plan] ?? 1000;
+    const planCap      = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
     const credits      = typeof d.credits      === 'number' ? d.credits      : 0;
     const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 

@@ -101,7 +101,6 @@ async function setUserPlan(
   const data: Record<string, unknown> = {
     plan,
     licenseStatus:  status,
-    deviceLimit:    1,        // enforce 1 device seat on every plan activation
     updatedAt:      new Date(),
     ...extra,
   };
@@ -110,9 +109,11 @@ async function setUserPlan(
   if (renewalDate) data.renewalDate = formatLsDate(renewalDate) ?? renewalDate;
 
   if (doc.exists) {
+    // Do NOT touch deviceLimit on existing docs — admin may have set a custom value.
     await ref.update(data);
   } else {
-    await ref.set({ ...data, createdAt: new Date() });
+    // New user doc — seed deviceLimit to 1.
+    await ref.set({ ...data, deviceLimit: 1, createdAt: new Date() });
   }
 
   console.log(`[ls-webhook] userId=${userId} → plan=${plan} status=${status}`);

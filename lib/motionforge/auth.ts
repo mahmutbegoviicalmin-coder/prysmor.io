@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/firebaseAdmin';
+import { getUser } from '@/lib/firestore/users';
 
 /**
  * Validates the static panel secret (legacy dev convenience).
@@ -41,6 +42,12 @@ export async function validatePanelToken(
     const data = doc.data()!;
     const expiresAt = data.expiresAt?.toDate?.() ?? new Date(0);
     if (Date.now() > expiresAt.getTime()) return null;
+
+    // Re-check that the user's subscription is still active in Firestore.
+    // This ensures that expired/suspended users lose panel access immediately,
+    // not just when their session TTL runs out.
+    const userDoc = await getUser(data.userId).catch(() => null);
+    if (!userDoc || userDoc.licenseStatus !== 'active') return null;
 
     return {
       userId:             data.userId,

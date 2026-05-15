@@ -3,6 +3,43 @@ import { NextRequest, NextResponse }  from 'next/server';
 import { db }                         from '@/lib/firebaseAdmin';
 import { PLAN_CREDITS }               from '@/lib/firestore/users';
 
+const CLERK_KEY = process.env.CLERK_SECRET_KEY ?? '';
+
+/** Fetch the latest Clerk session country for a user and return country + code. */
+async function fetchClerkCountry(userId: string): Promise<{ country: string | null; countryCode: string | null }> {
+  if (!CLERK_KEY) return { country: null, countryCode: null };
+  const NAME_TO_CODE: Record<string, string> = {
+    "australia":"AU","austria":"AT","bangladesh":"BD","belgium":"BE","brazil":"BR",
+    "canada":"CA","china":"CN","croatia":"HR","czech republic":"CZ","czechia":"CZ",
+    "denmark":"DK","egypt":"EG","finland":"FI","france":"FR","germany":"DE",
+    "ghana":"GH","greece":"GR","hungary":"HU","india":"IN","indonesia":"ID",
+    "iran":"IR","iraq":"IQ","ireland":"IE","israel":"IL","italy":"IT","japan":"JP",
+    "jordan":"JO","kenya":"KE","malaysia":"MY","mexico":"MX","morocco":"MA",
+    "netherlands":"NL","new zealand":"NZ","nigeria":"NG","norway":"NO","pakistan":"PK",
+    "philippines":"PH","poland":"PL","portugal":"PT","romania":"RO","russia":"RU",
+    "saudi arabia":"SA","serbia":"RS","singapore":"SG","south africa":"ZA",
+    "south korea":"KR","spain":"ES","sweden":"SE","switzerland":"CH","taiwan":"TW",
+    "thailand":"TH","turkey":"TR","ukraine":"UA","united arab emirates":"AE",
+    "united kingdom":"GB","united states":"US","vietnam":"VN",
+  };
+  try {
+    const res = await fetch(
+      `https://api.clerk.com/v1/sessions?user_id=${userId}&limit=5`,
+      { headers: { Authorization: `Bearer ${CLERK_KEY}` }, signal: AbortSignal.timeout(5000) },
+    );
+    if (!res.ok) return { country: null, countryCode: null };
+    const sessions: { latest_activity?: { country?: string } }[] = await res.json();
+    for (const s of sessions) {
+      const c = s.latest_activity?.country ?? null;
+      if (c) {
+        const code = NAME_TO_CODE[c.toLowerCase().trim()] ?? c.slice(0, 2).toUpperCase();
+        return { country: c, countryCode: code };
+      }
+    }
+  } catch { /* ignore */ }
+  return { country: null, countryCode: null };
+}
+
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
 async function checkAdmin() {
@@ -22,7 +59,7 @@ export async function PATCH(
   }
 
   let body: {
-    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'set_device_limit';
+    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'set_device_limit' | 'refresh_location';
     plan?:         string;
     status?:       string;
     credits?:      number;
@@ -59,6 +96,10 @@ export async function PATCH(
           licenseStatus: status,
           updatedAt:     new Date(),
         };
+        // Back-fill createdAt if the document was created without it
+        // (e.g. via syncUserProfile which doesn't set createdAt).
+        // Without this field the admin GET orderBy would silently exclude the user.
+        if (!data.createdAt) update.createdAt = new Date();
         if (body.resetCredits) {
           const cap           = PLAN_CREDITS[plan] ?? 1000;
           update.credits      = cap;
@@ -120,6 +161,16 @@ export async function PATCH(
         break;
       }
 
+      case 'refresh_location': {
+        const { country, countryCode } = await fetchClerkCountry(params.id);
+        if (country) {
+          await ref.update({ country, countryCode, updatedAt: new Date() });
+          const updated2 = await ref.get();
+          return NextResponse.json({ ok: true, data: { ...updated2.data(), country, countryCode } });
+        }
+        return NextResponse.json({ ok: true, data: { country: null, countryCode: null } });
+      }
+
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
@@ -145,11 +196,15 @@ export async function DELETE(
   try {
     const ref = db.collection('users').doc(params.id);
 
-    // Delete jobs subcollection (Firestore doesn't auto-delete subcollections)
-    const jobsSnap = await ref.collection('jobs').limit(500).get();
-    if (jobsSnap.docs.length > 0) {
+    // Delete subcollections (Firestore doesn't auto-delete them)
+    const [jobsSnap, devicesSnap] = await Promise.all([
+      ref.collection('jobs').limit(500).get(),
+      ref.collection('devices').get(),
+    ]);
+    if (jobsSnap.docs.length > 0 || devicesSnap.docs.length > 0) {
       const batch = db.batch();
       jobsSnap.docs.forEach(d => batch.delete(d.ref));
+      devicesSnap.docs.forEach(d => batch.delete(d.ref));
       await batch.commit();
     }
 
