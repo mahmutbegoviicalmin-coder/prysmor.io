@@ -904,11 +904,11 @@ function AnalyticsSection() {
   }
   if (error) return <div className="text-red-400 text-[13px] py-10">Error: {error}</div>;
 
-  const funnelSteps = [
-    { label: 'Page Views',     count: pageViews,     icon: '👁',  color: '#9CA3AF' },
-    { label: 'CTA Clicks',     count: ctaClicks,     icon: '🖱',  color: '#60A5FA', prev: pageViews },
-    { label: 'Pricing Clicks', count: pricingClicks, icon: '💰',  color: '#A3FF12', prev: ctaClicks },
-    { label: 'Sign Ups',       count: signUps,        icon: '✅',  color: '#34D399', prev: pricingClicks },
+  const funnelSteps: { label: string; count: number; iconName: 'eye' | 'mouse-pointer' | 'tag' | 'user-plus'; color: string; prev?: number }[] = [
+    { label: 'Page Views',     count: pageViews,     iconName: 'eye',           color: '#9CA3AF' },
+    { label: 'CTA Clicks',     count: ctaClicks,     iconName: 'mouse-pointer', color: '#60A5FA', prev: pageViews },
+    { label: 'Pricing Clicks', count: pricingClicks, iconName: 'tag',           color: '#A3FF12', prev: ctaClicks },
+    { label: 'Sign Ups',       count: signUps,        iconName: 'user-plus',    color: '#34D399', prev: pricingClicks },
   ];
   const maxFunnel = Math.max(pageViews, 1);
 
@@ -946,7 +946,7 @@ function AnalyticsSection() {
               <div key={step.label}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px]">{step.icon}</span>
+                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: step.color, opacity: 0.7 }} />
                     <span className="text-[12px] font-medium text-[#D1D5DB]">{step.label}</span>
                     {convPct !== null && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#A3FF12]/[0.08] border border-[#A3FF12]/20 text-[#A3FF12]">
