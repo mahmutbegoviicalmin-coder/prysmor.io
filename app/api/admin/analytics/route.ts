@@ -22,6 +22,11 @@ export async function GET() {
       .limit(500)
       .get();
 
+    /** Returns true for events that should be excluded from analytics */
+    function isInternal(page: string, userId: string | null) {
+      return page.startsWith('/dashboard') || page.startsWith('/admin') || userId === adminUserId;
+    }
+
     const events = snap.docs
       .map(doc => {
         const d = doc.data();
@@ -37,8 +42,7 @@ export async function GET() {
           timestamp:  d.timestamp?.toDate?.()?.toISOString() ?? null,
         };
       })
-      // Filter out dashboard/admin traffic and admin user
-      .filter(e => !e.page.startsWith('/dashboard') && e.userId !== adminUserId);
+      .filter(e => !isInternal(e.page, e.userId));
 
     // Today's events — same filters
     const startOfDay = new Date();
@@ -50,28 +54,19 @@ export async function GET() {
 
     const todayEvents = todaySnap.docs
       .map(d => d.data())
-      .filter(e => !String(e.page ?? '').startsWith('/dashboard') && e.userId !== adminUserId);
+      .filter(e => !isInternal(String(e.page ?? '/'), e.userId ?? null));
 
     const totalToday      = todayEvents.length;
     const pageViewsToday  = todayEvents.filter(e => e.event === 'page_view').length;
     const uniqueSessions  = new Set(todayEvents.map(e => e.sessionId).filter(Boolean)).size;
 
-    // New signups today: unique non-null userIds that appear today but NOT in the
-    // pre-today slice of the last-500 sample.
-    const todayUserIds = new Set(
-      todayEvents.map(e => e.userId).filter((id): id is string => Boolean(id))
-    );
-    const priorUserIds = new Set(
-      snap.docs
-        .map(d => d.data())
-        .filter(e => {
-          const ts = e.timestamp?.toDate?.();
-          return ts && ts < startOfDay && !String(e.page ?? '').startsWith('/dashboard') && e.userId !== adminUserId;
-        })
-        .map(e => e.userId)
-        .filter((id): id is string => Boolean(id))
-    );
-    const newSignupsToday = [...todayUserIds].filter(id => !priorUserIds.has(id)).length;
+    // New signups today: count sign_up events today (accurate — only fires once per user).
+    // Fallback: count distinct userIds that triggered sign_up today.
+    const newSignupsToday = new Set(
+      todayEvents
+        .filter(e => e.event === 'sign_up' && e.userId)
+        .map(e => e.userId as string)
+    ).size;
 
     return NextResponse.json({
       adminUserId,

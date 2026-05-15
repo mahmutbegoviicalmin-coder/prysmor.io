@@ -13,6 +13,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
+    // Drop internal traffic before writing to Firestore
+    const pagePath = String(page ?? '/');
+    if (pagePath.startsWith('/dashboard') || pagePath.startsWith('/admin')) {
+      return NextResponse.json({ ok: true, skipped: true });
+    }
+
     await db.collection('events').add({
       sessionId: sessionId ?? null,
       userId:    userId    ?? null,
