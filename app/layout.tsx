@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
+import "./globals.css";
+
+import { Suspense } from "react";
+import ConditionalShell from "@/components/site/ConditionalShell";
+import PageTracker from "@/components/PageTracker";
 
 const outfit = Outfit({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-outfit",
 });
-import Script from "next/script";
-import "./globals.css";
 
-const FB_PIXEL_ID = '4285435231716551';
-import ConditionalShell from "@/components/site/ConditionalShell";
+const FB_PIXEL_ID = "4285435231716551";
 
 export const metadata: Metadata = {
   title: {
@@ -115,7 +119,6 @@ const clerkAppearance = {
     badge: {
       display: "none",
     },
-    // keep these working from previous config
     formFieldInputShowPasswordButton: "!text-[#666] hover:!text-white",
     formResendCodeLink:               "!text-[#39FF6A] hover:!text-[#4fff7e]",
     identityPreviewEditButton:        "!text-[#39FF6A] hover:!text-[#4fff7e]",
@@ -134,6 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <html lang="en" className={outfit.variable}>
         <body className="bg-background text-ink antialiased">
+          <Suspense fallback={null}><PageTracker /></Suspense>
           <ConditionalShell>{children}</ConditionalShell>
           <Script src="https://assets.lemonsqueezy.com/lemon.js" strategy="afterInteractive" />
           <Script
@@ -154,6 +158,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               `,
             }}
           />
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

@@ -22,7 +22,7 @@ export async function PATCH(
   }
 
   let body: {
-    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'refresh_location' | 'set_device_limit';
+    action:        'set_plan' | 'set_credits' | 'adjust_credits' | 'set_status' | 'set_device_limit';
     plan?:         string;
     status?:       string;
     credits?:      number;
@@ -102,88 +102,6 @@ export async function PATCH(
           }
         }
         break;
-      }
-
-      case 'refresh_location': {
-        let country:     string | null = null;
-        let countryCode: string | null = null;
-
-        // ISO alpha-2 → name map (for reverse lookup)
-        const CODE_TO_NAME: Record<string,string> = {
-          AF:"Afghanistan",AL:"Albania",DZ:"Algeria",AR:"Argentina",AM:"Armenia",
-          AU:"Australia",AT:"Austria",AZ:"Azerbaijan",BH:"Bahrain",BD:"Bangladesh",
-          BY:"Belarus",BE:"Belgium",BA:"Bosnia and Herzegovina",BR:"Brazil",BG:"Bulgaria",
-          CA:"Canada",CL:"Chile",CN:"China",CO:"Colombia",HR:"Croatia",CZ:"Czech Republic",
-          DK:"Denmark",EG:"Egypt",EE:"Estonia",FI:"Finland",FR:"France",GE:"Georgia",
-          DE:"Germany",GH:"Ghana",GR:"Greece",HU:"Hungary",IN:"India",ID:"Indonesia",
-          IR:"Iran",IQ:"Iraq",IE:"Ireland",IL:"Israel",IT:"Italy",JP:"Japan",
-          JO:"Jordan",KZ:"Kazakhstan",KE:"Kenya",KW:"Kuwait",LV:"Latvia",LB:"Lebanon",
-          LT:"Lithuania",MY:"Malaysia",MX:"Mexico",MA:"Morocco",NL:"Netherlands",
-          NZ:"New Zealand",NG:"Nigeria",NO:"Norway",PK:"Pakistan",PA:"Panama",
-          PE:"Peru",PH:"Philippines",PL:"Poland",PT:"Portugal",QA:"Qatar",RO:"Romania",
-          RU:"Russia",SA:"Saudi Arabia",RS:"Serbia",SG:"Singapore",SK:"Slovakia",
-          SI:"Slovenia",ZA:"South Africa",KR:"South Korea",ES:"Spain",LK:"Sri Lanka",
-          SE:"Sweden",CH:"Switzerland",SY:"Syria",TW:"Taiwan",TH:"Thailand",
-          TR:"Turkey",UA:"Ukraine",AE:"United Arab Emirates",GB:"United Kingdom",
-          US:"United States",UY:"Uruguay",VE:"Venezuela",VN:"Vietnam",
-        };
-        const NAME_TO_CODE: Record<string,string> = Object.fromEntries(
-          Object.entries(CODE_TO_NAME).map(([k,v]) => [v.toLowerCase(), k])
-        );
-
-        try {
-          const sessionsRes = await clerkClient.sessions.getSessionList({
-            userId: params.id, limit: 5,
-          });
-          const sessions = (Array.isArray(sessionsRes)
-            ? sessionsRes
-            : (sessionsRes as { data?: unknown[] }).data ?? []) as {
-              latestActivity?: { ipAddress?: string | null; country?: string | null };
-            }[];
-
-          // ── 1. Clerk session country (most reliable) ──
-          for (const s of sessions) {
-            if (s.latestActivity?.country) {
-              country = s.latestActivity.country;
-              countryCode = NAME_TO_CODE[country.toLowerCase()] ?? null;
-              break;
-            }
-          }
-
-          // ── 2. Fallback: ip-api.com using session IP ──
-          if (!country) {
-            const session   = sessions[0];
-            const ipAddress = session?.latestActivity?.ipAddress ?? null;
-            const isPrivate = !ipAddress || ['::1','127.','10.','192.168.','172.16.']
-              .some(p => ipAddress.startsWith(p));
-
-            if (!isPrivate && ipAddress) {
-              const geoRes = await fetch(
-                `http://ip-api.com/json/${ipAddress}?fields=country,countryCode,status`,
-                { signal: AbortSignal.timeout(4000) },
-              );
-              if (geoRes.ok) {
-                const geo = await geoRes.json();
-                if (geo.status === 'success') {
-                  country     = geo.country;
-                  countryCode = geo.countryCode;
-                }
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[admin refresh_location] session lookup failed:', e);
-        }
-
-        if (country) {
-          await ref.update({
-            country,
-            ...(countryCode ? { countryCode } : {}),
-            updatedAt: new Date(),
-          });
-        }
-
-        return NextResponse.json({ ok: true, data: { country, countryCode } });
       }
 
       case 'set_device_limit': {

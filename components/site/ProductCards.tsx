@@ -62,7 +62,7 @@ export default function ProductCards({ compact = false }: ProductCardsProps) {
         return (
           <motion.div
             key={p.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 1, y: 0 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{

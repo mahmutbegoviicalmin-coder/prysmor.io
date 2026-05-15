@@ -4,15 +4,15 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Install Guide — Editron",
+  title: "Install Guide — Prysmor",
 };
 
 const steps = [
-  "Download the Editron panel installer from your dashboard.",
+  "Download the Prysmor panel installer from your dashboard.",
   "Run the installer and follow the on-screen prompts.",
   "Restart Adobe Premiere Pro.",
-  "Open the panel: Window \u2192 Extensions \u2192 Editron.",
-  "Click Sign In to authenticate with your Editron account.",
+  "Open the panel: Window \u2192 Extensions \u2192 Prysmor.",
+  "Click Sign In to authenticate with your Prysmor account.",
   "Your plan syncs automatically. Your engines appear in the panel.",
 ];
 
@@ -28,7 +28,7 @@ export default function InstallPage() {
             Panel install guide
           </h1>
           <p className="text-ink-muted text-[15px] mb-10">
-            Get the Editron panel running inside Premiere in under five minutes.
+            Get the Prysmor panel running inside Premiere in under five minutes.
           </p>
 
           <div className="rounded-[16px] border border-white/[0.07] bg-surface-1 p-6 mb-5">
@@ -38,7 +38,7 @@ export default function InstallPage() {
             <ul className="space-y-1.5 text-[13px] text-ink-subtle">
               <li>Adobe Premiere Pro CC 2022 or later</li>
               <li>Windows 10/11 or macOS 12+</li>
-              <li>Active Editron account (any plan)</li>
+              <li>Active Prysmor account (any plan)</li>
               <li>Internet connection for authentication</li>
             </ul>
           </div>

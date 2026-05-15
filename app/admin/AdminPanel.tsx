@@ -84,8 +84,9 @@ function fmtRelative(iso: string | null): string {
 
 /** Renders a country code as a styled badge (avoids Windows emoji rendering issues) */
 function CountryBadge({ code, name }: { code: string | null; name: string | null }) {
-  if (!code || !name) return <span className="text-[11px] text-[#2D2D35] italic">Pending…</span>;
-  const upper = code.toUpperCase().slice(0, 2);
+  if (!name) return <span className="text-[11px] text-[#2D2D35] italic">—</span>;
+  // If code missing, derive 2-letter abbreviation from name
+  const upper = (code ?? name.slice(0, 2)).toUpperCase().slice(0, 2);
   // Simple deterministic color from code letters
   const colors = [
     'bg-blue-500/20 text-blue-300',
@@ -661,6 +662,263 @@ function SubStatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Analytics Section ────────────────────────────────────────────────────────
+
+interface AnalyticsEvent {
+  id:         string;
+  sessionId:  string | null;
+  userId:     string | null;
+  event:      string;
+  properties: Record<string, unknown>;
+  page:       string;
+  referrer:   string;
+  userAgent:  string;
+  timestamp:  string | null;
+}
+
+interface AnalyticsSummary {
+  totalToday:     number;
+  pageViewsToday: number;
+  uniqueSessions: number;
+  newSignupsToday: number;
+}
+
+type AnalyticsFilter = 'all' | 'page_view' | 'cta_click' | 'pricing_click' | 'pricing_toggle';
+
+function fmtEventDate(iso: string | null) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+function fmtProps(properties: Record<string, unknown>): string {
+  if (!properties || Object.keys(properties).length === 0) return '—';
+  return Object.entries(properties)
+    .map(([k, v]) => {
+      if (k === 'price') return `$${v}`;
+      return `${k}: ${v}`;
+    })
+    .join(' · ');
+}
+
+function parseDevice(ua: string): string {
+  if (!ua) return '—';
+  const mobile = /mobile|android|iphone|ipad|ipod/i.test(ua);
+  const prefix = mobile ? 'Mobile' : 'Desktop';
+  if (/edg\//i.test(ua))    return `${prefix} Edge`;
+  if (/opr\//i.test(ua))    return `${prefix} Opera`;
+  if (/chrome/i.test(ua))   return `${prefix} Chrome`;
+  if (/firefox/i.test(ua))  return `${prefix} Firefox`;
+  if (/safari/i.test(ua))   return `${prefix} Safari`;
+  return prefix;
+}
+
+function shortenReferrer(ref: string): string {
+  if (!ref || ref === 'direct') return 'direct';
+  try {
+    const url = new URL(ref.startsWith('http') ? ref : `https://${ref}`);
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return ref.slice(0, 30);
+  }
+}
+
+function ReferrerBadge({ referrer }: { referrer: string }) {
+  const short = shortenReferrer(referrer);
+  let cls = 'text-[#4B5563]';
+  if (short === 'direct') cls = 'text-[#374151]';
+  else if (/instagram/i.test(short)) cls = 'text-purple-400';
+  else if (/google/i.test(short))    cls = 'text-blue-400';
+  return <span className={cls}>{short}</span>;
+}
+
+function AnalyticsSection() {
+  const [events,  setEvents]  = useState<AnalyticsEvent[]>([]);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [filter,  setFilter]  = useState<AnalyticsFilter>('all');
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/analytics');
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      setEvents(json.events ?? []);
+      setSummary(json.summary ?? null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const filtered = filter === 'all' ? events : events.filter(e => e.event === filter);
+
+  // Funnel — from already-filtered events (no dashboard, no admin)
+  const pageViews     = events.filter(e => e.event === 'page_view').length;
+  const ctaClicks     = events.filter(e => e.event === 'cta_click').length;
+  const pricingClicks = events.filter(e => e.event === 'pricing_click').length;
+  const signUps       = events.filter(e => e.event === 'sign_up').length;
+
+  const FILTERS: { id: AnalyticsFilter; label: string }[] = [
+    { id: 'all',            label: 'All' },
+    { id: 'page_view',      label: 'Page Views' },
+    { id: 'cta_click',      label: 'CTA Clicks' },
+    { id: 'pricing_click',  label: 'Pricing Clicks' },
+    { id: 'pricing_toggle', label: 'Pricing Toggles' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[#6B7280] text-[13px] py-10">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Loading analytics…
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-red-400 text-[13px] py-10">Error: {error}</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Events Today',    value: summary?.totalToday      ?? 0 },
+          { label: 'Unique Sessions Today', value: summary?.uniqueSessions  ?? 0 },
+          { label: 'Page Views Today',      value: summary?.pageViewsToday  ?? 0 },
+          { label: 'New Signups Today',     value: summary?.newSignupsToday ?? 0 },
+        ].map(card => (
+          <div key={card.label} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
+            <p className="text-[10px] uppercase tracking-widest text-[#4B5563] mb-2">{card.label}</p>
+            <p className="text-[22px] font-semibold text-white leading-none">{card.value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-[#374151] -mt-3">Excluding internal dashboard traffic and admin account.</p>
+
+      {/* Funnel */}
+      <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-5">
+        <p className="text-[10px] uppercase tracking-widest text-[#4B5563] mb-4">Conversion Funnel (last 500 events)</p>
+        <div className="flex flex-wrap items-center gap-2 text-[13px]">
+          {[
+            { label: 'Page Views',     count: pageViews },
+            { label: 'CTA Clicks',     count: ctaClicks,     prev: pageViews },
+            { label: 'Pricing Clicks', count: pricingClicks, prev: ctaClicks },
+            { label: 'Sign Ups',       count: signUps,        prev: pricingClicks },
+          ].map((step, i) => {
+            const pct = i > 0 && step.prev && step.prev > 0
+              ? Math.round((step.count / step.prev) * 100)
+              : null;
+            return (
+              <span key={step.label} className="flex items-center gap-2">
+                {i > 0 && <span className="text-[#374151]">→</span>}
+                <span className="text-white font-semibold">{step.count}</span>
+                <span className="text-[#6B7280]">{step.label}</span>
+                {pct !== null && (
+                  <span className="text-[11px] text-[#39FF6A] bg-[#39FF6A]/10 px-1.5 py-0.5 rounded-full">
+                    {pct}%
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {FILTERS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={`px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors ${
+              filter === f.id
+                ? 'bg-white/[0.10] text-white'
+                : 'text-[#6B7280] hover:text-[#9CA3AF] hover:bg-white/[0.04]'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <span className="ml-auto text-[11px] text-[#374151]">
+          {filtered.length} events · auto-refreshes every 60s
+        </span>
+      </div>
+
+      {/* Events table */}
+      <div className="rounded-[12px] border border-white/[0.06] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                {['Time', 'Event', 'Details', 'Page', 'Referrer', 'Device'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em]">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-[#4B5563]">No events found</td>
+                </tr>
+              ) : (
+                filtered.map(ev => (
+                  <tr key={ev.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-2.5 text-[#4B5563] whitespace-nowrap">{fmtEventDate(ev.timestamp)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        ev.event === 'page_view'      ? 'bg-white/[0.06] text-[#6B7280]' :
+                        ev.event === 'cta_click'      ? 'bg-blue-500/10 text-blue-400' :
+                        ev.event === 'pricing_click'  ? 'bg-[#39FF6A]/10 text-[#39FF6A]' :
+                        ev.event === 'pricing_toggle' ? 'bg-orange-500/10 text-orange-400' :
+                        'bg-white/[0.04] text-[#4B5563]'
+                      }`}>
+                        {ev.event}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 max-w-[200px] truncate">
+                      <span className="font-semibold text-[#9CA3AF]">{fmtProps(ev.properties)}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[#6B7280] font-mono">{ev.page}</td>
+                    <td className="px-4 py-2.5"><ReferrerBadge referrer={ev.referrer} /></td>
+                    <td className="px-4 py-2.5 text-[#4B5563]">{parseDevice(ev.userAgent)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={load}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Refresh now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RevenueSection() {
   const [data,    setData]    = useState<RevenueData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -930,36 +1188,6 @@ export function AdminPanel() {
     } finally { setActionLoading(null); }
   }
 
-  const [syncingAll, setSyncingAll] = useState(false);
-  const [syncProgress, setSyncProgress] = useState('');
-
-  async function syncAllLocations() {
-    const missing = users.filter(u => !u.country);
-    if (missing.length === 0) { setSyncProgress('All users already have country data.'); return; }
-    setSyncingAll(true);
-    let done = 0;
-    for (const u of missing) {
-      setSyncProgress(`Syncing ${done + 1}/${missing.length}…`);
-      try {
-        const res = await fetch(`/api/admin/users/${u.id}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'refresh_location' }),
-        });
-        if (res.ok) {
-          const { data } = await res.json();
-          if (data?.country) {
-            updateUser({ ...u, country: data.country, countryCode: data.countryCode ?? u.countryCode });
-          }
-        }
-      } catch { /* skip */ }
-      done++;
-      // Small delay to avoid rate limits
-      await new Promise(r => setTimeout(r, 300));
-    }
-    setSyncProgress(`Done — synced ${done} users.`);
-    setSyncingAll(false);
-  }
-
   async function revokeDevices(user: AdminUser) {
     setActionLoading(user.id);
     try {
@@ -1074,8 +1302,9 @@ export function AdminPanel() {
   }
 
   const tabs = [
-    { id: 'users',   label: 'Users',   icon: Users },
-    { id: 'revenue', label: 'Revenue', icon: BarChart2 },
+    { id: 'users',     label: 'Users',     icon: Users },
+    { id: 'revenue',   label: 'Revenue',   icon: BarChart2 },
+    { id: 'analytics', label: 'Analytics', icon: Activity },
   ] as const;
   type TabId = typeof tabs[number]['id'];
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -1089,20 +1318,6 @@ export function AdminPanel() {
           <p className="text-[13px] text-[#6B7280]">Users, revenue, and platform overview.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex flex-col items-end gap-1">
-            <button
-              onClick={syncAllLocations}
-              disabled={syncingAll || loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-[#39FF6A]/20 text-[11px] text-[#39FF6A]/70 hover:text-[#39FF6A] hover:border-[#39FF6A]/40 transition-colors disabled:opacity-50"
-              title="Sync country for all users missing location data"
-            >
-              {syncingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[10px]">🌍</span>}
-              Sync countries
-            </button>
-            {syncProgress && (
-              <span className="text-[10px] text-[#555]">{syncProgress}</span>
-            )}
-          </div>
           <button
             onClick={purgeOrphans}
             disabled={purging || loading}
@@ -1152,6 +1367,9 @@ export function AdminPanel() {
 
       {/* ── Revenue Tab ── */}
       {activeTab === 'revenue' && <RevenueSection />}
+
+      {/* ── Analytics Tab ── */}
+      {activeTab === 'analytics' && <AnalyticsSection />}
 
       {/* ── Users Tab ── */}
       {activeTab === 'users' && <div>

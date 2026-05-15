@@ -190,6 +190,35 @@ body::after {
 }
 .cl-alertText { color: #F87171 !important; }
 
+/* ── Fade-in CSS animations (replace framer-motion initial opacity:0) ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.anim-fade-up          { animation: fadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) both; }
+.anim-fade-up-d1       { animation: fadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.12s both; }
+.anim-fade-up-d2       { animation: fadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.24s both; }
+.anim-fade-up-d3       { animation: fadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.36s both; }
+.anim-fade-up-d4       { animation: fadeInUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.48s both; }
+.anim-fade             { animation: fadeIn    0.6s cubic-bezier(0.22,1,0.36,1) both; }
+.anim-fade-d1          { animation: fadeIn    0.6s cubic-bezier(0.22,1,0.36,1) 0.15s both; }
+.anim-fade-d2          { animation: fadeIn    0.6s cubic-bezier(0.22,1,0.36,1) 0.30s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-up-d1, .anim-fade-up-d2,
+  .anim-fade-up-d3, .anim-fade-up-d4,
+  .anim-fade, .anim-fade-d1, .anim-fade-d2 {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── Mobile responsive overrides ───────────────────────── */
 @media (max-width: 768px) {
   /* HowItWorks — card layout on mobile */

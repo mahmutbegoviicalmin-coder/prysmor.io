@@ -10,6 +10,7 @@ import {
   Settings, Download, ShieldCheck, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/track";
 
 const ADMIN_EMAIL      = "mahmutbegoviic.almin@gmail.com";
 const AFFILIATE_EMAILS = ["mahmutbegoviic.almin@gmail.com", "brzotrcipuska7@gmail.com"];
@@ -87,9 +88,9 @@ function NavLink({
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname  = usePathname();
-  const { user }  = useUser();
-  const firstName = user?.firstName ?? "";
+  const pathname          = usePathname();
+  const { user, isLoaded } = useUser();
+  const firstName         = user?.firstName ?? "";
 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [planLabel, setPlanLabel]       = useState("Free");
@@ -109,6 +110,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     fetch("/api/sync-location", { method: "POST" }).catch(() => {});
   }, []);
+
+  /* Track sign_in once per browser session */
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const sessionKey = `prysmor_si_${user.id}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+      track("sign_in", {
+        method: (user.externalAccounts?.length ?? 0) > 0 ? "google_oauth" : "email",
+        userId: user.id,
+      });
+    } catch { /* sessionStorage blocked */ }
+  }, [user?.id]);
+
+  /* Track dashboard_view once per browser session */
+  useEffect(() => {
+    if (!user?.id || pathname !== "/dashboard") return;
+    try {
+      const sessionKey = `prysmor_dv_${user.id}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+      track("dashboard_view", { userId: user.id });
+    } catch { /* sessionStorage blocked */ }
+  }, [user?.id, pathname]);
+
+  // Show a minimal spinner while Clerk initialises — prevents black screen on mobile
+  if (!isLoaded) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        minHeight: "100vh", background: "#080808",
+      }}>
+        <div style={{
+          width: "32px", height: "32px", borderRadius: "50%",
+          border: "2px solid #1a1a1a", borderTopColor: "#39FF6A",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   const currentLabel = pathname.startsWith("/dashboard/admin")
     ? "Admin"

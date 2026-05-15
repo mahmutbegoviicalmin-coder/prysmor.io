@@ -61,16 +61,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const geo = await fetch(
-      `http://ip-api.com/json/${ip}?fields=status,country,countryCode`,
-      { signal: AbortSignal.timeout(4000) },
-    );
-    const data = await geo.json() as { status: string; country: string; countryCode: string };
-    if (data.status !== 'success' || !data.country) {
+    const geo  = await fetch(`https://ipinfo.io/${ip}/json`, { signal: AbortSignal.timeout(4000) });
+    const data = await geo.json() as { country?: string; bogon?: boolean };
+    if (!data.country || data.bogon) {
       return NextResponse.json({ ok: false, reason: 'geo_failed' });
     }
-    await updateUserCountry(userId, data.country, data.countryCode);
-    return NextResponse.json({ ok: true, country: data.country, source: 'ip-api' });
+    const code = data.country.toUpperCase();
+    const name = getCountryName(code);
+    await updateUserCountry(userId, name, code);
+    return NextResponse.json({ ok: true, country: name, source: 'ipinfo' });
   } catch (err) {
     console.warn('[sync-location] failed:', err);
     return NextResponse.json({ ok: false, reason: 'exception' });

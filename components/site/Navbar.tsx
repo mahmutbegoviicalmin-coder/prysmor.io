@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Menu, X, LayoutDashboard, ArrowRight } from "lucide-react";
 import { useAuth, useClerk, UserButton } from "@clerk/nextjs";
+import { track } from "@/lib/track";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,7 @@ export default function Navbar() {
   const { openSignIn, openSignUp } = useClerk();
 
   const handleSignIn = () => openSignIn({ afterSignInUrl: "https://prysmor.io/dashboard" });
-  const handleSignUp = () => openSignUp({ afterSignUpUrl: "https://prysmor.io/dashboard" });
+  const handleSignUp = () => { track('cta_click', { location: 'navbar' }); openSignUp({ afterSignUpUrl: "https://prysmor.io/dashboard" }); };
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);

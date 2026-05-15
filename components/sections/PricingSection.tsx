@@ -6,6 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
+import { track } from "@/lib/track";
 import { getRefCodeFromCookie } from "@/components/site/RefTracker";
 
 declare global {
@@ -112,6 +113,9 @@ export default function PricingSection({
 
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
+    if (tierName && tierPrice !== undefined) {
+      track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
+    }
     if (!user) {
       const returnUrl = encodeURIComponent(window.location.pathname + window.location.search + "#pricing");
       window.location.href = `/sign-in?redirect_url=${returnUrl}`;
@@ -150,7 +154,7 @@ export default function PricingSection({
 
         {/* ── Heading ───────────────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5 }}
@@ -189,7 +193,7 @@ export default function PricingSection({
                 <label
                   key={String(isYr)}
                   className="inline-flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => setYearly(isYr)}
+                  onClick={() => { setYearly(isYr); track('pricing_toggle', { billing: isYr ? 'annual' : 'monthly' }); }}
                 >
                   <span style={{
                     width: "18px",
@@ -332,7 +336,7 @@ export default function PricingSection({
             return (
               <motion.div
                 key={tier.id}
-                initial={{ opacity: 0, y: 24 }}
+                initial={{ opacity: 1, y: 0 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.55, delay: i * 0.08, ease }}
@@ -605,7 +609,7 @@ export default function PricingSection({
       <AnimatePresence>
         {infoOpen && (
           <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             onClick={() => setInfoOpen(false)}
           >

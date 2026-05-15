@@ -27,7 +27,7 @@ export default function Testimonials({ title = "What creators say", items }: Tes
 
       <div className="mx-auto max-w-[1260px] px-4 sm:px-6 lg:px-10 mb-12">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.5 }}

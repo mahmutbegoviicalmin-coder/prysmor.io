@@ -2,8 +2,9 @@
 
 import { useRef, useEffect, useState, Fragment } from "react";
 import { useClerk } from "@clerk/nextjs";
-import { motion } from "framer-motion";
+import { motion, MotionConfig } from "framer-motion";
 import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
+import { track } from "@/lib/track";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
 import Comparison, { type ComparisonRow } from "@/components/sections/Comparison";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
@@ -15,7 +16,7 @@ import BeforeAfterSlider from "@/components/sections/BeforeAfterSlider";
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const fadeUp = {
-  initial:   { opacity: 0, y: 20 },
+  initial:   { opacity: 1, y: 0 },
   whileInView: { opacity: 1, y: 0 },
   viewport:  { once: true, margin: "-60px" },
   transition: { duration: 0.55, ease },
@@ -173,13 +174,7 @@ function ExamplesGrid() {
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 clamp(16px,4vw,32px)" }}>
 
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.45 }}
-          style={{ padding: "80px 0 56px" }}
-        >
+        <div className="anim-fade-up" style={{ padding: "80px 0 56px" }}>
           <p style={{
             fontSize: "10px", fontWeight: 500, color: "#39FF6A",
             letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
@@ -190,14 +185,14 @@ function ExamplesGrid() {
           }}>
             Prompt in.<br />Cinematic shot out.
           </h2>
-        </motion.div>
+        </div>
 
         {/* Category rows */}
         <div style={{ display: "flex", flexDirection: "column", gap: "48px", paddingBottom: "80px" }}>
           {EXAMPLE_CATEGORIES.map((cat, ci) => (
             <motion.div
               key={cat.name}
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 1, y: 0 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.5, delay: ci * 0.08 }}
@@ -339,7 +334,7 @@ function ModesSection() {
           {MODES.map((m, i) => (
             <motion.div
               key={m.badge}
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 1, y: 0 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.45, delay: i * 0.07, ease }}
@@ -552,13 +547,13 @@ function ExitIntentPopup() {
   useEffect(() => {
     // Desktop only — mobile has no mouse leave toward top
     if (window.innerWidth < 768) return;
-    if (sessionStorage.getItem("prysmor_exit_seen")) return;
+    try { if (sessionStorage.getItem("prysmor_exit_seen")) return; } catch { /* private mode */ }
 
     function onMouseLeave(e: MouseEvent) {
       if (e.clientY <= 8) {
         setOpen(true);
         requestAnimationFrame(() => setMounted(true));
-        sessionStorage.setItem("prysmor_exit_seen", "1");
+        try { sessionStorage.setItem("prysmor_exit_seen", "1"); } catch { /* private mode */ }
         document.removeEventListener("mouseleave", onMouseLeave);
       }
     }
@@ -833,14 +828,13 @@ function WelcomePopup() {
   const [secs, setSecs]       = useState(10 * 60);
 
   useEffect(() => {
-    if (sessionStorage.getItem("prysmor_welcome_seen")) return;
+    try { if (sessionStorage.getItem("prysmor_welcome_seen")) return; } catch { /* private mode */ }
     const onScroll = () => {
       const pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
       if (pct >= 0.20) {
         setOpen(true);
-        // Small delay so CSS animation has a start state to animate from
         requestAnimationFrame(() => setMounted(true));
-        sessionStorage.setItem("prysmor_welcome_seen", "1");
+        try { sessionStorage.setItem("prysmor_welcome_seen", "1"); } catch { /* private mode */ }
         window.removeEventListener("scroll", onScroll);
       }
     };
@@ -1096,6 +1090,7 @@ export default function PrysmorPage() {
   const { openSignUp } = useClerk();
 
   return (
+    <MotionConfig initial={false}>
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_SOFTWARE) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_ORG) }} />
@@ -1172,10 +1167,8 @@ export default function PrysmorPage() {
         >
 
           {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: "easeOut", delay: 0.1 }}
+          <div
+            className="anim-fade-up"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -1202,17 +1195,15 @@ export default function PrysmorPage() {
             }}>
               Premiere Pro · Native plugin
             </span>
-          </motion.div>
+          </div>
 
           {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.85, ease: [0.22,1,0.36,1], delay: 0.2 }}
+          <h1
+            className="anim-fade-up-d1"
             style={{ width: "100%", maxWidth: "720px", margin: 0, padding: 0 }}
           >
-            {/* Line 1 */}
-            <div style={{
+            <span style={{
+              display: "block",
               fontSize: "clamp(28px, 4.2vw, 54px)",
               fontWeight: 700,
               letterSpacing: "-1.5px",
@@ -1221,10 +1212,10 @@ export default function PrysmorPage() {
             }}>
               <span style={{ color: "#ffffff" }}>VFX that used to take </span>
               <span style={{ color: "rgba(255,255,255,0.42)" }}>hours.</span>
-            </div>
+            </span>
 
-            {/* Line 2 */}
-            <div style={{
+            <span style={{
+              display: "block",
               fontSize: "clamp(34px, 5.2vw, 66px)",
               fontWeight: 800,
               letterSpacing: "-2px",
@@ -1239,14 +1230,12 @@ export default function PrysmorPage() {
               }}>
                 minutes.
               </span>
-            </div>
-          </motion.h1>
+            </span>
+          </h1>
 
           {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: "easeOut", delay: 0.36 }}
+          <p
+            className="anim-fade-up-d2"
             style={{
               fontSize: "clamp(14px, 2vw, 17px)",
               color: "#5a5a5a",
@@ -1257,20 +1246,17 @@ export default function PrysmorPage() {
               letterSpacing: "0.01em",
             }}
           >
-            From prompt to timeline. Fully automated.
-          </motion.p>
+            No After Effects. No VFX artists. No exports. Just type and generate.
+          </p>
 
           {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, ease: "easeOut", delay: 0.5 }}
-            className="flex items-center justify-center flex-wrap"
+          <div
+            className="anim-fade-up-d3 flex items-center justify-center flex-wrap"
             style={{ gap: "12px", marginTop: "44px" }}
           >
             {/* Primary */}
             <button
-              onClick={() => openSignUp({ afterSignUpUrl: "/dashboard" })}
+              onClick={() => { track('cta_click', { location: 'hero_primary' }); openSignUp({ afterSignUpUrl: "/dashboard" }); }}
               className="inline-flex items-center gap-2 cursor-pointer"
               style={{
                 background: "linear-gradient(160deg, #44ff74 0%, #29d955 55%, #22c24a 100%)",
@@ -1301,6 +1287,7 @@ export default function PrysmorPage() {
             {/* Secondary */}
             <a
               href="#examples"
+              onClick={() => track('cta_click', { location: 'hero_demo' })}
               className="inline-flex items-center gap-2"
               style={{
                 background: "transparent",
@@ -1327,13 +1314,11 @@ export default function PrysmorPage() {
             >
               Watch Demo
             </a>
-          </motion.div>
+          </div>
 
           {/* Stats — purely typographic, no icons */}
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, ease: "easeOut", delay: 0.66 }}
+          <div
+            className="anim-fade-up-d4"
             style={{
               marginTop: "64px",
               display: "grid",
@@ -1380,13 +1365,11 @@ export default function PrysmorPage() {
                 </div>
               </Fragment>
             ))}
-          </motion.div>
+          </div>
 
           {/* Scroll indicator */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.1 }}
+          <div
+            className="anim-fade-d2"
             style={{
               marginTop: "60px",
               display: "flex",
@@ -1406,10 +1389,7 @@ export default function PrysmorPage() {
             }}>
               Scroll
             </span>
-            <motion.div
-              animate={{ y: [0, 5, 0] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              style={{
+            <div style={{
                 width: "20px",
                 height: "32px",
                 borderRadius: "10px",
@@ -1420,18 +1400,15 @@ export default function PrysmorPage() {
                 paddingTop: "5px",
               }}
             >
-              <motion.div
-                animate={{ y: [0, 8, 0], opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                style={{
+              <div style={{
                   width: "3px",
                   height: "6px",
                   borderRadius: "2px",
                   background: "rgba(57,255,106,0.5)",
                 }}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
         </div>
       </section>
@@ -1439,7 +1416,7 @@ export default function PrysmorPage() {
       {/* ── BEFORE / AFTER ──────────────────────────────────────────── */}
       <section style={{ background: "#080808", padding: "0 24px 100px" }}>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: 0.6 }}
@@ -1520,8 +1497,9 @@ export default function PrysmorPage() {
         title="Stop hiring VFX artists. Start typing."
         subtitle="Generate cinematic VFX directly inside Adobe Premiere Pro."
         primaryLabel="Get Started"
-        onPrimaryClick={() => openSignUp({ afterSignUpUrl: "/dashboard" })}
+        onPrimaryClick={() => { track('cta_click', { location: 'bottom_cta' }); openSignUp({ afterSignUpUrl: "/dashboard" }); }}
       />
     </>
+    </MotionConfig>
   );
 }

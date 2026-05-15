@@ -25,6 +25,39 @@ export interface AdminUser {
   lsSubscriptionId?: string;
 }
 
+// country name → ISO-2 code
+const NAME_TO_CODE: Record<string, string> = {
+  "afghanistan":"AF","albania":"AL","algeria":"DZ","argentina":"AR","armenia":"AM",
+  "australia":"AU","austria":"AT","azerbaijan":"AZ","bahrain":"BH","bangladesh":"BD",
+  "belarus":"BY","belgium":"BE","belize":"BZ","bolivia":"BO","bosnia and herzegovina":"BA",
+  "botswana":"BW","brazil":"BR","bulgaria":"BG","cambodia":"KH","cameroon":"CM",
+  "canada":"CA","chile":"CL","china":"CN","colombia":"CO","congo (drc)":"CD",
+  "costa rica":"CR","croatia":"HR","cuba":"CU","cyprus":"CY","czech republic":"CZ",
+  "czechia":"CZ","denmark":"DK","dominican republic":"DO","ecuador":"EC","egypt":"EG",
+  "el salvador":"SV","estonia":"EE","ethiopia":"ET","finland":"FI","france":"FR",
+  "georgia":"GE","germany":"DE","ghana":"GH","greece":"GR","guatemala":"GT",
+  "honduras":"HN","hong kong":"HK","hungary":"HU","india":"IN","indonesia":"ID",
+  "iran":"IR","iraq":"IQ","ireland":"IE","israel":"IL","italy":"IT","jamaica":"JM",
+  "japan":"JP","jordan":"JO","kazakhstan":"KZ","kenya":"KE","kuwait":"KW",
+  "latvia":"LV","lebanon":"LB","lithuania":"LT","luxembourg":"LU","malaysia":"MY",
+  "mexico":"MX","moldova":"MD","morocco":"MA","mozambique":"MZ","myanmar":"MM",
+  "nepal":"NP","netherlands":"NL","new zealand":"NZ","nicaragua":"NI","nigeria":"NG",
+  "north korea":"KP","north macedonia":"MK","norway":"NO","oman":"OM","pakistan":"PK",
+  "palestine":"PS","panama":"PA","paraguay":"PY","peru":"PE","philippines":"PH",
+  "poland":"PL","portugal":"PT","qatar":"QA","romania":"RO","russia":"RU",
+  "saudi arabia":"SA","senegal":"SN","serbia":"RS","singapore":"SG","slovakia":"SK",
+  "slovenia":"SI","south africa":"ZA","south korea":"KR","spain":"ES","sri lanka":"LK",
+  "sudan":"SD","sweden":"SE","switzerland":"CH","syria":"SY","taiwan":"TW",
+  "tanzania":"TZ","thailand":"TH","tunisia":"TN","turkey":"TR","uganda":"UG",
+  "ukraine":"UA","united arab emirates":"AE","united kingdom":"GB","united states":"US",
+  "uruguay":"UY","uzbekistan":"UZ","venezuela":"VE","vietnam":"VN","yemen":"YE",
+  "zambia":"ZM","zimbabwe":"ZW",
+};
+
+function countryNameToCode(name: string): string | null {
+  return NAME_TO_CODE[name.toLowerCase().trim()] ?? null;
+}
+
 export async function GET() {
   const user  = await currentUser();
   const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
@@ -33,58 +66,97 @@ export async function GET() {
   }
 
   // Fetch Firestore docs + Clerk users in parallel
-  // Clerk API v5+ returns { data: User[] }, older returns User[] — handle both
   const [snap, clerkRes] = await Promise.all([
     db.collection('users').orderBy('createdAt', 'desc').limit(500).get(),
     clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
   ]);
 
-  type ClerkUserShape = { id: string; firstName: string | null; lastName: string | null; emailAddresses: { emailAddress: string }[]; lastSignInAt: number | null; createdAt: number };
+  type ClerkUserShape = {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    emailAddresses: { emailAddress: string }[];
+    lastSignInAt: number | null;
+    createdAt: number;
+  };
+
   const rawList = Array.isArray(clerkRes) ? clerkRes : ((clerkRes as { data: unknown[] }).data ?? []);
   const clerkUserList = rawList as ClerkUserShape[];
 
-  // Build Firestore lookup map: userId → Firestore data
+  // Build Firestore lookup map
   const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
   for (const doc of snap.docs) {
     fsMap.set(doc.id, doc.data());
   }
 
-  // Source of truth = Clerk users list — show ALL Clerk users
+  // Fetch sessions from Clerk REST API directly (SDK types may hide fields)
+  const clerkCountry:     Record<string, string> = {};
+  const clerkCountryCode: Record<string, string> = {};
+  const CLERK_KEY = process.env.CLERK_SECRET_KEY ?? '';
+
+  const BATCH = 15;
+  for (let i = 0; i < clerkUserList.length; i += BATCH) {
+    await Promise.all(clerkUserList.slice(i, i + BATCH).map(async (cu) => {
+      try {
+        const res = await fetch(
+          `https://api.clerk.com/v1/sessions?user_id=${cu.id}&limit=10`,
+          {
+            headers: { Authorization: `Bearer ${CLERK_KEY}` },
+            signal:  AbortSignal.timeout(8000),
+          },
+        );
+        if (!res.ok) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessions: any[] = await res.json();
+        // Log first user's raw session so we can verify the field names
+        if (i === 0 && clerkUserList[0]?.id === cu.id && sessions.length > 0) {
+          console.log('[clerk-debug] sample session keys:', Object.keys(sessions[0]));
+          console.log('[clerk-debug] latest_activity:', JSON.stringify(sessions[0].latest_activity));
+        }
+        for (const s of sessions) {
+          // REST API returns snake_case; also try camelCase as fallback
+          const c = s.latest_activity?.country ?? s.latestActivity?.country ?? null;
+          if (c) {
+            clerkCountry[cu.id]     = c;
+            clerkCountryCode[cu.id] = countryNameToCode(c) ?? c.slice(0, 2).toUpperCase();
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn('[clerk-sessions] failed for', cu.id, e);
+      }
+    }));
+  }
+  console.log(`[admin] country resolved for ${Object.keys(clerkCountry).length}/${clerkUserList.length} users`);
+
+  // Build user list — country always comes from Clerk (live), fall back to Firestore cache
   const users: AdminUser[] = clerkUserList.map((cu) => {
     const d = fsMap.get(cu.id) ?? {};
 
-    // Only show a real plan if it was explicitly set — otherwise "unpaid"
-    const plan    = d.plan ?? 'unpaid';
-    const planCap = PLAN_CREDITS[plan] ?? 1000;
+    const plan         = d.plan ?? 'unpaid';
+    const planCap      = PLAN_CREDITS[plan] ?? 1000;
     const credits      = typeof d.credits      === 'number' ? d.credits      : 0;
     const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 
-    // createdAt from Firestore if available, else from Clerk
     let createdAt: string | null = null;
-    if (d.createdAt?.toDate) {
-      createdAt = d.createdAt.toDate().toISOString();
-    } else if (d.createdAt instanceof Date) {
-      createdAt = d.createdAt.toISOString();
-    } else if (cu.createdAt) {
-      createdAt = new Date(cu.createdAt).toISOString();
-    }
+    if (d.createdAt?.toDate)             createdAt = d.createdAt.toDate().toISOString();
+    else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
+    else if (cu.createdAt)               createdAt = new Date(cu.createdAt).toISOString();
 
-    const firstName     = cu.firstName  ?? d.firstName  ?? '';
-    const lastName      = cu.lastName   ?? d.lastName   ?? '';
+    const firstName     = cu.firstName ?? d.firstName ?? '';
+    const lastName      = cu.lastName  ?? d.lastName  ?? '';
     const clerkEmail    = cu.emailAddresses?.[0]?.emailAddress ?? '';
-    const fsEmail       = d.userEmail ?? d.email ?? '';
-    const resolvedEmail = clerkEmail || fsEmail;
+    const resolvedEmail = clerkEmail || d.userEmail || d.email || '';
 
-    let displayName = '';
-    if (firstName || lastName) {
-      displayName = [firstName, lastName].filter(Boolean).join(' ');
-    } else {
-      displayName = d.displayName ?? resolvedEmail.split('@')[0] ?? '';
-    }
+    const displayName = (firstName || lastName)
+      ? [firstName, lastName].filter(Boolean).join(' ')
+      : (d.displayName ?? resolvedEmail.split('@')[0] ?? '');
 
-    const lastSignInAt = cu.lastSignInAt
-      ? new Date(cu.lastSignInAt).toISOString()
-      : null;
+    const lastSignInAt = cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null;
+
+    // Country: live from Clerk sessions first, then Firestore cache
+    const country     = clerkCountry[cu.id]     ?? d.country     ?? null;
+    const countryCode = clerkCountryCode[cu.id] ?? d.countryCode ?? null;
 
     return {
       id:               cu.id,
@@ -94,20 +166,19 @@ export async function GET() {
       lastName,
       plan,
       planLabel:        PLAN_LABELS[plan] ?? plan,
-      licenseStatus:    d.licenseStatus   ?? 'inactive',
+      licenseStatus:    d.licenseStatus  ?? 'inactive',
       credits,
       creditsTotal,
-      renewalDate:      d.renewalDate     ?? null,
-      deviceLimit:      d.deviceLimit     ?? 1,
+      renewalDate:      d.renewalDate    ?? null,
+      deviceLimit:      d.deviceLimit    ?? 1,
       createdAt,
       lastSignInAt,
-      country:          d.country         ?? null,
-      countryCode:      d.countryCode     ?? null,
+      country,
+      countryCode,
       lsSubscriptionId: d.lsSubscriptionId,
     };
   });
 
-  // Sort by createdAt desc
   users.sort((a, b) => {
     if (!a.createdAt) return 1;
     if (!b.createdAt) return -1;

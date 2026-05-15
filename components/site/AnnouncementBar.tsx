@@ -16,7 +16,7 @@ export default function AnnouncementBar() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem("prysmor_bar_dismissed")) return;
+    try { if (sessionStorage.getItem("prysmor_bar_dismissed")) return; } catch { /* private mode */ }
     setVisible(true);
     document.documentElement.style.setProperty("--bar-h", `${BAR_H}px`);
   }, []);
@@ -24,7 +24,7 @@ export default function AnnouncementBar() {
   function dismiss() {
     setVisible(false);
     document.documentElement.style.setProperty("--bar-h", "0px");
-    sessionStorage.setItem("prysmor_bar_dismissed", "1");
+    try { sessionStorage.setItem("prysmor_bar_dismissed", "1"); } catch { /* private mode */ }
   }
 
   if (!visible) return null;
