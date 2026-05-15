@@ -760,6 +760,28 @@ function SubStatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+const EVENT_META: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  page_view:      { label: 'Page View',      color: 'text-[#9CA3AF]',  bg: 'bg-white/[0.06]',       border: 'border-white/[0.08]' },
+  cta_click:      { label: 'CTA Click',      color: 'text-[#60A5FA]',  bg: 'bg-blue-500/[0.12]',    border: 'border-blue-500/25' },
+  pricing_click:  { label: 'Pricing Click',  color: 'text-[#A3FF12]',  bg: 'bg-[#A3FF12]/[0.10]',   border: 'border-[#A3FF12]/25' },
+  pricing_toggle: { label: 'Pricing Toggle', color: 'text-[#F59E0B]',  bg: 'bg-amber-500/[0.10]',   border: 'border-amber-500/25' },
+  sign_up:        { label: 'Sign Up',        color: 'text-[#34D399]',  bg: 'bg-emerald-500/[0.12]', border: 'border-emerald-500/25' },
+  sign_in:        { label: 'Sign In',        color: 'text-[#818CF8]',  bg: 'bg-indigo-500/[0.10]',  border: 'border-indigo-500/20' },
+  dashboard_view: { label: 'Dashboard',      color: 'text-[#6B7280]',  bg: 'bg-white/[0.04]',       border: 'border-white/[0.06]' },
+};
+function getEventMeta(event: string) {
+  return EVENT_META[event] ?? { label: event, color: 'text-[#6B7280]', bg: 'bg-white/[0.04]', border: 'border-white/[0.06]' };
+}
+
+function fmtEventTime(iso: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+    d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
 // ─── Analytics Section ────────────────────────────────────────────────────────
 
 interface AnalyticsEvent {
@@ -838,184 +860,239 @@ function AnalyticsSection() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
   const [filter,  setFilter]  = useState<AnalyticsFilter>('all');
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   async function load() {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/admin/analytics');
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       setEvents(json.events ?? []);
       setSummary(json.summary ?? null);
+      setLastRefreshed(new Date());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
   }, []);
 
   const filtered = filter === 'all' ? events : events.filter(e => e.event === filter);
 
-  // Funnel — from already-filtered events (no dashboard, no admin)
   const pageViews     = events.filter(e => e.event === 'page_view').length;
   const ctaClicks     = events.filter(e => e.event === 'cta_click').length;
   const pricingClicks = events.filter(e => e.event === 'pricing_click').length;
   const signUps       = events.filter(e => e.event === 'sign_up').length;
 
-  const FILTERS: { id: AnalyticsFilter; label: string }[] = [
-    { id: 'all',            label: 'All' },
-    { id: 'page_view',      label: 'Page Views' },
-    { id: 'cta_click',      label: 'CTA Clicks' },
-    { id: 'pricing_click',  label: 'Pricing Clicks' },
-    { id: 'pricing_toggle', label: 'Pricing Toggles' },
-  ];
+  const eventCounts = events.reduce<Record<string,number>>((acc, e) => {
+    acc[e.event] = (acc[e.event] ?? 0) + 1;
+    return acc;
+  }, {});
 
-  if (loading) {
+  if (loading && events.length === 0) {
     return (
-      <div className="flex items-center gap-2 text-[#6B7280] text-[13px] py-10">
+      <div className="flex items-center gap-2 text-[#4B5563] text-[13px] py-16 justify-center">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading analytics…
       </div>
     );
   }
+  if (error) return <div className="text-red-400 text-[13px] py-10">Error: {error}</div>;
 
-  if (error) {
-    return <div className="text-red-400 text-[13px] py-10">Error: {error}</div>;
-  }
+  const funnelSteps = [
+    { label: 'Page Views',     count: pageViews,     icon: '👁',  color: '#9CA3AF' },
+    { label: 'CTA Clicks',     count: ctaClicks,     icon: '🖱',  color: '#60A5FA', prev: pageViews },
+    { label: 'Pricing Clicks', count: pricingClicks, icon: '💰',  color: '#A3FF12', prev: ctaClicks },
+    { label: 'Sign Ups',       count: signUps,        icon: '✅',  color: '#34D399', prev: pricingClicks },
+  ];
+  const maxFunnel = Math.max(pageViews, 1);
 
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-5">
+
+      {/* ── Today summary ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Events Today',    value: summary?.totalToday      ?? 0 },
-          { label: 'Unique Sessions Today', value: summary?.uniqueSessions  ?? 0 },
-          { label: 'Page Views Today',      value: summary?.pageViewsToday  ?? 0 },
-          { label: 'New Signups Today',     value: summary?.newSignupsToday ?? 0 },
-        ].map(card => (
-          <div key={card.label} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-4">
-            <p className="text-[10px] uppercase tracking-widest text-[#4B5563] mb-2">{card.label}</p>
-            <p className="text-[22px] font-semibold text-white leading-none">{card.value}</p>
+          { label: 'Events today',    value: summary?.totalToday      ?? 0, color: 'text-white',     dot: '#6B7280' },
+          { label: 'Sessions today',  value: summary?.uniqueSessions  ?? 0, color: 'text-[#60A5FA]', dot: '#60A5FA' },
+          { label: 'Page views',      value: summary?.pageViewsToday  ?? 0, color: 'text-[#9CA3AF]', dot: '#9CA3AF' },
+          { label: 'New sign-ups',    value: summary?.newSignupsToday ?? 0, color: 'text-[#34D399]', dot: '#34D399' },
+        ].map(c => (
+          <div key={c.label} className="rounded-[12px] border border-white/[0.07] bg-[#111113] px-4 py-3.5">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.dot }} />
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4B5563]">{c.label}</p>
+            </div>
+            <p className={`text-[26px] font-bold leading-none ${c.color}`}>{c.value}</p>
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-[#374151] -mt-3">Excluding internal dashboard traffic and admin account.</p>
+      <p className="text-[10px] text-[#374151]">Today only · excludes your admin traffic · auto-refreshes 60s</p>
 
-      {/* Funnel */}
-      <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-5">
-        <p className="text-[10px] uppercase tracking-widest text-[#4B5563] mb-4">Conversion Funnel (last 500 events)</p>
-        <div className="flex flex-wrap items-center gap-2 text-[13px]">
-          {[
-            { label: 'Page Views',     count: pageViews },
-            { label: 'CTA Clicks',     count: ctaClicks,     prev: pageViews },
-            { label: 'Pricing Clicks', count: pricingClicks, prev: ctaClicks },
-            { label: 'Sign Ups',       count: signUps,        prev: pricingClicks },
-          ].map((step, i) => {
-            const pct = i > 0 && step.prev && step.prev > 0
-              ? Math.round((step.count / step.prev) * 100)
-              : null;
+      {/* ── Conversion funnel ── */}
+      <div className="rounded-[14px] border border-white/[0.07] bg-[#111113] p-5">
+        <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Conversion Funnel (last 500 events)</p>
+        <div className="space-y-3">
+          {funnelSteps.map((step, i) => {
+            const pct = Math.round((step.count / maxFunnel) * 100);
+            const convPct = i > 0 && step.prev && step.prev > 0
+              ? Math.round((step.count / step.prev) * 100) : null;
             return (
-              <span key={step.label} className="flex items-center gap-2">
-                {i > 0 && <span className="text-[#374151]">→</span>}
-                <span className="text-white font-semibold">{step.count}</span>
-                <span className="text-[#6B7280]">{step.label}</span>
-                {pct !== null && (
-                  <span className="text-[11px] text-[#39FF6A] bg-[#39FF6A]/10 px-1.5 py-0.5 rounded-full">
-                    {pct}%
-                  </span>
-                )}
-              </span>
+              <div key={step.label}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px]">{step.icon}</span>
+                    <span className="text-[12px] font-medium text-[#D1D5DB]">{step.label}</span>
+                    {convPct !== null && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#A3FF12]/[0.08] border border-[#A3FF12]/20 text-[#A3FF12]">
+                        {convPct}% of prev
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[13px] font-bold" style={{ color: step.color }}>{step.count}</span>
+                </div>
+                <div className="h-[6px] w-full rounded-full bg-white/[0.05]">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: step.color }} />
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-1 flex-wrap">
-        {FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors ${
-              filter === f.id
-                ? 'bg-white/[0.10] text-white'
-                : 'text-[#6B7280] hover:text-[#9CA3AF] hover:bg-white/[0.04]'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <span className="ml-auto text-[11px] text-[#374151]">
-          {filtered.length} events · auto-refreshes every 60s
-        </span>
-      </div>
+      {/* ── Event type breakdown ── */}
+      {Object.keys(eventCounts).length > 0 && (
+        <div className="rounded-[14px] border border-white/[0.07] bg-[#111113] p-5">
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Event Breakdown (last 500)</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(eventCounts)
+              .sort((a, b) => b[1] - a[1])
+              .map(([evt, cnt]) => {
+                const meta = getEventMeta(evt);
+                return (
+                  <button
+                    key={evt}
+                    onClick={() => setFilter(filter === evt ? 'all' : evt as AnalyticsFilter)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-[8px] border text-[12px] font-medium transition-all ${
+                      filter === evt
+                        ? `${meta.bg} ${meta.border} ${meta.color} ring-1 ring-white/20`
+                        : `bg-white/[0.03] border-white/[0.06] text-[#6B7280] hover:border-white/[0.12]`
+                    }`}
+                  >
+                    <span className={meta.color}>{meta.label}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${meta.bg} ${meta.color}`}>{cnt}</span>
+                  </button>
+                );
+              })}
+            {filter !== 'all' && (
+              <button onClick={() => setFilter('all')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white transition-colors">
+                <X className="w-3 h-3" /> Clear filter
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Events table */}
-      <div className="rounded-[12px] border border-white/[0.06] overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* ── Event list ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em]">
+            {filter === 'all' ? 'All Events' : getEventMeta(filter).label}
+            <span className="ml-2 text-[#374151] font-normal normal-case tracking-normal">{filtered.length} shown</span>
+          </p>
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] border border-white/[0.07] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors disabled:opacity-50">
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Refresh'}
+          </button>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="text-center py-10 text-[13px] text-[#4B5563]">No events</div>
+        )}
+
+        {/* Mobile: card list */}
+        <div className="space-y-2 lg:hidden">
+          {filtered.slice(0, 100).map(ev => {
+            const meta = getEventMeta(ev.event);
+            const details = fmtProps(ev.properties);
+            return (
+              <div key={ev.id} className={`rounded-[12px] border ${meta.border} bg-[#111113] p-3.5`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-[6px] text-[10px] font-bold ${meta.bg} ${meta.color} border ${meta.border}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-[10px] text-[#374151] shrink-0">{fmtEventTime(ev.timestamp)}</span>
+                </div>
+                {details !== '—' && (
+                  <p className="text-[11px] text-[#D1D5DB] font-medium mb-1 truncate">{details}</p>
+                )}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                  <span className="text-[10px] text-[#4B5563] font-mono truncate max-w-[160px]">{ev.page}</span>
+                  {ev.referrer !== 'direct' && (
+                    <ReferrerBadge referrer={ev.referrer} />
+                  )}
+                  <span className="text-[10px] text-[#374151]">{parseDevice(ev.userAgent)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: compact table */}
+        <div className="hidden lg:block rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-white/[0.06] bg-white/[0.02]">
-                {['Time', 'Event', 'Details', 'Page', 'Referrer', 'Device'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em]">
-                    {h}
-                  </th>
+              <tr className="border-b border-white/[0.05]">
+                {['Event', 'Details', 'Page', 'Referrer', 'Device', 'Time'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-[#4B5563]">No events found</td>
-                </tr>
-              ) : (
-                filtered.map(ev => (
-                  <tr key={ev.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-2.5 text-[#4B5563] whitespace-nowrap">{fmtEventDate(ev.timestamp)}</td>
+              {filtered.slice(0, 200).map(ev => {
+                const meta = getEventMeta(ev.event);
+                return (
+                  <tr key={ev.id} className="border-b border-white/[0.03] hover:bg-white/[0.015] transition-colors">
                     <td className="px-4 py-2.5">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        ev.event === 'page_view'      ? 'bg-white/[0.06] text-[#6B7280]' :
-                        ev.event === 'cta_click'      ? 'bg-blue-500/10 text-blue-400' :
-                        ev.event === 'pricing_click'  ? 'bg-[#39FF6A]/10 text-[#39FF6A]' :
-                        ev.event === 'pricing_toggle' ? 'bg-orange-500/10 text-orange-400' :
-                        'bg-white/[0.04] text-[#4B5563]'
-                      }`}>
-                        {ev.event}
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.bg} ${meta.color}`}>
+                        {meta.label}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 max-w-[200px] truncate">
-                      <span className="font-semibold text-[#9CA3AF]">{fmtProps(ev.properties)}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-[#6B7280] font-mono">{ev.page}</td>
+                    <td className="px-4 py-2.5 max-w-[180px] truncate text-[#9CA3AF]">{fmtProps(ev.properties)}</td>
+                    <td className="px-4 py-2.5 text-[#6B7280] font-mono text-[11px] max-w-[140px] truncate">{ev.page}</td>
                     <td className="px-4 py-2.5"><ReferrerBadge referrer={ev.referrer} /></td>
                     <td className="px-4 py-2.5 text-[#4B5563]">{parseDevice(ev.userAgent)}</td>
+                    <td className="px-4 py-2.5 text-[#374151] whitespace-nowrap">{fmtEventTime(ev.timestamp)}</td>
                   </tr>
-                ))
-              )}
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
-
-      <div className="flex justify-end">
-        <button
-          onClick={load}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Refresh now
-        </button>
-      </div>
     </div>
   );
 }
+
+// Net income after LemonSqueezy fees (5% + $0.50/transaction/month)
+const PLAN_NET: Record<string, number> = {
+  starter:   Math.round((29   * 0.95 - 0.50) * 100) / 100,  // $27.05
+  pro:        Math.round((49   * 0.95 - 0.50) * 100) / 100,  // $46.05
+  exclusive: Math.round((149  * 0.95 - 0.50) * 100) / 100,  // $141.05
+};
+const PLAN_GROSS: Record<string, number> = { starter: 29, pro: 49, exclusive: 149 };
+const PLAN_CONFIG: { id: string; label: string; color: string; border: string; bg: string; dot: string }[] = [
+  { id: 'starter',   label: 'Starter',   color: 'text-[#9CA3AF]',  border: 'border-white/[0.10]',       bg: 'bg-white/[0.03]',        dot: '#6B7280' },
+  { id: 'pro',       label: 'Pro',       color: 'text-[#60A5FA]',  border: 'border-blue-500/25',         bg: 'bg-blue-500/[0.07]',     dot: '#60A5FA' },
+  { id: 'exclusive', label: 'Exclusive', color: 'text-[#F59E0B]',  border: 'border-amber-500/25',        bg: 'bg-amber-500/[0.07]',    dot: '#F59E0B' },
+];
 
 function RevenueSection() {
   const [data,    setData]    = useState<RevenueData | null>(null);
@@ -1025,7 +1102,7 @@ function RevenueSection() {
   async function load() {
     setLoading(true); setError('');
     try {
-      const res  = await fetch('/api/admin/revenue');
+      const res = await fetch('/api/admin/revenue');
       if (!res.ok) throw new Error((await res.json()).error ?? 'Failed');
       setData(await res.json());
     } catch (e) { setError(e instanceof Error ? e.message : 'Error'); }
@@ -1039,156 +1116,215 @@ function RevenueSection() {
       <Loader2 className="w-6 h-6 animate-spin text-[#4B5563]" />
     </div>
   );
-
   if (error) return (
     <div className="rounded-[10px] border border-red-500/20 bg-red-500/[0.05] px-4 py-3">
       <p className="text-[12px] text-red-400">{error}</p>
     </div>
   );
-
   if (!data) return null;
 
-  const maxMrr = Math.max(...data.planBreakdown.map(p => p.mrr), 1);
+  const planMap = Object.fromEntries(data.planBreakdown.map(p => [p.plan, p]));
+  const netMrr  = data.planBreakdown.reduce((sum, p) => {
+    const net = PLAN_NET[p.plan] ?? (p.mrr / p.count * 0.95 - 0.50);
+    return sum + net * p.count;
+  }, 0);
+  const totalActive = data.activeCount;
+  const totalSubCount = data.activeCount + data.cancelledCount + data.pausedCount + data.trialingCount;
 
   return (
     <div className="space-y-6">
-      {/* MRR / ARR top stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-[12px] border border-[#A3FF12]/[0.15] bg-[#A3FF12]/[0.03] p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <DollarSign className="w-3.5 h-3.5 text-[#A3FF12]" />
-            <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.08em]">MRR</span>
+
+      {/* ── Top KPI row ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Gross MRR',    value: `$${data.mrr.toLocaleString()}`,         sub: 'Monthly recurring',     dot: '#A3FF12' },
+          { label: 'Net MRR',      value: `$${netMrr.toFixed(0)}`,                 sub: 'After LS fees (5%+$0.50)', dot: '#34D399' },
+          { label: 'New / Month',  value: String(data.newThisMonth),                sub: 'Subscriptions started', dot: '#60A5FA' },
+          { label: 'Credit Packs', value: `$${data.orderRevenue.toFixed(0)}`,       sub: `${data.orderCount} one-time sales`, dot: '#F59E0B' },
+        ].map(c => (
+          <div key={c.label} className="rounded-[12px] border border-white/[0.07] bg-[#111113] px-4 py-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.dot }} />
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4B5563]">{c.label}</p>
+            </div>
+            <p className="text-[24px] font-bold leading-none text-white mb-1">{c.value}</p>
+            <p className="text-[10px] text-[#374151]">{c.sub}</p>
           </div>
-          <p className="text-[28px] font-semibold text-white">${data.mrr.toLocaleString()}</p>
-          <p className="text-[11px] text-[#4B5563] mt-1">Monthly recurring</p>
-        </div>
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-3.5 h-3.5 text-[#60A5FA]" />
-            <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.08em]">ARR</span>
-          </div>
-          <p className="text-[28px] font-semibold text-white">${data.arr.toLocaleString()}</p>
-          <p className="text-[11px] text-[#4B5563] mt-1">Annual run rate</p>
-        </div>
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <UserPlus className="w-3.5 h-3.5 text-[#A3FF12]" />
-            <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.08em]">New this month</span>
-          </div>
-          <p className="text-[28px] font-semibold text-white">{data.newThisMonth}</p>
-          <p className="text-[11px] text-[#4B5563] mt-1">New subscriptions</p>
-        </div>
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Package className="w-3.5 h-3.5 text-[#F59E0B]" />
-            <span className="text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.08em]">Credit packs</span>
-          </div>
-          <p className="text-[28px] font-semibold text-white">${data.orderRevenue.toFixed(0)}</p>
-          <p className="text-[11px] text-[#4B5563] mt-1">{data.orderCount} one-time sales</p>
-        </div>
+        ))}
       </div>
 
-      {/* Status breakdown + Plan breakdown */}
+      {/* ── Plan profit cards ── */}
+      <div>
+        <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-3">Active Plans &amp; Net Income</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {PLAN_CONFIG.map(cfg => {
+            const pl    = planMap[cfg.id];
+            const count = pl?.count ?? 0;
+            const gross = (PLAN_GROSS[cfg.id] ?? 0) * count;
+            const net   = (PLAN_NET[cfg.id] ?? 0) * count;
+            const fee   = gross - net;
+            return (
+              <div key={cfg.id} className={`rounded-[14px] border ${cfg.border} ${cfg.bg} p-5`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+                    <span className={`text-[11px] font-bold uppercase tracking-widest ${cfg.color}`}>{cfg.label}</span>
+                  </div>
+                  <span className={`text-[28px] font-black leading-none ${cfg.color}`}>{count}</span>
+                </div>
+                <p className="text-[11px] text-[#4B5563] mb-3">active subscribers</p>
+                <div className="space-y-1.5 text-[12px]">
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">Gross revenue</span>
+                    <span className="text-[#9CA3AF] font-medium">${gross.toFixed(0)}/mo</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">LS fees</span>
+                    <span className="text-red-400/70 font-medium">-${fee.toFixed(2)}/mo</span>
+                  </div>
+                  <div className={`flex justify-between pt-1.5 border-t border-white/[0.06] font-bold`}>
+                    <span className={cfg.color}>Net profit</span>
+                    <span className={cfg.color}>${net.toFixed(0)}/mo</span>
+                  </div>
+                </div>
+                {count === 0 && (
+                  <p className="text-[10px] text-[#374151] mt-2">No active subs on this plan</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-[#374151] mt-2">LS fee estimate: 5% + $0.50 per subscription per month · ARR: <strong className="text-[#4B5563]">${(netMrr * 12).toFixed(0)}</strong></p>
+      </div>
+
+      {/* ── Subscription status + churn ── */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Subscription statuses */}
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
-          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Subscription Status</p>
+        <div className="rounded-[14px] border border-white/[0.07] bg-[#111113] p-5">
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Subscription Health</p>
           <div className="space-y-3">
             {[
-              { label: 'Active',     count: data.activeCount,    color: '#A3FF12' },
-              { label: 'Cancelled',  count: data.cancelledCount, color: '#F87171' },
-              { label: 'Paused',     count: data.pausedCount,    color: '#F59E0B' },
-              { label: 'Trialing',   count: data.trialingCount,  color: '#60A5FA' },
+              { label: 'Active',    count: data.activeCount,    color: '#A3FF12', badge: 'text-[#A3FF12] bg-[#A3FF12]/[0.08]' },
+              { label: 'Cancelled', count: data.cancelledCount, color: '#F87171', badge: 'text-red-400 bg-red-500/[0.08]' },
+              { label: 'Paused',    count: data.pausedCount,    color: '#F59E0B', badge: 'text-amber-400 bg-amber-500/[0.08]' },
+              { label: 'Trialing',  count: data.trialingCount,  color: '#60A5FA', badge: 'text-blue-400 bg-blue-500/[0.08]' },
             ].map(row => {
-              const total = data.activeCount + data.cancelledCount + data.pausedCount + data.trialingCount;
-              const pct   = total > 0 ? (row.count / total) * 100 : 0;
+              const pct = totalSubCount > 0 ? (row.count / totalSubCount) * 100 : 0;
               return (
                 <div key={row.label}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[12px] text-[#9CA3AF]">{row.label}</span>
-                    <span className="text-[12px] font-semibold text-white">{row.count}</span>
+                    <span className="text-[12px] font-bold text-white">{row.count}</span>
                   </div>
-                  <div className="h-[4px] w-full rounded-full bg-white/[0.06]">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: row.color }} />
+                  <div className="h-[5px] w-full rounded-full bg-white/[0.05]">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: row.color }} />
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-4 pt-4 border-t border-white/[0.05] flex items-center justify-between">
-            <span className="text-[11px] text-[#4B5563]">Churned this month</span>
-            <span className="text-[12px] font-semibold text-red-400">{data.churnedThisMonth}</span>
+          <div className="mt-4 pt-4 border-t border-white/[0.05] grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] text-[#4B5563] mb-0.5">Churned this month</p>
+              <p className="text-[15px] font-bold text-red-400">{data.churnedThisMonth}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#4B5563] mb-0.5">Total active</p>
+              <p className="text-[15px] font-bold text-[#A3FF12]">{totalActive}</p>
+            </div>
           </div>
         </div>
 
-        {/* Plan MRR breakdown */}
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5">
-          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Plan Breakdown</p>
-          {data.planBreakdown.length === 0 ? (
-            <p className="text-[12px] text-[#4B5563] py-4 text-center">No active subscriptions</p>
-          ) : (
-            <div className="space-y-4">
-              {data.planBreakdown.map(plan => (
-                <div key={plan.plan}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: plan.color }} />
-                      <span className="text-[12px] font-medium text-white">{plan.label}</span>
-                      <span className="text-[11px] text-[#4B5563]">{plan.count} users</span>
-                    </div>
-                    <span className="text-[12px] font-semibold text-white">${plan.mrr}/mo</span>
-                  </div>
-                  <div className="h-[4px] w-full rounded-full bg-white/[0.06]">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${(plan.mrr / maxMrr) * 100}%`, background: plan.color }} />
-                  </div>
-                </div>
-              ))}
+        {/* Net income summary */}
+        <div className="rounded-[14px] border border-[#A3FF12]/[0.12] bg-[#A3FF12]/[0.02] p-5">
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-4">Income Summary</p>
+          <div className="space-y-3">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] text-[#4B5563] mb-1">Gross MRR</p>
+                <p className="text-[22px] font-bold text-white">${data.mrr.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-[#4B5563] mb-1">LS Fees</p>
+                <p className="text-[15px] font-semibold text-red-400/80">-${(data.mrr - netMrr).toFixed(0)}</p>
+              </div>
             </div>
-          )}
-          <div className="mt-4 pt-4 border-t border-white/[0.05] flex items-center justify-between">
-            <span className="text-[11px] text-[#4B5563]">Total MRR</span>
-            <span className="text-[13px] font-bold text-[#A3FF12]">${data.mrr}/mo</span>
+            <div className="h-px bg-white/[0.06]" />
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] text-[#4B5563] mb-1">Net MRR</p>
+                <p className="text-[28px] font-black text-[#A3FF12]">${netMrr.toFixed(0)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-[#4B5563] mb-1">Net ARR</p>
+                <p className="text-[18px] font-bold text-[#D1D5DB]">${(netMrr * 12).toFixed(0)}</p>
+              </div>
+            </div>
+            {data.orderRevenue > 0 && (
+              <div className="pt-3 border-t border-white/[0.05]">
+                <p className="text-[10px] text-[#4B5563] mb-0.5">+ One-time sales</p>
+                <p className="text-[15px] font-semibold text-[#F59E0B]">+${data.orderRevenue.toFixed(0)}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Recent subscriptions */}
+      {/* ── Recent subscriptions ── */}
       <div>
-        <p className="text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] mb-3">Recent Subscriptions</p>
-        <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">
+        <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-[0.08em] mb-3">Recent Subscriptions</p>
+
+        {/* Mobile cards */}
+        <div className="space-y-2 lg:hidden">
+          {data.recentSubs.length === 0 && <p className="text-[12px] text-[#4B5563] text-center py-6">No subscriptions</p>}
+          {data.recentSubs.map((sub: LsSub) => (
+            <div key={sub.id} className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <p className="text-[13px] font-medium text-white truncate max-w-[180px]">{sub.name || sub.email}</p>
+                  <p className="text-[10px] text-[#4B5563] truncate max-w-[180px]">{sub.email}</p>
+                </div>
+                <SubStatusBadge status={sub.status} />
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                <PlanBadge plan={sub.plan} label={sub.planLabel} />
+                {sub.mrr > 0 && <span className="text-[11px] text-[#A3FF12] font-semibold">${sub.mrr}/mo</span>}
+                {sub.renewsAt && <span className="text-[11px] text-[#6B7280]">Renews {fmtDate(sub.renewsAt)}</span>}
+                <span className="text-[11px] text-[#374151]">{fmtRelative(sub.createdAt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden lg:block rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
               <tr className="border-b border-white/[0.05]">
-                {['Subscriber', 'Plan', 'Status', 'MRR', 'Renews', 'Started'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.07em]">{h}</th>
+                {['Subscriber', 'Plan', 'Status', 'Gross/mo', 'Net/mo', 'Renews', 'Started'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.07em]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03]">
               {data.recentSubs.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-[#4B5563]">No subscriptions found</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-[#4B5563]">No subscriptions found</td></tr>
               )}
               {data.recentSubs.map((sub: LsSub) => (
                 <tr key={sub.id} className="hover:bg-white/[0.015] transition-colors">
                   <td className="px-4 py-3">
-                    <p className="text-white font-medium truncate max-w-[160px]">{sub.name || sub.email}</p>
-                    <p className="text-[10px] text-[#4B5563] truncate max-w-[160px]">{sub.email}</p>
+                    <p className="text-white font-medium truncate max-w-[140px]">{sub.name || sub.email}</p>
+                    <p className="text-[10px] text-[#374151] truncate max-w-[140px]">{sub.email}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <PlanBadge plan={sub.plan} label={sub.planLabel} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <SubStatusBadge status={sub.status} />
-                  </td>
-                  <td className="px-4 py-3 text-[#A3FF12] font-semibold">
+                  <td className="px-4 py-3"><PlanBadge plan={sub.plan} label={sub.planLabel} /></td>
+                  <td className="px-4 py-3"><SubStatusBadge status={sub.status} /></td>
+                  <td className="px-4 py-3 text-[#D1D5DB] font-medium">
                     {sub.mrr > 0 ? `$${sub.mrr}` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">
-                    {sub.renewsAt ? fmtDate(sub.renewsAt) : '—'}
+                  <td className="px-4 py-3 text-[#A3FF12] font-semibold">
+                    {sub.mrr > 0 ? `$${PLAN_NET[sub.plan]?.toFixed(2) ?? '—'}` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-[#6B7280]">
-                    {fmtRelative(sub.createdAt)}
-                  </td>
+                  <td className="px-4 py-3 text-[#6B7280]">{sub.renewsAt ? fmtDate(sub.renewsAt) : '—'}</td>
+                  <td className="px-4 py-3 text-[#4B5563]">{fmtRelative(sub.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1197,10 +1333,8 @@ function RevenueSection() {
       </div>
 
       <div className="flex justify-end">
-        <button
-          onClick={load}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
-        >
+        <button onClick={load}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.07] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors">
           <RefreshCw className="w-3 h-3" />
           Refresh revenue data
         </button>
@@ -1409,53 +1543,50 @@ export function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>('users');
 
   return (
-    <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[1400px]">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10 max-w-[1400px]">
+
       {/* ── Page Header ── */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between gap-3 mb-8">
         <div>
-          <h1 className="text-[28px] font-semibold text-white tracking-tight mb-1">Admin Panel</h1>
-          <p className="text-[13px] text-[#6B7280]">Users, revenue, and platform overview.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#A3FF12] shadow-[0_0_6px_#A3FF12]" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">Admin</span>
+          </div>
+          <h1 className="text-[24px] sm:text-[28px] font-bold text-white tracking-tight leading-none mb-1.5">Control Panel</h1>
+          <p className="text-[12px] text-[#4B5563]">Users · Revenue · Analytics</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={purgeOrphans}
-            disabled={purging || loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-red-500/20 text-[11px] text-red-400/70 hover:text-red-400 hover:border-red-500/40 transition-colors disabled:opacity-50"
-            title="Delete Firestore users with no Clerk account"
-          >
-            {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            Purge orphans
-          </button>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors disabled:opacity-50"
-          >
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] border border-white/[0.08] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.15] transition-all disabled:opacity-50">
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-            {new Date(lastRefresh).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            <span className="hidden sm:inline">
+              {new Date(lastRefresh).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </button>
+          <button onClick={purgeOrphans} disabled={purging || loading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] border border-red-500/[0.18] text-[11px] text-red-400/60 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-50"
+            title="Delete Firestore users with no Clerk account">
+            {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+            <span className="hidden sm:inline">Purge orphans</span>
           </button>
         </div>
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 mb-6 p-1 w-fit rounded-[10px] bg-white/[0.04] border border-white/[0.06]">
+      <div className="flex gap-1 mb-7 p-1 w-fit rounded-[11px] bg-white/[0.04] border border-white/[0.07]">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-[8px] text-[13px] font-medium transition-all ${
-                isActive
-                  ? 'bg-white/[0.08] text-white shadow-sm'
-                  : 'text-[#6B7280] hover:text-[#9CA3AF]'
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all ${
+                isActive ? 'bg-white/[0.09] text-white border border-white/[0.07]' : 'text-[#6B7280] hover:text-[#9CA3AF]'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#A3FF12]' : 'text-[#4B5563]'}`} />
-              {tab.label}
+              <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-[#A3FF12]' : 'text-[#4B5563]'}`} />
+              <span>{tab.label}</span>
               {tab.id === 'users' && users.length > 0 && (
-                <span className="ml-0.5 text-[10px] bg-white/[0.08] text-[#6B7280] px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-white/[0.08] text-[#6B7280] px-1.5 py-0.5 rounded-full font-semibold">
                   {users.length}
                 </span>
               )}
@@ -1475,10 +1606,21 @@ export function AdminPanel() {
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <StatCard icon={Users}       label="Total users"    value={stats.total}    sub={`${stats.active} active`}                                                    color="bg-white/[0.05] text-[#9CA3AF]" />
-          <StatCard icon={ShieldCheck} label="Active plans"   value={stats.active}   sub={`${((stats.active / Math.max(stats.total, 1)) * 100).toFixed(0)}% of users`} color="bg-[#A3FF12]/[0.08] text-[#A3FF12]" />
-          <StatCard icon={AlertCircle} label="Inactive"       value={stats.inactive} sub="No active plan"                                                              color="bg-red-500/[0.07] text-red-400" />
-          <StatCard icon={Zap}         label="Credits in use" value={stats.credits.toLocaleString()} sub="Across all users"                                            color="bg-blue-500/[0.07] text-[#60A5FA]" />
+          {[
+            { icon: Users,       label: 'Total users',    value: stats.total,                     sub: `${stats.active} with active plan`,    accent: '#9CA3AF', border: 'border-white/[0.07]' },
+            { icon: ShieldCheck, label: 'Active plans',   value: stats.active,                    sub: `${((stats.active/Math.max(stats.total,1))*100).toFixed(0)}% of users`, accent: '#A3FF12', border: 'border-[#A3FF12]/[0.15]' },
+            { icon: AlertCircle, label: 'Inactive',       value: stats.inactive,                  sub: 'No active plan',                      accent: '#F87171', border: 'border-red-500/[0.12]' },
+            { icon: Zap,         label: 'Credits in use', value: stats.credits.toLocaleString(),  sub: 'Across all users',                    accent: '#60A5FA', border: 'border-blue-500/[0.12]' },
+          ].map(c => (
+            <div key={c.label} className={`rounded-[13px] border ${c.border} bg-[#111113] px-4 py-4`}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <c.icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: c.accent }} />
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-[#4B5563]">{c.label}</span>
+              </div>
+              <p className="text-[26px] font-black leading-none mb-1" style={{ color: c.accent }}>{c.value}</p>
+              <p className="text-[10px] text-[#374151]">{c.sub}</p>
+            </div>
+          ))}
         </div>
 
         {/* ── Toolbar ── */}
