@@ -323,3 +323,36 @@ body::after {
   }
 
 }
+
+/* ── Examples section ───────────────────────────────────────────── */
+.eg-video:hover { transform: scale(1.03); }
+
+.eg-grid { display: grid; gap: 10px; }
+
+.eg-grid-2 { grid-template-columns: 3fr 2fr; }
+.eg-grid-2 .eg-cell { height: 380px; }
+
+.eg-grid-3 { grid-template-columns: 2fr 1fr 1fr; }
+.eg-grid-3 .eg-cell { height: 340px; }
+
+@media (max-width: 860px) {
+  .eg-grid-2 { grid-template-columns: 1fr 1fr; }
+  .eg-grid-2 .eg-cell { height: 260px; }
+  .eg-grid-3 { grid-template-columns: 1fr 1fr; }
+  .eg-grid-3 .eg-cell { height: 220px; }
+  .eg-grid-3 .eg-cell:first-child { grid-column: span 2; }
+  .eg-desc-desktop-hidden { display: none !important; }
+}
+
+@media (max-width: 560px) {
+  .eg-grid-2, .eg-grid-3 { grid-template-columns: 1fr; }
+  .eg-grid-2 .eg-cell,
+  .eg-grid-3 .eg-cell { height: 220px !important; grid-column: span 1 !important; }
+  .eg-desc-mobile { display: block !important; }
+}
+
+/* ── Timer pulse animation ──────────────────────────────────────── */
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}

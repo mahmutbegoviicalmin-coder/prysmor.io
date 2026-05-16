@@ -98,36 +98,35 @@ function PanelMockup() {
   );
 }
 
-/* ── Examples bento grid ─────────────────────────────────────────────────────── */
+/* ── Examples section ───────────────────────────────────────────────────────── */
 const EXAMPLE_CATEGORIES = [
   {
-    name: "Relight",
-    color: "rgba(255,190,90,0.8)",
-    videos: [
-      "/primjeri/re1.mp4",
-      "/primjeri/re2.mp4",
-    ],
+    id:    "relight",
+    label: "01",
+    name:  "Relight",
+    color: "#FFB347",
+    desc:  "Change the light, change the emotion.\nAny scene, any mood.",
+    videos: ["/primjeri/re1.mp4", "/primjeri/re2.mp4"],
   },
   {
-    name: "Background",
-    color: "rgba(90,170,255,0.8)",
-    videos: [
-      "/primjeri/bg1.mp4",
-      "/primjeri/bg2.mp4",
-      "/primjeri/stock.mp4",
-    ],
+    id:    "background",
+    label: "02",
+    name:  "Background",
+    color: "#60A5FA",
+    desc:  "Replace any background instantly.\nNo green screen. No rotoscoping.",
+    videos: ["/primjeri/bg1.mp4", "/primjeri/bg2.mp4", "/primjeri/stock.mp4"],
   },
   {
-    name: "VFX",
-    color: "rgba(57,255,106,0.8)",
-    videos: [
-      "/primjeri/vfx1.mp4",
-      "/primjeri/vfx2.mp4",
-    ],
+    id:    "vfx",
+    label: "03",
+    name:  "VFX",
+    color: "#39FF6A",
+    desc:  "Fire, rain, smoke, object removal.\nAll from a single sentence.",
+    videos: ["/primjeri/vfx1.mp4", "/primjeri/vfx2.mp4"],
   },
 ];
 
-function CategoryVideoCard({ src }: { src: string }) {
+function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const wrapRef  = useRef<HTMLDivElement>(null);
 
@@ -144,10 +143,15 @@ function CategoryVideoCard({ src }: { src: string }) {
   }, []);
 
   return (
-    <div ref={wrapRef} className="eg-card-inner" style={{
-      position: "relative", width: "100%", height: "100%",
-      overflow: "hidden", background: "#0a0a0a", borderRadius: "10px",
-    }}>
+    <div
+      ref={wrapRef}
+      style={{
+        position: "relative", width: "100%", height: "100%",
+        overflow: "hidden", borderRadius: "12px",
+        background: "#080808",
+        border: "1px solid rgba(255,255,255,0.07)",
+      }}
+    >
       <video
         ref={videoRef}
         src={src}
@@ -155,13 +159,20 @@ function CategoryVideoCard({ src }: { src: string }) {
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", display: "block",
-          transition: "transform 800ms cubic-bezier(0.22,1,0.36,1)",
+          transition: "transform 700ms cubic-bezier(0.22,1,0.36,1)",
           willChange: "transform",
         }}
+        className="eg-video"
       />
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)",
+        background: "linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%)",
+      }} />
+      {/* Accent corner line */}
+      <div style={{
+        position: "absolute", top: 0, left: 0,
+        width: "32px", height: "2px",
+        background: accent, opacity: 0.7,
       }} />
     </div>
   );
@@ -169,60 +180,91 @@ function CategoryVideoCard({ src }: { src: string }) {
 
 function ExamplesGrid() {
   return (
-    <section id="examples" style={{ background: "#080808", borderTop: "1px solid #111" }}>
+    <section id="examples" style={{ background: "#080808" }}>
+      <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 clamp(16px,4vw,40px)" }}>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 clamp(16px,4vw,32px)" }}>
-
-        {/* Header */}
-        <div className="anim-fade-up" style={{ padding: "80px 0 56px" }}>
+        {/* ── Section header ── */}
+        <div style={{ padding: "100px 0 0", borderTop: "1px solid #111" }}>
           <p style={{
-            fontSize: "10px", fontWeight: 500, color: "#39FF6A",
-            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 12px",
+            fontSize: "10px", fontWeight: 600, color: "#39FF6A",
+            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 20px",
+            fontFamily: "ui-monospace,SFMono-Regular,monospace",
           }}>// Real outputs</p>
           <h2 style={{
-            fontSize: "clamp(24px, 2.8vw, 40px)", fontWeight: 700,
-            color: "white", letterSpacing: "-1.4px", lineHeight: 1.08, margin: 0,
+            fontSize: "clamp(32px,4vw,56px)", fontWeight: 800,
+            color: "white", letterSpacing: "-2px", lineHeight: 1.06, margin: 0,
           }}>
             Prompt in.<br />Cinematic shot out.
           </h2>
         </div>
 
-        {/* Category rows */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "48px", paddingBottom: "80px" }}>
+        {/* ── Category blocks ── */}
+        <div style={{ paddingBottom: "100px" }}>
           {EXAMPLE_CATEGORIES.map((cat, ci) => (
             <motion.div
-              key={cat.name}
+              key={cat.id}
               initial={{ opacity: 1, y: 0 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.5, delay: ci * 0.08 }}
+              transition={{ duration: 0.5, delay: ci * 0.06 }}
             >
-              {/* Category label row */}
+              {/* Divider + category header */}
               <div style={{
-                display: "flex", alignItems: "center", gap: "14px",
-                marginBottom: "14px",
+                display: "flex", alignItems: "baseline",
+                gap: "clamp(16px,3vw,40px)",
+                padding: "clamp(40px,6vw,72px) 0 clamp(20px,3vw,32px)",
+                borderTop: ci === 0 ? "none" : "1px solid rgba(255,255,255,0.07)",
+                marginTop: ci === 0 ? "48px" : "0",
               }}>
+                {/* Number */}
                 <span style={{
-                  fontSize: "10px", fontWeight: 600, letterSpacing: "2.5px",
-                  textTransform: "uppercase", color: cat.color,
+                  fontSize: "clamp(11px,1vw,13px)", fontWeight: 500,
+                  color: "rgba(255,255,255,0.18)",
                   fontFamily: "ui-monospace,SFMono-Regular,monospace",
+                  letterSpacing: "1px",
+                  flexShrink: 0,
+                }}>
+                  {cat.label}
+                </span>
+
+                {/* Name */}
+                <h3 style={{
+                  fontSize: "clamp(36px,5.5vw,80px)", fontWeight: 800,
+                  color: "white", letterSpacing: "-3px", lineHeight: 0.95,
+                  margin: 0, flex: 1,
                 }}>
                   {cat.name}
-                </span>
-                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.06)" }} />
-                <span style={{
-                  fontSize: "10px", color: "#333",
-                  fontFamily: "ui-monospace,SFMono-Regular,monospace",
+                </h3>
+
+                {/* Description — right side on desktop */}
+                <p className="eg-desc-desktop-hidden" style={{
+                  fontSize: "clamp(13px,1.2vw,15px)", fontWeight: 400,
+                  color: "rgba(255,255,255,0.4)", lineHeight: 1.65,
+                  margin: 0,
+                  maxWidth: "260px",
+                  flexShrink: 0,
+                  whiteSpace: "pre-line",
                 }}>
-                  {cat.videos.length} clips
-                </span>
+                  {cat.desc}
+                </p>
               </div>
 
-              {/* Video row */}
-              <div className={`eg-row eg-row-${cat.videos.length}`}>
+              {/* Description — mobile only (below heading) */}
+              <p className="eg-desc-mobile" style={{
+                fontSize: "14px", fontWeight: 400,
+                color: "rgba(255,255,255,0.4)", lineHeight: 1.65,
+                margin: "0 0 20px",
+                whiteSpace: "pre-line",
+                display: "none",
+              }}>
+                {cat.desc}
+              </p>
+
+              {/* Videos */}
+              <div className={`eg-grid eg-grid-${cat.videos.length}`}>
                 {cat.videos.map((src, vi) => (
                   <div key={vi} className="eg-cell">
-                    <CategoryVideoCard src={src} />
+                    <ExampleVideoCard src={src} accent={cat.color} />
                   </div>
                 ))}
               </div>
@@ -231,38 +273,6 @@ function ExamplesGrid() {
         </div>
       </div>
 
-      <style>{`
-        .eg-card-inner:hover video { transform: scale(1.04); }
-
-        /* ── Desktop ── */
-        .eg-row { display: grid; gap: 8px; }
-
-        /* 2-video row (Relight, VFX) — first card wider */
-        .eg-row-2 { grid-template-columns: 3fr 2fr; }
-        .eg-row-2 .eg-cell { height: 300px; }
-
-        /* 3-video row (Background) — equal thirds */
-        .eg-row-3 { grid-template-columns: repeat(3, 1fr); }
-        .eg-row-3 .eg-cell { height: 220px; }
-
-        /* ── Tablet ── */
-        @media (max-width: 768px) {
-          .eg-row-2 { grid-template-columns: 1fr 1fr; }
-          .eg-row-2 .eg-cell { height: 220px; }
-          .eg-row-3 { grid-template-columns: 1fr 1fr; }
-          .eg-row-3 .eg-cell { height: 180px; }
-          .eg-row-3 .eg-cell:last-child { grid-column: span 2; }
-        }
-
-        /* ── Mobile ── */
-        @media (max-width: 480px) {
-          .eg-row-2,
-          .eg-row-3 { grid-template-columns: 1fr; gap: 4px; }
-          .eg-row-2 .eg-cell,
-          .eg-row-3 .eg-cell { height: 190px; }
-          .eg-row-3 .eg-cell:last-child { grid-column: 1; }
-        }
-      `}</style>
     </section>
   );
 }

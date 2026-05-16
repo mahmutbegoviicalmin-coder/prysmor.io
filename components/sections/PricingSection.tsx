@@ -112,7 +112,6 @@ export default function PricingSection({
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
   const { openSignUp } = useClerk();
-  const { mm, ss, secs: timerSecs } = usePricingCountdown();
 
   /** Directly open LS checkout for a logged-in user */
   const openLSCheckout = useCallback((baseUrl: string, tierName?: string, tierPrice?: number) => {
@@ -296,33 +295,54 @@ export default function PricingSection({
 
             /* CTA button */
             const renderBtn = () => {
-              const btnStyle: React.CSSProperties = {
+              const btnStyle: React.CSSProperties = tier.featured ? {
+                width: "100%",
+                padding: "14px 20px",
+                fontSize: "14px",
+                fontWeight: 600,
+                borderRadius: "9px",
+                cursor: "pointer",
+                letterSpacing: "0.01em",
+                transition: "opacity 0.15s, box-shadow 0.15s",
+                background: GREEN,
+                color: "#040e06",
+                border: "none",
+                boxShadow: "0 0 24px rgba(57,255,106,0.2)",
+              } : {
                 width: "100%",
                 padding: "13px 20px",
                 fontSize: "14px",
-                fontWeight: 600,
-                borderRadius: "8px",
+                fontWeight: 500,
+                borderRadius: "9px",
                 cursor: "pointer",
                 letterSpacing: "0.01em",
-                transition: "background 0.15s, box-shadow 0.15s",
-                // All cards: white button with dark text — matches reference exactly
-                background: "rgba(255,255,255,0.92)",
-                color: "#0a0a0a",
-                border: "none",
-                boxShadow: tier.featured
-                  ? "0 0 28px rgba(57,255,106,0.25)"
-                  : "none",
+                transition: "background 0.15s, border-color 0.15s",
+                background: "transparent",
+                color: "rgba(255,255,255,0.6)",
+                border: "1px solid #2a2a2a",
               };
 
               const enter = (e: React.MouseEvent) => {
                 const el = e.currentTarget as HTMLElement;
-                el.style.background = "white";
-                if (tier.featured) el.style.boxShadow = "0 0 40px rgba(57,255,106,0.4)";
+                if (tier.featured) {
+                  el.style.opacity = "0.88";
+                  el.style.boxShadow = "0 0 36px rgba(57,255,106,0.35)";
+                } else {
+                  el.style.background = "rgba(255,255,255,0.04)";
+                  el.style.borderColor = "#3a3a3a";
+                  el.style.color = "white";
+                }
               };
               const leave = (e: React.MouseEvent) => {
                 const el = e.currentTarget as HTMLElement;
-                el.style.background = "rgba(255,255,255,0.92)";
-                if (tier.featured) el.style.boxShadow = "0 0 28px rgba(57,255,106,0.25)";
+                if (tier.featured) {
+                  el.style.opacity = "1";
+                  el.style.boxShadow = "0 0 24px rgba(57,255,106,0.2)";
+                } else {
+                  el.style.background = "transparent";
+                  el.style.borderColor = "#2a2a2a";
+                  el.style.color = "rgba(255,255,255,0.6)";
+                }
               };
 
               if (lsBaseUrl) {
@@ -372,220 +392,152 @@ export default function PricingSection({
                 className={`pricing-card${tier.featured ? " pricing-card--featured" : ""}`}
                 style={{
                   position: "relative",
-                  borderRadius: "14px",
-                  padding: tier.featured ? "36px 28px" : "32px 24px",
+                  borderRadius: "16px",
+                  padding: "32px 28px 28px",
                   textAlign: "left",
                   display: "flex",
                   flexDirection: "column",
-                  overflow: "hidden",
-                  background: tier.featured
-                    ? "linear-gradient(145deg, #0f2e14 0%, #0a1f0d 35%, #061409 65%, #040e06 100%)"
-                    : "#111213",
+                  background: tier.featured ? "#0c1410" : "#0f0f0f",
                   border: tier.featured
-                    ? `1px solid rgba(57,255,106,0.28)`
-                    : "1px solid #1c1c1c",
+                    ? "1px solid rgba(57,255,106,0.22)"
+                    : "1px solid #1d1d1d",
                   borderTop: tier.featured
-                    ? `1px solid rgba(57,255,106,0.28)`
-                    : "1px solid #1c1c1c",
-                  transform: tier.featured ? "translateY(-14px)" : "none",
+                    ? "2px solid rgba(57,255,106,0.55)"
+                    : "1px solid #1d1d1d",
                   boxShadow: tier.featured
-                    ? `0 0 0 1px rgba(57,255,106,0.1), 0 20px 60px rgba(57,255,106,0.12), 0 40px 80px rgba(0,0,0,0.5)`
-                    : "0 8px 32px rgba(0,0,0,0.4)",
+                    ? "0 0 0 4px rgba(57,255,106,0.04), 0 24px 64px rgba(0,0,0,0.5), 0 0 60px rgba(57,255,106,0.08)"
+                    : "0 4px 24px rgba(0,0,0,0.3)",
+                  transform: tier.featured ? "translateY(-10px)" : "none",
                 }}
               >
+                {/* Subtle radial glow from top for featured */}
+                {tier.featured && (
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0, height: "120px",
+                    background: "radial-gradient(ellipse 80% 60px at 50% 0%, rgba(57,255,106,0.07), transparent)",
+                    borderRadius: "16px 16px 0 0",
+                    pointerEvents: "none",
+                  }} />
+                )}
 
-                {/* ── Content (above overlays) ─────────────────────────── */}
-                <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
+                <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
 
-                  {/* ① Badge + timer — featured only */}
-                  {tier.featured && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+                  {/* ① Plan name + badge */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "22px" }}>
+                    <span style={{
+                      fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: tier.featured ? GREEN : "#4a4a4a",
+                    }}>
+                      {tier.name}
+                    </span>
+                    {tier.featured && (
                       <span style={{
-                        display: "inline-block",
-                        fontSize: "10px", fontWeight: 600,
-                        letterSpacing: "0.5px", color: GREEN,
-                        background: "rgba(57,255,106,0.08)",
-                        border: "1px solid rgba(57,255,106,0.2)",
-                        borderRadius: "4px", padding: "3px 8px",
+                        fontSize: "10px", fontWeight: 500,
+                        color: "rgba(57,255,106,0.65)",
+                        background: "rgba(57,255,106,0.07)",
+                        border: "1px solid rgba(57,255,106,0.18)",
+                        borderRadius: "20px", padding: "3px 9px",
                       }}>
                         Most popular
                       </span>
-                      {/* Countdown */}
-                      <span style={{
-                        display: "inline-flex", alignItems: "center", gap: "5px",
-                        fontSize: "10px", fontWeight: 500,
-                        color: timerSecs < 120 ? "#ff8080" : "rgba(255,255,255,0.3)",
-                        fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                        letterSpacing: "0.5px",
-                        transition: "color 500ms ease",
-                      }}>
-                        <span style={{
-                          width: "5px", height: "5px", borderRadius: "50%",
-                          background: timerSecs < 120 ? "#ff6b6b" : "rgba(57,255,106,0.5)",
-                          display: "inline-block", flexShrink: 0,
-                          transition: "background 500ms ease",
-                        }} />
-                        {mm}:{ss}
-                      </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {/* Plan name */}
-                  <p style={{
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    color: tier.featured ? "rgba(57,255,106,0.9)" : "#888",
-                    letterSpacing: "0.02em",
-                    margin: "0 0 20px",
-                  }}>
-                    {tier.name}
-                  </p>
-
-                  {/* ② Price */}
-                  <div key={isYearly ? "yr" : "mo"} style={{ marginBottom: "6px" }}>
-                    <div className="flex items-baseline" style={{ gap: "4px" }}>
+                  {/* ② Price block */}
+                  <div key={isYearly ? "yr" : "mo"} style={{ marginBottom: "20px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: "5px", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.25)", paddingBottom: "9px" }}>$</span>
                       <span style={{
-                        fontSize: "16px",
-                        fontWeight: 500,
+                        fontSize: "clamp(46px, 9vw, 60px)",
+                        fontWeight: 700,
                         color: "white",
-                        lineHeight: 1,
-                        alignSelf: "flex-start",
-                        marginTop: "6px",
-                        opacity: 0.7,
-                      }}>$</span>
-                      <span style={{
-                        fontSize: "clamp(40px, 10vw, 52px)",
-                        fontWeight: 800,
-                        color: "white",
-                        letterSpacing: "-2px",
+                        letterSpacing: "-3px",
                         lineHeight: 1,
                       }}>
                         {fmtPrice(price)}
                       </span>
-                      <span style={{
-                        fontSize: "13px",
-                        color: "#555",
-                        fontWeight: 400,
-                        marginLeft: "2px",
-                      }}>
-                        {isYearly ? "per year" : "per month"}
+                      <span style={{ fontSize: "13px", color: "#3a3a3a", paddingBottom: "7px" }}>
+                        /{isYearly ? "yr" : "mo"}
                       </span>
                     </div>
 
-                    {/* Per-day */}
-                    {tier.yearlyPerDay && (
-                      <p style={{ fontSize: "12px", color: "#555", margin: "6px 0 0" }}>
-                        ${tier.yearlyPerDay}/day
-                      </p>
-                    )}
+                    {/* Per-day + description inline */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      {tier.yearlyPerDay && (
+                        <span style={{
+                          fontSize: "13px", fontWeight: 600,
+                          color: tier.featured ? "rgba(57,255,106,0.8)" : "rgba(57,255,106,0.45)",
+                        }}>
+                          ${tier.yearlyPerDay}/day
+                        </span>
+                      )}
+                      <span style={{ fontSize: "12px", color: "#383838" }}>·</span>
+                      <span style={{ fontSize: "12px", color: "#484848" }}>{tier.description}</span>
+                    </div>
                     {isYearly && tier.yearlySave && (
-                      <p style={{ fontSize: "11px", color: "#555", margin: "4px 0 0" }}>
-                        <span style={{ textDecoration: "line-through", color: "#3a3a3a", marginRight: "4px" }}>${fmtOrigYr}</span>
-                        Save ${tier.yearlySave}
-                      </p>
+                      <span style={{ fontSize: "11px", color: "rgba(57,255,106,0.5)", fontWeight: 500, display: "block", marginTop: "5px" }}>
+                        Save ${tier.yearlySave} vs monthly
+                      </span>
                     )}
                   </div>
 
-                  {/* ③ Description */}
-                  <p style={{
-                    fontSize: "13px",
-                    color: tier.featured ? "rgba(200,255,210,0.55)" : "#888",
-                    fontWeight: 400,
-                    lineHeight: 1.5,
-                    margin: "12px 0 20px",
-                  }}>
-                    {tier.description}
-                  </p>
+                  {/* ③ CTA */}
+                  <div style={{ marginBottom: "26px" }}>
+                    {renderBtn()}
+                  </div>
 
-                  {/* ④ Credits badge */}
+                  {/* ④ Divider */}
+                  <div style={{ height: "1px", background: tier.featured ? "rgba(57,255,106,0.1)" : "rgba(255,255,255,0.05)", marginBottom: "22px" }} />
+
+                  {/* ⑤ Credits callout */}
                   {unitMain && (
-                    <div
-                      key={isYearly ? "unit-yr" : "unit-mo"}
-                      style={{
-                        display: "inline-flex",
-                        flexDirection: "column",
-                        background: tier.featured
-                          ? "rgba(57,255,106,0.07)"
-                          : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${tier.featured ? "rgba(57,255,106,0.2)" : "rgba(255,255,255,0.08)"}`,
-                        borderRadius: "7px",
-                        padding: "7px 14px",
-                        marginBottom: "20px",
-                        gap: "2px",
-                        alignSelf: "flex-start",
-                      }}
-                    >
-                      <span style={{ fontSize: "13px", fontWeight: 600 }}>
-                        {unitMain.split(" ").map((word, wi) => {
-                          const isNum = /^\d+s$/.test(word);
-                          return (
-                            <span key={wi} style={{
-                              color: isNum ? "white" : "#555",
-                              fontWeight: isNum ? 700 : 400,
-                              marginRight: wi < unitMain.split(" ").length - 1 ? "4px" : "0",
-                            }}>
-                              {word}
-                            </span>
-                          );
-                        })}
+                    <div key={isYearly ? "unit-yr" : "unit-mo"} style={{
+                      display: "flex", alignItems: "center", gap: "10px",
+                      marginBottom: "20px",
+                      padding: "12px 14px",
+                      background: tier.featured ? "rgba(57,255,106,0.05)" : "rgba(255,255,255,0.02)",
+                      border: tier.featured ? "1px solid rgba(57,255,106,0.12)" : "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: "10px",
+                    }}>
+                      <span style={{
+                        fontSize: "32px", fontWeight: 800,
+                        color: tier.featured ? "white" : "rgba(255,255,255,0.9)",
+                        letterSpacing: "-1.5px", lineHeight: 1, flexShrink: 0,
+                      }}>
+                        {unitMain.split(" ")[0]}
                       </span>
-                      {unitSub && (
-                        <span style={{ fontSize: "11px", color: "#444", fontWeight: 300 }}>
-                          ≈ {unitSub}
-                        </span>
-                      )}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <p style={{ fontSize: "13px", fontWeight: 600, color: tier.featured ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)", margin: 0 }}>
+                          {unitMain.split(" ").slice(1).join(" ")}
+                        </p>
+                        {unitSub && (
+                          <p style={{ fontSize: "12px", fontWeight: 500, color: tier.featured ? "rgba(57,255,106,0.6)" : "rgba(255,255,255,0.3)", margin: 0 }}>
+                            ≈ {unitSub} of footage
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* ⑤ CTA button */}
-                  {renderBtn()}
-
-                  {/* ⑥ Divider */}
-                  <div style={{
-                    height: "1px",
-                    background: tier.featured ? "rgba(57,255,106,0.15)" : "rgba(255,255,255,0.07)",
-                    margin: "22px 0 18px",
-                  }} />
-
-                  {/* ⑦ Features label */}
-                  <p style={{
-                    fontSize: "12px",
-                    color: tier.featured ? "rgba(200,255,210,0.5)" : "#777",
-                    fontWeight: 400,
-                    margin: "0 0 14px",
-                  }}>
+                  {/* ⑥ Features label */}
+                  <p style={{ fontSize: "10px", color: "#3d3d3d", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px" }}>
                     {featLabel}
                   </p>
 
-                  {/* ⑧ Features list */}
-                  <ul style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: "0 0 auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                  }}>
+                  {/* ⑦ Features list */}
+                  <ul style={{ listStyle: "none", padding: 0, margin: "0 0 auto", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {tier.bullets.map((b) => (
-                      <li key={b} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                        <span style={{
-                          width: "17px",
-                          height: "17px",
-                          borderRadius: "50%",
-                          background: "rgba(57,255,106,0.12)",
-                          border: "1px solid rgba(57,255,106,0.25)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          marginTop: "1px",
-                        }}>
-                          <Check size={9} color={GREEN} strokeWidth={3.5} />
-                        </span>
+                      <li key={b} style={{ display: "flex", alignItems: "flex-start", gap: "9px" }}>
+                        <Check
+                          size={12}
+                          color={tier.featured ? "rgba(57,255,106,0.7)" : "#3a3a3a"}
+                          strokeWidth={2.5}
+                          style={{ flexShrink: 0, marginTop: "2px" }}
+                        />
                         <span style={{
                           fontSize: "13px",
-                          color: tier.featured ? "rgba(220,255,228,0.75)" : "#999",
-                          fontWeight: 400,
+                          color: tier.featured ? "rgba(255,255,255,0.65)" : "#5e5e5e",
                           lineHeight: 1.5,
                         }}>
                           {b}
@@ -594,19 +546,9 @@ export default function PricingSection({
                     ))}
                   </ul>
 
-                  {/* ⑨ Billed note — pinned to bottom */}
-                  <p style={{
-                    fontSize: "11px",
-                    color: tier.featured ? "rgba(200,255,210,0.4)" : "#555",
-                    textAlign: "center",
-                    margin: "24px 0 0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "5px",
-                  }}>
-                    <ShieldCheck size={12} color={GREEN} strokeWidth={2} style={{ opacity: 0.7 }} />
-                    Billed {isYearly ? "annually" : "monthly"}. Cancel anytime.
+                  {/* ⑧ Billing note */}
+                  <p style={{ fontSize: "11px", color: "#282828", margin: "22px 0 0", textAlign: "center" }}>
+                    Billed {isYearly ? "annually" : "monthly"} · Cancel anytime
                   </p>
 
                 </div>
@@ -617,18 +559,15 @@ export default function PricingSection({
 
         {footerNote && (
           <div style={{
-            marginTop: "40px",
-            display: "inline-flex",
+            marginTop: "36px",
+            display: "flex",
             alignItems: "center",
-            gap: "8px",
-            fontSize: "13px",
-            color: "#aaa",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "8px",
-            padding: "10px 18px",
+            justifyContent: "center",
+            gap: "6px",
+            fontSize: "12px",
+            color: "rgba(255,255,255,0.25)",
           }}>
-            <ShieldCheck size={15} color={GREEN} strokeWidth={2} />
+            <ShieldCheck size={12} color="rgba(57,255,106,0.5)" strokeWidth={2} />
             {footerNote}
           </div>
         )}
