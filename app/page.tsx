@@ -502,12 +502,42 @@ const pricingTiers: PriceTier[] = [
 ];
 
 const testimonials: Testimonial[] = [
-  { badge: "Saves 10+ hours a week", quote: "I knocked out a full music video in one afternoon. Typed the effect, hit generate, done. The fire looked so real my client assumed I had a whole VFX team behind me.", name: "Marcus W.", role: "Music Video Director" },
-  { badge: "Cut VFX time by 90%", quote: "No exporting, no round trips, no wasted time. It lives right inside Premiere and behaves exactly how you want it to. That alone made it worth it.", name: "Jordan Park", role: "Motion Designer" },
-  { badge: "ROI on first project", quote: "Replaced the background on 40 clips in a single sitting. What used to take me two days of green screen cleanup now takes under an hour and honestly looks better.", name: "Dre Santos", role: "Filmmaker" },
-  { badge: "Uses it daily", quote: "I was skeptical going in. The god rays result genuinely surprised me. What I would have built manually in three hours inside After Effects was ready in four minutes.", name: "Leah Torres", role: "VFX Artist" },
-  { badge: "Grew channel 3x", quote: "My montages look like a completely different show now. I add cinematic atmosphere in minutes and my audience genuinely thinks I brought on someone new.", name: "Tyson Blake", role: "Gaming Creator" },
-  { badge: "Raised freelance rates", quote: "As a solo editor I could never touch proper VFX work. Now I offer it as a service. My rates went up and clients actually pay them. That says everything.", name: "Mia Chen", role: "Freelance Video Editor" },
+  {
+    badge: "bro it actually works",
+    quote: "client wanted a fire effect on a deadline. used to be a whole After Effects project. prysmor did it in like 4 minutes. sent the file same day. dude thought i had a team. i'm literally a one-man show out of my bedroom.",
+    name: "Jake R.",
+    role: "Freelance Video Editor, 23",
+  },
+  {
+    badge: "charging more now",
+    quote: "i was doing edits for $300 flat. added VFX as a service after prysmor. now i charge $900 minimum and nobody argues because the results are actually insane. best investment i made this year no question.",
+    name: "Tyler M.",
+    role: "Content Creator, 22",
+  },
+  {
+    badge: "ok i wasn't expecting this",
+    quote: "been editing since i was 15 so i was like this is probably gonna be trash. first render had me genuinely staring at my screen. my reels went from 40k avg to like 180k after i started adding proper effects. that's not a coincidence.",
+    name: "Luca S.",
+    role: "Instagram / YouTube, 18",
+  },
+  {
+    badge: "actually replaced my AE workflow",
+    quote: "3 years doing motion design so i know what VFX should look like. skeptical going in. the god rays held up at 4K. atmospheric stuff, lens flares, light leaks — all clean. my turnaround went from 3 days to same day on most jobs.",
+    name: "Noah K.",
+    role: "Motion Designer, 24",
+  },
+  {
+    badge: "my editor friends keep asking",
+    quote: "dropped a music video last month and my whole comment section was asking who did the VFX. i typed like 6 words into prysmor. literally described the vibe and it matched. i don't even know how to explain it without sounding like an ad.",
+    name: "Marco A.",
+    role: "Music Video Director, 22",
+  },
+  {
+    badge: "40 clips in one afternoon",
+    quote: "had a brand shoot with like 40 clips that all needed the same atmospheric treatment. two days minimum normally. i did the whole thing in an afternoon. client asked if i brought in extra help. nope, just me and this tool.",
+    name: "Ethan V.",
+    role: "Brand Video Editor, 23",
+  },
 ];
 
 const faqItems: FAQItem[] = [

@@ -2,12 +2,14 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
 import { track } from "@/lib/track";
 import { getRefCodeFromCookie } from "@/components/site/RefTracker";
+
+const PENDING_KEY = 'prysmor_pending_checkout';
 
 declare global {
   interface Window {
@@ -109,19 +111,12 @@ export default function PricingSection({
   const [yearly, setYearly] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
+  const { openSignUp } = useClerk();
   const { mm, ss, secs: timerSecs } = usePricingCountdown();
 
-  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
-    e.preventDefault();
-    if (tierName && tierPrice !== undefined) {
-      track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
-    }
-    if (!user) {
-      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search + "#pricing");
-      window.location.href = `/sign-in?redirect_url=${returnUrl}`;
-      return;
-    }
-    // Fire Meta Pixel InitiateCheckout before opening overlay
+  /** Directly open LS checkout for a logged-in user */
+  const openLSCheckout = useCallback((baseUrl: string, tierName?: string, tierPrice?: number) => {
+    if (!user) return;
     try {
       if (typeof window !== 'undefined' && window.fbq && tierName && tierPrice !== undefined) {
         initiateCheckout(tierName, tierPrice);
@@ -139,6 +134,40 @@ export default function PricingSection({
       window.location.href = url;
     }
   }, [user]);
+
+  /** After sign-up: if there's a pending checkout stored, open it automatically */
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const raw = localStorage.getItem(PENDING_KEY);
+      if (!raw) return;
+      localStorage.removeItem(PENDING_KEY);
+      const { url, name, price } = JSON.parse(raw) as { url: string; name: string; price: number };
+      // Small delay so Clerk modal fully closes first
+      setTimeout(() => openLSCheckout(url, name, price), 600);
+    } catch { /* ignore */ }
+  }, [user, openLSCheckout]);
+
+  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
+    e.preventDefault();
+    if (tierName && tierPrice !== undefined) {
+      track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
+    }
+    if (!user) {
+      // Store the intended checkout so we can auto-open it after sign-up
+      try {
+        localStorage.setItem(PENDING_KEY, JSON.stringify({
+          url: baseUrl,
+          name: tierName ?? '',
+          price: tierPrice ?? 0,
+        }));
+      } catch { /* ignore */ }
+      // Open sign-up modal inline — no page redirect
+      openSignUp({ afterSignUpUrl: window.location.pathname + '#pricing' });
+      return;
+    }
+    openLSCheckout(baseUrl, tierName, tierPrice);
+  }, [user, openSignUp, openLSCheckout]);
 
   return (
     <section
