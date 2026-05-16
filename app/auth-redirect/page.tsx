@@ -1,36 +1,22 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 const PENDING_KEY = "prysmor_pending_checkout";
 
 export default function AuthRedirectPage() {
   const { isLoaded, isSignedIn } = useUser();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Hard timeout: if Clerk doesn't initialise in 5s the session is corrupt → clear and restart
-  useEffect(() => {
-    timerRef.current = setTimeout(() => {
-      window.location.replace("/sign-out");
-    }, 5000);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
-
-    // Cancel the timeout — Clerk loaded successfully
-    if (timerRef.current) clearTimeout(timerRef.current);
 
     if (!isSignedIn) {
       window.location.replace("/sign-in");
       return;
     }
 
-    // Pricing CTA flow → back to pricing; normal login → dashboard
+    // Came from pricing CTA → back to pricing; normal login → dashboard
     const hasPendingCheckout = !!localStorage.getItem(PENDING_KEY);
     window.location.replace(hasPendingCheckout ? "/#pricing" : "/dashboard");
   }, [isLoaded, isSignedIn]);
