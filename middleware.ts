@@ -5,6 +5,7 @@ export default authMiddleware({
   publicRoutes: [
     "/",
     "/sign-out",
+    "/auth-redirect",
     "/cutsync",
     "/motionforge",
     "/pricing",
