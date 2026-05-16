@@ -148,7 +148,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           border: "2px solid #1a1a1a", borderTopColor: "#39FF6A",
           animation: "spin 0.7s linear infinite",
         }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
