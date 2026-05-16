@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
   Settings, Download, ShieldCheck, TrendingUp,
@@ -88,9 +88,10 @@ function NavLink({
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname          = usePathname();
-  const { user, isLoaded } = useUser();
-  const firstName         = user?.firstName ?? "";
+  const pathname                    = usePathname();
+  const { user, isLoaded, isSignedIn } = useUser();
+  const firstName                   = user?.firstName ?? "";
+  const loadTimerRef                = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [planLabel, setPlanLabel]       = useState("Free");
@@ -136,15 +137,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } catch { /* sessionStorage blocked */ }
   }, [user?.id, pathname]);
 
-  // Show a minimal spinner while Clerk initialises — prevents black screen on mobile
-  if (!isLoaded) {
+  // If Clerk loads but user is not signed in → send to sign-in
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      window.location.replace("/sign-in");
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Safety timeout: if Clerk hasn't initialised in 6s, session is corrupt → clear and restart
+  useEffect(() => {
+    if (isLoaded) return;
+    loadTimerRef.current = setTimeout(() => {
+      window.location.replace("/sign-out");
+    }, 6000);
+    return () => {
+      if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+    };
+  }, [isLoaded]);
+
+  // Show a minimal spinner while Clerk initialises
+  if (!isLoaded || !isSignedIn) {
     return (
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: "16px",
         minHeight: "100vh", background: "#080808",
       }}>
+        <Image src="/logo/vecilogo.png" alt="Prysmor" width={28} height={28} style={{ objectFit: "contain", opacity: 0.5 }} />
         <div style={{
-          width: "32px", height: "32px", borderRadius: "50%",
+          width: "28px", height: "28px", borderRadius: "50%",
           border: "2px solid #1a1a1a", borderTopColor: "#39FF6A",
           animation: "spin 0.7s linear infinite",
         }} />
