@@ -89,7 +89,7 @@ function PaywallGate({ planName }: { planName: string }) {
 
 export default async function DownloadsPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-out");
+  if (!user) redirect("/");
 
   const userDoc       = await getUser(user.id).catch(() => null);
   const licenseStatus = userDoc?.licenseStatus ?? "inactive";

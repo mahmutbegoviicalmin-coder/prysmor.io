@@ -4,8 +4,6 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-const PENDING_KEY = "prysmor_pending_checkout";
-
 export default function AuthRedirectPage() {
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
@@ -18,17 +16,9 @@ export default function AuthRedirectPage() {
       return;
     }
 
-    // Check if there's a pending checkout — if so, go to homepage so PricingSection handles it
-    let hasPending = false;
-    try {
-      hasPending = !!localStorage.getItem(PENDING_KEY);
-    } catch { /* storage blocked */ }
-
-    if (hasPending) {
-      router.replace("/");
-    } else {
-      router.replace("/dashboard");
-    }
+    // Always go to homepage after auth — pricing section is visible,
+    // and PricingSection handles pending checkout automatically
+    router.replace("/");
   }, [isLoaded, isSignedIn, router]);
 
   return (

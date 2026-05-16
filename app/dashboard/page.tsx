@@ -100,22 +100,50 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /* ─── page ─── */
+const FALLBACK_DATA = {
+  license: { planName: "No Plan", status: "inactive" as const, renewalDate: "—", lastVerifiedAt: "—" },
+  panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
+  limits: { credits: 0, creditsTotal: 0, devicesUsed: 0, deviceLimit: 1, resetDate: "—" },
+  security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
+  activity: [],
+};
+
 export default async function DashboardOverviewPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-out");
+
+  // If no user (race condition after sign-up), show fallback UI instead of redirecting
+  // Middleware already protects this route — the user IS authenticated, just session propagating
+  if (!user) {
+    const data = FALLBACK_DATA;
+    const { license, panel, limits, security, activity } = data;
+    const pct = 0;
+    const creditSeconds = 0;
+    // Minimal render — client will refresh once Clerk session is ready
+    return (
+      <div style={{ padding: "40px 24px", maxWidth: "1100px", fontFamily: "var(--font-outfit), system-ui, sans-serif" }}>
+        <div style={{ marginBottom: "40px" }}>
+          <h1 style={{ fontSize: "clamp(24px, 3vw, 28px)", fontWeight: 700, color: "white", letterSpacing: "-1px", lineHeight: 1.15, margin: "0 0 8px 0" }}>
+            Account Overview
+          </h1>
+          <p style={{ fontSize: "14px", color: "#555", fontWeight: 300, margin: 0 }}>
+            Loading your account data...
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "24px", borderRadius: "12px", background: "#0c0c0c", border: "1px solid #161616" }}>
+          <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "2px solid #1a1a1a", borderTopColor: "#39FF6A", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />
+          <p style={{ fontSize: "14px", color: "#555", margin: 0 }}>Setting up your account, please wait a moment...</p>
+        </div>
+        <meta httpEquiv="refresh" content="2" />
+      </div>
+    );
+  }
 
   let data;
   try {
     data = await getDashboardData(user.id, user);
   } catch (err) {
     console.error("[dashboard] getDashboardData failed:", err);
-    data = {
-      license: { planName: "Starter", status: "active" as const, renewalDate: "—", lastVerifiedAt: "—" },
-      panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
-      limits: { credits: 1000, creditsTotal: 1000, devicesUsed: 0, deviceLimit: 3, resetDate: "—" },
-      security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
-      activity: [],
-    };
+    data = FALLBACK_DATA;
   }
 
   const { license, panel, limits, security, activity } = data;
@@ -193,7 +221,7 @@ export default async function DashboardOverviewPage() {
               </p>
             </div>
           </div>
-          <Link
+          <a
             href="/#pricing"
             style={{
               display: "inline-flex",
@@ -212,7 +240,7 @@ export default async function DashboardOverviewPage() {
           >
             <Zap style={{ width: "16px", height: "16px" }} />
             Buy a plan
-          </Link>
+          </a>
         </div>
       )}
 
