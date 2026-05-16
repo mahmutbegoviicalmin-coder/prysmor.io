@@ -129,8 +129,8 @@ export default function PricingSection({
           price: tierPrice ?? 0,
         }));
       } catch { /* ignore */ }
-      // Open sign-up modal inline — no page redirect
-      openSignUp({ afterSignUpUrl: window.location.pathname + '#pricing' });
+      // Open sign-up modal inline — redirect back to pricing after sign-up
+      openSignUp({ afterSignUpUrl: window.location.origin + '/#pricing' });
       return;
     }
     openLSCheckout(baseUrl, tierName, tierPrice);

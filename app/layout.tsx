@@ -132,7 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider
       afterSignInUrl="https://prysmor.io/dashboard"
-      afterSignUpUrl="https://prysmor.io/dashboard"
+      afterSignUpUrl="https://prysmor.io/#pricing"
       appearance={clerkAppearance}
     >
       <html lang="en" className={outfit.variable}>
