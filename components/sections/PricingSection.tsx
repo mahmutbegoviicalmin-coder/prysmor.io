@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
@@ -79,7 +79,6 @@ export default function PricingSection({
   const [yearly, setYearly] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
-  const { openSignUp } = useClerk();
 
   /** Directly open LS checkout for a logged-in user */
   const openLSCheckout = useCallback((baseUrl: string, tierName?: string, tierPrice?: number) => {
@@ -121,7 +120,7 @@ export default function PricingSection({
       track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
     }
     if (!user) {
-      // Store the intended checkout so we can auto-open it after sign-up
+      // Store the intended checkout so we can auto-open it after login
       try {
         localStorage.setItem(PENDING_KEY, JSON.stringify({
           url: baseUrl,
@@ -129,12 +128,13 @@ export default function PricingSection({
           price: tierPrice ?? 0,
         }));
       } catch { /* ignore */ }
-      // Open sign-up modal — redirect to homepage after sign-up (hash in URL breaks Clerk session init)
-      openSignUp({ afterSignUpUrl: window.location.origin + '/' });
+      // Hard redirect to sign-in with redirect_url — Clerk reads this server-side
+      // and guarantees redirect to /auth-redirect after Google OAuth, regardless of other settings
+      window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/auth-redirect');
       return;
     }
     openLSCheckout(baseUrl, tierName, tierPrice);
-  }, [user, openSignUp, openLSCheckout]);
+  }, [user, openLSCheckout]);
 
   return (
     <section
