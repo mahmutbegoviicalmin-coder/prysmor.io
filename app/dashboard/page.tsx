@@ -102,7 +102,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 /* ─── page ─── */
 export default async function DashboardOverviewPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  if (!user) redirect("/sign-out");
 
   let data;
   try {

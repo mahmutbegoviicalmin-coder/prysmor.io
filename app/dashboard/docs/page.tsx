@@ -29,7 +29,7 @@ const sections = [
 
 export default async function DashboardDocsPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  if (!user) redirect("/sign-out");
 
   const userDoc = await getUser(user.id).catch(() => null);
   if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");

@@ -17,7 +17,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default async function SettingsPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  if (!user) redirect("/sign-out");
 
   const userDoc = await getUser(user.id).catch(() => null);
   if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");

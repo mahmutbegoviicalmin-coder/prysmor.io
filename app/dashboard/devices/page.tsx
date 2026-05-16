@@ -8,7 +8,7 @@ export const metadata = { title: "Devices — Dashboard" };
 
 export default async function DevicesPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  if (!user) redirect("/sign-out");
 
   const userDoc = await getUser(user.id).catch(() => null);
   if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");

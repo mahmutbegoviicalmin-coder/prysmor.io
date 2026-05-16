@@ -1,9 +1,10 @@
 import { authMiddleware } from "@clerk/nextjs";
 
 export default authMiddleware({
-  signInUrl: "https://prysmor.io/sign-in",
+  signInUrl: "/sign-in",
   publicRoutes: [
     "/",
+    "/sign-out",
     "/cutsync",
     "/motionforge",
     "/pricing",
