@@ -1,25 +1,22 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function AuthRedirectPage() {
   const { isLoaded, isSignedIn } = useUser();
-  const router = useRouter();
 
   useEffect(() => {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
-      router.replace("/sign-in");
+      window.location.replace("/sign-in");
       return;
     }
 
-    // Always go to homepage after auth — pricing section is visible,
-    // and PricingSection handles pending checkout automatically
-    router.replace("/");
-  }, [isLoaded, isSignedIn, router]);
+    // Go to homepage and scroll to pricing — PricingSection handles pending checkout automatically
+    window.location.replace("/#pricing");
+  }, [isLoaded, isSignedIn]);
 
   return (
     <div style={{
