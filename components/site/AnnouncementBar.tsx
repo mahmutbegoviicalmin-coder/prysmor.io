@@ -118,14 +118,6 @@ export default function AnnouncementBar() {
         <X size={11} strokeWidth={2.5} />
       </button>
 
-      <style>{`
-        @keyframes annScroll {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
-        .ann-track { animation: annScroll 28s linear infinite; }
-        .ann-track:hover { animation-play-state: paused; }
-      `}</style>
     </div>
   );
 }

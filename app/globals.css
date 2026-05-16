@@ -357,7 +357,21 @@ body::after {
   50%       { opacity: 0.45; }
 }
 
-/* ── Spinner (dashboard loading state) ─────────────────────────── */
+/* ── Spinner ────────────────────────────────────────────────────── */
 @keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Announcement bar scroll ────────────────────────────────────── */
+@keyframes annScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ann-track { animation: annScroll 28s linear infinite; }
+.ann-track:hover { animation-play-state: paused; }
+
+/* ── Before/after slider spinner ───────────────────────────────── */
+@keyframes baSpin {
   to { transform: rotate(360deg); }
 }

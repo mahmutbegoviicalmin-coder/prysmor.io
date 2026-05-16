@@ -108,7 +108,7 @@ function AffiliateView() {
   if (loading) return (
     <div style={{ display: "flex", justifyContent: "center", padding: "80px" }}>
       <Loader2 style={{ width: "20px", height: "20px", color: "#333", animation: "spin 1s linear infinite" }} />
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+      
     </div>
   );
 
@@ -168,7 +168,7 @@ function AffiliateView() {
         </div>
       )}
 
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+      
     </div>
   );
 }
@@ -493,7 +493,7 @@ function AdminAffiliateView() {
         </div>
       )}
 
-      <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+      
     </div>
   );
 }

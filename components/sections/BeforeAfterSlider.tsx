@@ -361,7 +361,6 @@ export default function BeforeAfterSlider({
         </span>
       </div>
 
-      <style>{`@keyframes baSpin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
