@@ -3,6 +3,8 @@
 import { useUser } from "@clerk/nextjs";
 import { useEffect } from "react";
 
+const PENDING_KEY = "prysmor_pending_checkout";
+
 export default function AuthRedirectPage() {
   const { isLoaded, isSignedIn } = useUser();
 
@@ -14,8 +16,10 @@ export default function AuthRedirectPage() {
       return;
     }
 
-    // Go to homepage and scroll to pricing — PricingSection handles pending checkout automatically
-    window.location.replace("/#pricing");
+    // If user came from pricing CTA (pending checkout exists) → go to pricing
+    // Otherwise → go to dashboard (existing user normal login)
+    const hasPendingCheckout = !!localStorage.getItem(PENDING_KEY);
+    window.location.replace(hasPendingCheckout ? "/#pricing" : "/dashboard");
   }, [isLoaded, isSignedIn]);
 
   return (
