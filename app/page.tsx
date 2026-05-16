@@ -1,12 +1,10 @@
 "use client";
 
 import { useRef, useEffect, useState, Fragment } from "react";
-import { useClerk } from "@clerk/nextjs";
 import { motion, MotionConfig } from "framer-motion";
 import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
 import { track } from "@/lib/track";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
-import Comparison, { type ComparisonRow } from "@/components/sections/Comparison";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
 import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
 import FAQ, { type FAQItem } from "@/components/sections/FAQ";
@@ -440,16 +438,6 @@ function ModesSection() {
     </section>
   );
 }
-
-/* ── Data ───────────────────────────────────────────────────────────────────── */
-const compRows: ComparisonRow[] = [
-  { feature: "Cost", ours: "from $29.90/month", theirs: "$500–2,000/project" },
-  { feature: "Time per effect", ours: "2–5 minutes", theirs: "1–3 days" },
-  { feature: "Learning curve", ours: "None", theirs: "6+ months" },
-  { feature: "Works in your editor", ours: true, theirs: false },
-  { feature: "Unlimited revisions", ours: true, theirs: "Costs extra" },
-  { feature: "AI-powered generation", ours: true, theirs: false },
-];
 
 const pricingTiers: PriceTier[] = [
   {
@@ -1137,7 +1125,6 @@ function HeroVideo() {
 }
 
 export default function PrysmorPage() {
-  const { openSignUp } = useClerk();
 
   return (
     <MotionConfig initial={false}>
@@ -1217,6 +1204,40 @@ export default function PrysmorPage() {
         >
 
 
+          {/* Social proof */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "10px",
+            marginBottom: "32px", flexWrap: "wrap", justifyContent: "center",
+          }}>
+            <div style={{ display: "flex" }}>
+              {["/asim-nauwag.jpg","/chris-boustet.jpg","/editor-static-1.jpg","/eleven-percent.png"].map((src, i) => (
+                <div key={src} style={{
+                  width: "28px", height: "28px", borderRadius: "50%",
+                  border: "2px solid #0c0c0c",
+                  marginLeft: i === 0 ? "0" : "-8px",
+                  overflow: "hidden", flexShrink: 0,
+                  position: "relative", zIndex: 4 - i,
+                  background: "#1a1a1a",
+                }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ display: "flex", gap: "2px" }}>
+                {[...Array(5)].map((_, i) => (
+                  <svg key={i} width="11" height="11" viewBox="0 0 24 24" fill="#39FF6A" style={{ opacity: 0.75 }}>
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                  </svg>
+                ))}
+              </div>
+              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.32)", fontWeight: 400 }}>
+                Trusted by <span style={{ color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>2,000+</span> editors
+              </span>
+            </div>
+          </div>
+
           {/* Headline */}
           <h1
             className="anim-fade-up-d1"
@@ -1276,7 +1297,10 @@ export default function PrysmorPage() {
           >
             {/* Primary */}
             <button
-              onClick={() => { track('cta_click', { location: 'hero_primary' }); openSignUp({ afterSignUpUrl: "/dashboard" }); }}
+              onClick={() => {
+                track('cta_click', { location: 'hero_primary' });
+                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+              }}
               className="inline-flex items-center gap-2 cursor-pointer"
               style={{
                 background: "linear-gradient(160deg, #44ff74 0%, #29d955 55%, #22c24a 100%)",
@@ -1360,15 +1384,6 @@ export default function PrysmorPage() {
       {/* ── MODES ───────────────────────────────────────────────────── */}
       <ModesSection />
 
-      {/* ── COMPARISON ──────────────────────────────────────────────── */}
-      <Comparison
-        title="Prysmor vs The Alternatives"
-        subtitle="See why creators choose Prysmor over traditional methods."
-        ourLabel="Prysmor"
-        theirLabel="Hiring VFX Artist"
-        rows={compRows}
-      />
-
       {/* ── PRICING ─────────────────────────────────────────────────── */}
       <div id="pricing" />
       <PricingSection
@@ -1395,7 +1410,10 @@ export default function PrysmorPage() {
         title="Stop hiring VFX artists. Start typing."
         subtitle="Generate cinematic VFX directly inside Adobe Premiere Pro."
         primaryLabel="Get Started"
-        onPrimaryClick={() => { track('cta_click', { location: 'bottom_cta' }); openSignUp({ afterSignUpUrl: "/dashboard" }); }}
+        onPrimaryClick={() => {
+          track('cta_click', { location: 'bottom_cta' });
+          document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+        }}
       />
     </>
     </MotionConfig>

@@ -26,10 +26,18 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname  = usePathname();
   const { isSignedIn } = useAuth();
-  const { openSignIn, openSignUp } = useClerk();
+  const { openSignIn } = useClerk();
 
   const handleSignIn = () => openSignIn({ afterSignInUrl: "https://prysmor.io/dashboard" });
-  const handleSignUp = () => { track('cta_click', { location: 'navbar' }); openSignUp({ afterSignUpUrl: "https://prysmor.io/dashboard" }); };
+  const handleSignUp = () => {
+    track('cta_click', { location: 'navbar' });
+    const pricingEl = document.getElementById("pricing");
+    if (pricingEl) {
+      pricingEl.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.location.href = "/#pricing";
+    }
+  };
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
