@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import Navbar from "@/components/site/Navbar";
@@ -9,11 +9,24 @@ import RefTracker from "@/components/site/RefTracker";
 import AnnouncementBar from "@/components/site/AnnouncementBar";
 import { track } from "@/lib/track";
 
+const PENDING_KEY = "prysmor_pending_checkout";
+
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname    = usePathname();
+  const router      = useRouter();
   const isDashboard = pathname.startsWith("/dashboard");
   const isLanding   = pathname === "/";
   const { isSignedIn, isLoaded, user } = useUser();
+
+  /* Smart redirect: signed-in users on homepage without pending checkout → dashboard */
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !isLanding) return;
+    try {
+      const pending = localStorage.getItem(PENDING_KEY);
+      if (pending) return; // PricingSection will handle checkout
+    } catch { /* storage blocked */ }
+    router.replace("/dashboard");
+  }, [isLoaded, isSignedIn, isLanding, router]);
 
   /* Bug 1 fix — keep prysmor_user_id in localStorage in sync with Clerk auth state */
   useEffect(() => {
