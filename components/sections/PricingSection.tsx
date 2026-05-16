@@ -128,9 +128,9 @@ export default function PricingSection({
           price: tierPrice ?? 0,
         }));
       } catch { /* ignore */ }
-      // Hard redirect to sign-in with redirect_url — Clerk reads this server-side
-      // and guarantees redirect to /auth-redirect after Google OAuth, regardless of other settings
-      window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/auth-redirect');
+      // Redirect to sign-in with redirect_url pointing to auth-redirect?from=pricing
+      // Server-side auth-redirect reads this param and routes to /#pricing
+      window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/auth-redirect?from=pricing');
       return;
     }
     openLSCheckout(baseUrl, tierName, tierPrice);
