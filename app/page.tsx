@@ -11,7 +11,6 @@ import PricingSection, { type PriceTier } from "@/components/sections/PricingSec
 import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
 import FAQ, { type FAQItem } from "@/components/sections/FAQ";
 import FinalCTA from "@/components/sections/FinalCTA";
-import BeforeAfterSlider from "@/components/sections/BeforeAfterSlider";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -183,19 +182,13 @@ function ExamplesGrid() {
     <section id="examples" style={{ background: "#080808" }}>
       <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "0 clamp(16px,4vw,40px)" }}>
 
-        {/* ── Section header ── */}
-        <div style={{ padding: "100px 0 0", borderTop: "1px solid #111" }}>
+        {/* ── Section label ── */}
+        <div style={{ paddingTop: "80px", borderTop: "1px solid #111" }}>
           <p style={{
             fontSize: "10px", fontWeight: 600, color: "#39FF6A",
-            letterSpacing: "2.5px", textTransform: "uppercase", margin: "0 0 20px",
+            letterSpacing: "2.5px", textTransform: "uppercase", margin: 0,
             fontFamily: "ui-monospace,SFMono-Regular,monospace",
           }}>// Real outputs</p>
-          <h2 style={{
-            fontSize: "clamp(32px,4vw,56px)", fontWeight: 800,
-            color: "white", letterSpacing: "-2px", lineHeight: 1.06, margin: 0,
-          }}>
-            Prompt in.<br />Cinematic shot out.
-          </h2>
         </div>
 
         {/* ── Category blocks ── */}
@@ -214,7 +207,7 @@ function ExamplesGrid() {
                 gap: "clamp(16px,3vw,40px)",
                 padding: "clamp(40px,6vw,72px) 0 clamp(20px,3vw,32px)",
                 borderTop: ci === 0 ? "none" : "1px solid rgba(255,255,255,0.07)",
-                marginTop: ci === 0 ? "48px" : "0",
+                marginTop: ci === 0 ? "24px" : "0",
               }}>
                 {/* Number */}
                 <span style={{
@@ -788,71 +781,31 @@ function FloatingCTA() {
       }}>
         <button
           onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-          onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.96)"; }}
+          onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.97)"; }}
           onPointerUp={(e)   => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
           onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
           style={{
-            display: "inline-flex", alignItems: "center", gap: "0",
-            borderRadius: "14px",
-            background: "rgba(10,10,10,0.92)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            border: "1px solid rgba(57,255,106,0.2)",
+            display: "inline-flex", alignItems: "center", gap: "10px",
+            borderRadius: "100px",
+            background: "#39FF6A",
+            border: "none",
             cursor: "pointer",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(57,255,106,0.06) inset",
-            transition: "transform 130ms ease, border-color 200ms ease, box-shadow 200ms ease",
-            overflow: "hidden",
+            padding: "12px 20px 12px 18px",
+            boxShadow: "0 8px 32px rgba(57,255,106,0.25), 0 2px 8px rgba(0,0,0,0.4)",
+            transition: "transform 130ms ease, box-shadow 200ms ease, opacity 150ms ease",
           }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.borderColor = "rgba(57,255,106,0.4)";
-            el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(57,255,106,0.08)";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget as HTMLElement;
-            el.style.borderColor = "rgba(57,255,106,0.2)";
-            el.style.boxShadow = "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(57,255,106,0.06) inset";
-          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.88"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
         >
-          {/* Icon block */}
-          <span style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: "44px", height: "48px",
-            borderRight: "1px solid rgba(255,255,255,0.05)",
-            flexShrink: 0,
-          }}>
-            <Wand2 size={15} color="#39FF6A" strokeWidth={2} />
-          </span>
-
-          {/* Text */}
-          <span style={{
-            display: "flex", flexDirection: "column", alignItems: "flex-start",
-            padding: "0 14px 0 12px",
-          }}>
-            <span style={{
-              fontSize: "12px", fontWeight: 700, color: "white",
-              letterSpacing: "-0.1px", lineHeight: 1.3,
-            }}>
-              Generate VFX
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "1px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#040e06", letterSpacing: "-0.1px", lineHeight: 1.2 }}>
+              Get Started
             </span>
-            <span style={{
-              fontSize: "10px", fontWeight: 400,
-              color: "rgba(255,255,255,0.28)",
-              lineHeight: 1.3,
-            }}>
-              Premiere Pro
+            <span style={{ fontSize: "10px", fontWeight: 500, color: "rgba(4,14,6,0.55)", lineHeight: 1.2 }}>
+              7-day money-back
             </span>
           </span>
-
-          {/* Arrow pill */}
-          <span style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: "32px", height: "48px",
-            borderLeft: "1px solid rgba(255,255,255,0.05)",
-            flexShrink: 0,
-          }}>
-            <ArrowRight size={13} color="#39FF6A" strokeWidth={2.2} />
-          </span>
+          <ArrowRight size={14} color="#040e06" strokeWidth={2.5} style={{ flexShrink: 0 }} />
         </button>
       </div>
   );
@@ -1126,6 +1079,63 @@ const JSON_LD_FAQ = {
   ],
 };
 
+function HeroVideo() {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.play().then(() => setPlaying(true)).catch(() => {});
+  }, []);
+
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) { v.play(); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  };
+
+  return (
+    <div
+      onClick={toggle}
+      style={{
+        position: "relative", borderRadius: "14px", overflow: "hidden",
+        background: "#000", border: "1px solid #181818",
+        cursor: "pointer", maxWidth: "760px", margin: "0 auto",
+      }}
+    >
+      <video
+        ref={ref}
+        src="/vfx.mp4"
+        loop muted playsInline preload="auto"
+        style={{ width: "100%", display: "block", maxHeight: "440px", objectFit: "cover" }}
+      />
+
+      {/* Play overlay — only when paused */}
+      {!playing && (
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.4)",
+        }}>
+          <div style={{
+            width: "56px", height: "56px", borderRadius: "50%",
+            background: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(8px)",
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ marginLeft: "3px" }}>
+              <polygon points="5,3 19,12 5,21" />
+            </svg>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PrysmorPage() {
   const { openSignUp } = useClerk();
 
@@ -1143,7 +1153,7 @@ export default function PrysmorPage() {
         className="relative overflow-hidden flex flex-col items-center"
         style={{
           minHeight: "95vh",
-          paddingTop: "clamp(100px, 16vh, 160px)",
+          paddingTop: "clamp(200px, 28vh, 280px)",
           paddingBottom: "80px",
           paddingLeft: "20px",
           paddingRight: "20px",
@@ -1206,36 +1216,6 @@ export default function PrysmorPage() {
           style={{ position: "relative", zIndex: 10, maxWidth: "760px", margin: "0 auto" }}
         >
 
-          {/* Badge */}
-          <div
-            className="anim-fade-up"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "7px",
-              background: "rgba(255,255,255,0.03)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: "6px",
-              padding: "5px 12px",
-              marginBottom: "44px",
-              marginTop: "32px",
-            }}
-          >
-            <span style={{
-              width: "5px", height: "5px", borderRadius: "50%",
-              background: "#39FF6A", flexShrink: 0,
-            }} />
-            <span style={{
-              fontFamily: "ui-monospace, SFMono-Regular, monospace",
-              fontSize: "10px", fontWeight: 500,
-              color: "rgba(255,255,255,0.3)",
-              letterSpacing: "1.5px", textTransform: "uppercase",
-            }}>
-              Premiere Pro · Native plugin
-            </span>
-          </div>
 
           {/* Headline */}
           <h1
@@ -1324,136 +1304,12 @@ export default function PrysmorPage() {
               Generate VFX <ArrowRight size={15} />
             </button>
 
-            {/* Secondary */}
-            <a
-              href="#examples"
-              onClick={() => track('cta_click', { location: 'hero_demo' })}
-              className="inline-flex items-center gap-2"
-              style={{
-                background: "transparent",
-                color: "rgba(255,255,255,0.5)",
-                borderRadius: "10px",
-                padding: "14px 28px",
-                fontSize: "15px",
-                fontWeight: 400,
-                border: "1px solid rgba(255,255,255,0.08)",
-                textDecoration: "none",
-                transition: "border-color 200ms, color 200ms",
-                letterSpacing: "-0.1px",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "rgba(255,255,255,0.16)";
-                el.style.color = "rgba(255,255,255,0.8)";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "rgba(255,255,255,0.08)";
-                el.style.color = "rgba(255,255,255,0.5)";
-              }}
-            >
-              Watch Demo
-            </a>
-          </div>
-
-          {/* Stats — purely typographic, no icons */}
-          <div
-            className="anim-fade-up-d4"
-            style={{
-              marginTop: "64px",
-              display: "grid",
-              gridTemplateColumns: "1fr 1px 1fr 1px 1fr",
-              alignItems: "center",
-              width: "100%",
-              maxWidth: "480px",
-              margin: "64px auto 0",
-            }}
-          >
-            {heroStats.map(({ value, label }, idx) => (
-              <Fragment key={value}>
-                {idx > 0 && (
-                  <div style={{
-                    width: "1px",
-                    height: "32px",
-                    background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.07), transparent)",
-                    justifySelf: "center",
-                  }} />
-                )}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 8px" }}>
-                  <span style={{
-                    fontSize: "clamp(16px, 4vw, 22px)",
-                    fontWeight: 700,
-                    color: "white",
-                    letterSpacing: "-0.8px",
-                    lineHeight: 1,
-                    whiteSpace: "nowrap",
-                  }}>
-                    {value}
-                  </span>
-                  <span style={{
-                    fontSize: "clamp(7px, 1.8vw, 9px)",
-                    fontWeight: 500,
-                    color: "#333",
-                    textTransform: "uppercase",
-                    letterSpacing: "1.4px",
-                    marginTop: "6px",
-                    whiteSpace: "nowrap",
-                    textAlign: "center",
-                  }}>
-                    {label}
-                  </span>
-                </div>
-              </Fragment>
-            ))}
-          </div>
-
-          {/* Scroll indicator */}
-          <div
-            className="anim-fade-d2"
-            style={{
-              marginTop: "60px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "8px",
-              cursor: "pointer",
-            }}
-            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-          >
-            <span style={{
-              fontSize: "10px",
-              fontWeight: 500,
-              color: "rgba(255,255,255,0.18)",
-              letterSpacing: "2px",
-              textTransform: "uppercase",
-            }}>
-              Scroll
-            </span>
-            <div style={{
-                width: "20px",
-                height: "32px",
-                borderRadius: "10px",
-                border: "1px solid rgba(255,255,255,0.1)",
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "center",
-                paddingTop: "5px",
-              }}
-            >
-              <div style={{
-                  width: "3px",
-                  height: "6px",
-                  borderRadius: "2px",
-                  background: "rgba(57,255,106,0.5)",
-                }}
-              />
-            </div>
           </div>
 
         </div>
       </section>
 
-      {/* ── BEFORE / AFTER ──────────────────────────────────────────── */}
+      {/* ── HERO VIDEO + STATS ───────────────────────────────────────── */}
       <section style={{ background: "#080808", padding: "0 24px 100px" }}>
         <motion.div
           initial={{ opacity: 1, y: 0 }}
@@ -1462,33 +1318,35 @@ export default function PrysmorPage() {
           transition={{ duration: 0.6 }}
           style={{ maxWidth: "960px", margin: "0 auto" }}
         >
-          {/* Slider */}
-          <BeforeAfterSlider
-            beforeSrc="/hero/after.mp4"
-            afterSrc="/hero/before.mp4"
-            beforeLabel="ORIGINAL"
-            afterLabel="PRYSMOR"
-            initialPos={48}
-          />
+          <HeroVideo />
 
-          {/* Footer row */}
+          {/* Stats below video */}
           <div style={{
-            display: "flex", alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: "14px", flexWrap: "wrap", gap: "8px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1px 1fr 1px 1fr",
+            alignItems: "center",
+            maxWidth: "480px",
+            margin: "36px auto 0",
           }}>
-            <span style={{
-              fontSize: "11px", color: "#2a2a2a",
-              fontFamily: "ui-monospace, SFMono-Regular, monospace",
-            }}>
-              Generated inside Adobe Premiere Pro
-            </span>
-            <span style={{
-              fontSize: "11px", color: "#2a2a2a",
-              fontFamily: "ui-monospace, SFMono-Regular, monospace",
-            }}>
-              Render time: ~3 min
-            </span>
+            {heroStats.map(({ value, label }, idx) => (
+              <Fragment key={value}>
+                {idx > 0 && (
+                  <div style={{
+                    width: "1px", height: "28px",
+                    background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.07), transparent)",
+                    justifySelf: "center",
+                  }} />
+                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 8px" }}>
+                  <span style={{ fontSize: "clamp(16px,4vw,22px)", fontWeight: 700, color: "white", letterSpacing: "-0.8px", lineHeight: 1, whiteSpace: "nowrap" }}>
+                    {value}
+                  </span>
+                  <span style={{ fontSize: "clamp(7px,1.8vw,9px)", fontWeight: 500, color: "#333", textTransform: "uppercase", letterSpacing: "1.4px", marginTop: "6px", whiteSpace: "nowrap", textAlign: "center" }}>
+                    {label}
+                  </span>
+                </div>
+              </Fragment>
+            ))}
           </div>
         </motion.div>
       </section>
