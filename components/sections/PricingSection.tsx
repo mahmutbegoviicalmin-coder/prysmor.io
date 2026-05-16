@@ -9,7 +9,6 @@ import { initiateCheckout } from "@/lib/pixel";
 import { track } from "@/lib/track";
 import { getRefCodeFromCookie } from "@/components/site/RefTracker";
 
-const PENDING_KEY = 'prysmor_pending_checkout';
 
 declare global {
   interface Window {
@@ -101,34 +100,13 @@ export default function PricingSection({
     }
   }, [user]);
 
-  /** After sign-up: if there's a pending checkout stored, open it automatically */
-  useEffect(() => {
-    if (!user) return;
-    try {
-      const raw = localStorage.getItem(PENDING_KEY);
-      if (!raw) return;
-      localStorage.removeItem(PENDING_KEY);
-      const { url, name, price } = JSON.parse(raw) as { url: string; name: string; price: number };
-      // Small delay so Clerk modal fully closes first
-      setTimeout(() => openLSCheckout(url, name, price), 600);
-    } catch { /* ignore */ }
-  }, [user, openLSCheckout]);
-
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
     if (tierName && tierPrice !== undefined) {
       track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
     }
     if (!user) {
-      // Store the intended checkout so we can auto-open it after login
-      try {
-        localStorage.setItem(PENDING_KEY, JSON.stringify({
-          url: baseUrl,
-          name: tierName ?? '',
-          price: tierPrice ?? 0,
-        }));
-      } catch { /* ignore */ }
-      // After sign-in, Clerk uses redirect_url to send user directly to /#pricing
+      // Not logged in — send to sign-in, after login Clerk returns to /#pricing
       window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/#pricing');
       return;
     }
