@@ -1,35 +1,17 @@
-"use client";
+import { auth } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 
-import { useClerk } from "@clerk/nextjs";
-import { useEffect } from "react";
+export default async function SignOutPage() {
+  const { sessionId } = auth();
 
-export default function SignOutPage() {
-  const { signOut } = useClerk();
+  if (sessionId) {
+    try {
+      await clerkClient.sessions.revokeSession(sessionId);
+    } catch {
+      // Session already invalid — proceed to sign-in anyway
+    }
+  }
 
-  useEffect(() => {
-    signOut({ redirectUrl: "/sign-in" });
-  }, [signOut]);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        background: "#080808",
-      }}
-    >
-      <div
-        style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "50%",
-          border: "2px solid #1a1a1a",
-          borderTopColor: "#39FF6A",
-          animation: "spin 0.7s linear infinite",
-        }}
-      />
-    </div>
-  );
+  redirect("/sign-in");
 }
