@@ -6,609 +6,735 @@
   <title>Prysmor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=18"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css?v=19"/>
   <style>
-    /* ═══════════════════════════════════════════════════════
-       APPLE-INSPIRED DESIGN TOKENS
-    ═══════════════════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       DESIGN TOKENS
+    ───────────────────────────────────────────── */
     :root {
-      --bg:             #080808;
-      --card:           rgba(255,255,255,0.04);
-      --card-hover:     rgba(255,255,255,0.07);
-      --card-elevated:  rgba(28,28,30,0.95);
-      --border:         rgba(255,255,255,0.08);
-      --border-strong:  rgba(255,255,255,0.12);
-      --accent:         #00E676;
-      --accent-glow:    rgba(0,230,118,0.15);
-      --accent-soft:    rgba(0,230,118,0.08);
-      --text-primary:   #F5F5F7;
-      --text-secondary: rgba(245,245,247,0.5);
-      --text-tertiary:  rgba(245,245,247,0.28);
-      --red:            #FF453A;
-      --radius:         12px;
-      --radius-lg:      16px;
-      --radius-sm:      8px;
-      --inset-glow:     0 1px 0 rgba(255,255,255,0.05) inset;
+      --bg:              #080808;
+      --bg2:             #0d0d0d;
+      --surface:         #111111;
+      --surface2:        #181818;
+      --surface3:        #1e1e1e;
+      --border:          rgba(255,255,255,0.07);
+      --border-med:      rgba(255,255,255,0.11);
+      --border-strong:   rgba(255,255,255,0.16);
+      --accent:          #00e676;
+      --accent-hi:       #26ffb0;
+      --accent-dim:      rgba(0,230,118,0.10);
+      --accent-glow:     rgba(0,230,118,0.18);
+      --accent-border:   rgba(0,230,118,0.30);
+      --accent-border-hi:rgba(0,230,118,0.55);
+      --text:            #f0f0f0;
+      --text-2:          rgba(240,240,240,0.55);
+      --text-3:          rgba(240,240,240,0.28);
+      --red:             #ff4545;
+      --r:               10px;
+      --r-sm:            6px;
+      --r-xs:            4px;
+      --font:            'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      /* backward-compat aliases */
+      --card:            #111111;
+      --text-1:          #f0f0f0;
+      --text-muted:      rgba(240,240,240,0.55);
+      --text-dim:        rgba(240,240,240,0.28);
+      --border-strong-old: rgba(255,255,255,0.16);
+      --radius:          10px;
+      --radius-sm:       6px;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       RESET + BASE
-    ═══════════════════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       RESET
+    ───────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, system-ui, 'SF Pro Text', sans-serif;
+    html, body {
+      height: 100%; overflow: hidden;
       background: var(--bg);
-      color: var(--text-primary);
+      color: var(--text);
+      font-family: var(--font);
       font-size: 13px;
-      line-height: 1.4;
+      line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
-    button { font-family: inherit; cursor: pointer; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    textarea { font-family: inherit; }
     .hidden        { display: none !important; }
-    .sr-only       { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0; }
+    .sr-only       { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
     .compat-hidden { display: none !important; }
 
-    /* ═══════════════════════════════════════════════════════
-       TOAST  — slides down from top, never overlaps content
-    ═══════════════════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       TOAST
+    ───────────────────────────────────────────── */
     .toast {
-      position: fixed; top: 0; left: 0; right: 0;
-      transform: translateY(-100%);
-      opacity: 0;
-      background: #1c1c1e;
-      border-bottom: 1px solid var(--border-strong);
-      padding: 9px 16px;
-      font-size: 12px; font-weight: 500;
+      position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 9999;
       display: flex; align-items: center; gap: 8px;
-      z-index: 9999;
-      transition: transform .22s cubic-bezier(.32,0,.67,0), opacity .22s ease;
+      padding: 10px 14px;
+      background: rgba(18,18,18,0.97);
+      border: 1px solid var(--border-med);
+      border-radius: 10px;
+      font-size: 12px; font-weight: 500;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03);
+      opacity: 0; transform: translateY(8px);
       pointer-events: none;
-      min-height: 38px;
+      transition: opacity .2s ease, transform .22s ease;
     }
-    .toast.toast-visible {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-      transition: transform .28s cubic-bezier(.33,1,.68,1), opacity .2s ease;
-    }
-    .toast-dot {
-      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-    }
-    .toast.success .toast-dot { background: var(--accent); }
+    .toast.toast-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .toast-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .toast.success .toast-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
     .toast.error   .toast-dot { background: var(--red); }
-    .toast.info    .toast-dot { background: #0A84FF; }
-    #toast-icon { display: none; } /* replaced by dot */
-    #toast-text { color: var(--text-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .toast.info    .toast-dot { background: #3b82f6; }
+    #toast-icon { display: none; }
+    #toast-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 
-    /* ═══════════════════════════════════════════════════════
+    /* ─────────────────────────────────────────────
        VIEWS
-    ═══════════════════════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .view { position: absolute; inset: 0; overflow: hidden; }
 
-    /* ═══════════════════════════════════════════════════════
-       MAIN VIEW SHELL
-    ═══════════════════════════════════════════════════════ */
-    .main-view { display: flex; flex-direction: column; background: var(--bg); }
+    /* ─────────────────────────────────────────────
+       MAIN PANEL SHELL
+    ───────────────────────────────────────────── */
+    .v2-panel {
+      display: flex; flex-direction: column;
+      height: 100%;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
 
-    /* ═══════════════════════════════════════════════════════
-       STATUS BAR  (44px, no logo)
-    ═══════════════════════════════════════════════════════ */
-    .topbar {
-      height: 44px;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px;
-      flex-shrink: 0;
-      z-index: 20;
+    /* ─────────────────────────────────────────────
+       HEADER
+    ───────────────────────────────────────────── */
+    .v2-hdr {
+      height: 44px; flex-shrink: 0;
+      display: flex; align-items: center;
+      padding: 0 14px;
       border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
     }
-    .tb-left  { display: flex; align-items: center; gap: 6px; }
-    .tb-right { display: flex; align-items: center; gap: 10px; }
 
-    /* Credits pill — clean with inner glow ring */
+    /* Logo */
+    .v2-hdr-logo {
+      font-size: 14px; font-weight: 700; letter-spacing: -0.5px;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .v2-hdr-logo span {
+      /* subtle green tint on the last letter */
+      background: linear-gradient(135deg, #ffffff 40%, #6effc2 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Credits badge (JS reveals via style.display='') */
     #topbar-credits {
-      display: flex; align-items: center; gap: 5px;
-      background: rgba(0,230,118,0.06);
-      border: 1px solid rgba(0,230,118,0.18);
-      border-radius: 22px;
-      padding: 5px 11px 5px 9px;
-      box-shadow: 0 0 12px rgba(0,230,118,0.08), inset 0 1px 0 rgba(0,230,118,0.1);
+      display: flex;
+      align-items: center; gap: 5px;
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px;
+      padding: 3px 9px 3px 7px;
+      transition: border-color .2s, background .2s;
     }
-    #topbar-credits svg { color: var(--accent); flex-shrink: 0; }
+    #topbar-credits:hover {
+      background: rgba(0,230,118,0.13);
+      border-color: rgba(0,230,118,0.38);
+    }
+    #topbar-credits svg { flex-shrink: 0; }
     #topbar-credits-val {
-      font-size: 13px; font-weight: 700;
-      color: var(--accent); letter-spacing: -0.5px;
+      font-size: 12px; font-weight: 700; letter-spacing: -0.3px;
+      color: var(--accent);
       font-variant-numeric: tabular-nums;
-    }
-    .tb-credits-label {
-      font-size: 10px; font-weight: 500;
-      color: rgba(0,230,118,0.45); letter-spacing: .2px; margin-left: 1px;
+      text-shadow: 0 0 12px rgba(0,230,118,0.5);
     }
     #topbar-credits.low {
-      background: rgba(255,159,10,0.06);
-      border-color: rgba(255,159,10,0.22);
-      box-shadow: 0 0 12px rgba(255,159,10,0.08), inset 0 1px 0 rgba(255,159,10,0.1);
+      background: rgba(255,159,10,0.08);
+      border-color: rgba(255,159,10,0.25);
     }
-    #topbar-credits.low #topbar-credits-val { color: #FF9F0A; }
-    #topbar-credits.low svg { color: #FF9F0A; }
-    #topbar-credits.low .tb-credits-label { color: rgba(255,159,10,0.5); }
+    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; text-shadow: none; }
 
-    /* Plan badge — dark pill with shimmer border */
+    /* Right side of header */
+    .v2-hdr-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+    /* Plan badge (JS reveals via style.display='') */
     #topbar-plan {
-      font-size: 9px; font-weight: 700; letter-spacing: .8px;
-      text-transform: uppercase;
-      color: #F5F5F7;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 20px; padding: 4px 9px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-    }
-    #topbar-plan::before {
-      content: "◆ ";
-      font-size: 7px;
-      color: var(--accent);
-      letter-spacing: 0;
-      vertical-align: middle;
+      display: inline-block;
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.8px; text-transform: uppercase;
+      color: var(--text-3);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 2px 8px;
     }
 
     /* Gear button */
-    .tb-gear {
-      background: none; border: none;
-      color: var(--text-secondary);
+    .v2-gear-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 30px; height: 30px;
-      border-radius: 8px;
-      transition: color .2s ease, background .2s ease;
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      color: var(--text-3);
+      transition: color .15s, background .15s;
     }
-    .tb-gear:hover { color: var(--text-primary); background: var(--card); }
-    .tb-gear:active { transform: scale(0.92); }
+    .v2-gear-btn:hover { color: var(--text-2); background: var(--surface3); }
+    .v2-gear-btn:active { transform: scale(0.9); }
 
-    /* ═══════════════════════════════════════════════════════
-       SCROLL AREA
-    ═══════════════════════════════════════════════════════ */
-    .panel-scroll {
-      flex: 1; overflow-y: auto;
-      padding: 12px 12px 24px;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .panel-scroll::-webkit-scrollbar { width: 0px; }
-
-    /* ═══════════════════════════════════════════════════════
-       FROSTED GLASS CARD
-    ═══════════════════════════════════════════════════════ */
-    .card {
-      background: rgba(22,22,24,0.92);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
+    /* ─────────────────────────────────────────────
+       VIDEO PREVIEW  (16:9)
+    ───────────────────────────────────────────── */
+    .v2-preview {
+      position: relative; flex-shrink: 0;
+      width: 100%; aspect-ratio: 16/9;
+      background: #0a0a0a;
       overflow: hidden;
-      box-shadow: var(--inset-glow), 0 2px 16px rgba(0,0,0,0.35);
-      transition: background .2s ease;
-      /* backdrop-filter intentionally removed — causes black frames in CEP's Chromium 73 */
+      border-bottom: 1px solid var(--border);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       CLIP CARD
-    ═══════════════════════════════════════════════════════ */
-
-    /* Empty state */
-    .clip-empty {
-      padding: 28px 20px 24px;
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-      text-align: center;
+    /* EMPTY STATE */
+    #clip-empty {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(0,230,118,0.04) 0%, transparent 70%);
     }
-    .clip-empty-icon { color: var(--text-tertiary); margin-bottom: 6px; }
-    .clip-empty-t {
-      font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
-      color: var(--text-primary);
+    .pv-empty-icon {
+      position: relative; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: center;
     }
-    .clip-empty-s { font-size: 12px; color: var(--text-secondary); }
-    .clip-auto-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 500;
+    .pv-empty-glow {
+      position: absolute; inset: -14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,230,118,0.12) 0%, transparent 70%);
+      animation: glow-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.9); }
+      50%       { opacity: 1;   transform: scale(1.1); }
+    }
+    .pv-empty-icon svg {
+      position: relative; z-index: 1;
+      animation: icon-float 3s ease-in-out infinite;
+    }
+    @keyframes icon-float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-2px); }
+    }
+    .pv-empty-title {
+      font-size: 13px; font-weight: 600; color: var(--text-2);
+      letter-spacing: -0.2px;
+    }
+    .pv-empty-sub {
+      font-size: 11px; color: var(--text-3); margin-bottom: 8px;
+    }
+    .v2-watching-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
       color: var(--accent);
-      background: var(--accent-soft);
-      border: 1px solid rgba(0,230,118,0.15);
-      border-radius: 20px; padding: 4px 10px;
-      margin-top: 8px;
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px; padding: 3px 9px;
     }
-    .clip-auto-dot {
+    .v2-watching-dot {
       width: 5px; height: 5px; border-radius: 50%;
       background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
       animation: breathe 1.8s ease-in-out infinite;
     }
-    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.7)} }
+    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
 
-    /* Thumbnail */
-    .clip-thumb-wrap {
-      position: relative; width: 100%;
-      aspect-ratio: 16/9; background: #000;
-      overflow: hidden;
-    }
-    .clip-thumb-img {
-      width: 100%; height: 100%; object-fit: cover;
-      display: block;
-      opacity: 0;
-      transition: opacity .2s ease;
-    }
-    .clip-thumb-img.loaded { opacity: 1; }
-    .clip-thumb-placeholder {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--text-tertiary);
-    }
-    .clip-thumb-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
-      pointer-events: none;
-    }
-    .clip-thumb-badges {
-      position: absolute; bottom: 10px; left: 10px;
-      display: flex; gap: 4px; align-items: center;
-    }
-    .clip-live-indicator {
+    /* FILLED STATE */
+    #clip-info { position: absolute; inset: 0; }
+    #clip-thumbnail { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* LIVE badge */
+    .v2-preview-live {
       position: absolute; top: 10px; right: 10px;
-      display: flex; align-items: center; gap: 4px;
-      background: rgba(0,0,0,0.62);
-      border-radius: 20px; padding: 3px 7px;
-      font-size: 9px; font-weight: 600; letter-spacing: .4px;
+      display: flex; align-items: center; gap: 5px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
       color: var(--accent);
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,230,118,0.35);
+      border-radius: var(--r-xs); padding: 4px 8px;
     }
-    .clip-live-dot {
+    .v2-preview-live-dot {
       width: 5px; height: 5px; border-radius: 50%;
       background: var(--accent);
-      animation: breathe 2s ease-in-out infinite;
+      box-shadow: 0 0 6px var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
     }
 
-    /* Clip meta */
-    .clip-meta { padding: 10px 14px 12px; }
-    .clip-row-name {
-      font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
-      color: var(--text-primary);
+    /* Bottom info overlay */
+    .v2-preview-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: flex-end;
+      padding: 24px 12px 10px;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    }
+    #clip-name {
+      flex: 1; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.9);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      display: block; margin-bottom: 4px;
+      margin-right: 10px;
     }
-    .clip-meta-row { display: flex; align-items: center; justify-content: space-between; }
-    .clip-meta-left { display: flex; align-items: center; gap: 6px; }
-
-    /* Chips / tags */
-    .chip {
-      display: inline-flex; align-items: center;
-      font-size: 10px; font-weight: 600; letter-spacing: .2px;
-      padding: 2px 7px; border-radius: 20px;
-    }
-    .chip-green { background: rgba(0,230,118,.12); color: var(--accent); }
-    .chip-gray  { background: rgba(255,255,255,.06); color: var(--text-secondary); }
-    .chip-amber { background: rgba(255,159,10,.1); color: #FF9F0A; }
-
-    .clip-warn { padding: 0 14px 12px; font-size: 11px; color: #FF9F0A; line-height: 1.45; }
-
-    /* ═══════════════════════════════════════════════════════
-       PROMPT CARD
-    ═══════════════════════════════════════════════════════ */
-    .prompt-card { display: flex; flex-direction: column; }
-    .prompt-card textarea {
-      width: 100%; background: transparent; border: none; outline: none;
-      color: var(--text-primary);
-      font-size: 13px; font-family: inherit;
-      resize: none; padding: 14px 14px 0;
-      line-height: 1.6; min-height: 88px;
-      caret-color: var(--accent);
-    }
-    .prompt-card textarea::placeholder { color: var(--text-tertiary); }
-    .prompt-footer {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 12px 12px 14px;
-    }
-    .prompt-count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-
-    /* AI Enhance — the "brain" of the panel */
-    .ai-btn {
-      display: flex; align-items: center; gap: 6px;
-      /* subtle gradient: green tint on left, neutral on right */
-      background: linear-gradient(135deg, rgba(0,230,118,0.12) 0%, rgba(255,255,255,0.05) 100%);
-      border: 1px solid rgba(0,230,118,0.28);
-      color: var(--accent);
-      font-size: 11px; font-weight: 700; letter-spacing: .2px;
-      padding: 7px 13px; border-radius: 22px;
-      transition: all .22s ease;
-      box-shadow: 0 0 14px rgba(0,230,118,0.1), inset 0 1px 0 rgba(0,230,118,0.12);
-    }
-    .ai-btn:hover {
-      background: linear-gradient(135deg, rgba(0,230,118,0.2) 0%, rgba(0,230,118,0.06) 100%);
-      border-color: rgba(0,230,118,0.5);
-      box-shadow: 0 0 22px rgba(0,230,118,0.2), inset 0 1px 0 rgba(0,230,118,0.18);
-      color: #fff;
-    }
-    .ai-btn:active { transform: scale(0.97); }
-    .ai-btn:disabled { opacity: .35; cursor: wait; transform: none; box-shadow: none; }
-    .ai-btn-icon { flex-shrink: 0; display: flex; align-items: center; }
-    /* Success flash — brief green confirmation, no toast */
-    .ai-btn.ai-btn--done {
-      background: rgba(0,230,118,0.18);
-      border-color: rgba(0,230,118,0.7);
-      box-shadow: 0 0 18px rgba(0,230,118,0.28), inset 0 1px 0 rgba(0,230,118,0.25);
-      color: #fff;
-      pointer-events: none;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       GENERATE CARD
-    ═══════════════════════════════════════════════════════ */
-    .gen-card { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-
-    /* Output toggle — pill segmented control */
-    .output-row { display: flex; align-items: center; justify-content: space-between; }
-    .output-lbl { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
-    .output-seg {
-      display: flex;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      border-radius: 20px; padding: 3px; gap: 2px;
-    }
-    .seg-opt {
-      background: none; border: none;
-      color: var(--text-secondary);
-      font-size: 11px; font-weight: 600;
-      padding: 4px 13px; border-radius: 20px;
-      transition: all .2s ease;
-    }
-    .seg-opt.seg-active {
-      background: rgba(255,255,255,0.1);
-      color: var(--text-primary);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3), var(--inset-glow);
-    }
-    .seg-opt:hover:not(.seg-active) { color: var(--text-primary); }
-    .output-hint { font-size: 11px; color: var(--text-tertiary); margin-top: -4px; }
-
-    /* Generate button */
-    .gen-btn {
-      width: 100%;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: var(--accent); color: #000;
-      font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
-      border: none; border-radius: var(--radius);
-      padding: 13px; cursor: pointer;
-      transition: all .2s ease;
-      box-shadow: 0 0 0 0 var(--accent-glow);
-    }
-    .gen-btn:hover {
-      filter: brightness(1.08);
-      box-shadow: 0 4px 20px var(--accent-glow);
-    }
-    .gen-btn:active { transform: scale(0.98); }
-    .gen-btn:disabled { opacity: .3; cursor: not-allowed; transform: none; filter: none; box-shadow: none; }
-    .gen-cost-badge {
-      background: rgba(0,0,0,0.22);
-      border-radius: 20px; padding: 2px 8px;
-      font-size: 11px; font-weight: 700;
-    }
-
-    /* ── Generation progress ──────────────────────────────────────────── */
-    .gen-state { display: flex; flex-direction: column; gap: 7px; }
-
-    /* Pulsing dot — inherits color from state class */
-    .gp-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--accent); flex-shrink: 0;
-      animation: breathe 1.4s ease-in-out infinite;
-    }
-    /* Header row: dot + label on left, elapsed on right */
-    .gp-hdr { display: flex; align-items: center; justify-content: space-between; }
-    .gp-hdr-left { display: flex; align-items: center; gap: 8px; }
-    .gp-label {
-      font-size: 12px; font-weight: 500;
-      color: var(--text-primary); letter-spacing: -0.01em;
-    }
-    .gp-elapsed {
-      font-size: 11px; color: var(--text-tertiary);
+    #clip-dur-badge {
+      flex-shrink: 0;
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.6);
       font-variant-numeric: tabular-nums;
     }
-    /* 3px bar track */
-    .gp-track {
-      height: 3px;
-      background: var(--border);
-      border-radius: 99px; overflow: hidden;
-    }
-    .gp-fill {
-      height: 100%; border-radius: 99px;
-      background: var(--accent);
-      transition: width 0.4s ease;
-      box-shadow: 0 0 8px var(--accent-glow);
-      position: relative; overflow: hidden;
-    }
-    @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
-    .gp-shimmer {
-      position: absolute; inset: 0;
-      background: linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
-      animation: shimmer 1.8s linear infinite;
-    }
-    /* Footer row: estimate on left, pct on right */
-    .gp-ftr { display: flex; align-items: center; justify-content: space-between; }
-    .gp-estimate {
-      font-size: 11px; color: var(--text-tertiary);
-      transition: opacity .3s ease;
-    }
-    .gp-pct {
-      font-size: 11px; font-weight: 600;
-      color: var(--accent); font-variant-numeric: tabular-nums;
-    }
 
-    /* ── Inline failed state ──────────────────────────────────────────── */
-    .gen-failed {
-      display: flex; align-items: center; gap: 10px;
-      background: rgba(255,69,58,0.06);
-      border: 1px solid rgba(255,69,58,0.16);
-      border-radius: var(--radius-sm);
-      padding: 10px 12px;
-    }
-    .gen-fail-icon { color: var(--red); flex-shrink: 0; opacity: .8; }
-    .gen-fail-msg {
-      font-size: 12px; color: rgba(255,69,58,0.85);
-      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .gen-retry-btn {
+    /* ─────────────────────────────────────────────
+       MODE TABS  (replaces dropdown)
+    ───────────────────────────────────────────── */
+    .v2-mode-tabs {
       flex-shrink: 0;
-      background: none; border: 1px solid rgba(255,69,58,0.3);
-      color: var(--red); font-size: 11px; font-weight: 600;
-      padding: 4px 11px; border-radius: 20px; cursor: pointer;
-      transition: background .18s ease, border-color .18s ease;
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
-    .gen-retry-btn:hover { background: rgba(255,69,58,0.1); border-color: rgba(255,69,58,0.5); }
-    .gen-retry-btn:active { transform: scale(0.97); }
+    .mode-tab {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+      padding: 8px 4px;
+      color: var(--text-3);
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
+      border-bottom: 2px solid transparent;
+      transition: color .2s ease, border-color .2s ease, background .2s ease;
+      position: relative;
+    }
+    .mode-tab svg { transition: opacity .2s; opacity: 0.5; }
+    .mode-tab:hover { color: var(--text-2); background: rgba(255,255,255,0.02); }
+    .mode-tab:hover svg { opacity: 0.75; }
+    .mode-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: rgba(0,230,118,0.04);
+    }
+    .mode-tab.active svg {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px rgba(0,230,118,0.5));
+    }
+    .mode-tab:active { transform: scale(0.96); }
 
-    /* No credits */
+    /* ─────────────────────────────────────────────
+       PROMPT GLASS CARD
+    ───────────────────────────────────────────── */
+    .v2-prompt-outer {
+      flex: 1; min-height: 80px;
+      display: flex; flex-direction: column;
+      padding: 10px 12px 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    /* Top decorative sparkle */
+    .v2-prompt-sparkle {
+      position: absolute; top: 13px; left: 14px;
+      color: var(--text-3);
+      pointer-events: none;
+      transition: color .2s;
+      display: flex; align-items: center;
+      z-index: 2;
+    }
+    .v2-prompt-outer:focus-within .v2-prompt-sparkle { color: var(--accent); }
+
+    /* Glass container around textarea — relative for chip positioning */
+    .v2-prompt-glass {
+      flex: 1; min-height: 60px;
+      display: flex; flex-direction: column;
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .v2-prompt-glass:focus-within {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 1px rgba(0,230,118,0.12), 0 0 20px rgba(0,230,118,0.06);
+    }
+    .v2-prompt-glass textarea {
+      flex: 1; min-height: 60px;
+      width: 100%;
+      background: transparent; border: none; outline: none; resize: none;
+      color: var(--text); font-size: 13px; font-family: var(--font);
+      padding: 10px 112px 6px 30px; /* right pad reserves space for enhance chip */
+      line-height: 1.6;
+      caret-color: var(--accent);
+    }
+    .v2-prompt-glass textarea::placeholder { color: var(--text-3); }
+
+    /* Footer: char count only */
+    .v2-prompt-foot {
+      display: flex; align-items: center;
+      padding: 6px 2px 0; flex-shrink: 0;
+    }
+    .v2-char-count {
+      font-size: 10px; color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── AI Enhance chip — floats inside textarea glass, top-right ── */
+    .v2-enhance-chip {
+      position: absolute; top: 8px; right: 8px; z-index: 5;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 20px;
+      background: rgba(4,10,7,0.80);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,230,118,0.28);
+      color: var(--accent);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.05px;
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 0 0 12px rgba(0,230,118,0.10), 0 2px 8px rgba(0,0,0,0.45);
+      transition: background .18s ease, border-color .18s ease,
+                  box-shadow .18s ease, transform .14s ease;
+    }
+    .v2-enhance-chip:hover {
+      background: rgba(0,230,118,0.11);
+      border-color: rgba(0,230,118,0.55);
+      box-shadow: 0 0 24px rgba(0,230,118,0.26), 0 2px 10px rgba(0,0,0,0.5);
+      transform: scale(1.04);
+    }
+    .v2-enhance-chip:active { transform: scale(0.96); }
+    .v2-enhance-chip:disabled { opacity: 0.35; cursor: wait; pointer-events: none; }
+    .v2-enhance-chip.ai-btn--done {
+      background: rgba(0,230,118,0.12);
+      border-color: rgba(0,230,118,0.65);
+      box-shadow: 0 0 24px rgba(0,230,118,0.30), 0 2px 8px rgba(0,0,0,0.45);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes chipGlow {
+      0%,100% { box-shadow: 0 0 12px rgba(0,230,118,0.10), 0 2px 8px rgba(0,0,0,0.45); }
+      50%      { box-shadow: 0 0 28px rgba(0,230,118,0.34), 0 2px 8px rgba(0,0,0,0.45); }
+    }
+    .v2-enhance-chip.enhancing {
+      animation: chipGlow 1.1s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .v2-enhance-chip.enhancing .ai-btn-icon svg { animation: spin 0.85s linear infinite; }
+    .ai-btn-icon { display: flex; align-items: center; }
+
+    /* ─────────────────────────────────────────────
+       OUTPUT OPTIONS
+    ───────────────────────────────────────────── */
+    .v2-output-opts {
+      flex-shrink: 0;
+      padding: 10px 12px 9px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-opt-row { display: flex; align-items: center; }
+    .v2-opt-label {
+      font-size: 11px; font-weight: 600; color: var(--text-3);
+      letter-spacing: 0.3px; text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .v2-opt-seg {
+      display: flex;
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+    .v2-opt-pill {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 4px;
+      color: var(--text-3);
+      background: transparent;
+      transition: all .2s ease;
+    }
+    .v2-opt-pill:hover { color: var(--text-2); }
+    .v2-opt-pill.seg-active {
+      background: var(--surface3);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .v2-opt-hint {
+      font-size: 10px; color: var(--text-3);
+      margin-top: 5px; letter-spacing: 0.1px;
+    }
+
+    /* ─────────────────────────────────────────────
+       ERRORS / NO CREDITS
+    ───────────────────────────────────────────── */
+    .v2-inline-error {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px;
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      font-size: 12px; color: rgba(255,80,70,0.9);
+    }
+    .v2-err-retry {
+      margin-left: auto; flex-shrink: 0;
+      border: 1px solid rgba(255,69,58,0.3);
+      color: var(--red); font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      transition: background .15s;
+    }
+    .v2-err-retry:hover { background: rgba(255,69,58,0.1); }
+
     .no-credits-bar {
+      flex-shrink: 0;
       display: flex; align-items: center; gap: 7px;
-      background: rgba(255,69,58,.06);
-      border: 1px solid rgba(255,69,58,.15);
-      border-radius: var(--radius-sm);
-      padding: 9px 12px;
-      font-size: 11px; color: #FF453A;
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      padding: 9px 14px; font-size: 12px; color: var(--red);
     }
     .no-credits-link {
       color: var(--accent); text-decoration: none;
       margin-left: auto; font-weight: 600; font-size: 11px;
+      transition: opacity .15s;
     }
-    .no-credits-link:hover { text-decoration: underline; }
+    .no-credits-link:hover { opacity: 0.8; }
 
-    /* ═══════════════════════════════════════════════════════
-       RESULT CARD
-    ═══════════════════════════════════════════════════════ */
-    .result-wrap {
-      position: relative;
-      padding: 12px 12px 0;
+    /* ─────────────────────────────────────────────
+       GENERATE BUTTON  — the hero CTA
+    ───────────────────────────────────────────── */
+    .v2-gen-btn {
+      flex-shrink: 0;
+      position: relative; overflow: hidden;
+      width: 100%; height: 54px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #008f4a 0%, #00c864 50%, #00e676 100%);
+      color: #000;
+      font-size: 14px; font-weight: 700; letter-spacing: -0.2px;
+      cursor: pointer;
+      transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
     }
-    #mf-result-video {
-      width: 100%; aspect-ratio: 16/9;
-      object-fit: cover; display: block; background: #000;
-      border-radius: 8px;
-    }
-    .result-ai-badge {
-      position: absolute;
-      top: 20px; left: 20px;
-      background: rgba(0,0,0,0.65);
-      color: #fff;
-      font-size: 10px; font-weight: 600;
-      letter-spacing: .2px;
-      padding: 3px 8px;
-      border-radius: 4px;
+    .v2-gen-btn::before {
+      /* Top specular highlight */
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
       pointer-events: none;
     }
-    .result-actions {
-      display: flex; gap: 8px;
-      padding: 10px 12px 12px;
+    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) {
+      filter: brightness(1.08);
+      box-shadow: 0 0 28px rgba(0,230,118,0.3), 0 4px 20px rgba(0,0,0,0.5);
+      transform: translateY(-1px);
     }
-    .r-btn-new-gen {
-      flex: 1;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 9px 12px; border-radius: var(--radius-sm);
-      font-size: 12px; font-weight: 600; letter-spacing: -0.01em;
-      background: transparent;
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-      transition: all .2s ease;
-      cursor: pointer;
+    .v2-gen-btn:active:not(.v2-generating) {
+      transform: translateY(0) scale(0.995);
+      filter: brightness(0.96);
     }
-    .r-btn-new-gen:hover { border-color: var(--border-strong); background: var(--card-hover); }
-    .r-btn-new-gen:active { transform: scale(0.98); }
+    .v2-gen-btn:disabled:not(.v2-generating) { opacity: .35; cursor: not-allowed; }
+    .v2-gen-btn.v2-generating {
+      background: var(--surface2); color: var(--text-2);
+      cursor: default; transform: none; box-shadow: none; filter: none;
+    }
+    .v2-gen-cost {
+      background: rgba(0,0,0,0.18);
+      border-radius: 20px; padding: 2px 9px;
+      font-size: 11px; font-weight: 700;
+    }
+    .v2-generating .v2-gen-cost { display: none; }
+    .v2-gen-pline {
+      position: absolute; bottom: 0; left: 0;
+      height: 2px; width: 0%;
+      background: var(--accent);
+      transition: width .35s ease;
+      box-shadow: 0 0 10px rgba(0,230,118,0.7);
+    }
 
-    /* ═══════════════════════════════════════════════════════
-       SETTINGS OVERLAY  (full-screen, slide-up sheet)
-    ═══════════════════════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       REFERENCE IMAGE UPLOAD ZONE
+    ───────────────────────────────────────────── */
+    .v2-ref-img-zone {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-ref-img-label {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; color: var(--text-3);
+      font-size: 11px; font-weight: 500;
+      padding: 6px 10px;
+      border: 1px dashed var(--border-med);
+      border-radius: var(--r-sm);
+      width: 100%;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .v2-ref-img-label:hover {
+      color: var(--text-2); border-color: var(--border-strong);
+      background: rgba(255,255,255,0.02);
+    }
+    .v2-ref-img-icon { font-size: 13px; line-height: 1; }
+    .v2-ref-img-preview {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0;
+    }
+    .v2-ref-img-thumb {
+      height: 40px; width: auto; max-width: 80px;
+      object-fit: cover;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border);
+    }
+    .v2-ref-img-name {
+      flex: 1; font-size: 11px; color: var(--text-2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .v2-ref-img-clear {
+      color: var(--text-3); font-size: 14px; line-height: 1;
+      padding: 2px 7px; border-radius: var(--r-xs);
+      transition: color .15s, background .15s;
+    }
+    .v2-ref-img-clear:hover { color: var(--red); background: rgba(255,69,58,0.08); }
+
+    /* ─────────────────────────────────────────────
+       RESULT OVERLAY
+    ───────────────────────────────────────────── */
+    #mf-section-result {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+    }
+    .v2-result-preview {
+      flex: 1; min-height: 0;
+      position: relative;
+      background: #050505; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .v2-result-preview img,
+    .v2-result-preview video {
+      width: 100%; height: 100%; object-fit: contain; display: block;
+    }
+    .v2-result-preview img.hidden,
+    .v2-result-preview video.hidden { display: none; }
+
+    /* Result action buttons */
+    .v2-output-actions {
+      flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-timeline-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 16px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 700; letter-spacing: -0.1px;
+      background: var(--accent); color: #000;
+      transition: filter .2s, transform .15s, box-shadow .2s;
+    }
+    .v2-timeline-btn:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 0 18px rgba(0,230,118,0.25);
+      transform: translateY(-1px);
+    }
+    .v2-timeline-btn:active { transform: scale(0.98); filter: brightness(0.96); }
+    .v2-timeline-btn:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+
+    .v2-new-effect-btn {
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 11px 16px; border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 600; letter-spacing: -0.1px;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all .2s;
+    }
+    .v2-new-effect-btn:hover { border-color: var(--border-med); color: var(--text); background: var(--surface3); }
+    .v2-new-effect-btn:active { transform: scale(0.97); }
+
+    /* ─────────────────────────────────────────────
+       SETTINGS OVERLAY
+    ───────────────────────────────────────────── */
     #section-settings {
       position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(12px);
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(14px);
       display: flex; flex-direction: column; justify-content: flex-end;
       opacity: 0; pointer-events: none;
-      transition: opacity .25s ease;
+      transition: opacity .22s ease;
     }
-    #section-settings.settings-visible {
-      opacity: 1; pointer-events: auto;
-    }
+    #section-settings.settings-visible { opacity: 1; pointer-events: auto; }
     .settings-sheet {
-      background: var(--card-elevated);
-      border: 1px solid var(--border-strong);
-      border-bottom: none;
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-      padding: 0 0 env(safe-area-inset-bottom,0);
-      box-shadow: 0 -20px 60px rgba(0,0,0,0.5), var(--inset-glow);
+      background: rgba(14,14,14,0.98);
+      border: 1px solid var(--border-med); border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -32px 80px rgba(0,0,0,0.6);
       transform: translateY(20px);
-      transition: transform .25s cubic-bezier(.32,0,.67,0);
+      transition: transform .24s ease;
     }
-    #section-settings.settings-visible .settings-sheet {
-      transform: translateY(0);
-      transition: transform .3s cubic-bezier(.33,1,.68,1);
-    }
+    #section-settings.settings-visible .settings-sheet { transform: translateY(0); }
     .settings-handle {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 18px 8px;
-      border-bottom: 1px solid var(--border);
+      padding: 16px 16px 10px; border-bottom: 1px solid var(--border);
     }
-    .settings-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+    .settings-title { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
     .settings-close {
-      background: rgba(255,255,255,0.08); border: none;
-      color: var(--text-secondary);
-      width: 26px; height: 26px; border-radius: 50%;
+      background: rgba(255,255,255,0.07); color: var(--text-3);
+      width: 24px; height: 24px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; line-height: 1; font-weight: 600;
-      transition: background .2s;
+      font-size: 12px; font-weight: 700;
+      transition: background .15s, color .15s;
     }
-    .settings-close:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
-    /* Keep hidden settings-trigger/chevron/menu for JS compat but use new sheet items */
+    .settings-close:hover { background: rgba(255,255,255,0.13); color: var(--text); }
     .settings-toggle { display: none; }
     .settings-menu   { display: none; }
     .sm-item {
       display: flex; align-items: center; gap: 12px;
-      background: none; border: none;
-      color: var(--text-secondary); font-size: 13px; font-weight: 500;
-      padding: 13px 18px; width: 100%; text-align: left;
-      transition: color .15s, background .15s;
+      color: var(--text-2); font-size: 13px; font-weight: 500;
+      padding: 13px 16px; width: 100%; text-align: left;
       border-bottom: 1px solid var(--border);
+      transition: color .12s, background .12s;
     }
     .sm-item:last-child { border-bottom: none; }
-    .sm-item:hover { color: var(--text-primary); background: var(--card-hover); }
-    .sm-danger { }
+    .sm-item:hover { color: var(--text); background: rgba(255,255,255,0.025); }
     .sm-danger:hover { color: var(--red); }
-    .sm-item-icon { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,.07); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; }
-    /* Diag panel */
+    .sm-item-icon {
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); flex-shrink: 0;
+    }
     .diag-box {
-      background: rgba(255,255,255,0.03); border-top: 1px solid var(--border);
-      padding: 10px 18px; display: flex; flex-direction: column; gap: 6px;
+      background: rgba(255,255,255,0.018); border-top: 1px solid var(--border);
+      padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
     }
     .diag-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .5px; }
+    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; }
     .diag-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
-    .dk { color: var(--text-secondary); }
-    .dv { color: var(--text-primary); font-family: 'SF Mono', monospace; font-size: 10px; text-align: right; max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .diag-status.ok  { color: var(--accent); }
-    .diag-status.err { color: var(--red); }
-
-    /* ═══════════════════════════════════════════════════════
-       FOOTER
-    ═══════════════════════════════════════════════════════ */
-    .panel-foot {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 2px 2px 0;
+    .dk { color: var(--text-3); }
+    .dv {
+      color: var(--text-2); font-family: 'SF Mono', ui-monospace, monospace;
+      font-size: 10px; text-align: right;
+      max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .foot-v { font-size: 10px; color: var(--text-tertiary); }
-    .foot-links { display: flex; gap: 8px; font-size: 10px; color: var(--text-tertiary); }
-    .foot-links a { color: inherit; text-decoration: none; cursor: pointer; }
-    .foot-links a:hover { color: var(--text-secondary); }
+    .ghost-lnk {
+      background: none; border: none; color: var(--accent);
+      font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.1px;
+    }
+    .chip { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+    .chip-green { background: var(--accent-dim); color: var(--accent); }
+    .chip-gray  { background: rgba(255,255,255,0.06); color: var(--text-2); }
+    .chip-amber { background: rgba(255,159,10,0.10); color: #ff9f0a; }
   </style>
 </head>
 <body>
 
+  <!-- ════════════════════════════════
+       TOAST
+  ════════════════════════════════ -->
   <div id="toast" class="toast hidden" role="alert" aria-live="polite">
     <span class="toast-dot"></span>
     <span id="toast-icon"></span>
     <span id="toast-text"></span>
   </div>
 
-  <!-- ══════════════════════════════════════
-       LOGIN VIEW  (unchanged)
-  ══════════════════════════════════════ -->
+  <!-- ════════════════════════════════
+       LOGIN VIEW  (untouched)
+  ════════════════════════════════ -->
   <div id="view-login" class="view login-view">
     <div class="lbg" aria-hidden="true">
       <div class="lbg-glow-center"></div>
@@ -639,9 +765,6 @@
           </div>
         </div>
       </div>
-
-      <div class="lv-divider"></div>
-
       <div class="lv-workspace-card">
         <div class="lwc-header">
           <div class="lwc-icon">
@@ -649,7 +772,7 @@
           </div>
           <div>
             <p class="lwc-title">Access Workspace</p>
-            <p class="lwc-desc">Sign in to sync your subscription, available credits and generation tools.</p>
+            <p class="lwc-desc">Sign in to sync your subscription, credits and generation tools.</p>
           </div>
         </div>
         <button id="btn-continue" class="lv-cta-btn">
@@ -658,317 +781,508 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </span>
         </button>
+        <div class="lv-trust-row">
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Secure login</span>
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Credits sync</span>
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Premiere ready</span>
+        </div>
         <p id="login-status" style="display:none"></p>
       </div>
-
       <div class="lv-stats">
         <div class="lv-stat"><span class="lv-stat-label">Plan</span><span class="lv-stat-value">Not connected</span></div>
         <div class="lv-stat-sep"></div>
         <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value">v1.1.0</span></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v3.0.2</span></div>
       </div>
     </div>
   </div>
 
+  <!-- ════════════════════════════════
+       MAIN PANEL VIEW
+  ════════════════════════════════ -->
+  <div id="view-main" class="view v2-panel hidden">
 
-  <!-- ══════════════════════════════════════
-       MAIN PANEL VIEW  (Apple redesign)
-  ══════════════════════════════════════ -->
-  <div id="view-main" class="view main-view hidden">
+    <!-- ─ HEADER ──────────────────── -->
+    <header class="v2-hdr">
 
-    <!-- ── STATUS BAR ─────────────────────────────── -->
-    <header class="topbar">
-      <div class="tb-left">
+      <!-- Logo — left -->
+      <div class="v2-hdr-logo">Pr<span>ysmor</span></div>
+
+      <!-- Credits + plan + gear — right -->
+      <div class="v2-hdr-right">
+
+        <!-- Credits badge (JS reveals via style.display='') -->
         <div id="topbar-credits" style="display:none">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span id="topbar-credits-val">—</span>
-          <span class="tb-credits-label">cr</span>
         </div>
-      </div>
-      <div class="tb-right">
-        <span id="topbar-plan" class="tb-plan" style="display:none"></span>
-        <button class="tb-gear" id="btn-scroll-settings" title="Settings" aria-label="Settings">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+
+        <!-- Plan pill (JS reveals via style.display='') -->
+        <span id="topbar-plan" style="display:none"></span>
+
+        <!-- History button -->
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+
+        <!-- Settings gear -->
+        <button class="v2-gear-btn" id="btn-scroll-settings" title="Settings" aria-label="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
     </header>
 
-    <div class="panel-scroll">
+    <!-- ─ VIDEO PREVIEW (16:9) ─────── -->
+    <div class="v2-preview">
 
-      <!-- HIDDEN COMPAT: credits bar elements (JS still updates these) -->
-      <div id="credits-card" class="compat-hidden">
-        <b id="usage-used">—</b>/<span id="usage-limit">1000</span>
-        <span id="usage-seconds"></span>
-      </div>
-      <div class="compat-hidden"><div id="progress-fill" style="width:0%"></div></div>
-
-      <!-- ── CLIP CARD ──────────────────────────────── -->
-      <div class="card">
-
-        <!-- Empty state -->
-        <div id="clip-empty" class="clip-empty">
-          <div class="clip-empty-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="3"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          </div>
-          <p class="clip-empty-t">No clip selected</p>
-          <p class="clip-empty-s">Select a clip in your timeline</p>
-          <div class="clip-auto-badge">
-            <span class="clip-auto-dot"></span>
-            Watching timeline
-          </div>
+      <!-- Empty: no clip selected -->
+      <div id="clip-empty">
+        <div class="pv-empty-icon">
+          <div class="pv-empty-glow"></div>
+          <!-- Film frame icon -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,230,118,0.7)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2.5"/>
+            <path d="M7 3v14M17 3v14M2 8h2M20 8h2M2 13h2M20 13h2"/>
+          </svg>
         </div>
-
-        <!-- Clip selected state -->
-        <div id="clip-info" class="hidden">
-          <!-- 16:9 thumbnail -->
-          <div class="clip-thumb-wrap">
-            <img id="clip-thumbnail" class="clip-thumb-img" src="" alt="">
-            <div class="clip-thumb-placeholder" id="clip-thumb-placeholder">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-            </div>
-            <div class="clip-thumb-overlay"></div>
-            <!-- Duration + trim badges (bottom-left) -->
-            <div class="clip-thumb-badges">
-              <span class="chip chip-green" id="clip-dur-badge">—</span>
-              <span class="chip chip-amber" id="clip-trim-badge" style="display:none">Trimmed to 8s</span>
-            </div>
-            <!-- Live indicator (top-right) -->
-            <div class="clip-live-indicator">
-              <span class="clip-live-dot"></span>
-              LIVE
-            </div>
-          </div>
-
-          <!-- Clip meta below thumbnail -->
-          <div class="clip-meta">
-            <span class="clip-row-name" id="clip-name">clip.mp4</span>
-            <div class="clip-meta-row">
-              <div class="clip-meta-left">
-                <span class="chip chip-gray" id="clip-start-badge">—</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Compat (hidden) -->
-          <div style="display:none"><div class="clip-live"></div></div>
-        </div>
-
-        <!-- Compat: hidden refresh button -->
-        <button id="btn-refresh-clip" style="display:none"></button>
-
-        <p id="clip-trim-warning" class="clip-warn" style="display:none"></p>
-      </div>
-
-      <!-- ── PROMPT CARD ────────────────────────────── -->
-      <div class="card prompt-card">
-        <textarea id="mf-prompt" rows="4" maxlength="1000"
-          placeholder="Transform the scene into… add cinematic fire… frozen arctic…"></textarea>
-        <div class="prompt-footer">
-          <span class="prompt-count"><span id="mf-char-count">0</span> / 1000</span>
-          <button class="ai-btn" id="btn-compile-prompt">
-            <span class="ai-btn-icon">
-              <!-- Neural/AI sparkle icon -->
-              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 2C10 2 10.8 5.2 12.5 6.5C14.2 7.8 17.5 8 17.5 8C17.5 8 14.2 8.2 12.5 9.5C10.8 10.8 10 14 10 14C10 14 9.2 10.8 7.5 9.5C5.8 8.2 2.5 8 2.5 8C2.5 8 5.8 7.8 7.5 6.5C9.2 5.2 10 2 10 2Z" fill="currentColor"/>
-                <path d="M15.5 13.5C15.5 13.5 15.9 14.9 16.6 15.4C17.3 15.9 18.5 16 18.5 16C18.5 16 17.3 16.1 16.6 16.6C15.9 17.1 15.5 18.5 15.5 18.5C15.5 18.5 15.1 17.1 14.4 16.6C13.7 16.1 12.5 16 12.5 16C12.5 16 13.7 15.9 14.4 15.4C15.1 14.9 15.5 13.5 15.5 13.5Z" fill="currentColor" opacity="0.7"/>
-              </svg>
-            </span>
-            <span id="compile-label">Enhance</span>
-          </button>
+        <span class="pv-empty-title">Select a clip to start</span>
+        <span class="pv-empty-sub">Apply AI-powered effects in seconds</span>
+        <div class="v2-watching-badge">
+          <span class="v2-watching-dot"></span>
+          Watching timeline
         </div>
       </div>
 
-      <!-- ── GENERATE CARD ──────────────────────────── -->
-      <div class="card gen-card">
-
-        <!-- Output mode -->
-        <div class="output-row">
-          <span class="output-lbl">Output</span>
-          <div class="output-seg">
-            <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
-            <button class="seg-opt seg-active" id="out-btn-v2"     type="button">New track</button>
-            <button class="seg-opt"            id="out-btn-replace" type="button">Replace</button>
-          </div>
+      <!-- Filled: clip loaded -->
+      <div id="clip-info" class="hidden">
+        <img id="clip-thumbnail" src="" alt="Clip preview" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <!-- Live badge -->
+        <div class="v2-preview-live">
+          <span class="v2-preview-live-dot"></span>
+          LIVE
         </div>
-        <p class="output-hint" id="output-hint">Added on V2 — original clip untouched</p>
-
-        <!-- Generate button -->
-        <button id="mf-btn-generate" class="gen-btn">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Generate Effect
-          <span class="gen-cost-badge" id="gen-btn-cost" style="display:none">
-            <span id="gen-btn-cost-val">—</span> cr
-          </span>
-        </button>
-
-        <!-- Progress ─────────────────────────────────── -->
-        <div id="mf-gen-state" class="gen-state hidden">
-          <!-- Row 1: phase label + elapsed timer -->
-          <div class="gp-hdr">
-            <div class="gp-hdr-left">
-              <div class="gp-dot"></div>
-              <span id="gp-phase-label" class="gp-label">Starting…</span>
-            </div>
-            <span id="gp-elapsed" class="gp-elapsed">0:00</span>
-          </div>
-          <!-- Row 2: progress bar -->
-          <div class="gp-track">
-            <div class="gp-fill" id="gp-fill" style="width:0%">
-              <span class="gp-shimmer"></span>
-            </div>
-          </div>
-          <!-- Row 3: ETA + percentage -->
-          <div class="gp-ftr">
-            <span id="gp-estimate" class="gp-estimate"></span>
-            <span id="gp-pct" class="gp-pct">0%</span>
-          </div>
-          <!-- JS compat shims (invisible, referenced by legacy setStage calls) -->
-          <div style="display:none">
-            <div id="mf-gen-bar"></div>
-            <span id="mf-status-text"></span>
-            <span id="mf-gen-pct"></span>
-            <span id="mf-gen-elapsed"></span>
-            <span id="gs-upload"></span><span id="gs-generate"></span><span id="gs-done"></span>
-            <span id="gs-line-1"></span><span id="gs-line-2"></span>
-          </div>
-        </div>
-
-        <!-- Failed state ──────────────────────────────── -->
-        <div id="mf-gen-failed" class="gen-failed hidden">
-          <span class="gen-fail-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          </span>
-          <span id="gen-fail-msg" class="gen-fail-msg">Something went wrong.</span>
-          <button id="gen-retry-btn" class="gen-retry-btn">Retry</button>
-        </div>
-
-        <!-- No credits -->
-        <div id="no-credits-banner" class="no-credits-bar hidden">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>No credits remaining.</span>
-          <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
-        </div>
-
-        <!-- Compat -->
-        <div id="gen-cost-preview" style="display:none"></div>
-      </div>
-
-      <!-- ── RESULT CARD ────────────────────────────── -->
-      <div class="card hidden" id="mf-section-result">
-        <div class="result-wrap">
-          <video id="mf-result-video" src="" muted loop playsinline></video>
-          <span class="result-ai-badge">AI Generated</span>
-        </div>
-        <div class="result-actions">
-          <button id="mf-btn-new-gen" class="r-btn-new-gen">
-            ↺ New generation
-          </button>
+        <!-- Info bar -->
+        <div class="v2-preview-bar">
+          <span id="clip-name">clip.mp4</span>
+          <span id="clip-dur-badge">—</span>
         </div>
       </div>
 
-      <footer class="panel-foot">
-        <span class="foot-v">Prysmor v1.1.0</span>
-        <div class="foot-links"><a id="link-docs">Docs</a><span>·</span><a id="link-terms">Terms</a></div>
-      </footer>
+    </div>
 
-    </div><!-- /panel-scroll -->
+    <!-- ─ MODE TABS ────────────────── -->
+    <!--
+      Each button has BOTH class="mode-tab mode-pill" — mode-pill preserves
+      JS compat (bindEvents querySelectorAll('.mode-pill')).
+      mode-tab is for new visual styling.
+    -->
+    <div class="v2-mode-tabs">
 
-    <!-- ── SETTINGS OVERLAY (gear-activated) ──────── -->
-    <!-- NOTE: position:fixed so it overlays the whole panel -->
-    <div id="section-settings">
-      <div class="settings-sheet">
-        <div class="settings-handle">
-          <span class="settings-title">Settings</span>
-          <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
-        </div>
+      <button class="mode-tab mode-pill active" data-mode="background" onclick="prysmorSetMode('background')">
+        <!-- Landscape / background icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 16l5-5 4 4 3-3 4 4"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+        </svg>
+        BG
+      </button>
 
-        <!-- JS-compat hidden elements -->
-        <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
-        <div class="settings-menu" id="settings-menu" style="display:none"></div>
-        <span class="st-chev" id="settings-chevron" style="display:none"></span>
+      <button class="mode-tab mode-pill" data-mode="relight" onclick="prysmorSetMode('relight')">
+        <!-- Sun / light rays icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2"  x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/>
+          <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/>
+          <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        Light
+      </button>
 
-        <!-- Actual visible items -->
-        <button class="sm-item" id="btn-dashboard">
-          <span class="sm-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
+        <!-- Sparkles / magic icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+        </svg>
+        VFX
+      </button>
+
+    </div>
+
+    <!-- ─ REFERENCE IMAGE UPLOAD — visible only in BG mode ─── -->
+    <div class="v2-ref-img-zone" id="ref-img-zone">
+      <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
+        <span class="v2-ref-img-icon">＋</span>
+        <span>Reference image</span>
+      </label>
+      <input type="file" id="ref-img-input" accept="image/*" class="sr-only">
+      <div id="ref-img-preview" class="v2-ref-img-preview hidden">
+        <img id="ref-img-thumb" class="v2-ref-img-thumb" alt="Reference">
+        <span id="ref-img-name" class="v2-ref-img-name"></span>
+        <button id="ref-img-clear" class="v2-ref-img-clear" title="Remove reference image">×</button>
+      </div>
+    </div>
+
+    <!-- ─ PROMPT ────────────────────── -->
+    <div class="v2-prompt-outer">
+      <!-- Decorative sparkle icon — top-left of glass -->
+      <span class="v2-prompt-sparkle" aria-hidden="true">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2l2.09 6.44L21 10l-6.91 1.56L12 18l-2.09-6.44L3 10l6.91-1.56z"/>
+        </svg>
+      </span>
+
+      <div class="v2-prompt-glass">
+        <textarea id="mf-prompt" maxlength="1000"
+          placeholder="Describe the new background…"></textarea>
+
+        <!-- AI Enhance chip — top-right, inside glass -->
+        <button id="btn-compile-prompt" class="v2-enhance-chip"
+          title="AI will improve your prompt for better results">
+          <span class="ai-btn-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+            </svg>
           </span>
-          Open Dashboard
-        </button>
-        <button class="sm-item" id="btn-updates">
-          <span class="sm-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-          </span>
-          Check for Updates
-        </button>
-        <button class="sm-item" id="btn-diagnostics">
-          <span class="sm-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          </span>
-          <span id="btn-diagnostics-label">Diagnostics</span>
-        </button>
-        <div class="diag-box hidden" id="diag-panel">
-          <div class="diag-top">
-            <span class="diag-ttl">Environment</span>
-            <button class="ghost-lnk" id="btn-copy-diag">Copy JSON</button>
-          </div>
-          <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
-          <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
-          <div class="diag-row"><span class="dk">CEP</span><span class="dv" id="diag-cep">…</span></div>
-          <div class="diag-row"><span class="dk">cep.fs</span><span class="dv" id="diag-cepfs">…</span></div>
-          <div class="diag-row"><span class="dk">Backend</span><span class="dv" id="diag-backend">…</span></div>
-          <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
-        </div>
-        <button class="sm-item sm-danger" id="btn-logout">
-          <span class="sm-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          </span>
-          Sign Out
+          <span id="compile-label">Suggest</span>
         </button>
       </div>
+
+      <div class="v2-prompt-foot">
+        <span class="v2-char-count"><span id="mf-char-count">0</span> / 1000</span>
+      </div>
+    </div>
+
+    <!-- ─ OUTPUT OPTIONS ────────────── -->
+    <div class="v2-output-opts">
+      <div class="v2-opt-row">
+        <span class="v2-opt-label">Output</span>
+        <div class="v2-opt-seg">
+          <button id="out-btn-v2" class="v2-opt-pill seg-active">New track</button>
+          <button id="out-btn-replace" class="v2-opt-pill">Replace</button>
+        </div>
+      </div>
+      <div id="output-hint" class="v2-opt-hint">Added on V2 — original clip untouched</div>
+      <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
+    </div>
+
+    <!-- ─ ERRORS ────────────────────── -->
+    <div id="mf-gen-failed" class="v2-inline-error hidden">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="gen-fail-msg">Something went wrong.</span>
+      <button id="gen-retry-btn" class="v2-err-retry">Retry</button>
+    </div>
+
+    <div id="no-credits-banner" class="no-credits-bar hidden">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>No credits remaining.</span>
+      <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
+    </div>
+
+    <!-- ─ GENERATE CTA ──────────────── -->
+    <button id="mf-btn-generate" class="v2-gen-btn">
+      <span id="gen-btn-label">Generate Effect</span>
+      <span id="gen-btn-cost" class="v2-gen-cost" style="display:none">
+        <span id="gen-btn-cost-val">—</span> cr
+      </span>
+      <div class="v2-gen-pline" id="v2-gen-pline"></div>
+    </button>
+
+    <!-- ─ HIDDEN COMPAT ELEMENTS (all IDs JS references) ── -->
+    <div style="display:none" aria-hidden="true">
+      <div id="credits-card"><b id="usage-used">—</b>/<span id="usage-limit">1000</span><span id="usage-seconds"></span></div>
+      <div id="progress-fill" style="width:0%"></div>
+      <button id="btn-refresh-clip"></button>
+      <span id="clip-thumb-placeholder"></span>
+      <span id="clip-trim-badge"></span>
+      <span id="clip-start-badge"></span>
+      <p id="clip-trim-warning"></p>
+      <div class="clip-live"></div>
+      <div id="mf-gen-state">
+        <span id="gp-phase-label"></span>
+        <div id="gp-fill" style="width:0%"></div>
+        <span id="gp-pct">0%</span>
+        <span id="gp-estimate"></span>
+        <span id="gp-elapsed"></span>
+        <div id="mf-gen-bar"></div>
+        <span id="mf-status-text"></span>
+        <span id="mf-gen-pct"></span>
+        <span id="mf-gen-elapsed"></span>
+        <span id="gs-upload"></span>
+        <span id="gs-generate"></span>
+        <span id="gs-done"></span>
+        <span id="gs-line-1"></span>
+        <span id="gs-line-2"></span>
+      </div>
+      <div id="gen-cost-preview"></div>
+      <video id="mf-result-video" src="" muted loop playsinline></video>
+      <!-- Dropdown kept for inline-script applyMode() compat -->
+      <select id="mf-mode-select">
+        <option value="background">Background</option>
+        <option value="relight">Relight</option>
+        <option value="vfx">VFX</option>
+      </select>
+      <a id="link-docs"  href="#"></a>
+      <a id="link-terms" href="#"></a>
+    </div>
+
+    <!-- ─ RESULT OVERLAY ────────────── -->
+    <div id="mf-section-result" class="hidden">
+      <div class="v2-result-preview">
+        <img id="result-preview-img" class="hidden" alt="Generated output">
+        <video id="result-preview-video" class="hidden" muted autoplay loop playsinline></video>
+      </div>
+      <div class="v2-output-actions">
+        <button id="btn-add-to-timeline" class="v2-timeline-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          ↓ Add to Timeline
+        </button>
+        <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
+      </div>
+    </div>
+
+    <!-- hidden compat: keep ba-* IDs so any lingering references don't throw -->
+    <div style="display:none" aria-hidden="true">
+      <img id="ba-before" src="" alt=""><img id="ba-after" src="" alt="">
+      <div id="ba-divider"></div><input type="range" id="ba-slider" value="50" min="0" max="100">
     </div>
 
   </div><!-- /view-main -->
 
+  <!-- ════════════════════════════════
+       HISTORY OVERLAY
+  ════════════════════════════════ -->
+  <div id="section-history">
+    <div class="history-sheet">
+      <div class="history-handle">
+        <span class="history-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Generation History
+        </span>
+        <button class="history-close" id="history-close-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="history-loading" id="history-loading">
+          <div class="history-spinner"></div>
+          <span>Loading…</span>
+        </div>
+        <div id="history-empty" class="history-empty hidden">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>No generations yet.</p>
+        </div>
+        <div id="history-error" class="history-empty hidden" style="color:var(--red)">
+          <p id="history-error-msg">Failed to load history.</p>
+        </div>
+        <!-- Job cards injected by JS here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       SETTINGS OVERLAY
+  ════════════════════════════════ -->
+  <div id="section-settings">
+    <div class="settings-sheet">
+      <div class="settings-handle">
+        <span class="settings-title">Settings</span>
+        <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
+      </div>
+      <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
+      <div    class="settings-menu"   id="settings-menu"    style="display:none"></div>
+      <span                           id="settings-chevron" style="display:none"></span>
+
+      <button class="sm-item" id="btn-dashboard">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+        Open Dashboard
+      </button>
+      <button class="sm-item" id="btn-updates">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></span>
+        Check for Updates
+      </button>
+      <button class="sm-item" id="btn-diagnostics">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+        <span id="btn-diagnostics-label">Diagnostics</span>
+      </button>
+      <div class="diag-box hidden" id="diag-panel">
+        <div class="diag-top">
+          <span class="diag-ttl">Environment</span>
+          <button class="ghost-lnk" id="btn-copy-diag">Copy JSON</button>
+        </div>
+        <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
+        <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
+        <div class="diag-row"><span class="dk">CEP</span>     <span class="dv" id="diag-cep">…</span></div>
+        <div class="diag-row"><span class="dk">cep.fs</span>  <span class="dv" id="diag-cepfs">…</span></div>
+        <div class="diag-row"><span class="dk">Backend</span> <span class="dv" id="diag-backend">…</span></div>
+        <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
+      </div>
+      <button class="sm-item sm-danger" id="btn-logout">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <!-- ── History overlay styles ─────────────────────── -->
+  <style>
+    #section-history {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.55);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    #section-history.history-visible { opacity: 1; pointer-events: all; }
+    .history-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      max-height: 88%;
+      background: #111113;
+      border-top: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px 14px 0 0;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.32,0.72,0,1);
+    }
+    #section-history.history-visible .history-sheet { transform: translateY(0); }
+    .history-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .history-title { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; }
+    .history-close {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.06); border: none;
+      color: var(--text-2); font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .history-close:hover { background: rgba(255,255,255,0.11); }
+    .history-list {
+      overflow-y: auto; flex: 1;
+      padding: 10px 12px 16px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .history-loading, .history-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 32px 0;
+      color: var(--text-2); font-size: 11px;
+    }
+    .history-spinner {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .h-card {
+      background: #18181b; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 11px 13px;
+    }
+    .h-card-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .h-mode-badge {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--accent);
+      background: var(--accent-dim); border: 1px solid var(--accent-border);
+      border-radius: 4px; padding: 2px 6px;
+    }
+    .h-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+    .h-status-done { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .h-status-fail { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+    .h-status-gen  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .h-prompt { font-size: 11px; color: var(--text-2); line-height: 1.45; margin-bottom: 8px; word-break: break-word; }
+    .h-card-foot { display: flex; align-items: center; justify-content: space-between; }
+    .h-date { font-size: 10px; color: var(--text-3); }
+    .h-use-btn {
+      font-size: 10px; font-weight: 600; padding: 4px 10px;
+      background: var(--accent-dim); color: var(--accent);
+      border: 1px solid var(--accent-border); border-radius: 5px;
+      cursor: pointer; transition: background 0.12s;
+    }
+    .h-use-btn:hover { background: rgba(0,230,118,0.18); }
+  </style>
+
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=30"></script>
+  <script src="main.js?v=34"></script>
   <script>
-    /* Grain canvas for login view */
-    (function(){
-      var c=document.getElementById('grain');
-      if(!c)return;
-      var ctx=c.getContext('2d');
-      function draw(){
-        c.width=c.offsetWidth;c.height=c.offsetHeight;
-        var img=ctx.createImageData(c.width,c.height);
-        var d=img.data;
-        for(var i=0;i<d.length;i+=4){var v=Math.random()*22|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=16;}
-        ctx.putImageData(img,0,0);setTimeout(draw,80);
+    /* ── Mode switching — global so onclick= attributes can call it ── */
+    var _modePromptMap = {
+      background: 'Describe the new background...',
+      relight:    'Describe the lighting mood...',
+      vfx:        'Describe the visual effect...',
+    };
+    function prysmorSetMode(mode) {
+      /* update global used by main.js */
+      if (typeof selectedMode !== 'undefined') selectedMode = mode;
+      /* toggle active class on all tab+pill buttons */
+      var tabs = document.querySelectorAll('.mode-tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', tabs[i].getAttribute('data-mode') === mode);
+      }
+      /* sync hidden select */
+      var sel = document.getElementById('mf-mode-select');
+      if (sel) sel.value = mode;
+      /* update prompt placeholder */
+      var prompt = document.getElementById('mf-prompt');
+      if (prompt) prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+      /* show reference image zone only for background mode */
+      var refZone = document.getElementById('ref-img-zone');
+      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
+      /* update enhance chip label for new mode */
+      if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
+    }
+
+    /* ── Login grain canvas ────────────────────────────────────── */
+    (function () {
+      var c = document.getElementById('grain');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      function draw() {
+        c.width = c.offsetWidth; c.height = c.offsetHeight;
+        var img = ctx.createImageData(c.width, c.height), d = img.data;
+        for (var i = 0; i < d.length; i += 4) {
+          var v = Math.random() * 22 | 0;
+          d[i] = d[i+1] = d[i+2] = v; d[i+3] = 16;
+        }
+        ctx.putImageData(img, 0, 0);
+        setTimeout(draw, 80);
       }
       draw();
-    })();
+    }());
 
-    /* Thumbnail fade-in on load */
-    document.addEventListener('DOMContentLoaded', function() {
-      var img = document.getElementById('clip-thumbnail');
-      if (img) {
-        img.addEventListener('load', function() { img.classList.add('loaded'); });
-      }
-    });
+    document.addEventListener('DOMContentLoaded', function () {
 
-    /* Settings close button */
-    document.addEventListener('DOMContentLoaded', function() {
-      var closeBtn = document.getElementById('settings-close-btn');
+      /* ── Settings overlay ──────────────────────────────────── */
       var overlay  = document.getElementById('section-settings');
+      var closeBtn = document.getElementById('settings-close-btn');
+      var openBtn  = document.getElementById('btn-scroll-settings');
+      if (openBtn && overlay)  openBtn.addEventListener('click', function () { overlay.classList.add('settings-visible'); });
       if (closeBtn && overlay) {
-        closeBtn.addEventListener('click', function() {
-          overlay.classList.remove('settings-visible');
-        });
-        /* Tap backdrop to close */
-        overlay.addEventListener('click', function(e) {
-          if (e.target === overlay) overlay.classList.remove('settings-visible');
+        closeBtn.addEventListener('click', function () { overlay.classList.remove('settings-visible'); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
+      }
+
+      /* ── History overlay ──────────────────────────────────── */
+      var historyOverlay = document.getElementById('section-history');
+      var historyOpenBtn = document.getElementById('btn-history');
+      var historyCloseBtn = document.getElementById('history-close-btn');
+      if (historyOpenBtn && historyOverlay) {
+        historyOpenBtn.addEventListener('click', function () {
+          historyOverlay.classList.add('history-visible');
+          loadHistory();
         });
       }
+      if (historyCloseBtn && historyOverlay) {
+        historyCloseBtn.addEventListener('click', function () { historyOverlay.classList.remove('history-visible'); });
+        historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
+      }
+
+      /* Initial placeholder on load */
+      prysmorSetMode('background');
     });
   </script>
 </body>

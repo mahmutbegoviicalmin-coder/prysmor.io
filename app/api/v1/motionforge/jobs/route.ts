@@ -2,6 +2,45 @@ import { NextRequest, NextResponse }   from 'next/server';
 import { createJob }                   from '@/lib/motionforge/jobs';
 import { validatePanelToken, planHasVFXAccess, calcCreditCost } from '@/lib/motionforge/auth';
 import { deductCredits, getUser } from '@/lib/firestore/users';
+import { db } from '@/lib/firebaseAdmin';
+
+// ── List user's recent jobs ───────────────────────────────────────────────────
+export async function GET(req: NextRequest) {
+  const session = await validatePanelToken(req);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const snap = await db
+      .collection('users')
+      .doc(session.userId)
+      .collection('jobs')
+      .orderBy('createdAt', 'desc')
+      .limit(20)
+      .get();
+
+    const jobs = snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id:         doc.id,
+        status:     d.status,
+        prompt:     d.prompt ?? '',
+        mode:       d.mode ?? '',
+        effectType: d.effectType ?? '',
+        creditCost: d.creditCost ?? 0,
+        outputUrl:  d.outputUrl ?? null,
+        createdAt:  d.createdAt ?? null,
+      };
+    });
+
+    return NextResponse.json({ jobs });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[jobs/GET] error:', msg);
+    return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   // ── Authenticate panel session ────────────────────────────────────────────

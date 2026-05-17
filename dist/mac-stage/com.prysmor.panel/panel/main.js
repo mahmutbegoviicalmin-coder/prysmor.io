@@ -33,6 +33,47 @@ const LS_USER_ID        = 'prysmor_user_id';
 const LS_PLAN           = 'prysmor_plan';
 const LS_PLAN_LABEL     = 'prysmor_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_token_exp';
+const LS_MACHINE_ID     = 'prysmor_machine_id';
+
+// ─── Machine Fingerprint ──────────────────────────────────────────────────────
+
+function getMachineFingerprint() {
+  var stored = localStorage.getItem(LS_MACHINE_ID);
+  if (stored) return stored;
+  try {
+    var os  = require('os');
+    var raw = [
+      os.hostname(),
+      os.platform(),
+      os.cpus()[0].model,
+      os.totalmem(),
+    ].join('|');
+    var hash = 0;
+    for (var i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    var id = 'mfp-' + Math.abs(hash).toString(36) + '-' + Date.now().toString(36);
+    localStorage.setItem(LS_MACHINE_ID, id);
+    return id;
+  } catch (e) {
+    var raw2 = [
+      navigator.platform || 'unknown',
+      navigator.hardwareConcurrency || '0',
+      screen.width + 'x' + screen.height,
+      navigator.language || 'unknown',
+      new Date().getTimezoneOffset(),
+    ].join('|');
+    var hash2 = 0;
+    for (var j = 0; j < raw2.length; j++) {
+      hash2 = ((hash2 << 5) - hash2) + raw2.charCodeAt(j);
+      hash2 |= 0;
+    }
+    var id2 = 'mfp-' + Math.abs(hash2).toString(36) + '-' + Date.now().toString(36);
+    localStorage.setItem(LS_MACHINE_ID, id2);
+    return id2;
+  }
+}
 
 // ─── Generation Progress State ────────────────────────────────────────────────
 var _genStartTime    = null;   // Date.now() when Generate was clicked
@@ -72,8 +113,6 @@ function startClipAutoSelect() {
         if (_lastAutoSelectKey !== null) {
           _lastAutoSelectKey    = null;
           state.mf.selInfo      = null;
-          storedReferenceFrame  = null;
-          storedReferenceFrames = [];
           storedVideoInfo       = null;
           showClipEmpty();
           updateCostPreview();
@@ -84,6 +123,7 @@ function startClipAutoSelect() {
       if (key === _lastAutoSelectKey) return; // same clip — nothing to do
       _lastAutoSelectKey = key;
 
+      parsed.sourcePath = normalisePath(parsed.sourcePath);
       state.mf.selInfo = parsed;
       showClipInfo(parsed);
       updateCostPreview();
@@ -97,11 +137,9 @@ function stopClipAutoSelect() {
   _lastAutoSelectKey = null;
 }
 
-// ─── Reference Frame Store ────────────────────────────────────────────────────
-// Up to 3 frames captured at different timecodes when a clip is loaded.
-// storedReferenceFrame is always storedReferenceFrames[0] for backward compat.
-var storedReferenceFrames = [];   // primary — array of base64 JPEG strings
-var storedReferenceFrame  = null; // alias → storedReferenceFrames[0] || null
+// ─── Reference Image Store ────────────────────────────────────────────────────
+var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG), BG mode only
+var selectedMode = 'background';  // active generation mode: background | relight | vfx
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -159,12 +197,22 @@ window.addEventListener('DOMContentLoaded', function () {
   initCS();
   try {
     const raw = cs.getSystemPath(SystemPath.EXTENSION) || '';
-    state._extRoot = raw
-      .replace(/^file:[\/\\]+/, '')   // strip file:/// or file:\ prefix
-      .replace(/\\/g, '/')            // normalise to forward slashes
-      .replace(/\/$/, '');            // strip trailing slash
+    // Use normalisePath so macOS file:/// paths get a leading slash
+    state._extRoot = normalisePath(raw)
+      .replace(/\\/g, '/')   // normalise to forward slashes
+      .replace(/\/$/, '');   // strip trailing slash
   } catch (_) {}
   bindEvents();
+  // Display local panel version in login stats row
+  try {
+    var localVer = readLocalVersion();
+    var verEl = document.getElementById('lv-panel-version');
+    if (verEl && localVer) verEl.textContent = 'v' + localVer;
+  } catch (_) {}
+  // Set initial enhance chip label
+  updateEnhanceLabel();
+  // Check for OTA panel update in background — does not block login flow
+  checkForUpdates();
   // Try to restore saved session — validate against server before showing main view
   if (restoreSession()) {
     validateSessionThenEnter();
@@ -221,7 +269,7 @@ async function validateSessionThenEnter() {
 }
 
 function saveSession(token, userId, plan, planLabel) {
-  const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  const exp = Date.now() + 5 * 24 * 60 * 60 * 1000; // 5 days
   try {
     localStorage.setItem(LS_TOKEN,      token);
     localStorage.setItem(LS_USER_ID,    userId);
@@ -285,11 +333,12 @@ async function startLogin() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        platform:       osName,
-        hostApp:        appName,
-        hostAppVersion: appVersion,
-        cepVersion:     cepVer,
-        deviceName:     deviceLabel,
+        platform:           osName,
+        hostApp:            appName,
+        hostAppVersion:     appVersion,
+        cepVersion:         cepVer,
+        deviceName:         deviceLabel,
+        machineFingerprint: getMachineFingerprint(),
       }),
     });
     var data = null;
@@ -302,9 +351,18 @@ async function startLogin() {
     try { cs.openURLInDefaultBrowser(data.pairingUrl); opened = true; } catch (_) {}
     if (!opened) {
       // CEP 12 fallback: ExtendScript app.openURLInBrowser
-      var escapedUrl = data.pairingUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      cs.evalScript('app.openURLInBrowser("' + escapedUrl + '")', function() {});
+      try {
+        var escapedUrl = data.pairingUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        cs.evalScript('app.openURLInBrowser("' + escapedUrl + '")', function() {});
+        opened = true;
+      } catch (_) {}
     }
+    if (!opened) {
+      // Last resort: show the URL so user can copy-paste it manually
+      try { window.open(data.pairingUrl, '_blank'); } catch (_) {}
+    }
+    // Always show the URL in the status so user can open manually if needed
+    setLoginStatus('Open this link to sign in: ' + data.pairingUrl, false);
     setLoginStatus('Complete sign in in your browser, then come back.', false);
     btn.textContent = 'Waiting for browser…';
     startAuthPolling(data.deviceCode);
@@ -373,9 +431,18 @@ function setLoginStatus(msg, isError) {
 function sendHeartbeat() {
   if (!state.auth.token) return;
   fetch(API_BASE + '/api/panel/heartbeat', {
-    method: 'POST',
+    method:  'POST',
     headers: apiHeaders(),
-  }).catch(function () {}); // fire-and-forget
+  }).then(function (res) {
+    if (res.status === 401) {
+      res.json().then(function (data) {
+        if (data && data.code === 'machine_mismatch') {
+          logout();
+          showToast('Session invalid on this device. Please sign in again.', 'error');
+        }
+      }).catch(function () {});
+    }
+  }).catch(function () {});
 }
 
 function startHeartbeat() {
@@ -447,13 +514,13 @@ function logout() {
   }
 
   clearSession();
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
+  storedReferenceImage  = null;
   storedVideoInfo = null;
   state.mf = {
     jobId: null, selInfo: null, replaceMode: false,
     pollTimer: null, pollStart: 0, outputUrl: null, rawOutputUrl: null,
-    outputPath: null, tempDir: '', generating: false,
+    outputPath: null, startTimeSec: 0, resultAfterBase64: null,
+    tempDir: '', generating: false,
   };
   var btn = el('btn-continue');
   if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
@@ -470,8 +537,6 @@ function logout() {
  */
 function refreshClip(silent) {
   // Clear immediately so Generate is blocked while the async refresh is in progress.
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
   storedVideoInfo = null;
 
   el('btn-refresh-clip').disabled = true;
@@ -486,8 +551,6 @@ function refreshClip(silent) {
 
     if (!parsed || parsed.error) {
       state.mf.selInfo      = null;
-      storedReferenceFrame  = null;
-      storedReferenceFrames = [];
       storedVideoInfo = null;
       showClipEmpty();
       if (!silent) {
@@ -497,6 +560,7 @@ function refreshClip(silent) {
     }
 
     state.mf.selInfo = parsed;
+    parsed.sourcePath = normalisePath(parsed.sourcePath);
     showClipInfo(parsed);
     updateCostPreview();
     // Silently capture a reference frame in background so Enhance has it ready.
@@ -583,10 +647,9 @@ function showClipInfo(info) {
 function apiHeaders(extra) {
   var headers = {};
   var token = state.auth.token;
-  console.log('[auth] token being sent:', token ? 'YES length=' + token.length : 'NO TOKEN');
-  if (token) {
-    headers['Authorization'] = 'Bearer ' + token;
-  }
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  var machineId = getMachineFingerprint();
+  if (machineId) headers['X-Machine-ID'] = machineId;
   return Object.assign(headers, extra || {});
 }
 
@@ -604,11 +667,31 @@ async function apiFetch(path, options) {
   return json;
 }
 
+// ─── Enhance chip label helpers ───────────────────────────────────────────────
+
+var _enhanceSuggestMap = {
+  background: 'Suggest BG',
+  relight:    'Suggest lighting',
+  vfx:        'Suggest effect',
+};
+
+/** Returns the correct chip label based on textarea content and current mode. */
+function getEnhanceLabel() {
+  var ta = el('mf-prompt');
+  if (ta && ta.value.trim()) return 'Enhance';
+  return _enhanceSuggestMap[selectedMode] || 'Suggest';
+}
+
+/** Updates the chip label to match textarea content + mode. */
+function updateEnhanceLabel() {
+  var lbl = el('compile-label');
+  if (lbl) lbl.textContent = getEnhanceLabel();
+}
+
 // ─── Compile Prompt ───────────────────────────────────────────────────────────
 
 async function compilePrompt() {
-  console.log('[Prysmor:enhance] ENHANCE CLICKED - storedReferenceFrames:', storedReferenceFrames.length,
-    'frames, primary:', storedReferenceFrame ? 'YES length=' + storedReferenceFrame.length : 'NO');
+  console.log('[Prysmor:enhance] ENHANCE CLICKED');
   var textarea = el('mf-prompt');
   var raw      = textarea.value.trim();
   var btn      = el('btn-compile-prompt');
@@ -616,17 +699,15 @@ async function compilePrompt() {
 
   // If a job exists (video uploaded), use scene-aware enhance
   if (state.mf.jobId) {
-    btn.disabled    = true;
-    lbl.textContent = 'Analysing…';
+    btn.disabled = true;
+    btn.classList.add('enhancing');
+    lbl.textContent = 'Checking…';
 
     try {
       // Use whatever the user typed as intent, or ask for one if empty
       var intent = raw || 'make it cinematic and dramatic';
 
-      console.log('[Prysmor:enhance] storedReferenceFrames:', storedReferenceFrames.length, 'frames available');
-      var enhanceBody = { intent: intent };
-      if (storedReferenceFrame)          enhanceBody.frameBase64 = storedReferenceFrame;
-      if (storedReferenceFrames.length > 0) enhanceBody.frames = storedReferenceFrames;
+      var enhanceBody = { intent: intent, mode: selectedMode };
       var res = await fetch(API_BASE + '/api/v1/motionforge/jobs/' + state.mf.jobId + '/enhance-prompt', {
         method:  'POST',
         headers: apiHeaders({ 'Content-Type': 'application/json' }),
@@ -645,35 +726,33 @@ async function compilePrompt() {
 
       textarea.value = json.prompt;
       el('mf-char-count').textContent = json.prompt.length;
-
       flashEnhanceSuccess();
       textarea.focus();
 
     } catch (err) {
       showToast('Scene enhance failed: ' + (err.message || 'unknown error'), 'error');
+      lbl.textContent = getEnhanceLabel();
     } finally {
-      btn.disabled    = false;
-      lbl.textContent = 'AI Enhance';
+      btn.disabled = false;
+      btn.classList.remove('enhancing');
     }
     return;
   }
 
   // No job yet — use the top-level enhance-prompt endpoint (no job ID required).
-  // Sends the stored reference frame if available so Claude uses vision.
   if (!raw) {
     showToast('Enter a prompt first', 'error');
     textarea.focus();
     return;
   }
 
-  btn.disabled    = true;
+  btn.disabled = true;
+  btn.classList.add('enhancing');
   lbl.textContent = 'Enhancing…';
 
   try {
-    var enhanceBody2 = { prompt: raw };
-    if (storedReferenceFrames.length > 0) enhanceBody2.frames = storedReferenceFrames;
-    else if (storedReferenceFrame)        enhanceBody2.frames = [storedReferenceFrame];
-    console.log('[Prysmor:enhance] no-job path — frames:', enhanceBody2.frames ? enhanceBody2.frames.length : 0);
+    var enhanceBody2 = { prompt: raw, mode: selectedMode };
+    console.log('[Prysmor:enhance] no-job path — mode:', selectedMode);
 
     var res2 = await fetch(API_BASE + '/api/v1/motionforge/enhance-prompt', {
       method:  'POST',
@@ -699,9 +778,10 @@ async function compilePrompt() {
 
   } catch (err) {
     showToast(err.message || 'Failed to enhance prompt', 'error');
+    lbl.textContent = getEnhanceLabel();
   } finally {
-    btn.disabled    = false;
-    lbl.textContent = 'AI Enhance';
+    btn.disabled = false;
+    btn.classList.remove('enhancing');
   }
 }
 
@@ -806,11 +886,14 @@ function captureFrameViaFFmpeg(sourcePath, timeSec) {
 
       var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-frame-' + Date.now() + '.jpg';
 
+      // Scale to 1920x1080 (fit inside, no crop) — consistent 1080p for Runway reference images.
+      // force_original_aspect_ratio=decrease ensures content is never cropped;
+      // pad fills any gap (only visible for non-16:9 clips) so output is always exactly 1920x1080.
       var args = [
         '-ss', String(parseFloat((timeSec || 0).toFixed(6))),
         '-i',  sourcePath,
         '-vframes', '1',
-        '-vf', 'scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720',
+        '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
         '-q:v', '2',
         '-y', outPath,
       ];
@@ -885,12 +968,14 @@ function computeFrameSharpness(base64Jpeg) {
  * @returns {Promise<string[]>} up to 5 base64 JPEG strings, sharpest first
  */
 async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
-  var SAMPLE_COUNT  = 10;
+  var SAMPLE_COUNT  = 5;
   var KEEP_COUNT    = 5;
-  var SKIP_START    = 0.15;
-  var SKIP_END      = 0.15;
+  // For short clips reduce the skip margins so we don't waste too much of the clip.
+  // Clips < 3s: no skip. Clips 3-6s: 5% each end. Longer: 10% each end.
+  var SKIP_START = durationSec < 3 ? 0 : durationSec < 6 ? 0.05 : 0.10;
+  var SKIP_END   = SKIP_START;
 
-  // Build evenly spaced timestamps within [15%, 85%] of clip
+  // Build evenly spaced timestamps within the usable range of clip
   var usable    = durationSec * (1 - SKIP_START - SKIP_END);
   var startOff  = durationSec * SKIP_START;
   var timestamps = [];
@@ -923,41 +1008,33 @@ async function captureMultipleFrames(sourcePath, mediaInSec, durationSec) {
     })
   );
 
-  // Sort descending by sharpness, keep top N
+  // Sort descending by sharpness, keep top N (or all if fewer available)
   scored.sort(function (a, b) { return b.score - a.score; });
   var top = scored.slice(0, KEEP_COUNT);
 
-  console.log('[Prysmor:multiframe] top ' + top.length + ' sharpest frames selected (scores: ' +
+  console.log('[Prysmor:multiframe] top ' + top.length + '/' + scored.length +
+    ' sharpest frames selected (scores: ' +
     top.map(function (f) { return f.score.toFixed(0); }).join(', ') + ')');
 
   return top.map(function (f) { return f.b64; });
 }
 
-// Captures a reference frame + sequence dimensions when a clip is loaded.
-// Uses ffmpeg (reliable) instead of canvas (fails on wide/unusual codecs).
-// Runs silently in the background — errors leave storedReferenceFrame null.
+// Captures a thumbnail for display and reads sequence dimensions when a clip is loaded.
+// Frame capture for AI is removed — only used for UI thumbnail now.
 async function captureClipReferenceFrame(sourcePath) {
-  storedReferenceFrame  = null;
-  storedReferenceFrames = [];
   storedVideoInfo = null;
+
+  // Normalise path early — handles macOS file:// URLs and %20 encoding
+  sourcePath = normalisePath(sourcePath);
 
   var mediaIn  = (state.mf.selInfo && state.mf.selInfo.mediaInSec)  || 0;
   var duration = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
 
-  // ── Multi-frame capture via ffmpeg ──────────────────────────────────────
-  console.log('[Prysmor:frame] captureClipReferenceFrame: mediaInSec=' + mediaIn +
-    ' durationSec=' + duration + ' sourcePath=' + sourcePath);
-  console.log('[Prysmor:frame] selInfo startTimeSec:', (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 'n/a');
+  // ── Capture one frame just for the thumbnail ─────────────────────────────
   try {
     var frames = await captureMultipleFrames(sourcePath, mediaIn, duration);
     if (frames.length > 0) {
-      storedReferenceFrames = frames;
-      storedReferenceFrame  = frames[0];
-      showClipThumbnail(frames[0]); // display first frame as thumbnail
-      console.log('[Prysmor:frame] captureClipReferenceFrame: stored ' + frames.length +
-        ' frames, primary length=' + frames[0].length);
-    } else {
-      console.warn('[Prysmor:frame] captureClipReferenceFrame: all ffmpeg frames returned null');
+      showClipThumbnail(frames[0]);
     }
   } catch (frameErr) {
     console.error('[Prysmor:frame] captureClipReferenceFrame threw:', frameErr.message);
@@ -972,10 +1049,13 @@ async function captureClipReferenceFrame(sourcePath) {
     var freshInfo = null;
     try { freshInfo = JSON.parse(freshRaw || '{}'); } catch (_) {}
     if (freshInfo && !freshInfo.error) {
-      seqW = Number(freshInfo.seqWidth)  || 0;
-      seqH = Number(freshInfo.seqHeight) || 0;
-      console.log('[Prysmor:aspectRatio] ExtendScript seqWidth=' + freshInfo.seqWidth +
-        ' seqHeight=' + freshInfo.seqHeight + ' → seqW=' + seqW + ' seqH=' + seqH);
+      // Prefer clip source dimensions (actual media res); fall back to sequence dims
+      seqW = Number(freshInfo.clipWidth  || freshInfo.seqWidth)  || 0;
+      seqH = Number(freshInfo.clipHeight || freshInfo.seqHeight) || 0;
+      console.log('[Prysmor:aspectRatio] clipWidth=' + freshInfo.clipWidth +
+        ' clipHeight=' + freshInfo.clipHeight +
+        ' seqWidth=' + freshInfo.seqWidth + ' seqHeight=' + freshInfo.seqHeight +
+        ' → using ' + seqW + 'x' + seqH);
       if (state.mf.selInfo) {
         state.mf.selInfo.seqWidth  = seqW;
         state.mf.selInfo.seqHeight = seqH;
@@ -1027,7 +1107,7 @@ async function mfGenerate() {
     showToast('Please wait, clip is still loading…', 'error');
     return;
   }
-  // Any aspect ratio is allowed — extractAndPrepareClip always crops/scales to 1920x1080.
+  // Any aspect ratio is allowed — extractAndPrepareClip letterboxes to 1920x1080, content never cropped.
   if (storedVideoInfo.width > 0 && storedVideoInfo.height > 0) {
     var aspectRatio = storedVideoInfo.width / storedVideoInfo.height;
     console.log('[Prysmor:aspectRatio] ratio=' + aspectRatio.toFixed(4) + ' — will be normalised to 16:9 by ffmpeg');
@@ -1042,8 +1122,8 @@ async function mfGenerate() {
 
   // ── Step 1: Create job (deducts credits atomically on server) ────────────
   let jobId;
+  var clipDurSec = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
   try {
-    var clipDurSec = (state.mf.selInfo && state.mf.selInfo.durationSec) || 8;
     const created = await apiFetch('/api/v1/motionforge/jobs', {
       method:  'POST',
       headers: apiHeaders({
@@ -1070,20 +1150,21 @@ async function mfGenerate() {
   }
 
   var mediaInSec = parseFloat((state.mf.selInfo.mediaInSec || 0).toFixed(6));
-  var clipDurSec = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
-  var sourcePath = state.mf.selInfo.sourcePath;
+  clipDurSec     = parseFloat((state.mf.selInfo.durationSec || 8).toFixed(6));
+  var sourcePath = normalisePath(state.mf.selInfo.sourcePath);
 
   console.log('[Prysmor:selInfo] mediaInSec  :', mediaInSec);
   console.log('[Prysmor:selInfo] clipDurSec  :', clipDurSec);
   console.log('[Prysmor:selInfo] startTimeSec:', state.mf.selInfo.startTimeSec);
-  console.log('[Prysmor:selInfo] sourcePath  :', sourcePath);
+  console.log('[Prysmor:selInfo] sourcePath (raw) :', state.mf.selInfo.sourcePath);
+  console.log('[Prysmor:selInfo] sourcePath (norm):', sourcePath);
   console.log('[Prysmor:selInfo] full        :', JSON.stringify(state.mf.selInfo));
 
-  // ── Step 2: Get Runway pre-signed upload URL ──────────────────────────────
+  // ── Step 2: Get pre-signed upload URL (Beeble for bg/relight, Runway for vfx) ──
   setStatus('Preparing upload…', 12);
   var uploadSlot;
   try {
-    uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url');
+    uploadSlot = await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-url?mode=' + encodeURIComponent(selectedMode));
   } catch (err) {
     return fail('Upload init failed: ' + err.message);
   }
@@ -1107,22 +1188,8 @@ async function mfGenerate() {
       console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath +
         '  dims=' + preparedVideoWidth + 'x' + preparedVideoHeight);
       setStatus('Reading clip…', 20);
-      // Read file + capture 3 reference frames concurrently (file must exist for both)
-      var multiFrameResults = await Promise.all([
-        readFileBase64(preparedTmpPath),
-        captureMultipleFrames(preparedTmpPath, 0, clipDurSec),
-      ]);
-      fileBase64 = multiFrameResults[0];
-      var capturedFrames = multiFrameResults[1];
+      fileBase64 = await readFileBase64(preparedTmpPath);
       extractionSucceeded = true;
-      // Update stored frames with clean extracted-clip frames (cropped native res)
-      if (capturedFrames && capturedFrames.length > 0) {
-        storedReferenceFrames = capturedFrames;
-        storedReferenceFrame  = capturedFrames[0];
-        console.log('[Prysmor:frame] captured ' + capturedFrames.length + ' reference frames from extracted clip');
-      } else {
-        console.log('[Prysmor:frame] captureMultipleFrames returned 0 frames — using storedReferenceFrames from clip load');
-      }
       try { require('fs').unlinkSync(preparedTmpPath); } catch (_) {
         try { window.cep.fs.deleteFile(preparedTmpPath); } catch (_) {}
       }
@@ -1142,21 +1209,28 @@ async function mfGenerate() {
       }
     }
 
-    // Reference frames were already captured above via captureMultipleFrames.
-    // (captureReferenceFrame / canvas-based capture is no longer needed here)
-
     setStatus('Uploading clip…', 28);
     try {
       var blob = base64ToBlob(fileBase64, 'video/mp4');
-      var formData = new FormData();
-      var fields = uploadSlot.fields || {};
-      Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
-      formData.append('file', blob, 'clip.mp4');
-
-      var s3Res = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
-      if (!s3Res.ok && s3Res.status !== 204) {
-        var errText = await s3Res.text().catch(function () { return ''; });
-        throw new Error('S3 upload HTTP ' + s3Res.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+      var uploadRes;
+      if (uploadSlot.uploadMethod === 'put') {
+        // Beeble: raw PUT with binary body
+        uploadRes = await fetch(uploadSlot.uploadUrl, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'video/mp4' },
+          body:    blob,
+        });
+      } else {
+        // Runway: multipart FormData POST to S3
+        var formData = new FormData();
+        var fields = uploadSlot.fields || {};
+        Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
+        formData.append('file', blob, 'clip.mp4');
+        uploadRes = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+      }
+      if (!uploadRes.ok && uploadRes.status !== 204) {
+        var errText = await uploadRes.text().catch(function () { return ''; });
+        throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
       }
     } catch (err) {
       return fail('Upload failed: ' + err.message);
@@ -1165,14 +1239,16 @@ async function mfGenerate() {
   // ── Step 4: Notify server that upload is complete ─────────────────────────
   setStatus('Uploading clip…', 36);
   try {
+    var completeBody = { mediaInSec: mediaInSec, clipDurSec: clipDurSec };
+    if (uploadSlot.beebleUri) {
+      completeBody.beebleUri = uploadSlot.beebleUri;
+    } else {
+      completeBody.runwayUri = uploadSlot.runwayUri;
+    }
     await apiFetch('/api/v1/motionforge/jobs/' + jobId + '/upload-complete', {
       method:  'POST',
       headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body:    JSON.stringify({
-        runwayUri:  uploadSlot.runwayUri,
-        mediaInSec: mediaInSec,
-        clipDurSec: clipDurSec,
-      }),
+      body:    JSON.stringify(completeBody),
     });
   } catch (err) {
     return fail('Upload confirm failed: ' + err.message);
@@ -1180,14 +1256,11 @@ async function mfGenerate() {
 
   // ── Step 4: Start AI generation ──────────────────────────────────────────
   setStatus('Starting effect generation…', 38);
-  console.log('[Prysmor:frame] sending ' + storedReferenceFrames.length + ' reference frame(s) to generate endpoint');
   try {
-    var genBody = { prompt: prompt };
-    // Send all captured reference frames (primary + extras for identity conditioning)
-    if (storedReferenceFrames.length > 0) {
-      genBody.referenceFrameBase64 = storedReferenceFrames[0];      // primary (backward compat)
-      genBody.referenceFrames      = storedReferenceFrames;          // all frames
-    }
+    var genBody = { prompt: prompt, mode: selectedMode };
+    genBody.clipDuration = clipDurSec;
+    // Send user-uploaded reference image only for background mode
+    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
@@ -1374,7 +1447,7 @@ function startPolling(jobId) {
     setStatus('Downloading result\u2026', 98);
     try {
       console.log('[Prysmor] downloadAndInsert start:', job.outputUrl);
-      await downloadAndInsert(job.outputUrl, sel ? sel.startTimeSec : 0, state.mf.replaceMode);
+      await downloadAndInsert(job.outputUrl, sel ? sel.startTimeSec : 0, state.mf.replaceMode, (state.mf.selInfo && state.mf.selInfo.durationSec) || 0);
       console.log('[Prysmor] downloadAndInsert complete');
     } catch (err) {
       console.error('[Prysmor] downloadAndInsert threw:', err.message);
@@ -1409,7 +1482,7 @@ function stopMfPolling() {
 
 // ─── Download & Insert into Premiere ─────────────────────────────────────────
 
-async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
+async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSec) {
   console.log('[Prysmor] downloadAndInsert — url:', outputUrl);
 
   // Runway output URLs are public S3/CDN presigned URLs — do NOT send auth headers
@@ -1448,8 +1521,27 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     return;
   }
 
-  const tmpDir  = state.mf.tempDir || (state._extRoot + '/panel/temp');
-  const outPath = tmpDir + '/mf-output-' + Date.now() + '.mp4';
+  // Resolve temp directory — prefer extension's panel/temp folder, fall back to OS temp dir
+  var tmpDir = state.mf.tempDir || '';
+  if (!tmpDir) {
+    // Try to use Node.js os.tmpdir() for a reliable writable path (works on both Win + Mac)
+    try { tmpDir = require('os').tmpdir(); } catch (_) {}
+  }
+  if (!tmpDir) {
+    tmpDir = state._extRoot + '/panel/temp';
+  }
+  // Ensure the temp directory exists before writing
+  try {
+    var _nfs = require('fs');
+    if (!_nfs.existsSync(tmpDir)) {
+      _nfs.mkdirSync(tmpDir, { recursive: true });
+      console.log('[Prysmor] created tmpDir:', tmpDir);
+    }
+  } catch (_mkErr) {
+    console.warn('[Prysmor] could not create tmpDir:', tmpDir, _mkErr.message);
+  }
+
+  const outPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-output-' + Date.now() + '.mp4';
   console.log('[Prysmor] writing to disk:', outPath);
 
   // Use string literal 'Base64' — avoids crashes when cep.encoding is undefined
@@ -1466,32 +1558,51 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
   }
 
-  // ── ffmpeg post-process: remove black bars, scale to original clip dimensions ─
+  // ── ffmpeg post-process: ensure output is 1920×1080 ──────────────────────────
+  // We always upload 1920×1080 to Runway, so its output is always 16:9.
+  // Target is ALWAYS 1920×1080 — never use storedVideoInfo dimensions here because
+  // the original clip may be a different ratio (2.39:1, 4:3, vertical…) which would
+  // stretch the 16:9 Runway output if we tried to scale it back to those dimensions.
   var finalPath = outPath;
-  var vidInfo   = storedVideoInfo;
+  var TARGET_W = 1920;
+  var TARGET_H = 1080;
 
-  if (vidInfo && vidInfo.width > 0 && vidInfo.height > 0) {
-    var w          = vidInfo.width;
-    var h          = vidInfo.height;
-    var processedPath = tmpDir + '/mf-processed-' + Date.now() + '.mp4';
+  // Probe Runway output — decide whether we need scale and/or duration trim.
+  var runwayDims = await probeVideoDimensionsFfmpeg(outPath).catch(function () { return null; });
+  var needsScale = !(runwayDims && runwayDims.width === TARGET_W && runwayDims.height === TARGET_H);
+  // Trim output to match original clip duration (Runway may generate 5 or 10s regardless of input)
+  var trimSec = (typeof clipDurSec === 'number' && clipDurSec > 0) ? clipDurSec : 0;
+
+  if (!needsScale && trimSec <= 0) {
+    console.log('[Prysmor:postprocess] Runway output already 1920×1080, no trim needed — skipping re-encode');
+  } else {
+    if (needsScale) {
+      console.log('[Prysmor:postprocess] Runway output ' +
+        (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
+        ' → scaling to 1920×1080' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
+    } else {
+      console.log('[Prysmor:postprocess] Runway output already 1920×1080 — trimming to ' + trimSec.toFixed(3) + 's');
+    }
+
+    var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
     var ffmpegBin  = getFFmpegBin();
 
-    console.log('[Prysmor:postprocess] scaling ' + outPath + ' → ' + w + 'x' + h);
     setStatus('Processing video\u2026', 98);
 
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        var vf    = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=decrease,' +
-                    'pad=' + w + ':' + h + ':(ow-iw)/2:(oh-ih)/2,' +
-                    'crop=' + w + ':' + h;
-        var args  = [
-          '-y',
-          '-i',  outPath,
-          '-vf', vf,
-          '-c:a', 'copy',
-          processedPath,
-        ];
+        var args = ['-y', '-i', outPath];
+        // Add output duration trim before video filter so ffmpeg stops at clipDurSec
+        if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
+        if (needsScale) {
+          // Direct scale to 1920:1080 with high quality re-encode
+          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'copy');
+        } else {
+          // Only trimming needed — stream copy is fast and lossless
+          args.push('-c', 'copy');
+        }
+        args.push(processedPath);
         console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
         var proc = spawn(ffmpegBin, args);
 
@@ -1502,7 +1613,7 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
           if (code === 0) {
             var nfs = require('fs');
             if (nfs.existsSync(processedPath)) {
-              console.log('[Prysmor:postprocess] done — using processed file');
+              console.log('[Prysmor:postprocess] done — 1920×1080 output ready');
               try { nfs.unlinkSync(outPath); } catch (_) {}
               resolve(processedPath);
             } else {
@@ -1530,49 +1641,120 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode) {
     } else {
       console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
     }
-  } else {
-    console.log('[Prysmor:postprocess] no dimension info — skipping black bar removal');
   }
 
-  state.mf.outputPath = finalPath;
-  const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  // ── Audio merge: take video from Runway output, audio from original clip ──────
+  // Runway generates video-only (no audio). Re-attach audio from the source clip
+  // so the timeline clip has its original sound.
+  var originalSourcePath = state.mf.selInfo && state.mf.selInfo.sourcePath
+    ? state.mf.selInfo.sourcePath : null;
 
-  setStatus(replaceMode ? 'Replacing original\u2026' : 'Inserting on V2\u2026', 98);
-  console.log('[Prysmor] evalScript', replaceMode ? 'replaceSelection' : 'insertClipOnV2',
-    'path:', finalPath, 'startTimeSec:', startTimeSec);
+  if (originalSourcePath) {
+    var nfsCheck = require('fs');
+    if (nfsCheck.existsSync(originalSourcePath)) {
+      var audioMergedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-audio-' + Date.now() + '.mp4';
+      var ffmpegBinAudio  = getFFmpegBin();
 
-  await new Promise(function (resolve) {
-    const fn = replaceMode
-      ? 'replaceSelection("' + esc + '")'
-      : 'insertClipOnV2("' + esc + '", ' + startTimeSec + ')';
+      var audioDone = await new Promise(function (resolve) {
+        try {
+          var spawn = require('child_process').spawn;
+          // -map 0:v  → video from Runway output (finalPath)
+          // -map 1:a? → audio from original clip (? = optional, skips if no audio track)
+          // -c:v copy → no re-encode of video
+          // -c:a aac  → encode audio to AAC
+          // -shortest → stop at the shorter of the two streams
+          var args = [
+            '-y',
+            '-i', finalPath,
+            '-i', originalSourcePath,
+            '-map', '0:v',
+            '-map', '1:a?',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-shortest',
+            audioMergedPath,
+          ];
+          console.log('[MotionForge] Audio merge — ffmpeg args:', args.join(' '));
+          var proc = spawn(ffmpegBinAudio, args);
 
-    cs.evalScript(fn, function (r) {
-      console.log('[Prysmor] evalScript result:', r);
-      if (r && r.indexOf('error') === 0) {
-        showToast(r.replace('error: ', ''), 'error');
-      } else {
-        showToast(replaceMode
-          ? 'Original replaced with AI result!'
-          : 'AI clip inserted on V2 \u2014 aligned to selection!', 'success');
-      }
-      resolve();
+          var stderr = '';
+          proc.stderr.on('data', function (d) { stderr += d.toString(); });
+
+          proc.on('close', function (code) {
+            var nfs2 = require('fs');
+            if (code === 0 && nfs2.existsSync(audioMergedPath)) {
+              console.log('[MotionForge] Audio merged from original clip');
+              try { nfs2.unlinkSync(finalPath); } catch (_) {}
+              resolve(audioMergedPath);
+            } else {
+              // No audio track in source or ffmpeg error — use video-only output silently
+              console.warn('[MotionForge] Audio merge skipped (no audio track or ffmpeg error) — stderr:', stderr.slice(-200));
+              try { if (nfs2.existsSync(audioMergedPath)) nfs2.unlinkSync(audioMergedPath); } catch (_) {}
+              resolve(null);
+            }
+          });
+          proc.on('error', function (err) {
+            console.warn('[MotionForge] Audio merge spawn error:', err.message);
+            resolve(null);
+          });
+        } catch (e) {
+          console.warn('[MotionForge] Audio merge exception:', e.message);
+          resolve(null);
+        }
+      });
+
+      if (audioDone) finalPath = audioDone;
+    } else {
+      console.warn('[MotionForge] Audio merge skipped — source file not found:', originalSourcePath);
+    }
+  } else {
+    console.log('[MotionForge] Audio merge skipped — no source path available');
+  }
+
+  state.mf.outputPath  = finalPath;
+  state.mf.startTimeSec = startTimeSec; // store for "Add to Timeline" button
+
+  // ── Extract first frame from output for Before/After slider ──────────────
+  setStatus('Processing result\u2026', 98);
+  try {
+    var afterFramePath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-after-' + Date.now() + '.jpg';
+    var ffmpegBinAf    = getFFmpegBin();
+    await new Promise(function (resolveAf) {
+      try {
+        var spawnAf = require('child_process').spawn;
+        var procAf  = spawnAf(ffmpegBinAf, ['-y', '-i', finalPath, '-vframes', '1', '-q:v', '2', afterFramePath]);
+        procAf.on('close', resolveAf);
+        procAf.on('error', resolveAf);
+      } catch (_) { resolveAf(); }
     });
-  });
+    var nfsAf = require('fs');
+    if (nfsAf.existsSync(afterFramePath)) {
+      state.mf.resultAfterBase64 = nfsAf.readFileSync(afterFramePath).toString('base64');
+      console.log('[Prysmor] after-frame extracted:', afterFramePath);
+      try { nfsAf.unlinkSync(afterFramePath); } catch (_) {}
+    }
+  } catch (afErr) {
+    console.warn('[Prysmor] after-frame extract failed:', afErr.message);
+  }
 
   setStatus('Done!', 100);
-  console.log('[Prysmor] insert done, showing result');
-  showResult(blobUrl || ('file:///' + finalPath.replace(/\\/g, '/').replace(/^\//, '')));
+  console.log('[Prysmor] processing done, showing before/after result');
+  showResult(null);
 
-  // Clean up processed temp file (outPath already deleted above if ffmpeg ran)
-  setTimeout(function () {
-    try {
-      var nfs = require('fs');
-      if (finalPath !== outPath && nfs.existsSync(finalPath)) {
-        nfs.unlinkSync(finalPath);
-        console.log('[Prysmor:postprocess] temp file cleaned up:', finalPath);
-      }
-    } catch (_) {}
-  }, 5000);
+  // Do NOT delete finalPath immediately — Premiere needs time to import it.
+  // OS temp cleanup handles stale files on next boot.
+  // Only delete the intermediate outPath if ffmpeg produced a processed version.
+  if (finalPath !== outPath) {
+    setTimeout(function () {
+      try {
+        var nfs = require('fs');
+        if (nfs.existsSync(outPath)) {
+          nfs.unlinkSync(outPath);
+          console.log('[Prysmor:postprocess] raw temp cleaned up:', outPath);
+        }
+      } catch (_) {}
+    }, 30000); // wait 30s so Premiere has finished reading
+  }
 }
 
 
@@ -1606,34 +1788,43 @@ function showClipThumbnail(base64) {
 
 function setGenerating(active) {
   state.mf.generating = active;
-  var btn = el('mf-btn-generate');
-  if (btn) { btn.disabled = active; btn.style.display = active ? 'none' : ''; }
-  var costBadge = el('gen-btn-cost');
-  if (costBadge && active) costBadge.style.display = 'none';
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
 
-  var gs = el('mf-gen-state');
-  if (gs) gs.classList.toggle('hidden', !active);
-
-  // Hide result and error when starting
-  var rs = el('mf-section-result');
-  if (rs && active) rs.classList.add('hidden');
-  var failEl = el('mf-gen-failed');
-  if (failEl && active) failEl.classList.add('hidden');
+  if (btn) {
+    btn.disabled = active; // disabled while generating so double-clicks are blocked
+    btn.classList.toggle('v2-generating', active);
+  }
 
   if (active) {
-    // Reset progress state
+    // Show generating state in button
+    if (lbl)   lbl.textContent = 'Generating\u2026 0%';
+    if (pline) pline.style.width = '0%';
+    // Hide cost badge while generating
+    var costBadge = el('gen-btn-cost');
+    if (costBadge) costBadge.style.display = 'none';
+
+    // Hide result and error when starting a new generation
+    var rs = el('mf-section-result');
+    if (rs) rs.classList.add('hidden');
+    var failEl = el('mf-gen-failed');
+    if (failEl) failEl.classList.add('hidden');
+
+    // Reset legacy progress state (hidden compat elements)
     _displayPct      = 0;
     _progressHistory = [];
     var fill = el('gp-fill'); if (fill) fill.style.width = '0%';
     var pct  = el('gp-pct');  if (pct)  pct.textContent  = '0%';
     var est  = el('gp-estimate'); if (est) est.textContent = '';
-    var lbl  = el('gp-phase-label'); if (lbl) lbl.textContent = 'Starting\u2026';
+    var plbl = el('gp-phase-label'); if (plbl) plbl.textContent = 'Starting\u2026';
 
     startElapsedTimer();
-
-    // Compat shims: keep old hidden elements current
-    setStage('upload');
+    setStage('upload'); // compat shim
   } else {
+    // Restore button to normal state
+    if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+    if (pline) pline.style.width = '0%';
     stopElapsedTimer();
     _genStartTime = null;
     updateCostPreview();
@@ -1659,11 +1850,24 @@ function setStage(stage) {
 }
 
 function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
-  // Phase label
+  // ── Update the generate button inline during generation ──────────────────
+  if (state.mf.generating) {
+    var genLbl  = el('gen-btn-label');
+    var genPline = el('v2-gen-pline');
+    if (genLbl) {
+      var pctNum = pct != null ? Math.round(Math.min(Math.max(pct, 0), 100)) : null;
+      genLbl.textContent = text + (pctNum != null ? ' ' + pctNum + '%' : '');
+    }
+    if (genPline && pct != null) {
+      var clampedP = Math.min(Math.max(pct, 0), 100);
+      if (clampedP >= _displayPct) genPline.style.width = clampedP + '%';
+    }
+  }
+
+  // ── Legacy hidden compat elements ────────────────────────────────────────
   var lbl = el('gp-phase-label');
   if (lbl) lbl.textContent = text;
 
-  // Progress bar — never goes backwards
   if (pct != null) {
     var clamped = Math.min(Math.max(pct, 0), 100);
     if (clamped >= _displayPct) {
@@ -1673,22 +1877,10 @@ function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
       var pctLbl = el('gp-pct');
       if (pctLbl) pctLbl.textContent = Math.round(clamped) + '%';
 
-      // Record progress sample for ETA estimation
       _progressHistory.push({ t: Date.now(), pct: clamped });
       if (_progressHistory.length > 8) _progressHistory.shift();
       updateETA(clamped);
     }
-  }
-
-  // Stage-based dot color: uploading→amber, generating/completing→green
-  var dot = document.querySelector('.gp-dot');
-  if (dot && pct != null) {
-    if (_displayPct < 40)  dot.style.background = '#FF9F0A';       // amber: uploading
-    else                   dot.style.background = 'var(--accent)'; // green: generating/completing
-  }
-
-  // Compat shims: keep legacy hidden elements in sync
-  if (pct != null) {
     var clamped2 = Math.min(Math.max(pct, 0), 100);
     var oldBar = el('mf-gen-bar'); if (oldBar) oldBar.style.width = clamped2 + '%';
     var oldPct = el('mf-gen-pct'); if (oldPct) oldPct.textContent = Math.round(clamped2) + '%';
@@ -1705,12 +1897,14 @@ function fail(msg) {
   _genStartTime = null;
   state.mf.generating = false;
 
-  // Hide generate button (restored on retry)
-  var btn = el('mf-btn-generate');
-  if (btn) { btn.disabled = false; btn.style.display = 'none'; }
-  // Hide progress bar
-  var gs = el('mf-gen-state');
-  if (gs) gs.classList.add('hidden');
+  // Reset button to normal (not generating) state — do NOT hide it
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
+  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+  if (pline) pline.style.width = '0%';
+  updateCostPreview();
 
   // Show inline error card
   var failEl  = el('mf-gen-failed');
@@ -1718,7 +1912,6 @@ function fail(msg) {
   if (failEl)  failEl.classList.remove('hidden');
   if (failMsg) failMsg.textContent = msg || 'Generation failed.';
 
-  // Also surface as toast for immediate visibility
   showToast(msg, 'error');
 }
 
@@ -1726,9 +1919,42 @@ function showResult(videoUrl) {
   var sec = el('mf-section-result');
   if (!sec) return;
   sec.classList.remove('hidden');
-  var vid = el('mf-result-video');
-  if (vid) { vid.src = videoUrl; vid.load(); vid.play && vid.play().catch(function () {}); }
+
+  var previewImg   = el('result-preview-img');
+  var previewVideo = el('result-preview-video');
+
+  if (videoUrl && previewVideo) {
+    // Show video playback
+    previewVideo.src = videoUrl;
+    previewVideo.classList.remove('hidden');
+    if (previewImg) previewImg.classList.add('hidden');
+  } else if (state.mf.resultAfterBase64 && previewImg) {
+    // Show first-frame still image from AI output
+    previewImg.src = 'data:image/jpeg;base64,' + state.mf.resultAfterBase64;
+    previewImg.classList.remove('hidden');
+    if (previewVideo) { previewVideo.classList.add('hidden'); previewVideo.src = ''; }
+  } else {
+    // Nothing available yet — hide both
+    if (previewImg)  previewImg.classList.add('hidden');
+    if (previewVideo) { previewVideo.classList.add('hidden'); previewVideo.src = ''; }
+  }
+
+  // Enable/disable Add to Timeline button based on whether local file exists
+  var addBtn = el('btn-add-to-timeline');
+  if (addBtn) addBtn.disabled = !state.mf.outputPath;
+
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Unlock Generate button
+  var btn   = el('mf-btn-generate');
+  var lbl   = el('gen-btn-label');
+  var pline = el('v2-gen-pline');
+  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+  if (pline) pline.style.width = '0%';
+  state.mf.generating = false;
+  stopElapsedTimer();
+  updateCostPreview();
 }
 
 function resetUI() {
@@ -1740,6 +1966,61 @@ function resetUI() {
   const cc = el('mf-char-count');     if (cc) cc.textContent = '0';
 }
 
+// ─── Add to Timeline ──────────────────────────────────────────────────────────
+
+async function addToTimeline() {
+  var finalPath    = state.mf.outputPath;
+  var replaceMode  = state.mf.replaceMode;
+  var startTimeSec = state.mf.startTimeSec || (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 0;
+
+  if (!finalPath) {
+    showToast('No output available — generate first', 'error');
+    return;
+  }
+
+  var btn = el('btn-add-to-timeline');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding\u2026'; }
+
+  const esc = finalPath.replace(/\\/g, '/').replace(/"/g, '\\"');
+  console.log('[Prysmor] addToTimeline — path:', finalPath, 'replaceMode:', replaceMode, 'startTimeSec:', startTimeSec);
+
+  await new Promise(function (resolve) {
+    var fn;
+    if (replaceMode) {
+      fn = 'replaceSelection("' + esc + '")';
+    } else {
+      // Insert video-only: temporarily untarget all audio tracks so Premiere
+      // does not insert audio from the generated clip into the timeline.
+      fn = '(function() {' +
+        'try {' +
+        'var seq = app.project.activeSequence;' +
+        'if (!seq) return "error: no active sequence";' +
+        'var i, n = seq.audioTracks.numTracks;' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
+        'var result = insertClipOnV2("' + esc + '", ' + startTimeSec + ');' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        'return result;' +
+        '} catch(e) { return "error: " + e.toString(); }' +
+        '})()';
+    }
+
+    cs.evalScript(fn, function (r) {
+      console.log('[Prysmor] addToTimeline evalScript result:', r);
+      if (r && (r.indexOf('error') === 0 || r.indexOf('Error') === 0)) {
+        showToast(r.replace(/^error:\s*/i, ''), 'error');
+      } else {
+        showToast('AI clip added to timeline!', 'success');
+      }
+      resolve();
+    });
+  });
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg> Add to Timeline';
+  }
+}
+
 // ─── File I/O Helpers ─────────────────────────────────────────────────────────
 
 function readFileBase64(absPath) {
@@ -1747,6 +2028,8 @@ function readFileBase64(absPath) {
     if (!window.cep || !window.cep.fs) {
       return reject(new Error('cep.fs not available — run inside Premiere'));
     }
+    // Normalise path before passing to cep.fs (handles macOS file:// and %20)
+    absPath = normalisePath(absPath);
     // window.cep.encoding.Base64 may be undefined on some CEP builds — fall back to string literal
     var enc = 'Base64';
     try { if (window.cep.encoding && window.cep.encoding.Base64) enc = window.cep.encoding.Base64; } catch (_) {}
@@ -1777,6 +2060,239 @@ function fileExistsSync(p) {
   try { return window.cep.fs.stat(p).err === 0; } catch (_) { return null; }
 }
 
+// ─── Auto-Update ──────────────────────────────────────────────────────────────
+
+var VERSION_API = 'https://prysmor-io.vercel.app/api/panel/version';
+
+/**
+ * Returns the extension root directory (absolute path, no trailing slash).
+ * Handles the macOS case where _extRoot may be missing the leading `/`.
+ */
+function getUpdateRoot() {
+  var root = state._extRoot || '';
+  var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+  if (!isWin && root && root[0] !== '/') root = '/' + root;
+  return root;
+}
+
+/**
+ * Reads version.txt from the panel folder.
+ * Falls back to '1.1.0' for panels installed before the auto-update feature.
+ */
+function readLocalVersion() {
+  try {
+    var nodeFs   = require('fs');
+    var nodePath = require('path');
+    var f = nodePath.join(getUpdateRoot(), 'panel', 'version.txt');
+    if (nodeFs.existsSync(f)) return nodeFs.readFileSync(f, 'utf8').trim();
+  } catch (_) {}
+  return '1.1.0';
+}
+
+/**
+ * Compares two semver strings. Returns true if `remote` is strictly newer.
+ */
+function isNewerVersion(remote, local) {
+  var r = (remote || '0.0.0').split('.').map(Number);
+  var l = (local  || '0.0.0').split('.').map(Number);
+  for (var i = 0; i < 3; i++) {
+    var rv = r[i] || 0, lv = l[i] || 0;
+    if (rv > lv) return true;
+    if (rv < lv) return false;
+  }
+  return false;
+}
+
+/**
+ * Downloads a URL using Node.js https module — bypasses browser CSP/CORS
+ * and correctly follows HTTP redirects (GitHub raw always redirects).
+ * Returns a Promise<string> with the response body as UTF-8 text.
+ */
+function nodeHttpGet(url, _redirects) {
+  _redirects = _redirects || 0;
+  return new Promise(function (resolve, reject) {
+    if (_redirects > 10) return reject(new Error('Too many redirects: ' + url));
+    try {
+      var https = require('https');
+      var http  = require('http');
+      var mod   = url.startsWith('https://') ? https : http;
+      var req   = mod.get(url, { headers: { 'User-Agent': 'Prysmor-Panel/2.4.1' } }, function (res) {
+        // Follow redirects (301/302/307/308)
+        if (res.statusCode >= 301 && res.statusCode <= 308 && res.headers.location) {
+          console.log('[Prysmor:update] redirect', res.statusCode, '→', res.headers.location);
+          res.resume(); // drain to free socket
+          return nodeHttpGet(res.headers.location, _redirects + 1).then(resolve).catch(reject);
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          res.resume();
+          return reject(new Error('HTTP ' + res.statusCode + ' for ' + url));
+        }
+        var chunks = [];
+        res.on('data', function (c) { chunks.push(c); });
+        res.on('end',  function ()  { resolve(Buffer.concat(chunks).toString('utf8')); });
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.end();
+    } catch (e) { reject(e); }
+  });
+}
+
+/**
+ * Downloads new main.js + styles.css via Node.js https (not browser fetch)
+ * and writes them to the panel folder, then shows a restart banner.
+ */
+function applyUpdate(data) {
+  console.log('[Prysmor:update] Applying update', data.version, '…');
+  var root     = getUpdateRoot();
+  var nodeFs   = require('fs');
+  var nodePath = require('path');
+
+  console.log('[Prysmor:update] Panel root:', root);
+
+  var jobs = [
+    { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')    },
+    { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
+    { url: data.index_html_url, dest: nodePath.join(root, 'panel', 'index.html') },
+  ].filter(function (j) { return !!j.url; });
+
+  var pending = jobs.length;
+  if (pending === 0) return;
+
+  jobs.forEach(function (job) {
+    console.log('[Prysmor:update] Downloading:', job.url, '→', job.dest);
+    nodeHttpGet(job.url)
+      .then(function (code) {
+        nodeFs.writeFileSync(job.dest, code, 'utf8');
+        console.log('[Prysmor:update] Written (' + code.length + ' chars):', job.dest);
+        pending--;
+        if (pending === 0) {
+          try {
+            var vf = nodePath.join(root, 'panel', 'version.txt');
+            nodeFs.writeFileSync(vf, data.version, 'utf8');
+            console.log('[Prysmor:update] version.txt updated to', data.version);
+          } catch (_) {}
+          showUpdateBanner(data.version);
+        }
+      })
+      .catch(function (e) {
+        console.warn('[Prysmor:update] Download failed for', job.url, ':', e.message);
+      });
+  });
+}
+
+/**
+ * Displays a non-intrusive banner at the top of the panel asking the user
+ * to restart Premiere Pro to apply the update.
+ */
+function showUpdateBanner(version) {
+  try {
+    var existing = document.getElementById('prysmor-update-banner');
+    if (existing) existing.remove();
+
+    var banner = document.createElement('div');
+    banner.id = 'prysmor-update-banner';
+    banner.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:9999',
+      'background:rgba(0,20,10,0.92)',
+      'border-bottom:1px solid rgba(0,230,118,0.25)',
+      'backdrop-filter:blur(12px)',
+      'padding:9px 14px', 'display:flex', 'align-items:center',
+      'justify-content:space-between', 'gap:10px',
+    ].join(';');
+
+    var dot = document.createElement('span');
+    dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#00e676;box-shadow:0 0 6px rgba(0,230,118,0.7);flex-shrink:0;';
+
+    var msg = document.createElement('span');
+    msg.style.cssText = 'flex:1;font-size:11.5px;color:rgba(0,230,118,0.9);font-weight:500;letter-spacing:-0.01em;';
+    msg.textContent = 'Panel updated to v' + version + ' — restart Premiere to apply.';
+
+    var close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = [
+      'background:none', 'border:none', 'color:rgba(240,240,240,0.35)',
+      'cursor:pointer', 'font-size:13px', 'padding:0 2px', 'line-height:1',
+      'transition:color .15s',
+    ].join(';');
+    close.onmouseover = function () { close.style.color = 'rgba(240,240,240,0.75)'; };
+    close.onmouseout  = function () { close.style.color = 'rgba(240,240,240,0.35)'; };
+    close.onclick = function () { banner.style.opacity = '0'; setTimeout(function () { banner.remove(); }, 150); };
+    banner.style.transition = 'opacity .15s';
+
+    banner.appendChild(dot);
+    banner.appendChild(msg);
+    banner.appendChild(close);
+    document.body.appendChild(banner);
+  } catch (e) {
+    console.log('[Prysmor:update] Updated to', version, '— please restart Premiere.');
+  }
+}
+
+/**
+ * Checks for a newer panel version using Node.js https (bypasses browser CSP)
+ * and silently downloads + applies it. Called once on DOMContentLoaded.
+ */
+function checkForUpdates() {
+  try { require('fs'); } catch (_) {
+    return; // Node.js not available (mock env)
+  }
+  var localVersion = readLocalVersion();
+  console.log('[Prysmor:update] Local version:', localVersion, '| root:', getUpdateRoot());
+
+  nodeHttpGet(VERSION_API)
+    .then(function (body) {
+      var data;
+      try { data = JSON.parse(body); } catch (e) {
+        console.warn('[Prysmor:update] Bad JSON from version API:', body.slice(0, 100));
+        return;
+      }
+      if (!data || !data.version) return;
+      console.log('[Prysmor:update] Remote version:', data.version);
+      if (isNewerVersion(data.version, localVersion)) {
+        applyUpdate(data);
+      } else {
+        console.log('[Prysmor:update] Already up to date (', localVersion, ').');
+      }
+    })
+    .catch(function (e) {
+      console.log('[Prysmor:update] Version check failed (offline?):', e.message);
+    });
+}
+
+// ─── Path normalisation ───────────────────────────────────────────────────────
+/**
+ * Normalises a file path returned by Premiere Pro / ExtendScript on any OS.
+ *
+ * Premiere on macOS can return paths as:
+ *   file:///Volumes/...      → /Volumes/...
+ *   file://localhost/...     → /...
+ *   /path/with%20spaces/...  → /path/with spaces/...
+ *
+ * Windows paths are left unchanged except for stripping any accidental
+ * file:// prefix.
+ */
+function normalisePath(p) {
+  if (!p) return p;
+  // 1. URL-decode percent-encoded characters (%20 etc.)
+  try { p = decodeURIComponent(p); } catch (_) {}
+  // 2. Strip file://localhost (macOS Premiere sometimes uses this)
+  p = p.replace(/^file:\/\/localhost/i, '');
+  // 3. Strip file:// or file:\ prefix (any number of slashes)
+  p = p.replace(/^file:[\/\\]+/i, function (m) {
+    // On macOS the result is /absolute/path, on Windows it's C:\...
+    // Keep one leading slash for macOS absolute paths
+    var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+    return isWin ? '' : '/';
+  });
+  // 4. Normalise path separators via Node.js path (when available)
+  try {
+    var nodePath = require('path');
+    p = nodePath.normalize(p);
+  } catch (_) {}
+  return p;
+}
+
 // ─── Video Preprocessing ──────────────────────────────────────────────────────
 // Centre-crops width to ≤2.358:1 at native resolution (no scale/pad) using ffmpeg.
 // Bundled binary: panel/ffmpeg/win/ffmpeg.exe  (Windows)
@@ -1805,7 +2321,31 @@ function getFFmpegBin() {
   console.log('[Prysmor:ffmpeg] extRoot    :', extRoot);
   console.log('[Prysmor:ffmpeg] bundledBin :', bundledBin, '→ exists:', binExists(bundledBin));
 
-  if (binExists(bundledBin)) return bundledBin;
+  if (binExists(bundledBin)) {
+    console.log('[Prysmor:ffmpeg] using bundled binary:', bundledBin);
+    return bundledBin;
+  }
+
+  // On macOS, try `which ffmpeg` to locate system ffmpeg
+  if (!isWin) {
+    try {
+      var cp = require('child_process');
+      var which = cp.execSync('which ffmpeg 2>/dev/null', { timeout: 3000 }).toString().trim();
+      if (which && nodeFs && nodeFs.existsSync(which)) {
+        console.log('[Prysmor:ffmpeg] using system ffmpeg from which:', which);
+        return which;
+      }
+      // Also check Homebrew locations
+      var brewPaths = ['/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg', '/opt/local/bin/ffmpeg'];
+      for (var bi = 0; bi < brewPaths.length; bi++) {
+        if (nodeFs && nodeFs.existsSync(brewPaths[bi])) {
+          console.log('[Prysmor:ffmpeg] using Homebrew ffmpeg:', brewPaths[bi]);
+          return brewPaths[bi];
+        }
+      }
+    } catch (_) {}
+  }
+
   console.log('[Prysmor:ffmpeg] bundled not found — falling back to system PATH "ffmpeg"');
   return 'ffmpeg';
 }
@@ -1905,9 +2445,20 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
 
     var outPath = tmpDir + (isWin ? '\\' : '/') + 'prysmor-clip-' + Date.now() + '.mp4';
 
-    // Crop to 16:9 from centre, then scale to 1920×1080 for Runway.
-    // Works for any input: portrait, square, ultrawide, landscape.
-    var filter = 'crop=ih*16/9:ih:(iw-ih*16/9)/2:0,scale=1920:1080';
+    // Preserve original aspect ratio — NEVER crop content.
+    // Runway's only hard limit is max 2.358:1 width:height ratio.
+    // Strategy:
+    //   1. If clip exceeds 2.358:1, crop the minimum width needed to satisfy Runway.
+    //   2. Scale to fit inside 1920×1080 (force_original_aspect_ratio=decrease).
+    //   3. Pad to exactly 1920×1080 so Runway always receives a standard frame.
+    //      Black bars are added only where the original ratio requires them.
+    // Result: 2.39:1 clip → slight width crop to 2.358:1 → 1920×816 → pad → 1920×1080 (132px bars top+bottom)
+    //         16:9 clip  → no crop → 1920×1080 → no pad needed
+    var filter = [
+      "crop='min(iw,ih*2.358)':ih:'(iw-min(iw,ih*2.358))/2':0",
+      'scale=1920:1080:force_original_aspect_ratio=decrease',
+      'pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+    ].join(',');
 
     // -ss before -i = fast seek (stream copy to target point then decode).
     var args = [
@@ -2161,18 +2712,17 @@ function flashEnhanceSuccess() {
   if (!btn) return;
 
   var prevIcon = icon ? icon.innerHTML : '';
-  var prevLbl  = lbl  ? lbl.textContent : 'Enhance';
 
   if (icon) icon.innerHTML =
-    '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M2 7L5.5 10.5L12 3.5"/>' +
     '</svg>';
   if (lbl) lbl.textContent = 'Done';
   btn.classList.add('ai-btn--done');
 
   setTimeout(function () {
     if (icon) icon.innerHTML = prevIcon;
-    if (lbl)  lbl.textContent = prevLbl;
+    if (lbl)  lbl.textContent = getEnhanceLabel();
     btn.classList.remove('ai-btn--done');
   }, 1600);
 }
@@ -2203,15 +2753,24 @@ function bindEvents() {
   el('btn-refresh-clip').addEventListener('click', function () {
     // Clear stale state immediately so Generate stays blocked until the
     // full refresh + frame capture cycle completes.
-    storedReferenceFrame  = null;
-    storedReferenceFrames = [];
     storedVideoInfo = null;
     refreshClip(false);
   });
 
-  // Prompt char count
+  // Mode selector pills
+  document.querySelectorAll('.mode-pill').forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      selectedMode = this.getAttribute('data-mode');
+      document.querySelectorAll('.mode-pill').forEach(function (p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      console.log('[Prysmor] Mode changed to:', selectedMode);
+    });
+  });
+
+  // Prompt char count + enhance chip label sync
   el('mf-prompt').addEventListener('input', function () {
     el('mf-char-count').textContent = this.value.length;
+    updateEnhanceLabel();
   });
 
   // Compile prompt
@@ -2241,26 +2800,91 @@ function bindEvents() {
   // Generate
   el('mf-btn-generate').addEventListener('click', mfGenerate);
 
-  // Retry after failure — hide error card and restore generate button
+  // Retry after failure
   var retryBtn = el('gen-retry-btn');
   if (retryBtn) {
     retryBtn.addEventListener('click', function () {
       var failEl = el('mf-gen-failed');
       if (failEl) failEl.classList.add('hidden');
-      // Restore generate button
       var genBtn = el('mf-btn-generate');
-      if (genBtn) { genBtn.disabled = false; genBtn.style.display = ''; }
+      if (genBtn) { genBtn.disabled = false; genBtn.classList.remove('v2-generating'); }
       updateCostPreview();
     });
   }
 
-  // New generation
+  // Add to Timeline button
+  var addBtn = el('btn-add-to-timeline');
+  if (addBtn) {
+    addBtn.addEventListener('click', function () { addToTimeline(); });
+  }
+
+  // Reference image upload
+  var refInput   = el('ref-img-input');
+  var refLabel   = el('ref-img-label');
+  var refPreview = el('ref-img-preview');
+  var refThumb   = el('ref-img-thumb');
+  var refName    = el('ref-img-name');
+  var refClear   = el('ref-img-clear');
+
+  if (refInput) {
+    refInput.addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var dataUrl = e.target.result;
+        // Strip the data URI prefix — backend expects raw base64
+        var comma = dataUrl.indexOf(',');
+        storedReferenceImage = comma !== -1 ? dataUrl.slice(comma + 1) : null;
+        if (!storedReferenceImage) return;
+        if (refThumb)   refThumb.src = dataUrl;
+        if (refName)    refName.textContent = file.name;
+        if (refLabel)   refLabel.classList.add('hidden');
+        if (refPreview) refPreview.classList.remove('hidden');
+        console.log('[Prysmor:refImg] Reference image stored, size:', storedReferenceImage.length);
+      };
+      reader.readAsDataURL(file);
+      // Reset input so the same file can be re-selected after clearing
+      this.value = '';
+    });
+  }
+
+  if (refClear) {
+    refClear.addEventListener('click', function () {
+      storedReferenceImage = null;
+      if (refThumb)   refThumb.src = '';
+      if (refName)    refName.textContent = '';
+      if (refPreview) refPreview.classList.add('hidden');
+      if (refLabel)   refLabel.classList.remove('hidden');
+      console.log('[Prysmor:refImg] Reference image cleared');
+    });
+  }
+
+  // New Effect — clear prompt, hide result, keep clip + mode
   el('mf-btn-new-gen').addEventListener('click', function () {
-    el('mf-section-result').classList.add('hidden');
-    state.mf.jobId       = null;
-    state.mf.outputUrl   = null;
-    state.mf.rawOutputUrl = null;
-    el('mf-prompt').focus();
+    var rs = el('mf-section-result');
+    if (rs) rs.classList.add('hidden');
+    // Clear job + result state
+    state.mf.jobId             = null;
+    state.mf.outputUrl         = null;
+    state.mf.rawOutputUrl      = null;
+    state.mf.outputPath        = null;
+    state.mf.resultAfterBase64 = null;
+    // Clear prompt
+    var promptEl = el('mf-prompt');
+    if (promptEl) { promptEl.value = ''; promptEl.dispatchEvent(new Event('input')); }
+    var cc = el('mf-char-count'); if (cc) cc.textContent = '0';
+    // Restore Generate button
+    var btn   = el('mf-btn-generate');
+    var lbl   = el('gen-btn-label');
+    var pline = el('v2-gen-pline');
+    if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
+    if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
+    if (pline) pline.style.width = '0%';
+    state.mf.generating = false;
+    stopElapsedTimer();
+    updateCostPreview();
+    if (promptEl) setTimeout(function () { promptEl.focus(); }, 150);
   });
 
   // Settings
@@ -2297,9 +2921,149 @@ function bindEvents() {
     e.preventDefault();
     cs.openURLInDefaultBrowser(SITE_URL + '/terms');
   });
+
+  // Clear auth tokens when the panel page unloads (Premiere closes or panel reloads).
+  // Machine fingerprint is intentionally preserved so it is not regenerated each session.
+  window.addEventListener('beforeunload', function () {
+    localStorage.removeItem(LS_TOKEN);
+    localStorage.removeItem(LS_USER_ID);
+    localStorage.removeItem(LS_PLAN);
+    localStorage.removeItem(LS_PLAN_LABEL);
+    localStorage.removeItem(LS_TOKEN_EXP);
+    // LS_MACHINE_ID is intentionally kept — no need to regenerate on every open.
+  });
+
+  // CEP application lifecycle note:
+  // com.adobe.csxs.events.ApplicationDeactivate fires when the user switches *away*
+  // from Premiere Pro (focus loss), not on app close — so it is not suitable for
+  // clearing tokens. The beforeunload event above reliably fires on panel unload /
+  // host-app shutdown and is the correct hook for session cleanup.
 }
 
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
 function el(id) { return document.getElementById(id); }
+
+// ─── Generation History ───────────────────────────────────────────────────────
+
+function loadHistory() {
+  var token = localStorage.getItem(LS_TOKEN);
+  if (!token) return;
+
+  var loadingEl = el('history-loading');
+  var emptyEl   = el('history-empty');
+  var errorEl   = el('history-error');
+  var errorMsg  = el('history-error-msg');
+  var listEl    = el('history-list');
+
+  // Reset state
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  if (emptyEl)   emptyEl.classList.add('hidden');
+  if (errorEl)   errorEl.classList.add('hidden');
+
+  // Remove old cards (keep loading/empty/error elements)
+  var old = listEl ? listEl.querySelectorAll('.h-card') : [];
+  old.forEach(function (n) { n.remove(); });
+
+  fetch(API_BASE + '/api/v1/motionforge/jobs', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  })
+  .then(function (res) { return res.json(); })
+  .then(function (data) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+
+    if (!data.jobs || data.jobs.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    data.jobs.forEach(function (job) {
+      var card = renderHistoryCard(job);
+      if (listEl) listEl.appendChild(card);
+    });
+  })
+  .catch(function (err) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (errorEl) {
+      errorEl.classList.remove('hidden');
+      if (errorMsg) errorMsg.textContent = 'Failed to load history.';
+    }
+    console.error('[Prysmor:history] fetch error:', err);
+  });
+}
+
+function renderHistoryCard(job) {
+  var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX' }[job.mode] || job.mode || '—';
+  var statusClass = { completed: 'h-status-done', failed: 'h-status-fail', generating: 'h-status-gen' }[job.status] || 'h-status-gen';
+  var statusLabel = { completed: 'Done', failed: 'Failed', generating: 'Processing', uploading: 'Uploading', created: 'Queued' }[job.status] || job.status;
+
+  // Format date
+  var dateStr = '—';
+  if (job.createdAt) {
+    try {
+      var d = new Date(job.createdAt._seconds ? job.createdAt._seconds * 1000 : job.createdAt);
+      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' +
+                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {}
+  }
+
+  var promptText = job.prompt ? (job.prompt.length > 72 ? job.prompt.slice(0, 70) + '…' : job.prompt) : '(no prompt)';
+
+  var card = document.createElement('div');
+  card.className = 'h-card';
+  card.innerHTML =
+    '<div class="h-card-top">' +
+      '<span class="h-mode-badge">' + modeLabel + '</span>' +
+      '<span class="h-status ' + statusClass + '">' + statusLabel + '</span>' +
+    '</div>' +
+    '<p class="h-prompt">' + escapeHtml(promptText) + '</p>' +
+    '<div class="h-card-foot">' +
+      '<span class="h-date">' + dateStr + '</span>' +
+      (job.status === 'completed' && job.outputUrl
+        ? '<button class="h-use-btn" data-url="' + escapeHtml(job.outputUrl) + '" data-mode="' + escapeHtml(job.mode) + '">↓ Use</button>'
+        : '') +
+    '</div>';
+
+  var useBtn = card.querySelector('.h-use-btn');
+  if (useBtn) {
+    useBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var url  = this.getAttribute('data-url');
+      var mode = this.getAttribute('data-mode');
+      // Close history overlay
+      var overlay = el('section-history');
+      if (overlay) overlay.classList.remove('history-visible');
+      // Set the output URL into the result section
+      state.mf = state.mf || {};
+      state.mf.outputUrl = url;
+      state.mf.rawOutputUrl = url;
+      // Apply mode and show result
+      if (mode) prysmorSetMode(mode);
+      var resultSection = el('mf-section-result');
+      var resultVideo   = el('result-preview-video');
+      var resultImg     = el('result-preview-img');
+      if (resultVideo && url.match(/\.(mp4|webm|mov)/i)) {
+        resultVideo.src = url;
+        resultVideo.classList.remove('hidden');
+        if (resultImg) resultImg.classList.add('hidden');
+        resultVideo.play().catch(function(){});
+      } else if (resultImg) {
+        resultImg.src = url;
+        resultImg.classList.remove('hidden');
+        if (resultVideo) resultVideo.classList.add('hidden');
+      }
+      if (resultSection) resultSection.classList.remove('hidden');
+    });
+  }
+
+  return card;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

@@ -821,6 +821,11 @@
         <!-- Plan pill (JS reveals via style.display='') -->
         <span id="topbar-plan" style="display:none"></span>
 
+        <!-- History button -->
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+
         <!-- Settings gear -->
         <button class="v2-gear-btn" id="btn-scroll-settings" title="Settings" aria-label="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -1051,6 +1056,35 @@
   </div><!-- /view-main -->
 
   <!-- ════════════════════════════════
+       HISTORY OVERLAY
+  ════════════════════════════════ -->
+  <div id="section-history">
+    <div class="history-sheet">
+      <div class="history-handle">
+        <span class="history-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Generation History
+        </span>
+        <button class="history-close" id="history-close-btn" aria-label="Close">✕</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="history-loading" id="history-loading">
+          <div class="history-spinner"></div>
+          <span>Loading…</span>
+        </div>
+        <div id="history-empty" class="history-empty hidden">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>No generations yet.</p>
+        </div>
+        <div id="history-error" class="history-empty hidden" style="color:var(--red)">
+          <p id="history-error-msg">Failed to load history.</p>
+        </div>
+        <!-- Job cards injected by JS here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
        SETTINGS OVERLAY
   ════════════════════════════════ -->
   <div id="section-settings">
@@ -1093,6 +1127,84 @@
       </button>
     </div>
   </div>
+
+  <!-- ── History overlay styles ─────────────────────── -->
+  <style>
+    #section-history {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.55);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    #section-history.history-visible { opacity: 1; pointer-events: all; }
+    .history-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      max-height: 88%;
+      background: #111113;
+      border-top: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px 14px 0 0;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.32,0.72,0,1);
+    }
+    #section-history.history-visible .history-sheet { transform: translateY(0); }
+    .history-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .history-title { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; }
+    .history-close {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.06); border: none;
+      color: var(--text-2); font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .history-close:hover { background: rgba(255,255,255,0.11); }
+    .history-list {
+      overflow-y: auto; flex: 1;
+      padding: 10px 12px 16px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .history-loading, .history-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 32px 0;
+      color: var(--text-2); font-size: 11px;
+    }
+    .history-spinner {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .h-card {
+      background: #18181b; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 11px 13px;
+    }
+    .h-card-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .h-mode-badge {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--accent);
+      background: var(--accent-dim); border: 1px solid var(--accent-border);
+      border-radius: 4px; padding: 2px 6px;
+    }
+    .h-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+    .h-status-done { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .h-status-fail { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+    .h-status-gen  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .h-prompt { font-size: 11px; color: var(--text-2); line-height: 1.45; margin-bottom: 8px; word-break: break-word; }
+    .h-card-foot { display: flex; align-items: center; justify-content: space-between; }
+    .h-date { font-size: 10px; color: var(--text-3); }
+    .h-use-btn {
+      font-size: 10px; font-weight: 600; padding: 4px 10px;
+      background: var(--accent-dim); color: var(--accent);
+      border: 1px solid var(--accent-border); border-radius: 5px;
+      cursor: pointer; transition: background 0.12s;
+    }
+    .h-use-btn:hover { background: rgba(0,230,118,0.18); }
+  </style>
 
   <script src="lib/CSInterface.js"></script>
   <script src="main.js?v=34"></script>
@@ -1152,6 +1264,21 @@
       if (closeBtn && overlay) {
         closeBtn.addEventListener('click', function () { overlay.classList.remove('settings-visible'); });
         overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
+      }
+
+      /* ── History overlay ──────────────────────────────────── */
+      var historyOverlay = document.getElementById('section-history');
+      var historyOpenBtn = document.getElementById('btn-history');
+      var historyCloseBtn = document.getElementById('history-close-btn');
+      if (historyOpenBtn && historyOverlay) {
+        historyOpenBtn.addEventListener('click', function () {
+          historyOverlay.classList.add('history-visible');
+          loadHistory();
+        });
+      }
+      if (historyCloseBtn && historyOverlay) {
+        historyCloseBtn.addEventListener('click', function () { historyOverlay.classList.remove('history-visible'); });
+        historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
       }
 
       /* Initial placeholder on load */

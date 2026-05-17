@@ -2944,3 +2944,126 @@ function bindEvents() {
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
 function el(id) { return document.getElementById(id); }
+
+// ─── Generation History ───────────────────────────────────────────────────────
+
+function loadHistory() {
+  var token = localStorage.getItem(LS_TOKEN);
+  if (!token) return;
+
+  var loadingEl = el('history-loading');
+  var emptyEl   = el('history-empty');
+  var errorEl   = el('history-error');
+  var errorMsg  = el('history-error-msg');
+  var listEl    = el('history-list');
+
+  // Reset state
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  if (emptyEl)   emptyEl.classList.add('hidden');
+  if (errorEl)   errorEl.classList.add('hidden');
+
+  // Remove old cards (keep loading/empty/error elements)
+  var old = listEl ? listEl.querySelectorAll('.h-card') : [];
+  old.forEach(function (n) { n.remove(); });
+
+  fetch(API_BASE + '/api/v1/motionforge/jobs', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  })
+  .then(function (res) { return res.json(); })
+  .then(function (data) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+
+    if (!data.jobs || data.jobs.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    data.jobs.forEach(function (job) {
+      var card = renderHistoryCard(job);
+      if (listEl) listEl.appendChild(card);
+    });
+  })
+  .catch(function (err) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (errorEl) {
+      errorEl.classList.remove('hidden');
+      if (errorMsg) errorMsg.textContent = 'Failed to load history.';
+    }
+    console.error('[Prysmor:history] fetch error:', err);
+  });
+}
+
+function renderHistoryCard(job) {
+  var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX' }[job.mode] || job.mode || '—';
+  var statusClass = { completed: 'h-status-done', failed: 'h-status-fail', generating: 'h-status-gen' }[job.status] || 'h-status-gen';
+  var statusLabel = { completed: 'Done', failed: 'Failed', generating: 'Processing', uploading: 'Uploading', created: 'Queued' }[job.status] || job.status;
+
+  // Format date
+  var dateStr = '—';
+  if (job.createdAt) {
+    try {
+      var d = new Date(job.createdAt._seconds ? job.createdAt._seconds * 1000 : job.createdAt);
+      dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' +
+                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {}
+  }
+
+  var promptText = job.prompt ? (job.prompt.length > 72 ? job.prompt.slice(0, 70) + '…' : job.prompt) : '(no prompt)';
+
+  var card = document.createElement('div');
+  card.className = 'h-card';
+  card.innerHTML =
+    '<div class="h-card-top">' +
+      '<span class="h-mode-badge">' + modeLabel + '</span>' +
+      '<span class="h-status ' + statusClass + '">' + statusLabel + '</span>' +
+    '</div>' +
+    '<p class="h-prompt">' + escapeHtml(promptText) + '</p>' +
+    '<div class="h-card-foot">' +
+      '<span class="h-date">' + dateStr + '</span>' +
+      (job.status === 'completed' && job.outputUrl
+        ? '<button class="h-use-btn" data-url="' + escapeHtml(job.outputUrl) + '" data-mode="' + escapeHtml(job.mode) + '">↓ Use</button>'
+        : '') +
+    '</div>';
+
+  var useBtn = card.querySelector('.h-use-btn');
+  if (useBtn) {
+    useBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var url  = this.getAttribute('data-url');
+      var mode = this.getAttribute('data-mode');
+      // Close history overlay
+      var overlay = el('section-history');
+      if (overlay) overlay.classList.remove('history-visible');
+      // Set the output URL into the result section
+      state.mf = state.mf || {};
+      state.mf.outputUrl = url;
+      state.mf.rawOutputUrl = url;
+      // Apply mode and show result
+      if (mode) prysmorSetMode(mode);
+      var resultSection = el('mf-section-result');
+      var resultVideo   = el('result-preview-video');
+      var resultImg     = el('result-preview-img');
+      if (resultVideo && url.match(/\.(mp4|webm|mov)/i)) {
+        resultVideo.src = url;
+        resultVideo.classList.remove('hidden');
+        if (resultImg) resultImg.classList.add('hidden');
+        resultVideo.play().catch(function(){});
+      } else if (resultImg) {
+        resultImg.src = url;
+        resultImg.classList.remove('hidden');
+        if (resultVideo) resultVideo.classList.add('hidden');
+      }
+      if (resultSection) resultSection.classList.remove('hidden');
+    });
+  }
+
+  return card;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
