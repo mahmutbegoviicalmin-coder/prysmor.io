@@ -21,29 +21,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Only JPEG, PNG, WebP or GIF allowed" }, { status: 415 });
   }
 
+  // Check if Firebase bucket is initialized
+  if (!bucket) {
+    console.error("[upload] Firebase bucket is null – FIREBASE_PRIVATE_KEY env var missing?");
+    return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split(".").pop() ?? "jpg";
   const storagePath = `support/${userId}/${Date.now()}.${ext}`;
 
-  // Generate a download token so the URL works without public ACLs
-  // (compatible with Uniform bucket-level access which blocks makePublic())
   const { randomUUID } = await import("crypto");
   const downloadToken = randomUUID();
 
-  const fileRef = bucket.file(storagePath);
-  await fileRef.save(buffer, {
-    metadata: {
-      contentType: file.type,
+  try {
+    const fileRef = bucket.file(storagePath);
+    await fileRef.save(buffer, {
       metadata: {
-        firebaseStorageDownloadTokens: downloadToken,
+        contentType: file.type,
+        metadata: { firebaseStorageDownloadTokens: downloadToken },
       },
-    },
-    resumable: false,
-  });
+      resumable: false,
+    });
 
-  const bucketName = bucket.name;
-  const encodedPath = encodeURIComponent(storagePath);
-  const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${downloadToken}`;
-
-  return NextResponse.json({ url });
+    const bucketName = bucket.name;
+    const encodedPath = encodeURIComponent(storagePath);
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+    console.log("[upload] success:", url);
+    return NextResponse.json({ url });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[upload] Firebase Storage error:", msg);
+    return NextResponse.json({ error: "Upload failed", detail: msg }, { status: 500 });
+  }
 }
