@@ -8,13 +8,13 @@ import {
   ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "3.0.3";
+const PANEL_VERSION = "3.0.5";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.3/PrysmrSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.5/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.3/Prysmor-3.0.3.pkg";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.0.5/Prysmor-3.0.5.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -126,7 +126,7 @@ export default function DownloadsContent() {
         </h1>
         <p className="text-[14px] text-[#6B7280] leading-relaxed max-w-[560px]">
           Install the Prysmor CEP extension into Adobe Premiere Pro.
-          AI-powered background replacement, relighting, and VFX — with intelligent prompt enhancement and automatic video preprocessing. No configuration needed.
+          Background replacement, relighting, and VFX — directly inside your timeline. No configuration needed.
         </p>
       </div>
 
@@ -145,8 +145,8 @@ export default function DownloadsContent() {
               </span>
             </div>
             <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
-              One-click installer — sets up the CEP panel with bundled ffmpeg for automatic
-              video preprocessing. No Python, no sidecar, no configuration needed.
+              One-click installer — sets up the CEP panel with bundled ffmpeg.
+              No Python, no sidecar, no configuration needed.
             </p>
 
             <a
@@ -166,12 +166,12 @@ export default function DownloadsContent() {
 
             <div className="mt-4 pt-4 border-t border-[#111] space-y-1.5">
               {[
-                "CEP panel installed automatically to the correct Premiere Pro folder",
-                "ffmpeg bundled — auto-crops and scales wide videos before AI processing",
-                "AI prompt enhancement built-in — smarter results with one click",
+                "CEP panel installed to the correct Premiere Pro folder",
+                "ffmpeg bundled — auto-crops and scales wide clips before processing",
+                "Prompt enhance built-in",
                 "PlayerDebugMode set for CSXS.10, 11, 12, 13 automatically",
                 "CEP caches cleared — panel loads immediately on next Premiere launch",
-                "One-click setup — no configuration, no admin rights needed",
+                "No configuration, no admin rights needed",
               ].map((s) => <FeatureRow key={s}>{s}</FeatureRow>)}
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function DownloadsContent() {
 
             <a
               href={DOWNLOAD_MAC}
-              download="Prysmor-3.0.3.pkg"
+              download="Prysmor-3.0.5.pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#39FF6A] text-[#050505] text-[13px] font-bold hover:bg-[#4fff7e] transition-colors"
@@ -267,18 +267,17 @@ export default function DownloadsContent() {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-white mb-1.5">
-              AI-powered VFX directly in Adobe Premiere Pro
+              VFX directly in Adobe Premiere Pro
             </p>
             <p className="text-[12px] text-[#6B7280] leading-relaxed mb-3">
-              The panel brings AI background replacement, relighting, and VFX effects directly into
-              your Premiere Pro timeline — no extra software, no startup services, no configuration.
-              Just select a clip, describe the effect, and generate.
+              Background replacement, relighting, and VFX directly in your timeline.
+              No extra software, no startup services, no configuration.
             </p>
             <div className="grid sm:grid-cols-3 gap-2">
               {[
-                ["AI Enhance", "Smart prompt suggestions per mode"],
+                ["Enhance", "Smart prompt suggestions per mode"],
                 ["Auto Preprocessing", "ffmpeg crops wide video to 720p"],
-                ["3 AI Modes", "Background, Relight, VFX"],
+                ["3 Modes", "Background, Relight, VFX"],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-[7px] bg-[#080808] border border-[#111] px-3 py-2">
                   <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>

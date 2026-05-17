@@ -194,7 +194,7 @@ export default async function DashboardOverviewPage() {
                 Activate your plan to get started
               </p>
               <p style={{ fontSize: "13px", color: "#555", maxWidth: "420px", lineHeight: 1.6, margin: 0 }}>
-                Subscribe to unlock the Prysmor Premiere panel, AI VFX generation, and Identity Lock.
+                Subscribe to unlock the Prysmor Premiere panel, VFX generation, and Identity Lock.
               </p>
             </div>
           </div>
@@ -373,7 +373,7 @@ export default async function DashboardOverviewPage() {
                 />
               </div>
               <p style={{ marginTop: "6px", fontSize: "12px", color: "#444" }}>
-                ≈ {creditSeconds}s of AI VFX remaining
+                ≈ {creditSeconds}s remaining
               </p>
             </div>
           )}
