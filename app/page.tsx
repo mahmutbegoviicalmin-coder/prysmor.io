@@ -124,20 +124,31 @@ const EXAMPLE_CATEGORIES = [
 ];
 
 function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const wrapRef  = useRef<HTMLDivElement>(null);
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const wrapRef   = useRef<HTMLDivElement>(null);
+  const [lazySrc, setLazySrc] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const v = videoRef.current;
     const el = wrapRef.current;
-    if (!v || !el) return;
+    if (!el) return;
     const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else v.pause(); },
+      ([e]) => {
+        if (e.isIntersecting) {
+          setLazySrc(src);
+          if (v) v.play().catch(() => {});
+        } else {
+          if (v) v.pause();
+        }
+      },
       { threshold: 0.1 },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [src]);
+
+  // once src is set, play when ready
+  const onCanPlay = () => { videoRef.current?.play().catch(() => {}); };
 
   return (
     <div
@@ -151,13 +162,12 @@ function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
     >
       <video
         ref={videoRef}
-        src={src}
-        muted loop playsInline preload="metadata"
+        src={lazySrc}
+        muted loop playsInline preload="none"
+        onCanPlay={onCanPlay}
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", display: "block",
-          transition: "transform 700ms cubic-bezier(0.22,1,0.36,1)",
-          willChange: "transform",
         }}
         className="eg-video"
       />
@@ -265,6 +275,29 @@ function ExamplesGrid() {
       </div>
 
     </section>
+  );
+}
+
+/* Lazy wrapper — defers ExamplesGrid JS until it scrolls near viewport */
+function ExamplesGridLazy() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setShow(true); io.disconnect(); } },
+      { rootMargin: "400px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref}>
+      {show ? <ExamplesGrid /> : (
+        <div style={{ background: "#080808", minHeight: "400px", borderTop: "1px solid #111" }} />
+      )}
+    </div>
   );
 }
 
@@ -1378,7 +1411,7 @@ export default function PrysmorPage() {
 
       {/* ── EXAMPLES ────────────────────────────────────────────────── */}
       <div id="examples">
-        <ExamplesGrid />
+        <ExamplesGridLazy />
       </div>
 
       {/* ── MODES ───────────────────────────────────────────────────── */}
