@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Loader2, ArrowLeft, Send, Image as ImageIcon, Check } from "lucide-react";
+import { Loader2, ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 
 const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
@@ -225,9 +225,22 @@ export default function AdminSupportPage() {
                       </p>
                       <p style={{ fontSize: "13px", color: "#D1D5DB", margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{selected.description}</p>
                       {selected.screenshotUrl && (
-                        <a href={selected.screenshotUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "5px", marginTop: "8px", fontSize: "12px", color: "#60A5FA" }}>
-                          <ImageIcon style={{ width: "12px", height: "12px" }} /> View screenshot
-                        </a>
+                        <div style={{ marginTop: "10px" }}>
+                          <a href={selected.screenshotUrl} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={selected.screenshotUrl}
+                              alt="Screenshot"
+                              style={{
+                                maxWidth: "100%", maxHeight: "300px",
+                                objectFit: "contain", borderRadius: "8px",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                display: "block", cursor: "zoom-in",
+                              }}
+                            />
+                          </a>
+                          <p style={{ fontSize: "10px", color: "#374151", marginTop: "4px" }}>Click to open full size</p>
+                        </div>
                       )}
                     </div>
                     <span style={{ fontSize: "10px", color: "#374151", marginTop: "4px" }}>User · {formatTime(selected.createdAt)}</span>
