@@ -793,7 +793,7 @@
         <div class="lv-stat-sep"></div>
         <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v3.0.5</span></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v3.0.6</span></div>
       </div>
     </div>
   </div>
@@ -822,7 +822,7 @@
         <span id="topbar-plan" style="display:none"></span>
 
         <!-- History button -->
-        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px">
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </button>
 
@@ -1065,7 +1065,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Generation History
         </span>
-        <button class="history-close" id="history-close-btn" aria-label="Close">✕</button>
+        <button class="history-close" id="history-close-btn" aria-label="Close" onclick="document.getElementById('section-history').classList.remove('history-visible')">✕</button>
       </div>
       <div id="history-list" class="history-list">
         <div class="history-loading" id="history-loading">
@@ -1131,12 +1131,12 @@
   <!-- ── History overlay styles ─────────────────────── -->
   <style>
     #section-history {
-      position: fixed; inset: 0; z-index: 200;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
       background: rgba(0,0,0,0.55);
       opacity: 0; pointer-events: none;
       transition: opacity 0.18s ease;
     }
-    #section-history.history-visible { opacity: 1; pointer-events: all; }
+    #section-history.history-visible { opacity: 1; pointer-events: auto; }
     .history-sheet {
       position: absolute; bottom: 0; left: 0; right: 0;
       max-height: 88%;
@@ -1207,7 +1207,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=37"></script>
+  <script src="main.js?v=38"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
