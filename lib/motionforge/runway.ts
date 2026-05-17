@@ -236,7 +236,7 @@ export async function createVideoToVideoTask(
   if (!res.ok) {
     const errBody = await res.text();
     console.error(`[runway] ❌ video_to_video FAILED ${res.status} — FULL ERROR BODY:`, errBody);
-    throw new Error(`Runway video_to_video error ${res.status}: ${errBody}`);
+    throw new Error(`VFX generation failed (${res.status}): ${errBody}`);
   }
 
   return res.json() as Promise<RunwayTaskCreated>;

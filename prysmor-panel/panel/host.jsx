@@ -298,12 +298,8 @@ function replaceSelection(filePath) {
     if (!selectedClip) return 'error: No clip selected.';
 
     var startSec = selectedClip.start.seconds;
-    var durSec   = selectedClip.duration.seconds;
 
-    // Remove the original clip
-    selectedClip.remove(false, false);
-
-    // Import and insert replacement
+    // Import the generated clip without removing the original
     app.project.importFiles([filePath], true, app.project.rootItem, false);
     var item = findProjectItemByPath(app.project.rootItem, filePath);
     if (!item) {
@@ -312,8 +308,16 @@ function replaceSelection(filePath) {
     }
     if (!item) return 'error: Replacement clip not found: ' + fileNameFromPath(filePath);
 
-    var track2 = seq.videoTracks[selectedTrackIdx];
-    track2.insertClip(item, startSec);
+    // Place generated clip on V2 above the original — original is preserved on V1
+    var v2 = seq.videoTracks[1];
+    if (!v2) return 'error: V2 track not found';
+    var time = new Time();
+    time.seconds = startSec;
+    if (v2.overwriteClip) {
+      v2.overwriteClip(item, time.seconds);
+    } else {
+      v2.insertClip(item, time.seconds);
+    }
 
     return 'success';
   } catch (e) {

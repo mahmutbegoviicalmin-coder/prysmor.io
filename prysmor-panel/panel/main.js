@@ -634,7 +634,7 @@ function showClipInfo(info) {
   var warnEl = el('clip-trim-warning');
   if (warnEl) {
     if (willTrim) {
-      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's — only first ' + effectiveDur.toFixed(0) + 's will be processed (Runway limit). Trim your selection to max 8s for best results.';
+      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's — only the first ' + effectiveDur.toFixed(0) + 's will be processed. Trim your selection to max 8s for best results.';
       warnEl.style.display = '';
     } else {
       warnEl.style.display = 'none';
@@ -1902,8 +1902,19 @@ async function addToTimeline() {
   var replaceMode  = state.mf.replaceMode;
   var startTimeSec = state.mf.startTimeSec || (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 0;
 
+  // History "Use" case: outputUrl is set but outputPath is not yet downloaded to disk
+  if (!finalPath && state.mf.outputUrl) {
+    showToast('Downloading clip\u2026', 'info');
+    try {
+      await downloadAndInsert(state.mf.outputUrl, startTimeSec, replaceMode, (state.mf.selInfo && state.mf.selInfo.durationSec) || 0);
+    } catch (err) {
+      showToast('Download failed: ' + err.message, 'error');
+    }
+    return;
+  }
+
   if (!finalPath) {
-    showToast('No output available — generate first', 'error');
+    showToast('Generate a clip first', 'error');
     return;
   }
 
