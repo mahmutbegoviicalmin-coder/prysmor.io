@@ -8,8 +8,9 @@ import {
   ShieldCheck, MoreHorizontal, ArrowUpDown,
   Eye, Plus, Minus, TrendingUp, DollarSign, Activity,
   UserPlus, UserMinus, BarChart2, Package,
-  Trash2, MapPin, Download, Copy, Globe,
+  Trash2, MapPin, Download, Copy, Globe, LifeBuoy,
 } from 'lucide-react';
+import Link from 'next/link';
 
 import type { RevenueData, LsSub } from '@/app/api/admin/revenue/route';
 
@@ -1573,26 +1574,34 @@ export function AdminPanel() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 mb-7 p-1 w-fit rounded-[11px] bg-white/[0.04] border border-white/[0.07]">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all ${
-                isActive ? 'bg-white/[0.09] text-white border border-white/[0.07]' : 'text-[#6B7280] hover:text-[#9CA3AF]'
-              }`}
-            >
-              <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-[#A3FF12]' : 'text-[#4B5563]'}`} />
-              <span>{tab.label}</span>
-              {tab.id === 'users' && users.length > 0 && (
-                <span className="text-[10px] bg-white/[0.08] text-[#6B7280] px-1.5 py-0.5 rounded-full font-semibold">
-                  {users.length}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <div className="flex items-center gap-3 mb-7 flex-wrap">
+        <div className="flex gap-1 p-1 rounded-[11px] bg-white/[0.04] border border-white/[0.07]">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium transition-all ${
+                  isActive ? 'bg-white/[0.09] text-white border border-white/[0.07]' : 'text-[#6B7280] hover:text-[#9CA3AF]'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-[#A3FF12]' : 'text-[#4B5563]'}`} />
+                <span>{tab.label}</span>
+                {tab.id === 'users' && users.length > 0 && (
+                  <span className="text-[10px] bg-white/[0.08] text-[#6B7280] px-1.5 py-0.5 rounded-full font-semibold">
+                    {users.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <Link href="/dashboard/admin/support"
+          className="flex items-center gap-2 px-4 py-2 rounded-[9px] text-[13px] font-medium text-[#6B7280] hover:text-white border border-white/[0.07] hover:border-white/[0.15] transition-all bg-white/[0.02]"
+        >
+          <LifeBuoy className="w-3.5 h-3.5 text-[#4B5563]" />
+          Support Tickets
+        </Link>
       </div>
 
       {/* ── Revenue Tab ── */}

@@ -9,9 +9,18 @@ export async function GET() {
   const snap = await db
     .collection("support_tickets")
     .where("userId", "==", userId)
-    .orderBy("createdAt", "desc")
     .get();
 
-  const tickets = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const tickets = snap.docs
+    .map((doc) => {
+      const data = doc.data() as { createdAt?: string; [key: string]: unknown };
+      return { id: doc.id, ...data };
+    })
+    .sort((a, b) => {
+      const aDate = (a.createdAt as string) ?? "";
+      const bDate = (b.createdAt as string) ?? "";
+      return bDate > aDate ? 1 : -1;
+    });
+
   return NextResponse.json({ tickets });
 }
