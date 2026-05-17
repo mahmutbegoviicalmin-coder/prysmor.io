@@ -1,6 +1,6 @@
 {
   "name": "prysmor.io",
-  "version": "3.0.3",
+  "version": "3.0.5",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -33,6 +33,7 @@
     "process": "^0.11.10",
     "react": "^18",
     "react-dom": "^18",
+    "resend": "^6.12.3",
     "sharp": "^0.34.5",
     "svix": "^1.90.0",
     "tailwind-merge": "^3.5.0"
