@@ -24,7 +24,7 @@
   </choices-outline>
 
   <pkg-ref id="com.prysmor.panel"
-           version="3.0.6"
+           version="3.7.0"
            onConclusion="none">PrysmorPanel.pkg</pkg-ref>
 
 </installer-gui-script>
