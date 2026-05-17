@@ -1,5 +1,5 @@
 # Build Windows (.exe) + macOS (.pkg) installers and attach to GitHub Release
-# Run manually only — auto-trigger causes LFS quota exhaustion on every push
+# ffmpeg is downloaded from official sources — no Git LFS dependency
 name: Build installers
 
 on:
@@ -13,10 +13,22 @@ jobs:
     name: windows
     runs-on: windows-latest
     steps:
-      - name: Checkout (with Git LFS)
+      - name: Checkout (no LFS)
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+
+      - name: Download ffmpeg for Windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "prysmor-panel\panel\ffmpeg\win" | Out-Null
+          Write-Host "Downloading ffmpeg for Windows..."
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          Invoke-WebRequest -Uri $url -OutFile "ffmpeg-win.zip" -TimeoutSec 120
+          Expand-Archive "ffmpeg-win.zip" -DestinationPath "ffmpeg-win-extracted" -Force
+          $exe = Get-ChildItem -Path "ffmpeg-win-extracted" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          Copy-Item $exe.FullName "prysmor-panel\panel\ffmpeg\win\ffmpeg.exe"
+          Write-Host "ffmpeg.exe ready: $(Get-Item 'prysmor-panel\panel\ffmpeg\win\ffmpeg.exe' | Select-Object -ExpandProperty Length) bytes"
 
       - name: Install NSIS
         run: choco install nsis -y
@@ -42,10 +54,20 @@ jobs:
     name: macos
     runs-on: macos-latest
     steps:
-      - name: Checkout (with Git LFS)
+      - name: Checkout (no LFS)
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
+
+      - name: Download ffmpeg for macOS
+        run: |
+          mkdir -p prysmor-panel/panel/ffmpeg/mac
+          echo "Downloading ffmpeg for macOS..."
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o ffmpeg-mac.zip --max-time 120
+          unzip -o ffmpeg-mac.zip -d ffmpeg-mac-extracted
+          cp ffmpeg-mac-extracted/ffmpeg prysmor-panel/panel/ffmpeg/mac/ffmpeg
+          chmod +x prysmor-panel/panel/ffmpeg/mac/ffmpeg
+          echo "ffmpeg ready: $(du -sh prysmor-panel/panel/ffmpeg/mac/ffmpeg)"
 
       - name: Build macOS .pkg
         run: |
@@ -92,12 +114,10 @@ jobs:
             gh release create "$TAG" "$WIN" "$MAC" \
               --repo "$REPO" \
               --title "Prysmor Panel $TAG" \
-              --notes "Built by GitHub Actions — Windows (PrysmrSetup.exe) + macOS (Prysmor-3.0.5.pkg)."
+              --notes "Windows (PrysmrSetup.exe) + macOS (Prysmor-3.0.5.pkg)"
           fi
 
-          echo ""
-          echo "=== Download URLs ==="
           OWNER="${GITHUB_REPOSITORY%%/*}"
           NAME="${GITHUB_REPOSITORY#*/}"
-          echo "https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmrSetup.exe"
-          echo "https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-3.0.5.pkg"
+          echo "Windows: https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmrSetup.exe"
+          echo "macOS:   https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-3.0.5.pkg"
