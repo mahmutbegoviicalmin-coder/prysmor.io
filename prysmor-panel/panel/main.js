@@ -1592,12 +1592,15 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        var args = ['-y', '-i', outPath];
+        // Build args: silent audio (-f lavfi -i aevalsrc=0) replaces any original audio.
+        // When Premiere places this clip on V2, the silent audio overwrites A1 at that
+        // position — so the original clip's audio is silenced during the generated segment.
+        var args = ['-y', '-i', outPath, '-f', 'lavfi', '-i', 'aevalsrc=0'];
         if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
         if (needsScale) {
-          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-an');
+          args.push('-map', '0:v', '-map', '1:a', '-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'aac', '-ar', '44100', '-shortest');
         } else {
-          args.push('-c:v', 'copy', '-an');
+          args.push('-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-ar', '44100', '-shortest');
         }
         args.push(processedPath);
         console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
@@ -1929,16 +1932,31 @@ async function addToTimeline() {
     if (replaceMode) {
       fn = 'replaceSelection("' + esc + '")';
     } else {
-      // Insert video-only: temporarily untarget all audio tracks so Premiere
-      // does not insert audio from the generated clip into the timeline.
+      // Place generated clip (video on V2 + explicitly mute A1 for that segment).
+      // We cannot rely on overwriteClip on a video track to auto-place audio — we
+      // call audioTracks[0].overwriteClip() explicitly after placing video.
+      // A2+ are untargeted so we don't overwrite music/sfx on higher tracks.
       fn = '(function() {' +
         'try {' +
         'var seq = app.project.activeSequence;' +
         'if (!seq) return "error: no active sequence";' +
         'var i, n = seq.audioTracks.numTracks;' +
-        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
+        'for (i = 1; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
         'var result = insertClipOnV2("' + esc + '", ' + startTimeSec + ');' +
-        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        'if (result === "success") {' +
+        '  try {' +
+        '    var silItem = findProjectItemByPath(app.project.rootItem, "' + esc + '");' +
+        '    if (!silItem) {' +
+        '      var silName = "' + esc + '".replace(/\\\\/g,"/").split("/").pop();' +
+        '      silItem = findProjectItemByName(app.project.rootItem, silName);' +
+        '    }' +
+        '    if (silItem && seq.audioTracks.numTracks > 0) {' +
+        '      var a1 = seq.audioTracks[0];' +
+        '      if (a1 && a1.overwriteClip) { a1.overwriteClip(silItem, ' + startTimeSec + '); }' +
+        '    }' +
+        '  } catch(_sil) {}' +
+        '}' +
+        'for (i = 1; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
         'return result;' +
         '} catch(e) { return "error: " + e.toString(); }' +
         '})()';
@@ -2094,6 +2112,7 @@ function applyUpdate(data) {
     { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')    },
     { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
     { url: data.index_html_url, dest: nodePath.join(root, 'panel', 'index.html') },
+    { url: data.host_jsx_url,   dest: nodePath.join(root, 'panel', 'host.jsx')   },
   ].filter(function (j) { return !!j.url; });
 
   var pending = jobs.length;

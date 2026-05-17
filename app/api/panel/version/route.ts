@@ -6,7 +6,7 @@ export const runtime = 'edge';
  * Current panel version — bump this string to push an OTA update to all installed panels.
  * Panels compare their local version.txt against this value on every Premiere launch.
  */
-const PANEL_VERSION = '3.8.0';
+const PANEL_VERSION = '3.9.0';
 
 const GITHUB_RAW =
   'https://raw.githubusercontent.com/mahmutbegoviicalmin-coder/prysmor.io/main/prysmor-panel/panel';
@@ -30,6 +30,7 @@ export async function GET() {
       main_js_url:    `${GITHUB_RAW}/main.js`,
       styles_css_url: `${GITHUB_RAW}/styles.css`,
       index_html_url: `${GITHUB_RAW}/index.html`,
+      host_jsx_url:   `${GITHUB_RAW}/host.jsx`,
     },
     { headers: CORS },
   );
