@@ -124,41 +124,29 @@ const EXAMPLE_CATEGORIES = [
 ];
 
 function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const wrapRef    = useRef<HTMLDivElement>(null);
-  const [lazySrc, setLazySrc] = useState<string | undefined>(undefined);
-  const visibleRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef  = useRef<HTMLDivElement>(null);
 
-  // Step 1: IntersectionObserver only sets lazySrc (triggers React re-render with src)
   useEffect(() => {
+    const v  = videoRef.current;
     const el = wrapRef.current;
-    if (!el) return;
+    if (!v || !el) return;
+
     const io = new IntersectionObserver(
-      ([e]) => {
-        visibleRef.current = e.isIntersecting;
-        if (e.isIntersecting) {
-          setLazySrc(src);
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          // If not yet loaded, trigger load first
+          if (v.readyState === 0) v.load();
+          v.play().catch(() => {});
         } else {
-          videoRef.current?.pause();
+          v.pause();
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0.05, rootMargin: "100px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [src]);
-
-  // Step 2: Once lazySrc is set in DOM, load and play
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!lazySrc || !v) return;
-    v.load();
-    if (visibleRef.current) v.play().catch(() => {});
-  }, [lazySrc]);
-
-  const onCanPlay = () => {
-    if (visibleRef.current) videoRef.current?.play().catch(() => {});
-  };
+  }, []);
 
   return (
     <div
@@ -172,12 +160,12 @@ function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
     >
       <video
         ref={videoRef}
-        src={lazySrc}
+        src={src}
         muted loop playsInline preload="none"
-        onCanPlay={onCanPlay}
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", display: "block",
+          transform: "translateZ(0)",
         }}
         className="eg-video"
       />
@@ -274,7 +262,7 @@ function ExamplesGrid() {
               {/* Videos */}
               <div className={`eg-grid eg-grid-${cat.videos.length}`}>
                 {cat.videos.map((src, vi) => (
-                  <div key={vi} className="eg-cell">
+                  <div key={vi} className="eg-cell" style={{ contain: "layout style paint" }}>
                     <ExampleVideoCard src={src} accent={cat.color} />
                   </div>
                 ))}
@@ -285,29 +273,6 @@ function ExamplesGrid() {
       </div>
 
     </section>
-  );
-}
-
-/* Lazy wrapper — defers ExamplesGrid JS until it scrolls near viewport */
-function ExamplesGridLazy() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setShow(true); io.disconnect(); } },
-      { rootMargin: "400px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={ref}>
-      {show ? <ExamplesGrid /> : (
-        <div style={{ background: "#080808", minHeight: "400px", borderTop: "1px solid #111" }} />
-      )}
-    </div>
   );
 }
 
@@ -1421,7 +1386,7 @@ export default function PrysmorPage() {
 
       {/* ── EXAMPLES ────────────────────────────────────────────────── */}
       <div id="examples">
-        <ExamplesGridLazy />
+        <ExamplesGrid />
       </div>
 
       {/* ── MODES ───────────────────────────────────────────────────── */}
