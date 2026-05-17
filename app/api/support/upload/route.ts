@@ -25,20 +25,25 @@ export async function POST(req: Request) {
   const ext = file.name.split(".").pop() ?? "jpg";
   const storagePath = `support/${userId}/${Date.now()}.${ext}`;
 
-  const fileRef = bucket.file(storagePath);
+  // Generate a download token so the URL works without public ACLs
+  // (compatible with Uniform bucket-level access which blocks makePublic())
+  const { randomUUID } = await import("crypto");
+  const downloadToken = randomUUID();
 
+  const fileRef = bucket.file(storagePath);
   await fileRef.save(buffer, {
-    metadata: { contentType: file.type },
+    metadata: {
+      contentType: file.type,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+      },
+    },
     resumable: false,
   });
 
-  // Explicitly make the file public (compatible with all firebase-admin versions)
-  await fileRef.makePublic();
-
-  // Use Firebase Storage download URL format (works without auth)
   const bucketName = bucket.name;
   const encodedPath = encodeURIComponent(storagePath);
-  const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
+  const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 
   return NextResponse.json({ url });
 }
