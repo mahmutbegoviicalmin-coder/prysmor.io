@@ -1573,74 +1573,86 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
   // Trim output to match original clip duration (Runway may generate 5 or 10s regardless of input)
   var trimSec = (typeof clipDurSec === 'number' && clipDurSec > 0) ? clipDurSec : 0;
 
-  // Always run ffmpeg: strip audio (-an) + optional scale + optional trim.
-  // Even when no scale/trim is needed, we must strip audio from the AI output.
+  // Post-process: generate TWO files:
+  //   1. video-only MP4  (-an)  → placed on V2
+  //   2. silent AAC file        → placed on A1 separately, so overwriteClip on A1
+  //      only puts audio there and never touches V1.
+  // Using a single file with video+silent-audio caused Premiere to also overwrite V1
+  // when we called audioTracks[0].overwriteClip(), deleting the original clip.
   {
-    if (needsScale) {
-      console.log('[Prysmor:postprocess] Runway output ' +
-        (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
-        ' → scaling to 1920×1080 + strip audio' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
-    } else {
-      console.log('[Prysmor:postprocess] Strip audio' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : '') + ' (stream copy)');
-    }
-
-    var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
-    var ffmpegBin  = getFFmpegBin();
+    var ts = Date.now();
+    var sep = (tmpDir.endsWith('/') || tmpDir.endsWith('\\')) ? '' : '/';
+    var processedPath  = tmpDir + sep + 'mf-processed-' + ts + '.mp4';
+    var silentAacPath  = tmpDir + sep + 'mf-silence-'   + ts + '.aac';
+    var ffmpegBin = getFFmpegBin();
 
     setStatus('Processing video\u2026', 98);
 
+    // ── Step 1: video-only ───────────────────────────────────────────────────
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
-        // Build args: silent audio (-f lavfi -i aevalsrc=0) replaces any original audio.
-        // When Premiere places this clip on V2, the silent audio overwrites A1 at that
-        // position — so the original clip's audio is silenced during the generated segment.
-        var args = ['-y', '-i', outPath, '-f', 'lavfi', '-i', 'aevalsrc=0'];
+        var args = ['-y', '-i', outPath];
         if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
         if (needsScale) {
-          args.push('-map', '0:v', '-map', '1:a', '-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'aac', '-ar', '44100', '-shortest');
+          console.log('[Prysmor:postprocess] scale to 1920x1080 + strip audio');
+          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-an');
         } else {
-          args.push('-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-ar', '44100', '-shortest');
+          console.log('[Prysmor:postprocess] stream copy + strip audio');
+          args.push('-c:v', 'copy', '-an');
         }
         args.push(processedPath);
-        console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
+        console.log('[Prysmor:postprocess] video args:', args.join(' '));
         var proc = spawn(ffmpegBin, args);
-
         var stderr = '';
         proc.stderr.on('data', function (d) { stderr += d.toString(); });
-
         proc.on('close', function (code) {
           if (code === 0) {
             var nfs = require('fs');
             if (nfs.existsSync(processedPath)) {
-              console.log('[Prysmor:postprocess] done — 1920×1080 output ready');
               try { nfs.unlinkSync(outPath); } catch (_) {}
               resolve(processedPath);
-            } else {
-              console.warn('[Prysmor:postprocess] output file missing after ffmpeg exit 0');
-              resolve(null);
-            }
+            } else { resolve(null); }
           } else {
-            console.warn('[Prysmor:postprocess] ffmpeg exited', code, '— stderr:', stderr.slice(-400));
+            console.warn('[Prysmor:postprocess] video ffmpeg exit', code, stderr.slice(-400));
             resolve(null);
           }
         });
-        proc.on('error', function (err) {
-          console.warn('[Prysmor:postprocess] spawn error:', err.message);
-          resolve(null);
-        });
-      } catch (spawnErr) {
-        console.warn('[Prysmor:postprocess] exception:', spawnErr.message);
-        resolve(null);
-      }
+        proc.on('error', function (err) { console.warn('[Prysmor:postprocess] video spawn error:', err.message); resolve(null); });
+      } catch (e) { console.warn('[Prysmor:postprocess] video exception:', e.message); resolve(null); }
     });
 
     if (postDone) {
       finalPath = postDone;
-      console.log('[Prysmor:postprocess] using processed path:', finalPath);
+      console.log('[Prysmor:postprocess] video-only ready:', finalPath);
     } else {
-      console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
+      console.warn('[Prysmor:postprocess] video ffmpeg failed — using raw output');
     }
+
+    // ── Step 2: silent AAC (exact same duration) ─────────────────────────────
+    // Duration: prefer trimSec, fall back to runwayDims probe (usually 5 or 10s).
+    var silDur = trimSec > 0 ? trimSec : 10;
+    var silenceDone = await new Promise(function (resolve) {
+      try {
+        var spawn2 = require('child_process').spawn;
+        var sArgs = [
+          '-y', '-f', 'lavfi', '-i', 'aevalsrc=0:c=stereo',
+          '-t', String(parseFloat(silDur.toFixed(6))),
+          '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+          silentAacPath
+        ];
+        console.log('[Prysmor:postprocess] silence args:', sArgs.join(' '));
+        var sProc = spawn2(ffmpegBin, sArgs);
+        sProc.on('close', function (code) {
+          var nfs2 = require('fs');
+          resolve(code === 0 && nfs2.existsSync(silentAacPath) ? silentAacPath : null);
+        });
+        sProc.on('error', function () { resolve(null); });
+      } catch (e) { resolve(null); }
+    });
+
+    state.mf.silentAudioPath = silenceDone || null;
+    console.log('[Prysmor:postprocess] silent audio:', state.mf.silentAudioPath);
   }
 
   state.mf.outputPath  = finalPath;
@@ -1930,33 +1942,59 @@ async function addToTimeline() {
   await new Promise(function (resolve) {
     var fn;
     if (replaceMode) {
-      fn = 'replaceSelection("' + esc + '")';
+      // Replace mode: place on V2 via replaceSelection, then also silence A1
+      // using the dedicated silent AAC file (different file from the video-only clip).
+      var silPathR = (state.mf.silentAudioPath || '').replace(/\\/g, '/').replace(/"/g, '\\"');
+      fn = '(function() {' +
+        'try {' +
+        'var result = replaceSelection("' + esc + '");' +
+        (silPathR ? (
+          'if (result === "success") {' +
+          '  try {' +
+          '    var seq2 = app.project.activeSequence;' +
+          '    app.project.importFiles(["' + silPathR + '"], true, app.project.rootItem, false);' +
+          '    var silR = findProjectItemByPath(app.project.rootItem, "' + silPathR + '");' +
+          '    if (!silR) { var sn="' + silPathR + '".split("/").pop(); silR=findProjectItemByName(app.project.rootItem,sn); }' +
+          '    if (silR && seq2 && seq2.audioTracks.numTracks > 0) {' +
+          '      var a1r = seq2.audioTracks[0];' +
+          '      if (a1r && a1r.overwriteClip) { a1r.overwriteClip(silR, ' + startTimeSec + '); }' +
+          '    }' +
+          '  } catch(_) {}' +
+          '}') : '') +
+        'return result;' +
+        '} catch(e) { return "error: " + e.toString(); }' +
+        '})()';
+
     } else {
-      // Place generated clip (video on V2 + explicitly mute A1 for that segment).
-      // We cannot rely on overwriteClip on a video track to auto-place audio — we
-      // call audioTracks[0].overwriteClip() explicitly after placing video.
-      // A2+ are untargeted so we don't overwrite music/sfx on higher tracks.
+      // Place VIDEO-ONLY clip on V2. Then separately place a SILENT AAC file on A1.
+      // Using two distinct files prevents Premiere from also touching V1 when we
+      // call overwriteClip on the audio track (which happened with a combined file).
+      var silPath = (state.mf.silentAudioPath || '').replace(/\\/g, '/').replace(/"/g, '\\"');
       fn = '(function() {' +
         'try {' +
         'var seq = app.project.activeSequence;' +
         'if (!seq) return "error: no active sequence";' +
+        // Untarget ALL audio tracks so inserting video-only clip on V2 never writes to any A track.
         'var i, n = seq.audioTracks.numTracks;' +
-        'for (i = 1; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
         'var result = insertClipOnV2("' + esc + '", ' + startTimeSec + ');' +
-        'if (result === "success") {' +
-        '  try {' +
-        '    var silItem = findProjectItemByPath(app.project.rootItem, "' + esc + '");' +
-        '    if (!silItem) {' +
-        '      var silName = "' + esc + '".replace(/\\\\/g,"/").split("/").pop();' +
-        '      silItem = findProjectItemByName(app.project.rootItem, silName);' +
-        '    }' +
-        '    if (silItem && seq.audioTracks.numTracks > 0) {' +
-        '      var a1 = seq.audioTracks[0];' +
-        '      if (a1 && a1.overwriteClip) { a1.overwriteClip(silItem, ' + startTimeSec + '); }' +
-        '    }' +
-        '  } catch(_sil) {}' +
-        '}' +
-        'for (i = 1; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        (silPath ? (
+          // Now place the separate silent AAC on A1 only.
+          'if (result === "success") {' +
+          '  try {' +
+          '    app.project.importFiles(["' + silPath + '"], true, app.project.rootItem, false);' +
+          '    var silItem = findProjectItemByPath(app.project.rootItem, "' + silPath + '");' +
+          '    if (!silItem) {' +
+          '      var silName = "' + silPath + '".split("/").pop();' +
+          '      silItem = findProjectItemByName(app.project.rootItem, silName);' +
+          '    }' +
+          '    if (silItem && seq.audioTracks.numTracks > 0) {' +
+          '      var a1 = seq.audioTracks[0];' +
+          '      if (a1 && a1.overwriteClip) { a1.overwriteClip(silItem, ' + startTimeSec + '); }' +
+          '    }' +
+          '  } catch(_sil) { /* non-fatal */ }' +
+          '}') : '') +
         'return result;' +
         '} catch(e) { return "error: " + e.toString(); }' +
         '})()';

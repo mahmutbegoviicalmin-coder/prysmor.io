@@ -319,15 +319,6 @@ function replaceSelection(filePath) {
       v2.insertClip(item, time.seconds);
     }
 
-    // Explicitly place silent audio on A1 to mute the original clip's audio
-    // for the duration of the generated segment.
-    try {
-      var a1 = seq.audioTracks[0];
-      if (a1 && a1.overwriteClip) {
-        a1.overwriteClip(item, time.seconds);
-      }
-    } catch (_) {}
-
     return 'success';
   } catch (e) {
     return 'error: ' + e.message;
