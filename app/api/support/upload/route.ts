@@ -23,14 +23,22 @@ export async function POST(req: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `support/${userId}/${Date.now()}.${ext}`;
+  const storagePath = `support/${userId}/${Date.now()}.${ext}`;
 
-  const fileRef = bucket.file(path);
+  const fileRef = bucket.file(storagePath);
+
   await fileRef.save(buffer, {
     metadata: { contentType: file.type },
-    public: true,
+    resumable: false,
   });
 
-  const url = `https://storage.googleapis.com/${bucket.name}/${path}`;
+  // Explicitly make the file public (compatible with all firebase-admin versions)
+  await fileRef.makePublic();
+
+  // Use Firebase Storage download URL format (works without auth)
+  const bucketName = bucket.name;
+  const encodedPath = encodeURIComponent(storagePath);
+  const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
+
   return NextResponse.json({ url });
 }

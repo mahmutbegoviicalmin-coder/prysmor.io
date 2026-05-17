@@ -188,7 +188,7 @@ function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
       setUploadStatus("done");
     } catch {
       setUploadStatus("error");
-      setScreenshotPreview(null);
+      // Keep preview visible so user can retry or remove manually
     }
   }
 
@@ -257,6 +257,17 @@ function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
                 {uploadStatus === "done" && (
                   <div style={{ position: "absolute", top: "8px", left: "8px", display: "flex", alignItems: "center", gap: "5px", background: "rgba(57,255,106,0.15)", border: "1px solid rgba(57,255,106,0.3)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", color: "#39FF6A", fontWeight: 600 }}>
                     <CheckCircle2 style={{ width: "11px", height: "11px" }} /> Uploaded
+                  </div>
+                )}
+                {uploadStatus === "error" && (
+                  <div style={{ position: "absolute", top: "8px", left: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", color: "#EF4444", fontWeight: 600 }}>
+                      Upload failed
+                    </span>
+                    <button type="button" onClick={() => { if (fileInputRef.current) { const file = fileInputRef.current.files?.[0]; if (file) handleFileChange({ target: { files: fileInputRef.current.files } } as React.ChangeEvent<HTMLInputElement>); } }}
+                      style={{ background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", color: "white", cursor: "pointer" }}>
+                      Retry
+                    </button>
                   </div>
                 )}
                 <button type="button" onClick={removeScreenshot}
