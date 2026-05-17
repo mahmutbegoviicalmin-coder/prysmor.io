@@ -171,24 +171,52 @@ function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
     (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [field]: e.target.value }));
 
+  async function compressImage(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("no canvas ctx")); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = objectUrl;
+    });
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setScreenshotPreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
     setUploadStatus("uploading");
-    const fd = new FormData();
-    fd.append("file", file);
     try {
-      const res = await fetch("/api/support/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error();
+      const imageBase64 = await compressImage(file);
+      setScreenshotPreview(imageBase64);
+      const res = await fetch("/api/support/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64 }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || errData.error || "Upload failed");
+      }
       const { url } = await res.json();
       setScreenshotUrl(url);
       setUploadStatus("done");
-    } catch {
+    } catch (err) {
+      console.error("[upload] error:", err);
       setUploadStatus("error");
-      // Keep preview visible so user can retry or remove manually
     }
   }
 
@@ -264,7 +292,7 @@ function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
                     <span style={{ display: "flex", alignItems: "center", gap: "4px", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", color: "#EF4444", fontWeight: 600 }}>
                       Upload failed
                     </span>
-                    <button type="button" onClick={() => { if (fileInputRef.current) { const file = fileInputRef.current.files?.[0]; if (file) handleFileChange({ target: { files: fileInputRef.current.files } } as React.ChangeEvent<HTMLInputElement>); } }}
+                    <button type="button" onClick={() => fileInputRef.current?.click()}
                       style={{ background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", color: "white", cursor: "pointer" }}>
                       Retry
                     </button>
