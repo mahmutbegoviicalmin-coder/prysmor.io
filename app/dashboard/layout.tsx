@@ -7,7 +7,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  Settings, Download, ShieldCheck, TrendingUp,
+  Settings, Download, ShieldCheck, TrendingUp, LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
@@ -23,6 +23,7 @@ const navItems = [
   { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: true  },
   { label: "Billing",         href: "/dashboard/billing",   icon: CreditCard,      requiresPlan: false },
   { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: true  },
+  { label: "Support",         href: "/dashboard/support",   icon: LifeBuoy,        requiresPlan: false },
 ];
 
 function NavLink({
