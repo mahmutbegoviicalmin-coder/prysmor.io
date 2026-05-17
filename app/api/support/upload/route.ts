@@ -1,0 +1,36 @@
+import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import { bucket } from "@/lib/firebaseAdmin";
+
+export async function POST(req: Request) {
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const formData = await req.formData();
+  const file = formData.get("file") as File | null;
+
+  if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
+
+  const maxSize = 8 * 1024 * 1024; // 8 MB
+  if (file.size > maxSize) {
+    return NextResponse.json({ error: "File too large (max 8 MB)" }, { status: 413 });
+  }
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!allowedTypes.includes(file.type)) {
+    return NextResponse.json({ error: "Only JPEG, PNG, WebP or GIF allowed" }, { status: 415 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `support/${userId}/${Date.now()}.${ext}`;
+
+  const fileRef = bucket.file(path);
+  await fileRef.save(buffer, {
+    metadata: { contentType: file.type },
+    public: true,
+  });
+
+  const url = `https://storage.googleapis.com/${bucket.name}/${path}`;
+  return NextResponse.json({ url });
+}
