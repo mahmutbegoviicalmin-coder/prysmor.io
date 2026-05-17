@@ -124,21 +124,22 @@ const EXAMPLE_CATEGORIES = [
 ];
 
 function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
-  const videoRef  = useRef<HTMLVideoElement>(null);
-  const wrapRef   = useRef<HTMLDivElement>(null);
+  const videoRef   = useRef<HTMLVideoElement>(null);
+  const wrapRef    = useRef<HTMLDivElement>(null);
   const [lazySrc, setLazySrc] = useState<string | undefined>(undefined);
+  const visibleRef = useRef(false);
 
+  // Step 1: IntersectionObserver only sets lazySrc (triggers React re-render with src)
   useEffect(() => {
-    const v = videoRef.current;
     const el = wrapRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
       ([e]) => {
+        visibleRef.current = e.isIntersecting;
         if (e.isIntersecting) {
           setLazySrc(src);
-          if (v) v.play().catch(() => {});
         } else {
-          if (v) v.pause();
+          videoRef.current?.pause();
         }
       },
       { threshold: 0.1 },
@@ -147,8 +148,17 @@ function ExampleVideoCard({ src, accent }: { src: string; accent: string }) {
     return () => io.disconnect();
   }, [src]);
 
-  // once src is set, play when ready
-  const onCanPlay = () => { videoRef.current?.play().catch(() => {}); };
+  // Step 2: Once lazySrc is set in DOM, load and play
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!lazySrc || !v) return;
+    v.load();
+    if (visibleRef.current) v.play().catch(() => {});
+  }, [lazySrc]);
+
+  const onCanPlay = () => {
+    if (visibleRef.current) videoRef.current?.play().catch(() => {});
+  };
 
   return (
     <div
