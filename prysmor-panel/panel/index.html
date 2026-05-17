@@ -1207,7 +1207,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=35"></script>
+  <script src="main.js?v=36"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
@@ -1254,9 +1254,10 @@
       draw();
     }());
 
-    document.addEventListener('DOMContentLoaded', function () {
+    /* ── Bind overlays (script is at end of body so all elements exist) ── */
+    (function () {
 
-      /* ── Settings overlay ──────────────────────────────────── */
+      /* Settings overlay */
       var overlay  = document.getElementById('section-settings');
       var closeBtn = document.getElementById('settings-close-btn');
       var openBtn  = document.getElementById('btn-scroll-settings');
@@ -1266,14 +1267,14 @@
         overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
       }
 
-      /* ── History overlay ──────────────────────────────────── */
-      var historyOverlay = document.getElementById('section-history');
-      var historyOpenBtn = document.getElementById('btn-history');
+      /* History overlay */
+      var historyOverlay  = document.getElementById('section-history');
+      var historyOpenBtn  = document.getElementById('btn-history');
       var historyCloseBtn = document.getElementById('history-close-btn');
       if (historyOpenBtn && historyOverlay) {
         historyOpenBtn.addEventListener('click', function () {
           historyOverlay.classList.add('history-visible');
-          loadHistory();
+          if (typeof loadHistory === 'function') loadHistory();
         });
       }
       if (historyCloseBtn && historyOverlay) {
@@ -1281,9 +1282,9 @@
         historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
       }
 
-      /* Initial placeholder on load */
+      /* Initial mode */
       prysmorSetMode('background');
-    });
+    }());
   </script>
 </body>
 </html>
