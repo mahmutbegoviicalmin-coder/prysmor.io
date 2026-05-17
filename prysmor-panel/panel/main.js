@@ -1573,15 +1573,15 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
   // Trim output to match original clip duration (Runway may generate 5 or 10s regardless of input)
   var trimSec = (typeof clipDurSec === 'number' && clipDurSec > 0) ? clipDurSec : 0;
 
-  if (!needsScale && trimSec <= 0) {
-    console.log('[Prysmor:postprocess] Runway output already 1920×1080, no trim needed — skipping re-encode');
-  } else {
+  // Always run ffmpeg: strip audio (-an) + optional scale + optional trim.
+  // Even when no scale/trim is needed, we must strip audio from the AI output.
+  {
     if (needsScale) {
       console.log('[Prysmor:postprocess] Runway output ' +
         (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
-        ' → scaling to 1920×1080' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
+        ' → scaling to 1920×1080 + strip audio' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
     } else {
-      console.log('[Prysmor:postprocess] Runway output already 1920×1080 — trimming to ' + trimSec.toFixed(3) + 's');
+      console.log('[Prysmor:postprocess] Strip audio' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : '') + ' (stream copy)');
     }
 
     var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
@@ -1593,14 +1593,11 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
       try {
         var spawn = require('child_process').spawn;
         var args = ['-y', '-i', outPath];
-        // Add output duration trim before video filter so ffmpeg stops at clipDurSec
         if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
         if (needsScale) {
-          // Direct scale to 1920:1080 with high quality re-encode
-          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'copy');
+          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-an');
         } else {
-          // Only trimming needed — stream copy is fast and lossless
-          args.push('-c', 'copy');
+          args.push('-c:v', 'copy', '-an');
         }
         args.push(processedPath);
         console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
