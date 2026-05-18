@@ -148,10 +148,21 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#F59E0B]/20 bg-[#F59E0B]/[0.06] px-4 py-3">
           <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-semibold text-[#F59E0B]">Subscription inactive</p>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">
-              VFX generation is disabled. Renew your plan to restore access.
-            </p>
+            {userDoc?.lsSubscriptionId ? (
+              <>
+                <p className="text-[13px] font-semibold text-[#F59E0B]">Subscription inactive</p>
+                <p className="text-[12px] text-[#6B7280] mt-0.5">
+                  VFX generation is disabled. Reactivate your plan to restore access.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[13px] font-semibold text-[#F59E0B]">No active plan</p>
+                <p className="text-[12px] text-[#6B7280] mt-0.5">
+                  Choose a plan below to unlock VFX generation and the Premiere panel.
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
