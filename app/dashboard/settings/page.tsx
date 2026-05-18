@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { mockSecurity } from "@/lib/mockData";
-import { getUser } from "@/lib/firestore/users";
+import { DeleteAccountButton } from "./DeleteAccountButton";
 
 export const metadata = { title: "Settings — Dashboard" };
 
@@ -18,9 +18,6 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 export default async function SettingsPage() {
   const user = await currentUser();
   if (!user) redirect("/");
-
-  const userDoc = await getUser(user.id).catch(() => null);
-  if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
   const fields = [
     { label: "First name",    value: user?.firstName ?? "" },
     { label: "Last name",     value: user?.lastName  ?? "" },
@@ -85,9 +82,7 @@ export default async function SettingsPage() {
             <p className="text-[12px] text-[#6B7280] mb-4">
               Permanently delete your Prysmor account. This will cancel your subscription and remove all associated data. This action cannot be undone.
             </p>
-            <button className="px-3.5 py-2 rounded-[8px] text-[12px] font-medium border border-red-500/20 text-red-400/80 hover:bg-red-500/10 transition-colors">
-              Delete account
-            </button>
+            <DeleteAccountButton />
           </div>
         </div>
       </div>
