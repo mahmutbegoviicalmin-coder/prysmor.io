@@ -8,7 +8,8 @@ import { getUser } from '@/lib/firestore/users';
  */
 export function validatePanelKey(req: NextRequest): boolean {
   const secret = process.env.PRYSMOR_PANEL_SECRET;
-  if (!secret) return true; // dev fallback
+  // Reject all requests if the secret is not configured — never open-gate in production.
+  if (!secret) return false;
   const provided = req.headers.get('x-panel-key');
   return provided === secret;
 }

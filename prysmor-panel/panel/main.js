@@ -39,7 +39,14 @@ const LS_MACHINE_ID     = 'prysmor_machine_id';
 
 function getMachineFingerprint() {
   var stored = localStorage.getItem(LS_MACHINE_ID);
-  if (stored) return stored;
+  // Migrate legacy IDs that included a timestamp suffix (unstable across reinstalls).
+  if (stored && !stored.match(/-[0-9a-z]+-[0-9a-z]+$/)) return stored;
+  if (stored && stored.split('-').length === 3) {
+    // Old format: mfp-<hash>-<timestamp> — strip the timestamp part to stabilise.
+    var stripped = stored.split('-').slice(0, 2).join('-');
+    localStorage.setItem(LS_MACHINE_ID, stripped);
+    return stripped;
+  }
   try {
     var os  = require('os');
     var raw = [
@@ -53,7 +60,8 @@ function getMachineFingerprint() {
       hash = ((hash << 5) - hash) + raw.charCodeAt(i);
       hash |= 0;
     }
-    var id = 'mfp-' + Math.abs(hash).toString(36) + '-' + Date.now().toString(36);
+    // No Date.now() — fingerprint must be stable across reinstalls and updates.
+    var id = 'mfp-' + Math.abs(hash).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id);
     return id;
   } catch (e) {
@@ -69,7 +77,8 @@ function getMachineFingerprint() {
       hash2 = ((hash2 << 5) - hash2) + raw2.charCodeAt(j);
       hash2 |= 0;
     }
-    var id2 = 'mfp-' + Math.abs(hash2).toString(36) + '-' + Date.now().toString(36);
+    // No Date.now() — stable fingerprint.
+    var id2 = 'mfp-' + Math.abs(hash2).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id2);
     return id2;
   }

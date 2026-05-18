@@ -104,6 +104,9 @@ export async function POST(req: NextRequest) {
       cepVersion,
     });
   } catch (err) {
+    // Clean up the session doc that was already written before this check.
+    await db.collection("panel_sessions").doc(token).delete().catch(() => {});
+
     if (err instanceof DeviceLimitError) {
       return NextResponse.json(
         {
