@@ -358,7 +358,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "What if I'm not satisfied?",
-    a: "We offer a 7-day money-back guarantee with no questions asked. If VFXPilot isn't the right fit, just reach out within 7 days of purchase for a full refund.",
+    a: "We offer a 7-day refund window from the date of purchase. If the product does not work as described and our support team cannot resolve the issue, contact us with your order details for a refund.",
   },
   {
     q: "Why is this so much cheaper than hiring a VFX artist?",

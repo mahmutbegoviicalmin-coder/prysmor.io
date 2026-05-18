@@ -172,7 +172,7 @@ export const faqItems: FAQItem[] = [
     id: "cancel",
     question: "Can I cancel anytime?",
     answer:
-      "Yes. Cancel from your account dashboard at any time. Access continues until the end of your billing period. No questions asked.",
+      "Yes. Cancel from your account dashboard at any time. Access continues until the end of your billing period.",
   },
 ];
 

@@ -11,7 +11,7 @@ const perks = [
   {
     icon: RotateCcw,
     title: "7-day money-back",
-    desc: "Not what you expected? Email us within 7 days for a full refund, no questions asked.",
+    desc: "Not satisfied? Email us within 7 days of purchase for a full refund — see our refund policy for details.",
   },
   {
     icon: Zap,
