@@ -1,17 +1,12 @@
 import { currentUser } from '@clerk/nextjs/server';
 import { NextResponse }  from 'next/server';
 import { LS_STORE_ID, VARIANT_TO_PLAN } from '@/lib/lemonsqueezy';
-import { db } from '@/lib/firebaseAdmin';
 
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
+const LS_API       = 'https://api.lemonsqueezy.com/v1';
 
-const LS_API = 'https://api.lemonsqueezy.com/v1';
-
-const PLAN_MONTHLY_USD: Record<string, number> = {
-  starter:   29,
-  pro:       49,
-  exclusive: 149,
-};
+// Variant IDs that belong to plans (not credit packs)
+const PLAN_VARIANT_IDS = new Set(Object.keys(VARIANT_TO_PLAN));
 
 const PLAN_COLOR: Record<string, string> = {
   starter:   '#6B7280',
@@ -29,8 +24,8 @@ const PLAN_LABEL: Record<string, string> = {
 
 function lsHeaders() {
   return {
-    Authorization:  `Bearer ${process.env.LEMONSQUEEZY_API_KEY}`,
-    Accept:         'application/vnd.api+json',
+    Authorization: `Bearer ${process.env.LEMONSQUEEZY_API_KEY}`,
+    Accept:        'application/vnd.api+json',
   };
 }
 
@@ -38,8 +33,11 @@ async function fetchAllPages(url: string): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
   let next: string | null = url;
   while (next) {
-    const res  = await fetch(next, { headers: lsHeaders() });
-    if (!res.ok) break;
+    const res  = await fetch(next, { headers: lsHeaders(), next: { revalidate: 0 } });
+    if (!res.ok) {
+      console.error('[revenue] LS fetch failed', res.status, await res.text().catch(() => ''));
+      break;
+    }
     const json = await res.json() as {
       data:  Record<string, unknown>[];
       links: { next?: string };
@@ -57,11 +55,11 @@ export interface LsSub {
   plan:        string;
   planLabel:   string;
   status:      string;
-  mrr:         number;
+  mrr:         number; // USD
   createdAt:   string;
   renewsAt:    string | null;
   cancelledAt: string | null;
-  source:      'firestore' | 'lemonsqueezy';
+  source:      'lemonsqueezy';
 }
 
 export interface RevenueData {
@@ -87,113 +85,135 @@ export async function GET() {
   }
 
   const apiKey = process.env.LEMONSQUEEZY_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'LEMONSQUEEZY_API_KEY not configured' }, { status: 500 });
+  }
 
   const now        = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // ── 1. Firestore — source of truth for active plans ───────────────────────
-  const fsSnap = await db.collection('users').limit(1000).get();
+  // ── Pull all subscriptions + orders from LemonSqueezy ─────────────────────
+  const [rawSubs, rawOrders] = await Promise.all([
+    fetchAllPages(`${LS_API}/subscriptions?filter[store_id]=${LS_STORE_ID}&page[size]=100`),
+    fetchAllPages(`${LS_API}/orders?filter[store_id]=${LS_STORE_ID}&page[size]=100`),
+  ]);
 
-  const fsPlanCounts: Record<string, number> = {};
-  const fsPlanMrr:    Record<string, number> = {};
-  let fsActiveCount   = 0;
-  let fsNewThisMonth  = 0;
-  const fsSubs: LsSub[] = [];
+  // ── Process subscriptions ──────────────────────────────────────────────────
+  let activeCount      = 0;
+  let cancelledCount   = 0;
+  let pausedCount      = 0;
+  let trialingCount    = 0;
+  let newThisMonth     = 0;
+  let churnedThisMonth = 0;
 
-  for (const doc of fsSnap.docs) {
-    const d     = doc.data();
-    const plan  = String(d.plan ?? 'none');
-    const stat  = String(d.licenseStatus ?? 'inactive');
-    if (stat !== 'active') continue;
-    if (!['starter', 'pro', 'exclusive'].includes(plan)) continue;
+  const planCounts: Record<string, number> = {};
+  const planMrr:    Record<string, number> = {};
+  const allSubs:    LsSub[]                = [];
 
-    const monthlyUsd = PLAN_MONTHLY_USD[plan] ?? 0;
-    fsActiveCount++;
-    fsPlanCounts[plan] = (fsPlanCounts[plan] ?? 0) + 1;
-    fsPlanMrr[plan]    = (fsPlanMrr[plan]    ?? 0) + monthlyUsd;
+  for (const sub of rawSubs) {
+    const attrs     = sub.attributes as Record<string, unknown>;
+    const status    = String(attrs.status ?? '');
+    const variantId = String(
+      (sub.relationships as Record<string, unknown> | undefined)
+        ? ((sub.relationships as Record<string, Record<string, unknown>>)?.variant?.data as Record<string, unknown>)?.id ?? ''
+        : attrs.variant_id ?? ''
+    );
 
-    const createdAtRaw = d.createdAt?.toDate?.() ?? (d.createdAt ? new Date(d.createdAt) : null);
-    if (createdAtRaw && createdAtRaw >= monthStart) fsNewThisMonth++;
+    // Map variant → plan
+    const plan      = VARIANT_TO_PLAN[variantId] ?? 'other';
+    const planLabel = PLAN_LABEL[plan] ?? plan;
 
-    fsSubs.push({
-      id:          doc.id,
-      email:       String(d.email       ?? ''),
-      name:        String(d.displayName ?? d.email ?? ''),
+    // MRR from LS in cents → USD
+    const mrrCents  = typeof attrs.mrr === 'number' ? attrs.mrr : 0;
+    const mrrUsd    = mrrCents / 100;
+
+    const createdAt  = String(attrs.created_at  ?? '');
+    const renewsAt   = attrs.renews_at    ? String(attrs.renews_at)   : null;
+    const cancelledAt = attrs.ends_at     ? String(attrs.ends_at)     : null;
+
+    const createdDate = createdAt ? new Date(createdAt) : null;
+
+    if (status === 'active') {
+      activeCount++;
+      if (createdDate && createdDate >= monthStart) newThisMonth++;
+      if (plan !== 'other') {
+        planCounts[plan] = (planCounts[plan] ?? 0) + 1;
+        planMrr[plan]    = (planMrr[plan]    ?? 0) + mrrUsd;
+      }
+    } else if (status === 'cancelled' || status === 'expired') {
+      cancelledCount++;
+      // Churned this month: cancelled + updated this month
+      const updatedAt = attrs.updated_at ? new Date(String(attrs.updated_at)) : null;
+      if (attrs.cancelled && updatedAt && updatedAt >= monthStart) churnedThisMonth++;
+    } else if (status === 'paused') {
+      pausedCount++;
+    } else if (status === 'trialing') {
+      trialingCount++;
+      if (createdDate && createdDate >= monthStart) newThisMonth++;
+    }
+
+    allSubs.push({
+      id:          String(sub.id ?? ''),
+      email:       String(attrs.user_email ?? ''),
+      name:        String(attrs.user_name  ?? attrs.user_email ?? ''),
       plan,
-      planLabel:   PLAN_LABEL[plan] ?? plan,
-      status:      'active',
-      mrr:         monthlyUsd,
-      createdAt:   createdAtRaw?.toISOString() ?? '',
-      renewsAt:    d.renewalDate ? String(d.renewalDate) : null,
-      cancelledAt: null,
-      source:      'firestore',
+      planLabel,
+      status,
+      mrr:         mrrUsd,
+      createdAt,
+      renewsAt,
+      cancelledAt,
+      source:      'lemonsqueezy',
     });
   }
 
   // Sort newest first
-  fsSubs.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+  allSubs.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+
+  const grossMrr = Object.values(planMrr).reduce((s, v) => s + v, 0);
 
   const planBreakdown = ['exclusive', 'pro', 'starter']
-    .filter(p => (fsPlanCounts[p] ?? 0) > 0)
+    .filter(p => (planCounts[p] ?? 0) > 0)
     .map(p => ({
       plan:  p,
       label: PLAN_LABEL[p],
-      count: fsPlanCounts[p] ?? 0,
-      mrr:   fsPlanMrr[p]   ?? 0,
+      count: planCounts[p] ?? 0,
+      mrr:   planMrr[p]   ?? 0,
       color: PLAN_COLOR[p],
     }));
 
-  const fsMrr = Object.values(fsPlanMrr).reduce((s, v) => s + v, 0);
+  // ── Process orders — only count credit pack one-time purchases ─────────────
+  // Subscription payments also create orders in LS; we exclude them by checking
+  // whether the order's first_order_item variant belongs to a subscription plan.
+  let orderCount   = 0;
+  let orderRevenue = 0;
 
-  // ── 2. LemonSqueezy — subscription history & one-time orders ─────────────
-  let lsCancelledCount   = 0;
-  let lsPausedCount      = 0;
-  let lsTrialingCount    = 0;
-  let lsChurnedThisMonth = 0;
-  let orderCount         = 0;
-  let orderRevenue       = 0;
+  for (const order of rawOrders) {
+    const attrs = order.attributes as Record<string, unknown>;
+    if (String(attrs.status ?? '') !== 'paid') continue;
 
-  if (apiKey) {
-    try {
-      const [rawSubs, rawOrders] = await Promise.all([
-        fetchAllPages(`${LS_API}/subscriptions?filter[store_id]=${LS_STORE_ID}&page[size]=100`),
-        fetchAllPages(`${LS_API}/orders?filter[store_id]=${LS_STORE_ID}&page[size]=100`),
-      ]);
+    // Check if this order contains a subscription plan variant — if so, skip it.
+    const firstItem = (attrs.first_order_item as Record<string, unknown> | null) ?? null;
+    const itemVariantId = firstItem ? String(firstItem.variant_id ?? '') : '';
+    if (PLAN_VARIANT_IDS.has(itemVariantId)) continue; // subscription payment, not a credit pack
 
-      for (const sub of rawSubs) {
-        const attrs  = sub.attributes as Record<string, unknown>;
-        const status = String(attrs.status ?? '');
-        if (status === 'trialing') lsTrialingCount++;
-        else if (status === 'cancelled' || status === 'expired') lsCancelledCount++;
-        else if (status === 'paused') lsPausedCount++;
-        if (attrs.cancelled && attrs.updated_at && new Date(String(attrs.updated_at)) >= monthStart) {
-          lsChurnedThisMonth++;
-        }
-      }
-
-      for (const order of rawOrders) {
-        const attrs  = order.attributes as Record<string, unknown>;
-        if (String(attrs.status ?? '') !== 'paid') continue;
-        orderCount++;
-        const total = typeof attrs.total === 'number' ? attrs.total : 0;
-        orderRevenue += total / 100;
-      }
-    } catch (err) {
-      console.error('[admin/revenue] LS fetch error (non-fatal):', err);
-    }
+    // This is a one-time / credit pack order
+    orderCount++;
+    const total = typeof attrs.total === 'number' ? attrs.total : 0;
+    orderRevenue += total / 100;
   }
 
   const data: RevenueData = {
-    mrr:              fsMrr,
-    arr:              fsMrr * 12,
-    activeCount:      fsActiveCount,
-    cancelledCount:   lsCancelledCount,
-    pausedCount:      lsPausedCount,
-    trialingCount:    lsTrialingCount,
-    newThisMonth:     fsNewThisMonth,
-    churnedThisMonth: lsChurnedThisMonth,
+    mrr:              grossMrr,
+    arr:              grossMrr * 12,
+    activeCount,
+    cancelledCount,
+    pausedCount,
+    trialingCount,
+    newThisMonth,
+    churnedThisMonth,
     planBreakdown,
-    recentSubs:       fsSubs.slice(0, 20),
+    recentSubs:       allSubs.slice(0, 20),
     orderCount,
     orderRevenue,
   };
