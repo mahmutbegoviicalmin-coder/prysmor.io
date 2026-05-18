@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs";
 import { redirect }     from "next/navigation";
-import { ShieldAlert, ShieldCheck, Mail, User, Calendar, Smartphone, ExternalLink, Chrome } from "lucide-react";
+import { ShieldAlert, Mail, Chrome } from "lucide-react";
 import { DeleteAccountButton } from "./DeleteAccountButton";
 
 export const metadata = { title: "Settings — Dashboard" };
@@ -87,14 +87,6 @@ export default async function SettingsPage() {
             </p>
             <p className="text-[12px] text-[#4B5563]">{primaryEmail?.emailAddress ?? "—"}</p>
           </div>
-          <a
-            href="https://accounts.clerk.com/user"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.07] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors flex-shrink-0"
-          >
-            Edit profile <ExternalLink className="w-3 h-3" />
-          </a>
         </div>
         <div className="space-y-0">
           <DataRow
@@ -182,21 +174,9 @@ export default async function SettingsPage() {
             }
           />
         </div>
-        <div className="mt-4 pt-4 border-t border-white/[0.04] flex items-center justify-between">
-          <p className="text-[11px] text-[#374151]">
-            {mfaEnabled
-              ? "Your account is protected with two-factor authentication."
-              : "Enable 2FA for stronger account security."}
-          </p>
-          <a
-            href="https://accounts.clerk.com/user/security"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] border border-white/[0.07] text-[11px] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors flex-shrink-0"
-          >
-            {mfaEnabled ? "Manage 2FA" : "Enable 2FA"} <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
+        <p className="mt-4 text-[11px] text-[#374151]">
+          Contact support to manage two-factor authentication or active sessions.
+        </p>
       </div>
 
       {/* ── Danger zone ─────────────────────────────────────────────────────── */}
