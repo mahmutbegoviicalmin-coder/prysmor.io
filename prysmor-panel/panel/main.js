@@ -39,14 +39,8 @@ const LS_MACHINE_ID     = 'prysmor_machine_id';
 
 function getMachineFingerprint() {
   var stored = localStorage.getItem(LS_MACHINE_ID);
-  // Migrate legacy IDs that included a timestamp suffix (unstable across reinstalls).
-  if (stored && !stored.match(/-[0-9a-z]+-[0-9a-z]+$/)) return stored;
-  if (stored && stored.split('-').length === 3) {
-    // Old format: mfp-<hash>-<timestamp> — strip the timestamp part to stabilise.
-    var stripped = stored.split('-').slice(0, 2).join('-');
-    localStorage.setItem(LS_MACHINE_ID, stripped);
-    return stripped;
-  }
+  // Return any existing stored ID unchanged — preserves device registration across OTA updates.
+  if (stored) return stored;
   try {
     var os  = require('os');
     var raw = [
