@@ -89,47 +89,9 @@ export async function GET() {
     fsMap.set(doc.id, doc.data());
   }
 
-  // Fetch sessions from Clerk REST API directly (SDK types may hide fields)
-  const clerkCountry:     Record<string, string> = {};
-  const clerkCountryCode: Record<string, string> = {};
-  const CLERK_KEY = process.env.CLERK_SECRET_KEY ?? '';
-
-  const BATCH = 15;
-  for (let i = 0; i < clerkUserList.length; i += BATCH) {
-    await Promise.all(clerkUserList.slice(i, i + BATCH).map(async (cu) => {
-      try {
-        const res = await fetch(
-          `https://api.clerk.com/v1/sessions?user_id=${cu.id}&limit=10`,
-          {
-            headers: { Authorization: `Bearer ${CLERK_KEY}` },
-            signal:  AbortSignal.timeout(8000),
-          },
-        );
-        if (!res.ok) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sessions: any[] = await res.json();
-        // Log first user's raw session so we can verify the field names
-        if (i === 0 && clerkUserList[0]?.id === cu.id && sessions.length > 0) {
-          console.log('[clerk-debug] sample session keys:', Object.keys(sessions[0]));
-          console.log('[clerk-debug] latest_activity:', JSON.stringify(sessions[0].latest_activity));
-        }
-        for (const s of sessions) {
-          // REST API returns snake_case; also try camelCase as fallback
-          const c = s.latest_activity?.country ?? s.latestActivity?.country ?? null;
-          if (c) {
-            clerkCountry[cu.id]     = c;
-            clerkCountryCode[cu.id] = countryNameToCode(c) ?? c.slice(0, 2).toUpperCase();
-            break;
-          }
-        }
-      } catch (e) {
-        console.warn('[clerk-sessions] failed for', cu.id, e);
-      }
-    }));
-  }
-  console.log(`[admin] country resolved for ${Object.keys(clerkCountry).length}/${clerkUserList.length} users`);
-
-  // Build user list — country always comes from Clerk (live), fall back to Firestore cache
+  // Build user list — country comes from Firestore cache only.
+  // Per-user country refresh is available via the "Refresh location" action in the admin panel.
+  // Bulk Clerk session fetching was removed because it caused route timeouts with large user lists.
   const users: AdminUser[] = clerkUserList.map((cu) => {
     const d = fsMap.get(cu.id) ?? {};
 
@@ -139,7 +101,7 @@ export async function GET() {
     const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 
     let createdAt: string | null = null;
-    if (d.createdAt?.toDate)             createdAt = d.createdAt.toDate().toISOString();
+    if (d.createdAt?.toDate)              createdAt = d.createdAt.toDate().toISOString();
     else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
     else if (cu.createdAt)               createdAt = new Date(cu.createdAt).toISOString();
 
@@ -153,10 +115,6 @@ export async function GET() {
       : (d.displayName ?? resolvedEmail.split('@')[0] ?? '');
 
     const lastSignInAt = cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null;
-
-    // Country: live from Clerk sessions first, then Firestore cache
-    const country     = clerkCountry[cu.id]     ?? d.country     ?? null;
-    const countryCode = clerkCountryCode[cu.id] ?? d.countryCode ?? null;
 
     return {
       id:               cu.id,
@@ -173,8 +131,8 @@ export async function GET() {
       deviceLimit:      d.deviceLimit    ?? 1,
       createdAt,
       lastSignInAt,
-      country,
-      countryCode,
+      country:          d.country     ?? null,
+      countryCode:      d.countryCode ?? null,
       lsSubscriptionId: d.lsSubscriptionId,
     };
   });
