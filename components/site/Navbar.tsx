@@ -28,7 +28,7 @@ export default function Navbar() {
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
 
-  const handleSignIn = () => openSignIn({ afterSignInUrl: "/dashboard" });
+  const handleSignIn = () => openSignIn({ afterSignInUrl: "/auth-redirect" });
   const handleSignUp = () => {
     track('cta_click', { location: 'navbar' });
     const pricingEl = document.getElementById("pricing");
