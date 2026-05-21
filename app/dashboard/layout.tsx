@@ -138,12 +138,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } catch { /* sessionStorage blocked */ }
   }, [user?.id, pathname]);
 
-  // If Clerk loads but user is not signed in → send to sign-in
+  // If Clerk loads but user is not signed in → wait briefly then redirect
+  // (OAuth sessions can take a moment to establish after redirect)
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
+    if (!isLoaded || isSignedIn) return;
+    const timer = setTimeout(() => {
       window.location.replace("/sign-in");
-    }
+    }, 2500);
+    return () => clearTimeout(timer);
   }, [isLoaded, isSignedIn]);
+
+  // Show spinner while Clerk is loading or session is settling
+  if (!isLoaded || (!isSignedIn && isLoaded)) {
+    // If not signed in, still render briefly (timer above will redirect)
+    // But if Clerk hasn't loaded yet, show spinner
+    if (!isLoaded) {
+      return (
+        <div style={{
+          minHeight: "100vh", background: "#080808",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            width: "32px", height: "32px", borderRadius: "50%",
+            border: "2px solid #1a1a1a", borderTopColor: "#39FF6A",
+            animation: "spin 0.8s linear infinite",
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      );
+    }
+  }
 
   const currentLabel = pathname.startsWith("/dashboard/admin")
     ? "Admin"
