@@ -22,7 +22,7 @@ export default function SignUpPage() {
         </span>
       </div>
 
-      <SignUp afterSignUpUrl="/auth-redirect" />
+      <SignUp />
     </div>
   );
 }

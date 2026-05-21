@@ -23,7 +23,7 @@ export default function SignInPage() {
         </span>
       </div>
 
-      <SignIn afterSignInUrl="/auth-redirect" />
+      <SignIn />
     </div>
   );
 }
