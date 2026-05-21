@@ -153,7 +153,7 @@ export default function PlaygroundPage() {
       const jobRes  = await fetch("/api/v1/playground/jobs", { method: "POST" });
       const jobData = await jobRes.json();
       if (!jobRes.ok) {
-        const msg = jobData.error === "trial_used" ? "Your free trial has already been used." : (jobData.message ?? "Failed to start.");
+        const msg = jobData.message ?? (jobData.error === "trial_used" ? "Your free trial has already been used." : "Failed to start.");
         setJob(j => ({ ...j!, stage: "error", error: msg }));
         if (jobData.error === "trial_used") setTrialUsed(true);
         return;

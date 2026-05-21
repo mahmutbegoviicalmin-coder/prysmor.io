@@ -153,7 +153,16 @@ function TrialBadge({ usedAt }: { usedAt: string | null }) {
     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-violet-500/30 bg-violet-500/[0.10] text-violet-300"
       title={usedAt ? `Trial used: ${new Date(usedAt).toLocaleString('en-GB')}` : 'Trial used'}>
       <Sparkles className="w-2.5 h-2.5" />
-      Trial
+      Trial used
+    </span>
+  );
+}
+
+function TrialUnusedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-white/[0.06] text-[#333]">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#222]" />
+      No trial
     </span>
   );
 }
@@ -1774,6 +1783,7 @@ export function AdminPanel() {
                   <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[110px]">Country</th>
                   <SortHeader label="Credits"      col="credits"       className="min-w-[110px]" />
                   <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[120px]">Expires</th>
+                  <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[90px]">Trial</th>
                   <SortHeader label="Last sign-in" col="lastSignInAt"  className="min-w-[110px]" />
                   <SortHeader label="Joined"       col="createdAt"     className="min-w-[90px]" />
                   <th className="px-3 py-3 w-10" />
@@ -1838,6 +1848,16 @@ export function AdminPanel() {
                       {/* Expires — color-coded */}
                       <td className="px-3 py-3">
                         <span className={`text-[11px] ${expiry.color}`}>{expiry.label}</span>
+                      </td>
+
+                      {/* Trial */}
+                      <td className="px-3 py-3">
+                        {user.trialUsed
+                          ? <TrialBadge usedAt={user.trialUsedAt} />
+                          : <TrialUnusedBadge />}
+                        {user.trialUsed && user.trialUsedAt && (
+                          <p className="text-[10px] text-[#374151] mt-0.5">{fmtDate(user.trialUsedAt)}</p>
+                        )}
                       </td>
 
                       {/* Last sign-in */}
