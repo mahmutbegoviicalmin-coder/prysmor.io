@@ -162,16 +162,13 @@ export default function PlaygroundPage() {
       const jobId: string = jobData.jobId;
       setJob(j => ({ ...j!, jobId, progress: 10 }));
 
-      const urlRes  = await fetch(`/api/v1/playground/jobs/${jobId}/upload-url?mode=${mode}`);
-      const urlData = await urlRes.json();
-      if (!urlRes.ok) throw new Error(urlData.error ?? "Upload URL failed");
-
-      setJob(j => ({ ...j!, progress: 20 }));
-
-      const uploadRes = await fetch(urlData.uploadUrl, {
-        method: "PUT", body: videoFile, headers: { "Content-Type": "video/mp4" },
-      });
-      if (!uploadRes.ok) throw new Error(`Upload failed (HTTP ${uploadRes.status})`);
+      // Proxy upload through our server to avoid Beeble S3 CORS restrictions
+      const uploadRes = await fetch(
+        `/api/v1/playground/jobs/${jobId}/upload?mode=${mode}`,
+        { method: "POST", body: videoFile, headers: { "Content-Type": "video/mp4" } },
+      );
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error ?? "Upload failed");
 
       setJob(j => ({ ...j!, stage: "generating", progress: 30 }));
 
@@ -183,7 +180,7 @@ export default function PlaygroundPage() {
           prompt:         prompt.trim() || (mode === "relight" ? "Natural warm lighting" : "Clean studio background"),
           referenceImage: mode === "background" ? (refImage ?? undefined) : undefined,
           clipDuration:   videoDur,
-          beebleVideoUri: urlData.beebleUri,
+          beebleVideoUri: uploadData.beebleUri,
         }),
       });
       const genData = await genRes.json();
