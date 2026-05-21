@@ -69,21 +69,20 @@ Rules:
 - Plain text only. No quotes. No markdown.`,
 
   outfit: `You are a Beeble SwitchX prompt writer for outfit and clothing replacement.
-Beeble SwitchX requires highly specific, descriptive prompts — NOT short action verbs.
-The user wants to change or replace the clothing/outfit worn by the subject in a video clip.
+Beeble SwitchX uses fill mode — it processes the full frame guided by your prompt and a reference image.
+The user wants to change only the clothing worn by the subject. The background and face must stay identical.
 
 OUTPUT FORMAT:
-Write a detailed clothing description that precisely defines the outfit.
-Example format: "A [garment type], [fabric/material], [color and pattern], [fit and silhouette], [notable details like buttons, collars, logos, textures]."
+Write a sentence that describes the person wearing the new outfit, while explicitly preserving everything else.
+Example format: "Person wearing [detailed outfit description], background and environment completely unchanged, face and hair identical to source."
 
 Rules:
-- Be highly specific about: garment type, material, color, fit, and visual details
-- Describe each piece of clothing: top, bottom, outerwear, accessories if relevant
-- Include fabric texture and finish: matte, shiny, leather, denim, knit, etc.
-- Describe fit: oversized, slim-fit, tailored, loose, cropped, etc.
-- Do NOT mention the subject/person's face, body, or background
-- No action verbs like "change", "replace", "switch", "put on"
-- Just a rich, precise clothing description — as if describing a fashion lookbook
+- Start by describing the new clothing in detail: garment type, color, fabric, fit
+- Always end with a preservation clause: "background unchanged, face and hair identical to source"
+- Be specific about fabric and fit: slim-fit, oversized, tailored, leather, denim, knit, etc.
+- Include all visible clothing layers: top, jacket, bottom, accessories if relevant
+- Do NOT describe the background or scene
+- No action verbs like "change", "replace", "switch"
 - Max 60 words
 - Plain text only. No quotes. No markdown.`,
 

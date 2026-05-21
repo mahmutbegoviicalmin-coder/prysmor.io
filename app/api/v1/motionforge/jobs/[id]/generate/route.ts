@@ -143,7 +143,7 @@ export async function POST(
         sourceUri:         beebleVideoUri,
         referenceImageUri: beebleRefImageUri,
         prompt,
-        alphaMode:         mode === 'relight' ? 'fill' : 'auto',
+        alphaMode:         (mode === 'relight' || mode === 'outfit') ? 'fill' : 'auto',
         maxResolution:     720,
       });
 
