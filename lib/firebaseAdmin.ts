@@ -10,7 +10,7 @@ if (!admin.apps.length && privateKey) {
       clientEmail: "firebase-adminsdk-fbsvc@prysmor-4841d.iam.gserviceaccount.com",
       privateKey,
     }),
-    storageBucket: "prysmor-4841d.appspot.com",
+    storageBucket: "prysmor-4841d.firebasestorage.app",
   });
 }
 

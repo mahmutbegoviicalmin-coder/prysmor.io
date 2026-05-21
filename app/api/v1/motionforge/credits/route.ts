@@ -22,13 +22,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const planCap = PLAN_CREDITS[user.plan] ?? PLAN_CREDITS.starter;
-  const credits = typeof user.credits === 'number' ? user.credits : planCap;
+  const planCap      = PLAN_CREDITS[user.plan] ?? PLAN_CREDITS.starter;
+  const credits      = typeof user.credits      === 'number' ? user.credits      : planCap;
   const creditsTotal = typeof user.creditsTotal === 'number' ? user.creditsTotal : planCap;
 
-  return NextResponse.json({
-    credits,
-    creditsTotal,
-    plan: user.plan,
-  });
+  return NextResponse.json({ credits, creditsTotal, plan: user.plan });
 }

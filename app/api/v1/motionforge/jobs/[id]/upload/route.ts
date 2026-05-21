@@ -9,11 +9,82 @@ import * as path from 'path';
 import * as fs   from 'fs';
 import { uploadToRunway } from '@/lib/motionforge/runway';
 import { uploadToBeeble } from '@/lib/motionforge/beeble';
+import { put as blobPut } from '@vercel/blob';
 
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 
 function tmpPath(name: string) {
   return path.join(os.tmpdir(), name);
+}
+
+// ─── PUT handler — KIE.AI path (panel uploads binary directly to our server) ──
+// The panel PUTs the raw video binary here; we upload to Vercel Blob and
+// return the public URL so the panel can pass it to upload-complete.
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const session = await validatePanelToken(req);
+  if (!session && !validatePanelKey(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let job;
+  try {
+    job = session
+      ? await getJob(session.userId, params.id)
+      : await getJobAny(params.id);
+  } catch (e) {
+    console.error('[upload/PUT] getJob failed:', e);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
+
+  if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+  // upload-url already set status to 'uploading'
+  if (job.status !== 'uploading') {
+    return NextResponse.json({ error: `Job status is "${job.status}", expected "uploading"` }, { status: 409 });
+  }
+
+  const userId = session?.userId ?? job.userId;
+
+  try {
+    const arrayBuf = await req.arrayBuffer();
+    const buffer   = Buffer.from(arrayBuf);
+
+    console.log(`[upload/PUT] Received ${buffer.byteLength} bytes for job ${params.id}`);
+
+    if (buffer.byteLength === 0) {
+      await updateJob(userId, params.id, { status: 'failed', error: 'Empty file body' });
+      return NextResponse.json({ error: 'Empty file body' }, { status: 400 });
+    }
+    if (buffer.byteLength > MAX_FILE_BYTES) {
+      await updateJob(userId, params.id, { status: 'failed', error: 'File too large' });
+      return NextResponse.json({ error: 'File exceeds 500 MB limit' }, { status: 413 });
+    }
+
+    // Upload to Vercel Blob (public read, no sign-in required for KIE.AI to fetch)
+    console.log(`[upload/PUT] Uploading to Vercel Blob…`);
+    const blob = await blobPut(`vfx-input/${params.id}.mp4`, buffer, {
+      access:      'public',
+      contentType: 'video/mp4',
+    });
+
+    console.log(`[upload/PUT] Vercel Blob URL: ${blob.url}`);
+
+    await updateJob(userId, params.id, {
+      assetUrl:    blob.url,
+      kieAssetUrl: blob.url,
+    } as any);
+
+    return NextResponse.json({ success: true, kieAssetUrl: blob.url });
+
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[upload/PUT] Error:', msg);
+    await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function POST(

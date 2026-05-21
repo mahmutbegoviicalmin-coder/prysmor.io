@@ -318,6 +318,21 @@
       filter: drop-shadow(0 0 4px rgba(0,230,118,0.5));
     }
     .mode-tab:active { transform: scale(0.96); }
+    /* Omni PRO badge */
+    .omni-pro-badge {
+      position: absolute; top: 4px; right: 4px;
+      font-size: 7px; font-weight: 700; letter-spacing: 0.4px;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed);
+      color: #fff;
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.4;
+      pointer-events: none;
+    }
+    #omni-tab.plan-ok .omni-pro-badge { display: none; }
+    #omni-tab.plan-locked { opacity: 0.55; }
+    .mode-tab-soon { opacity: 0.5; cursor: not-allowed; }
+    .mode-tab-soon .omni-pro-badge { background: linear-gradient(135deg, #6b7280, #4b5563); }
 
     /* ─────────────────────────────────────────────
        PROMPT GLASS CARD
@@ -905,12 +920,29 @@
         Light
       </button>
 
+      <button class="mode-tab mode-pill" data-mode="outfit" onclick="prysmorSetMode('outfit')">
+        <!-- Shirt / clothing icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/>
+        </svg>
+        Outfit
+      </button>
+
       <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
         <!-- Sparkles / magic icon -->
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
         </svg>
         VFX
+      </button>
+
+      <button class="mode-tab mode-pill mode-tab-soon" data-mode="omni" id="omni-tab" onclick="prysmorSetMode('omni')">
+        <!-- Wand / AI icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/>
+        </svg>
+        Omni
+        <span class="omni-pro-badge" id="omni-pro-badge">SOON</span>
       </button>
 
     </div>
@@ -1026,6 +1058,7 @@
       <select id="mf-mode-select">
         <option value="background">Background</option>
         <option value="relight">Relight</option>
+        <option value="outfit">Outfit</option>
         <option value="vfx">VFX</option>
       </select>
       <a id="link-docs"  href="#"></a>
@@ -1207,15 +1240,21 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=42"></script>
+  <script src="main.js?v=43"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
       background: 'Describe the new background...',
       relight:    'Describe the lighting mood...',
+      outfit:     'Describe the outfit or style...',
       vfx:        'Describe the visual effect...',
     };
     function prysmorSetMode(mode) {
+      /* Omni is coming soon — block entirely */
+      if (mode === 'omni') {
+        if (typeof showToast === 'function') showToast('Gemini Omni is coming soon. Stay tuned!', 'info');
+        return;
+      }
       /* update global used by main.js */
       if (typeof selectedMode !== 'undefined') selectedMode = mode;
       /* toggle active class on all tab+pill buttons */
@@ -1228,10 +1267,23 @@
       if (sel) sel.value = mode;
       /* update prompt placeholder */
       var prompt = document.getElementById('mf-prompt');
-      if (prompt) prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
-      /* show reference image zone only for background mode */
-      var refZone = document.getElementById('ref-img-zone');
-      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
+      if (prompt) {
+        prompt.disabled = false;
+        prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+      }
+      /* disable generate button if omni (extra safety) */
+      var genBtn = document.getElementById('btn-generate');
+      if (genBtn) genBtn.disabled = false;
+      /* show reference image zone for background + outfit modes */
+      var refZone  = document.getElementById('ref-img-zone');
+      var refLabel = document.getElementById('ref-img-label');
+      var refLabelSpan = refLabel && refLabel.querySelector('span:last-child');
+      if (refZone) refZone.style.display = (mode === 'background' || mode === 'outfit') ? '' : 'none';
+      if (refLabelSpan) {
+        refLabelSpan.textContent = mode === 'outfit'
+          ? 'Upload outfit reference photo'
+          : 'Reference image';
+      }
       /* update enhance chip label for new mode */
       if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
     }

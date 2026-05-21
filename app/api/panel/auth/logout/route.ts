@@ -1,8 +1,7 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
-import { validatePanelToken }        from '@/lib/motionforge/auth';
-
-export const runtime = 'nodejs';
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -15,49 +14,36 @@ export async function OPTIONS() {
   });
 }
 
-/**
- * POST /api/panel/auth/logout
- *
- * Revokes the panel session:
- *   1. Deletes the device doc from users/{userId}/devices/{deviceId}
- *      so the device slot is freed and re-login never hits device_limit_reached.
- *   2. Deletes the panel_sessions/{token} doc.
- *
- * Called by the panel logout() function before clearing localStorage.
- * Safe to call even if the session is already expired / missing.
- */
 export async function POST(req: NextRequest) {
   const auth  = req.headers.get('authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
 
   if (!token) {
-    return NextResponse.json({ ok: true }); // nothing to revoke
+    return NextResponse.json({ ok: true });
   }
 
   try {
-    const sessionRef = db.collection('panel_sessions').doc(token);
-    const sessionDoc = await sessionRef.get();
+    const sessionSnap = await db.collection('panel_sessions').doc(token).get();
 
-    if (sessionDoc.exists) {
-      const { userId, deviceId } = sessionDoc.data()!;
+    if (sessionSnap.exists) {
+      const session = sessionSnap.data()!;
 
-      // Remove device so the slot is freed for the next login
-      if (userId && deviceId) {
+      // Free device slot in Firestore
+      if (session.userId && session.deviceId) {
         await db
           .collection('users')
-          .doc(userId)
+          .doc(session.userId)
           .collection('devices')
-          .doc(deviceId)
+          .doc(session.deviceId)
           .delete()
-          .catch(() => {}); // non-fatal if already gone
+          .catch(() => {});
       }
 
-      // Delete the session token
-      await sessionRef.delete();
+      // Delete session
+      await sessionSnap.ref.delete();
     }
   } catch (err) {
     console.error('[panel/auth/logout]', err);
-    // Always return ok — panel should clear local state regardless
   }
 
   return NextResponse.json({ ok: true });

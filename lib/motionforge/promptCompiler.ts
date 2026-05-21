@@ -28,96 +28,29 @@ const TAG = 'promptCompiler';
 const MODEL      = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 160;  // identity + VFX only; prefix is prepended by us
 
-// ─── Anti-artifact prefix (hard rule, always first) ──────────────────────────
-
-/**
- * Prepended unconditionally to every compiled prompt — both OpenAI and fallback.
- *
- * Placed at the START of the prompt because Runway weights early instructions
- * more heavily. This is the primary mechanism for suppressing banding and
- * display-overlay artifacts in generated video.
- *
- * IMPORTANT: Uses only POSITIVE language ("clean film", "pristine") —
- * never negative keyword lists. Runway moderation keyword-matches the prompt
- * and will block requests that contain artifact-related words even in a
- * "no X" context (e.g. "no scanlines", "no CRT" both trigger moderation).
- *
- * This is a non-negotiable backend constraint — never exposed in the UI and
- * the user should never need to type this manually.
- */
-// NOTE: Do NOT include "clean", "sharp", "pristine" adjectives about the image
-// quality here — those words tell Runway to remove fog, haze, particles and other
-// atmospheric effects the user may have requested. Keep it focused on film/cinematic
-// framing quality, not image "cleanliness".
-export const ANTI_ARTIFACT_PREFIX =
-  'Cinematic film-quality footage, photorealistic rendering, professional cinematography.';
-
-/**
- * Fingerprint used to detect whether the prefix is already present (idempotency).
- * Must match the opening phrase of ANTI_ARTIFACT_PREFIX exactly (lowercase).
- */
-const ARTIFACT_FINGERPRINT = 'cinematic film-quality footage';
+// ANTI_ARTIFACT_PREFIX removed — Claude output is used directly as the final prompt.
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a VFX prompt compiler for Runway video-to-video generation.
+const SYSTEM_PROMPT = `You are a Runway Gen-4 Aleph video-to-video prompt writer.
 
-Your job is to rewrite a short user input into a concise Runway VFX transformation instruction.
+Runway is a video-to-video model. It receives an existing video and transforms it based on your description.
+Describe HOW the effect looks and moves in the scene — not commands like "add" or "keep".
+Write in present tense as if the effect already exists in the video.
 
-FIRST PRIORITY — Photorealistic film output (mandatory, non-negotiable):
-• The generated video MUST be photorealistic, film-quality cinematography.
-• Use only POSITIVE descriptive language for the visual quality. Never write "no X" lists.
-  - WRONG: "no scanlines, no banding, no artifacts"
-  - RIGHT: "cinematic film-quality footage, professional cinematography"
-• The output should look like professional film — not a screen recording or display capture.
-• CRITICAL: Do NOT use words like "clean", "sharp", "pristine" to describe image quality —
-  these suppress fog, haze, mist, particles and other atmospheric effects the user requested.
-• IMPORTANT: Do NOT add phrases like "smooth uniform lighting" or "solid flat colours" — these would
-  cancel out any lighting effects, atmosphere, or colour grading the user has requested.
-  If the user asks for god rays, volumetric light, fog, glow, or any lighting effect, HONOUR it fully.
-• FORBIDDEN WORDS — never include these anywhere in your output (they trigger content moderation):
-  scanlines, banding, CRT, interlacing, glitch, VHS, corrupted, static, distorted, artifacts, compression,
-  shutter artifact, signal, data-moshing, interlaced, noise pattern, horizontal lines, digital defects.
+Rules:
+- Describe only the visual effect: what it looks like, its color, motion, and intensity
+- Never use command words: Add, Remove, Keep, Change, Make, Create, Apply, Transform
+- Never use quality words: cinematic, photorealistic, film-quality, professional, rendering
+- Never use preservation phrases: "keep people unchanged", "preserve identity", "leave background"
+- Never describe camera: no shot types, angles, or camera movements
+- Output 1-2 sentences maximum. Plain text only. No quotes. No markdown.
 
-TRADEMARK / COPYRIGHT RULE (critical):
-• NEVER use real trademarked character names, superhero names, or franchise names in your output.
-  These will be blocked by content moderation.
-• Instead, describe the VISUAL APPEARANCE of the costume/style in generic terms:
-  - "Spider-Man suit" → "form-fitting bodysuit with geometric web texture pattern in black and red"
-  - "Batman costume" → "sleek black armoured bodysuit with angular chest plate and pointed cowl"
-  - "Iron Man armor" → "full-body metallic red and gold powered armour suit with chest arc detail"
-  - "Superman suit" → "bright blue fitted suit with red cape and yellow chest emblem"
-  - Apply this rule to ALL trademarked characters, brands in costume context, or licensed IP.
-
-Transformation rules:
-• This is a TRANSFORMATION of an existing video clip — NOT a new scene generation.
-• Always preserve: the subject's identity, face, pose, body proportions, and performance.
-• Only modify what the user explicitly requested: VFX effects, environment, atmosphere, lighting, wardrobe additions, accessories, or scene elements.
-• CAMERA — include zero camera angle, movement, or shot-type language (e.g. "cinematic shot",
-  "wide-angle lens", "camera push-in", "shallow depth of field"). Runway inherits camera position
-  from the source video automatically. Only include camera language if the user explicitly requested it.
-• Do NOT invent creative additions the user did not ask for.
-• Output must be 1 to 3 sentences maximum.
-• The output must read as a direct transformation instruction, not a description of a new scene.
-• Be specific and visual — describe effects in concrete terms (e.g. "frosted surfaces, cold mist, blue-white lighting") rather than vague labels.
-• Do not include explanations, options, alternatives, meta-commentary, or a preamble.
-• Return only the final compiled prompt as plain text. No quotes. No prefixes. No labels.
-
-Vehicle and named-object rules (critical for realism):
-• When the user names a specific car brand or model, you MUST describe its distinctive physical characteristics so Runway renders the correct vehicle — not a generic car.
-  - Lamborghini: ultra-low aggressive supercar body, sharp angular wedge silhouette, wide rear haunches, scissor-door profile, flat aggressive nose
-  - Ferrari: sleek low-slung sports car, pronounced rear haunches, iconic prancing-horse proportions, bold hood lines
-  - Rolls-Royce: large imposing luxury saloon or SUV, upright tall grille, long bonnet, coach-built proportions, chrome detailing
-  - Bentley: wide muscular luxury grand tourer, rounded haunches, chrome matrix grille, substantial road presence
-  - McLaren: lightweight mid-engine supercar, dihedral doors, low streamlined nose, racing-derived aerodynamic body
-  - Porsche 911: rear-engine sports car, rounded fastback roofline, flared rear arches, compact and low stance
-  - Mercedes G-Class: boxy upright SUV, flat vertical panels, round headlights, exposed door hinges, square footprint
-  - BMW M3/M4: compact sport saloon or coupe, wide kidney grille, muscular flared arches, athletic stance
-  - For any other named car: describe its most visually distinctive body shape, roofline, proportions, and stance in enough detail for an AI to identify it.
-• Always include the user-specified colour on the vehicle description (e.g. "pearl white", "matte black", "red").
-• Always specify exact placement of the vehicle relative to the subject so it does not overlap the person:
-  use phrases like "parked in the distant background", "positioned to the left side of the frame behind the subject", "visible in the background to the right", "in the far background".
-• The vehicle must appear parked or stationary unless the user explicitly asks for motion.`;
+Examples:
+- "money rain" → "Green dollar bills floating and drifting downward through the air, paper money falling slowly across the scene."
+- "fire effect" → "Bright orange and red flames flickering upward from the ground, fire spreading with glowing ember particles rising."
+- "lightning" → "Electric white lightning bolts flashing across the dark sky, bright arcs of energy illuminating the scene."
+- "fog" → "Thick white mist rolling across the ground, dense atmospheric fog filling the lower half of the scene."`;
 
 // ─── Effect type classifier ───────────────────────────────────────────────────
 
@@ -267,21 +200,11 @@ export function sanitizeForRunway(text: string): string {
  * Final structure: [ANTI_ARTIFACT_PREFIX] [identity sentence]. [VFX sentence].
  */
 export function normalizeCompiled(raw: string): string {
-  // 1. Collapse extra whitespace
   let text = raw.replace(/\s{2,}/g, ' ').trim();
-
-  // 2. Idempotent guard — skip prepending if prefix already present
-  if (text.toLowerCase().includes(ARTIFACT_FINGERPRINT)) {
-    return text;
-  }
-
-  // 3. Ensure the VFX body ends cleanly before joining
   if (text && !text.endsWith('.') && !text.endsWith('!') && !text.endsWith('?')) {
     text += '.';
   }
-
-  // 4. Prepend — Runway weights the start of the prompt most heavily
-  return `${ANTI_ARTIFACT_PREFIX} ${text}`;
+  return text;
 }
 
 // ─── Fallback compile (no Claude) ────────────────────────────────────────────
@@ -299,13 +222,7 @@ export function fallbackCompile(userPrompt: string): string {
   const cleaned = userPrompt.trim();
   const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   const stmt    = body.endsWith('.') ? body : body + '.';
-
-  const base =
-    `Preserve the subject's identity, face, pose, and framing. ` +
-    `${stmt} ` +
-    `Keep all other aspects of the shot unchanged.`;
-
-  return normalizeCompiled(base);
+  return normalizeCompiled(stmt);
 }
 
 // ─── Claude call ──────────────────────────────────────────────────────────────

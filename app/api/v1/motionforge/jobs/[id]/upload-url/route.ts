@@ -4,8 +4,10 @@ export const maxDuration = 15;
 import { NextRequest, NextResponse }  from 'next/server';
 import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { validatePanelToken, validatePanelKey } from '@/lib/motionforge/auth';
-import { createRunwayUploadSlot }        from '@/lib/motionforge/runway';
 import { createBeebleUploadSlot }        from '@/lib/motionforge/beeble';
+import { createRunwayUploadSlot }         from '@/lib/motionforge/runway';
+
+const OMNI_PLANS = new Set(['pro', 'exclusive', 'creator', 'creator-suite']);
 
 export async function GET(
   req: NextRequest,
@@ -25,28 +27,56 @@ export async function GET(
   }
 
   const userId = session?.userId ?? job.userId;
+  const mode   = (req.nextUrl.searchParams.get('mode') ?? '').toLowerCase();
 
-  // Panel passes ?mode= so we know which backend to prepare an upload slot for
-  const mode         = (req.nextUrl.searchParams.get('mode') ?? '').toLowerCase();
-  const isBeebleMode = mode === 'background' || mode === 'relight';
+  // Plan guard for Omni mode
+  if (mode === 'omni' && session) {
+    if (!OMNI_PLANS.has(session.plan)) {
+      return NextResponse.json(
+        { error: 'Gemini Omni requires a Pro or Exclusive plan. Upgrade at prysmor.io/pricing' },
+        { status: 403 },
+      );
+    }
+  }
 
   try {
-    const filename = `clip-${params.id}.mp4`;
-
     await updateJob(userId, params.id, { status: 'uploading' });
 
-    if (isBeebleMode) {
-      // ── Beeble SwitchX: return a pre-signed PUT slot ────────────────────
-      const slot = await createBeebleUploadSlot(filename);
-      console.log(`[upload-url] Beeble slot for job ${params.id}: ${slot.beebleUri}`);
+    if (mode === 'background' || mode === 'relight' || mode === 'outfit') {
+      // ── Beeble SwitchX ────────────────────────────────────────────────────
+      const slot = await createBeebleUploadSlot(`clip-${params.id}.mp4`);
+      console.log(`[upload-url] Beeble slot for job ${params.id} (mode=${mode})`);
       return NextResponse.json({
         uploadUrl:    slot.uploadUrl,
         beebleUri:    slot.beebleUri,
-        uploadMethod: 'put',          // panel switches from FormData POST → raw PUT
+        uploadMethod: 'put',
       });
+
+    } else if (mode === 'omni') {
+      // ── KIE.AI Gemini Omni: direct client → Vercel Blob upload ────────────
+      // Panel uploads directly to Vercel Blob (bypasses our serverless function
+      // entirely, avoiding the 4.5 MB body size limit).
+      const { generateClientTokenFromReadWriteToken } = await import('@vercel/blob/client');
+      const pathname = `vfx-input/${params.id}.mp4`;
+      const clientToken = await generateClientTokenFromReadWriteToken({
+        token:               process.env.BLOB_READ_WRITE_TOKEN!,
+        pathname,
+        allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/*'],
+        maximumSizeInBytes:  500 * 1024 * 1024, // 500 MB
+      });
+      console.log(`[upload-url] Vercel Blob direct-upload slot for job ${params.id}`);
+      return NextResponse.json({
+        uploadUrl:       `https://blob.vercel-storage.com`,
+        blobPathname:    pathname,
+        blobClientToken: clientToken,
+        uploadMethod:    'blob-direct',
+        kieMode:         true,
+      });
+
     } else {
-      // ── Runway: return a pre-signed S3 FormData slot ────────────────────
-      const slot = await createRunwayUploadSlot(filename);
+      // ── Runway (VFX + any other mode) ─────────────────────────────────────
+      const slot = await createRunwayUploadSlot(`clip-${params.id}.mp4`);
+      console.log(`[upload-url] Runway slot for job ${params.id}`);
       return NextResponse.json({
         uploadUrl:    slot.uploadUrl,
         fields:       slot.fields,
@@ -54,6 +84,7 @@ export async function GET(
         uploadMethod: 'post',
       });
     }
+
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});

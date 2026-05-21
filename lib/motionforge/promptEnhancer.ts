@@ -68,19 +68,43 @@ Rules:
 - Max 50 words
 - Plain text only. No quotes. No markdown.`,
 
-  vfx: `You are a Runway Gen-4 Aleph prompt writer for visual effects.
-The user wants to add a cinematic visual effect to a video clip.
-Analyse the user intent and write a single Runway prompt.
+  outfit: `You are a Beeble SwitchX prompt writer for outfit and clothing replacement.
+Beeble SwitchX requires highly specific, descriptive prompts — NOT short action verbs.
+The user wants to change or replace the clothing/outfit worn by the subject in a video clip.
 
-OUTPUT FORMAT (strict):
-"Add [3-5 word effect description] to the scene. Keep all people unchanged."
+OUTPUT FORMAT:
+Write a detailed clothing description that precisely defines the outfit.
+Example format: "A [garment type], [fabric/material], [color and pattern], [fit and silhouette], [notable details like buttons, collars, logos, textures]."
 
 Rules:
-- Always start with "Add"
-- Describe the effect in 3-5 words: type, color, intensity
-- Never mention changing people, clothing, or background
-- Always end with "Keep all people unchanged."
-- Max 12 words total
+- Be highly specific about: garment type, material, color, fit, and visual details
+- Describe each piece of clothing: top, bottom, outerwear, accessories if relevant
+- Include fabric texture and finish: matte, shiny, leather, denim, knit, etc.
+- Describe fit: oversized, slim-fit, tailored, loose, cropped, etc.
+- Do NOT mention the subject/person's face, body, or background
+- No action verbs like "change", "replace", "switch", "put on"
+- Just a rich, precise clothing description — as if describing a fashion lookbook
+- Max 60 words
+- Plain text only. No quotes. No markdown.`,
+
+  vfx: `You are a Runway Gen-4 Aleph video-to-video prompt writer.
+Runway reads descriptive prompts, not commands.
+Describe HOW the effect looks and moves in the scene, not what to "add" or "keep".
+
+OUTPUT FORMAT:
+Describe only the visual effect as if it already exists in the scene.
+Present tense. Visual and motion detail. Max 15 words.
+
+Examples:
+- Input: "add fire" → Output: "Flames flickering and rising from the ground, orange and red fire spreading upward"
+- Input: "money rain" → Output: "Green dollar bills floating and drifting downward through the air, paper money falling"
+- Input: "lightning storm" → Output: "Bright lightning bolts flashing across the sky, electric arcs illuminating the scene"
+
+Rules:
+- Never use: Add, Remove, Keep, Change, Make, Create
+- Never use: cinematic, photorealistic, footage, film-quality
+- Never use preservation phrases like "keep people unchanged"
+- Describe the effect in present tense as if it exists in the scene
 - Plain text only. No quotes. No markdown.`,
 };
 
@@ -131,8 +155,10 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
       return stmt;
     case 'relight':
       return stmt;
+    case 'outfit':
+      return stmt;
     case 'vfx':
-      return `Add ${cleaned.charAt(0).toLowerCase() + cleaned.slice(1)} to the scene. Keep all people unchanged.`;
+      return `${body} visible in the scene, overlaid on existing footage.`;
     default:
       return stmt;
   }

@@ -2,7 +2,7 @@ import crypto                        from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
-import { topUpCredits, addCredits }  from '@/lib/firestore/users';
+import { topUpCredits, addCredits, PLAN_LABELS }  from '@/lib/firestore/users';
 import { recordReferral }            from '@/lib/affiliates';
 
 export const runtime = 'nodejs';
@@ -250,7 +250,6 @@ export async function POST(req: NextRequest) {
 
       case 'subscription_expired':
         // Billing period ended — revoke access, downgrade to free.
-        // Credits are preserved so the user can still see their balance history.
         await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
           renewalDate: null,
         });
@@ -258,7 +257,6 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'subscription_paused':
-        // Plan is paused (e.g. payment failure grace period ended)
         await db.collection('users').doc(userId).set({
           licenseStatus: 'inactive',
           lsPausedAt:    new Date(),

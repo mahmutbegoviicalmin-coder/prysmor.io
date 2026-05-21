@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import { getRunwayTaskStatus } from '@/lib/motionforge/runway';
+import { getKieTaskStatus }    from '@/lib/motionforge/kieai';
 import { pollSwitchXJob }      from '@/lib/motionforge/beeble';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
@@ -113,6 +114,81 @@ export async function GET(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Beeble polling error';
       logError(TAG, `[beeble] Polling threw for job ${params.id}: ${msg}`, err);
+      return NextResponse.json({ status: 'generating', error: msg });
+    }
+  }
+
+  // ── Poll KIE.AI (Gemini Omni Video) ────────────────────────────────────────
+  if (job.status === 'generating' && (job as any).kieTaskId) {
+    const kieTaskId = (job as any).kieTaskId as string;
+
+    // Rate-limit KIE.AI polls to once every 8 s
+    const kieLastPolled = (job as any).kiePolledAt
+      ? ((job as any).kiePolledAt instanceof Date
+          ? (job as any).kiePolledAt
+          : ((job as any).kiePolledAt as FirebaseFirestore.Timestamp).toDate())
+      : null;
+    const msKieSinceLastPoll = kieLastPolled ? Date.now() - kieLastPolled.getTime() : Infinity;
+
+    if (msKieSinceLastPoll < 8_000) {
+      const cached = (job as any).kieProgress ?? 0;
+      log(TAG, `[kieai] Cached ${cached}% (${Math.round(msKieSinceLastPoll / 1000)}s since last poll)`);
+      return NextResponse.json({ status: 'generating', progress: cached });
+    }
+
+    try {
+      const result = await getKieTaskStatus(kieTaskId);
+      log(TAG, `[kieai] Task ${kieTaskId} → ${result.state}`);
+
+      // Map KIE.AI states: waiting/queuing/generating → still working
+      if (result.state === 'waiting' || result.state === 'queuing' || result.state === 'generating') {
+        const prevProgress = (job as any).kieProgress ?? 0;
+        const nextProgress = typeof result.progress === 'number'
+          ? Math.min(result.progress, 90)
+          : Math.min(prevProgress < 10 ? 10 : prevProgress + 4, 90);
+
+        await updateJob(userId, params.id, {
+          kiePolledAt:  new Date(),
+          kieProgress:  nextProgress,
+          progress:     nextProgress,
+        } as any);
+        return NextResponse.json({ status: 'generating', progress: nextProgress });
+      }
+
+      if (result.state === 'fail') {
+        const reason = result.failMsg || 'KIE.AI Gemini Omni Video failed';
+        logError(TAG, `[kieai] Task ${kieTaskId} failed: ${reason}`);
+        await updateJob(userId, params.id, { status: 'failed', error: reason });
+        if (job.userId && job.creditCost) {
+          refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});
+        }
+        return NextResponse.json({ status: 'failed', error: reason });
+      }
+
+      if (result.state === 'success') {
+        if (!result.resultUrl) {
+          // URL not yet populated — retry next poll
+          warn(TAG, `[kieai] Task ${kieTaskId} succeeded but resultUrl missing — waiting`);
+          await updateJob(userId, params.id, { kiePolledAt: new Date(), kieProgress: 95 } as any);
+          return NextResponse.json({ status: 'generating', progress: 95 });
+        }
+
+        log(TAG, `[kieai] Completed for job ${params.id} — outputUrl: ${result.resultUrl.slice(0, 80)}`);
+        await updateJob(userId, params.id, {
+          status:       'completed',
+          outputUrl:    result.resultUrl,
+          rawOutputUrl: result.resultUrl,
+          progress:     100,
+        });
+        return NextResponse.json({ status: 'completed', progress: 100, outputUrl: result.resultUrl });
+      }
+
+      warn(TAG, `[kieai] Unexpected state "${result.state}" for task ${kieTaskId}`);
+      return NextResponse.json({ status: 'generating', progress: (job as any).kieProgress ?? 0 });
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'KIE.AI polling error';
+      logError(TAG, `[kieai] Polling threw for job ${params.id}: ${msg}`, err);
       return NextResponse.json({ status: 'generating', error: msg });
     }
   }

@@ -85,6 +85,15 @@ export interface MotionForgeJob {
   /** Last cached Runway progress (0-100) to return between Runway polls */
   runwayProgress?: number;
 
+  /** KIE.AI Gemini Omni Video task id — set for vfx/style modes (replaces Runway) */
+  kieTaskId?: string;
+  /** Timestamp of the last KIE.AI status poll */
+  kiePolledAt?: FirebaseFirestore.Timestamp | Date;
+  /** Last cached KIE.AI progress (0-100) */
+  kieProgress?: number;
+  /** Firebase Storage signed URL used as video reference for KIE.AI */
+  kieAssetUrl?: string;
+
   /** Beeble SwitchX task id — set for background and relight modes */
   beebleTaskId?: string;
   /** Beeble URI of the uploaded source video — set during /upload for bg/relight modes */

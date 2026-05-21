@@ -7,13 +7,13 @@ const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
-const POLL_MS         = 2000;
-const POLL_MS_SLOW    = 10000;              // slower after 10 min
+const POLL_MS         = 5000;
+const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 
 // Auth polling
-const AUTH_POLL_MS  = 2500;  // how often to check if browser auth completed
+const AUTH_POLL_MS  = 6000;  // how often to check if browser auth completed
 const AUTH_MAX_MS   = 5 * 60 * 1000; // 5 min before code expires
 
 // Generation status labels by elapsed time (no vendor names)
@@ -142,7 +142,8 @@ function stopClipAutoSelect() {
 
 // ─── Reference Image Store ────────────────────────────────────────────────────
 var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG), BG mode only
-var selectedMode = 'background';  // active generation mode: background | relight | vfx
+var selectedMode = 'background';  // active generation mode: background | relight | outfit | vfx | omni
+var OMNI_PLANS   = ['pro', 'exclusive', 'creator', 'creator-suite'];
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -675,7 +676,9 @@ async function apiFetch(path, options) {
 var _enhanceSuggestMap = {
   background: 'Suggest BG',
   relight:    'Suggest lighting',
+  outfit:     'Suggest outfit',
   vfx:        'Suggest effect',
+  omni:       'Suggest effect',
 };
 
 /** Returns the correct chip label based on textarea content and current mode. */
@@ -1216,13 +1219,42 @@ async function mfGenerate() {
     try {
       var blob = base64ToBlob(fileBase64, 'video/mp4');
       var uploadRes;
-      if (uploadSlot.uploadMethod === 'put') {
-        // Beeble: raw PUT with binary body
+
+      if (uploadSlot.uploadMethod === 'blob-direct') {
+        // ── Vercel Blob direct upload (Omni mode) ─────────────────────────
+        // Upload straight to Vercel Blob CDN — no 4.5 MB serverless limit.
+        // Encode each path segment individually — don't encode the '/' separator
+        var blobUrl = 'https://blob.vercel-storage.com/' +
+          uploadSlot.blobPathname.split('/').map(encodeURIComponent).join('/');
+        uploadRes = await fetch(blobUrl, {
+          method:  'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + uploadSlot.blobClientToken,
+            'x-content-type': 'video/mp4',
+            'Content-Type':   'video/mp4',
+          },
+          body: blob,
+        });
+        if (!uploadRes.ok) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 200) : ''));
+        }
+        // Vercel Blob returns JSON with the public URL
+        var blobData = await uploadRes.json().catch(function () { return {}; });
+        uploadSlot.kieAssetUrl = blobData.url || ('https://blob.vercel-storage.com/' + uploadSlot.blobPathname);
+
+      } else if (uploadSlot.uploadMethod === 'put') {
+        // For Beeble: PUT to external S3 (no auth headers — they invalidate presigned URLs)
         uploadRes = await fetch(uploadSlot.uploadUrl, {
           method:  'PUT',
           headers: { 'Content-Type': 'video/mp4' },
           body:    blob,
         });
+        if (!uploadRes.ok && uploadRes.status !== 204) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+        }
+
       } else {
         // Runway: multipart FormData POST to S3
         var formData = new FormData();
@@ -1230,11 +1262,12 @@ async function mfGenerate() {
         Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
         formData.append('file', blob, 'clip.mp4');
         uploadRes = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+        if (!uploadRes.ok && uploadRes.status !== 204) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+        }
       }
-      if (!uploadRes.ok && uploadRes.status !== 204) {
-        var errText = await uploadRes.text().catch(function () { return ''; });
-        throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
-      }
+
     } catch (err) {
       return fail('Upload failed: ' + err.message);
     }
@@ -1245,6 +1278,8 @@ async function mfGenerate() {
     var completeBody = { mediaInSec: mediaInSec, clipDurSec: clipDurSec };
     if (uploadSlot.beebleUri) {
       completeBody.beebleUri = uploadSlot.beebleUri;
+    } else if (uploadSlot.kieAssetUrl) {
+      completeBody.kieAssetUrl = uploadSlot.kieAssetUrl;
     } else {
       completeBody.runwayUri = uploadSlot.runwayUri;
     }
@@ -1262,8 +1297,8 @@ async function mfGenerate() {
   try {
     var genBody = { prompt: prompt, mode: selectedMode };
     genBody.clipDuration = clipDurSec;
-    // Send user-uploaded reference image only for background mode
-    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
+    // Send user-uploaded reference image for background + outfit modes
+    if (storedReferenceImage && (selectedMode === 'background' || selectedMode === 'outfit')) genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
@@ -2757,10 +2792,32 @@ function bindEvents() {
     refreshClip(false);
   });
 
+  // Mark Omni tab based on plan
+  (function () {
+    var omniTab = el('omni-tab');
+    if (!omniTab) return;
+    var plan = state.auth.plan || '';
+    if (OMNI_PLANS.indexOf(plan) !== -1) {
+      omniTab.classList.add('plan-ok');
+    } else {
+      omniTab.classList.add('plan-locked');
+    }
+  }());
+
   // Mode selector pills
   document.querySelectorAll('.mode-pill').forEach(function (pill) {
     pill.addEventListener('click', function () {
-      selectedMode = this.getAttribute('data-mode');
+      var mode = this.getAttribute('data-mode');
+      // Omni is coming soon — block entirely, don't change active tab
+      if (mode === 'omni') {
+        showToast('Gemini Omni is coming soon. Stay tuned!', 'info');
+        // Keep active highlight on the previously selected tab
+        document.querySelectorAll('.mode-pill').forEach(function (p) {
+          p.classList.toggle('active', p.getAttribute('data-mode') === selectedMode);
+        });
+        return;
+      }
+      selectedMode = mode;
       document.querySelectorAll('.mode-pill').forEach(function (p) { p.classList.remove('active'); });
       this.classList.add('active');
       console.log('[Prysmor] Mode changed to:', selectedMode);
@@ -2994,7 +3051,7 @@ function loadHistory() {
 }
 
 function renderHistoryCard(job) {
-  var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX' }[job.mode] || job.mode || '—';
+    var modeLabel = { background: 'Background', relight: 'Relight', outfit: 'Outfit', vfx: 'VFX', omni: 'Omni' }[job.mode] || job.mode || '—';
   var statusClass = { completed: 'h-status-done', failed: 'h-status-fail', generating: 'h-status-gen' }[job.status] || 'h-status-gen';
   var statusLabel = { completed: 'Done', failed: 'Failed', generating: 'Processing', uploading: 'Uploading', created: 'Queued' }[job.status] || job.status;
 

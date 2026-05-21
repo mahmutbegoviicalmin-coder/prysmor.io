@@ -8,13 +8,13 @@ import {
   ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "3.9.3";
+const PANEL_VERSION = "5.2.0";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.9.0/PrysmrSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.2.0/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v3.9.0/Prysmor-3.9.0.pkg";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.2.0/Prysmor-5.2.0.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -126,7 +126,7 @@ export default function DownloadsContent() {
         </h1>
         <p className="text-[14px] text-[#6B7280] leading-relaxed max-w-[560px]">
           Install the Prysmor CEP extension into Adobe Premiere Pro.
-          Background replacement, relighting, and VFX — directly inside your timeline. No configuration needed.
+          Background replacement, relighting, outfit swap, and VFX — directly inside your timeline. No configuration needed.
         </p>
       </div>
 
@@ -208,7 +208,7 @@ export default function DownloadsContent() {
 
             <a
               href={DOWNLOAD_MAC}
-              download="Prysmor-3.8.0.pkg"
+              download="Prysmor-5.2.0.pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#39FF6A] text-[#050505] text-[13px] font-bold hover:bg-[#4fff7e] transition-colors"
@@ -270,14 +270,14 @@ export default function DownloadsContent() {
               VFX directly in Adobe Premiere Pro
             </p>
             <p className="text-[12px] text-[#6B7280] leading-relaxed mb-3">
-              Background replacement, relighting, and VFX directly in your timeline.
+              Background replacement, relighting, outfit swap, and VFX directly in your timeline.
               No extra software, no startup services, no configuration.
             </p>
             <div className="grid sm:grid-cols-3 gap-2">
               {[
                 ["Enhance", "Smart prompt suggestions per mode"],
                 ["Auto Preprocessing", "ffmpeg crops wide video to 720p"],
-                ["3 Modes", "Background, Relight, VFX"],
+                ["4 Modes", "Background, Relight, Outfit, VFX"],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-[7px] bg-[#080808] border border-[#111] px-3 py-2">
                   <p className="text-[10px] text-[#4B5563] mb-0.5">{k}</p>

@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebaseAdmin";
+import { db }                        from "@/lib/firebaseAdmin";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin":  "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
   });
 }
-
-const CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -22,7 +20,6 @@ function generateCode(): string {
 }
 
 export async function POST(req: NextRequest) {
-  // Accept optional device diagnostics from the panel
   let body: {
     platform?: string;
     hostApp?: string;
@@ -33,21 +30,20 @@ export async function POST(req: NextRequest) {
   } = {};
   try { body = await req.json(); } catch (_) {}
 
-  const code = generateCode();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + CODE_TTL_MS);
+  const code      = generateCode();
+  const now       = Date.now();
+  const expiresAt = now + 5 * 60 * 1000; // 5 minutes
 
   await db.collection("panel_auth_codes").doc(code).set({
-    status: "pending",
+    status:    "pending",
     createdAt: now,
     expiresAt,
-    // Store device diagnostics so confirm route can register the device
-    ...(body.platform            && { platform: body.platform }),
-    ...(body.hostApp             && { hostApp: body.hostApp }),
-    ...(body.hostAppVersion      && { hostAppVersion: body.hostAppVersion }),
-    ...(body.cepVersion          && { cepVersion: body.cepVersion }),
-    ...(body.deviceName          && { deviceName: body.deviceName }),
-    ...(body.machineFingerprint  && { machineFingerprint: body.machineFingerprint }),
+    ...(body.platform           && { platform:           body.platform }),
+    ...(body.hostApp            && { hostApp:            body.hostApp }),
+    ...(body.hostAppVersion     && { hostAppVersion:     body.hostAppVersion }),
+    ...(body.cepVersion         && { cepVersion:         body.cepVersion }),
+    ...(body.deviceName         && { deviceName:         body.deviceName }),
+    ...(body.machineFingerprint && { machineFingerprint: body.machineFingerprint }),
   });
 
   const base =

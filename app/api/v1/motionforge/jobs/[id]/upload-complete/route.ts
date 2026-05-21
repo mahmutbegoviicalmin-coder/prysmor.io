@@ -14,18 +14,21 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { runwayUri?: string; beebleUri?: string; mediaInSec?: number; clipDurSec?: number };
+  let body: {
+    runwayUri?:  string;
+    beebleUri?:  string;
+    kieAssetUrl?: string;
+    mediaInSec?: number;
+    clipDurSec?: number;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { runwayUri, beebleUri, mediaInSec = 0, clipDurSec = 8 } = body;
+  const { runwayUri, beebleUri, kieAssetUrl, mediaInSec = 0, clipDurSec = 8 } = body;
 
-  if (!runwayUri && !beebleUri) {
-    return NextResponse.json({ error: 'Missing runwayUri or beebleUri' }, { status: 400 });
-  }
   if (runwayUri && !runwayUri.startsWith('runway://')) {
     return NextResponse.json({ error: 'Invalid runwayUri' }, { status: 400 });
   }
@@ -37,14 +40,24 @@ export async function POST(
 
   const userId = session?.userId ?? job.userId;
 
+  // KIE.AI PUT path: assetUrl already stored by the upload/PUT handler.
+  // Accept upload-complete even if no URI is provided in the body.
+  const existingAsset = (job as any).assetUrl as string | undefined;
+  if (!runwayUri && !beebleUri && !kieAssetUrl && !existingAsset) {
+    return NextResponse.json(
+      { error: 'Missing runwayUri, beebleUri, or kieAssetUrl' },
+      { status: 400 },
+    );
+  }
+
   try {
-    const assetUrl = beebleUri ?? runwayUri!;
+    const assetUrl = beebleUri ?? kieAssetUrl ?? runwayUri ?? existingAsset!;
     await updateJob(userId, params.id, {
       assetUrl,
       mediaInSec,
       clipDurSec,
-      // Store Beeble URI explicitly for the generate route to detect
-      ...(beebleUri ? { beebleVideoUri: beebleUri } : {}),
+      ...(beebleUri   ? { beebleVideoUri: beebleUri }   : {}),
+      ...(kieAssetUrl ? { kieAssetUrl }                 : {}),
     } as any);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

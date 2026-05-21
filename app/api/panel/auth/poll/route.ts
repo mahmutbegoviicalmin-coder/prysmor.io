@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebaseAdmin";
+import { db }                        from "@/lib/firebaseAdmin";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin":  "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
@@ -18,21 +18,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing code" }, { status: 400 });
   }
 
-  const codeDoc = await db
-    .collection("panel_auth_codes")
-    .doc(code.toUpperCase())
-    .get();
-
-  if (!codeDoc.exists) {
-    return NextResponse.json({ error: "Invalid code" }, { status: 404 });
+  const snap = await db.collection("panel_auth_codes").doc(code.toUpperCase()).get();
+  if (!snap.exists) {
+    return NextResponse.json({ error: "Invalid or expired code" }, { status: 404 });
   }
 
-  const data = codeDoc.data()!;
+  const data = snap.data()!;
 
-  // Check expiry
-  const expiresAt = data.expiresAt?.toDate?.() ?? new Date(0);
-  if (Date.now() > expiresAt.getTime() && data.status === "pending") {
-    await codeDoc.ref.update({ status: "expired" });
+  if (Date.now() > data.expiresAt && data.status === "pending") {
+    await snap.ref.update({ status: "expired" });
     return NextResponse.json({ status: "expired" });
   }
 
@@ -41,14 +35,13 @@ export async function GET(req: NextRequest) {
   }
 
   if (data.status === "authorized") {
-    // Delete the code doc so it can't be reused
-    await codeDoc.ref.delete();
-
+    // Delete so it can't be reused
+    await snap.ref.delete();
     return NextResponse.json({
-      status: "authorized",
-      token: data.token,
-      userId: data.userId,
-      plan: data.plan,
+      status:    "authorized",
+      token:     data.token,
+      userId:    data.userId,
+      plan:      data.plan,
       planLabel: data.planLabel,
     });
   }
