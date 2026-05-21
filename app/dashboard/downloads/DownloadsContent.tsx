@@ -8,13 +8,13 @@ import {
   ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "5.2.0";
+const PANEL_VERSION = "5.3.1";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.2.0/PrysmrSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.3.1/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.2.0/Prysmor-5.2.0.pkg";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.3.1/Prysmor-5.3.1.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ export default function DownloadsContent() {
 
             <a
               href={DOWNLOAD_MAC}
-              download="Prysmor-5.2.0.pkg"
+              download="Prysmor-5.3.1.pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#39FF6A] text-[#050505] text-[13px] font-bold hover:bg-[#4fff7e] transition-colors"
