@@ -1,12 +1,22 @@
-import { currentUser } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
+'use client';
 
-export default async function AuthRedirectPage() {
-  const user = await currentUser();
+import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
-  if (!user) {
-    redirect("/sign-in");
-  }
+export default function AuthRedirectPage() {
+  const { user, isLoaded } = useUser();
+  const router = useRouter();
 
-  redirect("/dashboard");
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (user) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/sign-in");
+    }
+  }, [user, isLoaded, router]);
+
+  // Blank while Clerk loads — no flash
+  return null;
 }
