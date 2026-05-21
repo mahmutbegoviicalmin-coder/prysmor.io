@@ -241,9 +241,12 @@ export async function POST(
     return NextResponse.json({ success: true, taskId: task.id });
 
   } catch (err: unknown) {
-    const msg     = err instanceof Error ? err.message : 'Generation failed';
-    const userMsg = ASPECT_RATIO_RE.test(msg) ? ASPECT_RATIO_MSG : msg;
-    const status  = ASPECT_RATIO_RE.test(msg) ? 400 : 502;
+    const raw     = err instanceof Error ? err.message : 'Generation failed';
+    const cleaned = raw.includes('API_KEY') || raw.includes('api_key')
+      ? 'Generation service temporarily unavailable. Please try again.'
+      : raw;
+    const userMsg = ASPECT_RATIO_RE.test(cleaned) ? ASPECT_RATIO_MSG : cleaned;
+    const status  = ASPECT_RATIO_RE.test(cleaned) ? 400 : 502;
     logError(TAG, `Generation failed for job ${params.id}`, err);
     await updateJob(userId, params.id, { status: 'failed', error: userMsg }).catch(() => {});
     return NextResponse.json({ error: userMsg }, { status });

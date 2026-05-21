@@ -23,6 +23,8 @@ export interface AdminUser {
   country:          string | null;
   countryCode:      string | null;
   lsSubscriptionId?: string;
+  trialUsed:        boolean;
+  trialUsedAt:      string | null;
 }
 
 // country name → ISO-2 code
@@ -134,6 +136,9 @@ export async function GET() {
       country:          d.country     ?? null,
       countryCode:      d.countryCode ?? null,
       lsSubscriptionId: d.lsSubscriptionId,
+      trialUsed:        d.trialUsed   === true,
+      trialUsedAt:      d.trialUsedAt?.toDate?.()?.toISOString?.()
+                        ?? (d.trialUsedAt instanceof Date ? d.trialUsedAt.toISOString() : null),
     };
   });
 

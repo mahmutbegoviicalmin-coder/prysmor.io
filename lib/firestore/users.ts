@@ -11,6 +11,10 @@ export interface UserDoc {
   // ── Credits ──────────────────────────────────────────────────────────────
   credits?:         number;   // current balance
   creditsTotal?:    number;   // plan cap (used for progress bar)
+  // ── Free Trial (Playground) ───────────────────────────────────────────────
+  trialUsed?:       boolean;  // true once the free playground trial has been consumed
+  trialJobId?:      string;   // job ID of the completed trial generation
+  trialUsedAt?:     firestore.Timestamp | Date | null;
 }
 
 export const PLAN_LABELS: Record<string, string> = {
@@ -56,9 +60,39 @@ export async function createUser(userId: string) {
       deviceLimit:    1,
       credits:        0,
       creditsTotal:   0,
+      trialUsed:      false,
+      trialJobId:     null,
+      trialUsedAt:    null,
       createdAt:      new Date(),
     });
   }
+}
+
+/**
+ * Atomically marks the free trial as consumed for a user.
+ * Returns false if the trial was already used, true if successfully claimed.
+ */
+export async function consumeTrialSlot(
+  userId: string,
+  jobId: string,
+): Promise<boolean> {
+  const ref = db.collection("users").doc(userId);
+
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists) return false;
+
+    const data = doc.data()!;
+    if (data.trialUsed === true) return false;
+
+    tx.update(ref, {
+      trialUsed:   true,
+      trialJobId:  jobId,
+      trialUsedAt: new Date(),
+      updatedAt:   new Date(),
+    });
+    return true;
+  });
 }
 
 export async function getUser(userId: string): Promise<UserDoc | null> {

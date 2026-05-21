@@ -131,9 +131,6 @@ const clerkAppearance = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
       afterSignInUrl="/auth-redirect"
       afterSignUpUrl="/auth-redirect"
       appearance={clerkAppearance}

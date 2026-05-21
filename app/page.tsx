@@ -1303,12 +1303,10 @@ export default function PrysmorPage() {
             className="anim-fade-up-d3 flex items-center justify-center flex-wrap"
             style={{ gap: "12px", marginTop: "44px" }}
           >
-            {/* Primary */}
-            <button
-              onClick={() => {
-                track('cta_click', { location: 'hero_primary' });
-                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
-              }}
+            {/* Primary — Start Free Trial */}
+            <a
+              href="/sign-up"
+              onClick={() => track('cta_click', { location: 'hero_trial' })}
               className="inline-flex items-center gap-2 cursor-pointer"
               style={{
                 background: "linear-gradient(160deg, #44ff74 0%, #29d955 55%, #22c24a 100%)",
@@ -1321,6 +1319,7 @@ export default function PrysmorPage() {
                 boxShadow: "0 1px 0 rgba(255,255,255,0.25) inset, 0 6px 24px rgba(57,255,106,0.18), 0 2px 8px rgba(0,0,0,0.3)",
                 transition: "transform 200ms ease, box-shadow 200ms ease",
                 letterSpacing: "-0.2px",
+                textDecoration: "none",
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLElement;
@@ -1333,7 +1332,39 @@ export default function PrysmorPage() {
                 el.style.boxShadow = "0 1px 0 rgba(255,255,255,0.25) inset, 0 6px 24px rgba(57,255,106,0.18), 0 2px 8px rgba(0,0,0,0.3)";
               }}
             >
-              Generate VFX <ArrowRight size={15} />
+              Start free trial <ArrowRight size={15} />
+            </a>
+
+            {/* Secondary — See pricing */}
+            <button
+              onClick={() => {
+                track('cta_click', { location: 'hero_pricing' });
+                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="inline-flex items-center gap-2 cursor-pointer"
+              style={{
+                background: "transparent",
+                color: "rgba(255,255,255,0.45)",
+                borderRadius: "10px",
+                padding: "14px 24px",
+                fontSize: "14px",
+                fontWeight: 500,
+                border: "1px solid #1e1e1e",
+                transition: "color 150ms, border-color 150ms",
+                letterSpacing: "-0.1px",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.color = "white";
+                el.style.borderColor = "#333";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.color = "rgba(255,255,255,0.45)";
+                el.style.borderColor = "#1e1e1e";
+              }}
+            >
+              See pricing
             </button>
 
           </div>

@@ -2,7 +2,7 @@ const BEEBLE_API_BASE = 'https://api.beeble.ai';
 
 function beebleHeaders(): Record<string, string> {
   const key = process.env.BEEBLE_API_KEY;
-  if (!key) throw new Error('BEEBLE_API_KEY is not set');
+  if (!key) throw new Error('Generation service is temporarily unavailable. Please try again later.');
   return {
     'x-api-key':    key,
     'Content-Type': 'application/json',

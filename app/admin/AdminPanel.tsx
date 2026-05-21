@@ -8,7 +8,7 @@ import {
   ShieldCheck, MoreHorizontal, ArrowUpDown,
   Eye, Plus, Minus, TrendingUp, DollarSign, Activity,
   UserPlus, UserMinus, BarChart2, Package,
-  Trash2, MapPin, Download, Copy, Globe, LifeBuoy,
+  Trash2, MapPin, Download, Copy, Globe, LifeBuoy, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,6 +34,8 @@ interface AdminUser {
   country:          string | null;
   countryCode:      string | null;
   lsSubscriptionId?: string;
+  trialUsed:        boolean;
+  trialUsedAt:      string | null;
 }
 
 type SortKey = 'createdAt' | 'lastSignInAt' | 'email' | 'plan' | 'credits' | 'licenseStatus';
@@ -142,6 +144,16 @@ function StatusBadge({ status }: { status: string }) {
     }`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-[#A3FF12]' : 'bg-[#4B5563]'}`} />
       {active ? 'Active' : 'Inactive'}
+    </span>
+  );
+}
+
+function TrialBadge({ usedAt }: { usedAt: string | null }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-violet-500/30 bg-violet-500/[0.10] text-violet-300"
+      title={usedAt ? `Trial used: ${new Date(usedAt).toLocaleString('en-GB')}` : 'Trial used'}>
+      <Sparkles className="w-2.5 h-2.5" />
+      Trial
     </span>
   );
 }
@@ -456,6 +468,7 @@ function DetailModal({ user, onClose }: { user: AdminUser; onClose: () => void }
     ['Renewal date',  user.renewalDate || '—'],
     ['Device limit',  String(user.deviceLimit)],
     ['LS Sub ID',     user.lsSubscriptionId || '—'],
+    ['Free trial',    user.trialUsed ? `Used ${user.trialUsedAt ? fmtDate(user.trialUsedAt) : ''}` : 'Not used'],
     ['Joined',        fmtDate(user.createdAt)],
     ['Last sign-in',  fmtDate(user.lastSignInAt)],
   ];
@@ -694,6 +707,7 @@ function UserCard({
       <div className="flex flex-wrap items-center gap-1.5">
         <PlanBadge plan={user.plan} label={user.planLabel} />
         <StatusBadge status={user.licenseStatus} />
+        {user.trialUsed && <TrialBadge usedAt={user.trialUsedAt} />}
         {user.country && <CountryBadge code={user.countryCode} name={user.country} />}
       </div>
 
@@ -1356,6 +1370,7 @@ export function AdminPanel() {
   const [planFilter,    setPlanFilter]    = useState('all');
   const [statFilter,    setStatFilter]    = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
+  const [trialFilter,   setTrialFilter]   = useState<'all' | 'used' | 'unused'>('all');
   const [sortKey,       setSortKey]       = useState<SortKey>('createdAt');
   const [sortDir,       setSortDir]       = useState<'asc' | 'desc'>('desc');
   const [modal,         setModal]         = useState<Modal>(null);
@@ -1450,11 +1465,12 @@ export function AdminPanel() {
   }
 
   function exportCsv() {
-    const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Credits', 'Credits Total', 'Country', 'Renewal Date', 'Joined', 'Last Sign-in'];
+    const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Credits', 'Credits Total', 'Country', 'Renewal Date', 'Trial Used', 'Trial Used At', 'Joined', 'Last Sign-in'];
     const rows = filtered.map(u => [
       u.id, u.displayName, u.email, u.planLabel, u.licenseStatus,
       u.credits, u.creditsTotal, u.country ?? '',
-      u.renewalDate ?? '', u.createdAt ?? '', u.lastSignInAt ?? '',
+      u.renewalDate ?? '', u.trialUsed ? 'Yes' : 'No', u.trialUsedAt ?? '',
+      u.createdAt ?? '', u.lastSignInAt ?? '',
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -1481,6 +1497,8 @@ export function AdminPanel() {
       if (planFilter    !== 'all' && u.plan             !== planFilter)    return false;
       if (statFilter    !== 'all' && u.licenseStatus    !== statFilter)    return false;
       if (countryFilter !== 'all' && (u.countryCode ?? 'XX') !== countryFilter) return false;
+      if (trialFilter === 'used'   && !u.trialUsed)  return false;
+      if (trialFilter === 'unused' &&  u.trialUsed)  return false;
       return true;
     });
 
@@ -1513,10 +1531,11 @@ export function AdminPanel() {
 
   // ── Stats ───────────────────────────────────────────────────────────────────
   const stats = useMemo(() => ({
-    total:    users.length,
-    active:   users.filter(u => u.licenseStatus === 'active').length,
-    inactive: users.filter(u => u.licenseStatus !== 'active').length,
-    credits:  users.reduce((s, u) => s + u.credits, 0),
+    total:       users.length,
+    active:      users.filter(u => u.licenseStatus === 'active').length,
+    inactive:    users.filter(u => u.licenseStatus !== 'active').length,
+    credits:     users.reduce((s, u) => s + u.credits, 0),
+    trialUsed:   users.filter(u => u.trialUsed).length,
   }), [users]);
 
   // ── SortHeader ──────────────────────────────────────────────────────────────
@@ -1614,12 +1633,13 @@ export function AdminPanel() {
       {activeTab === 'users' && <div>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           {[
             { icon: Users,       label: 'Total users',    value: stats.total,                     sub: `${stats.active} with active plan`,    accent: '#9CA3AF', border: 'border-white/[0.07]' },
             { icon: ShieldCheck, label: 'Active plans',   value: stats.active,                    sub: `${((stats.active/Math.max(stats.total,1))*100).toFixed(0)}% of users`, accent: '#A3FF12', border: 'border-[#A3FF12]/[0.15]' },
             { icon: AlertCircle, label: 'Inactive',       value: stats.inactive,                  sub: 'No active plan',                      accent: '#F87171', border: 'border-red-500/[0.12]' },
             { icon: Zap,         label: 'Credits in use', value: stats.credits.toLocaleString(),  sub: 'Across all users',                    accent: '#60A5FA', border: 'border-blue-500/[0.12]' },
+            { icon: Sparkles,    label: 'Trial used',     value: stats.trialUsed,                 sub: `${((stats.trialUsed/Math.max(stats.total,1))*100).toFixed(0)}% of users`, accent: '#A78BFA', border: 'border-violet-500/[0.15]' },
           ].map(c => (
             <div key={c.label} className={`rounded-[13px] border ${c.border} bg-[#111113] px-4 py-4`}>
               <div className="flex items-center gap-2 mb-2.5">
@@ -1675,6 +1695,18 @@ export function AdminPanel() {
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4B5563] pointer-events-none" />
+            </div>
+
+            {/* Trial filter */}
+            <div className="relative">
+              <Sparkles className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 pointer-events-none" />
+              <select value={trialFilter} onChange={e => setTrialFilter(e.target.value as 'all' | 'used' | 'unused')}
+                className="appearance-none pl-6 pr-7 py-1.5 rounded-[7px] bg-[#111113] border border-white/[0.07] text-[11px] text-[#9CA3AF] focus:outline-none cursor-pointer hover:border-white/[0.14] transition-colors">
+                <option value="all">All trials</option>
+                <option value="used">Trial used</option>
+                <option value="unused">Trial unused</option>
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#4B5563] pointer-events-none" />
             </div>
@@ -1772,9 +1804,12 @@ export function AdminPanel() {
                         <div className="flex items-center gap-2.5">
                           <Avatar user={user} />
                           <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-white truncate max-w-[150px]">
-                              {user.displayName || <span className="text-[#6B7280] italic">No name</span>}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[12px] font-medium text-white truncate max-w-[130px]">
+                                {user.displayName || <span className="text-[#6B7280] italic">No name</span>}
+                              </p>
+                              {user.trialUsed && <TrialBadge usedAt={user.trialUsedAt} />}
+                            </div>
                             <p className="text-[11px] text-[#4B5563] truncate max-w-[150px]">{user.email}</p>
                           </div>
                         </div>

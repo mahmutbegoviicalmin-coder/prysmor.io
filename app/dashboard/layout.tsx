@@ -7,7 +7,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  Settings, Download, ShieldCheck, TrendingUp, LifeBuoy,
+  Settings, Download, ShieldCheck, TrendingUp, LifeBuoy, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/track";
@@ -18,12 +18,13 @@ const AFFILIATE_EMAILS = ["mahmutbegoviic.almin@gmail.com", "brzotrcipuska7@gmai
 const GREEN = "#39FF6A";
 
 const navItems = [
-  { label: "Overview",        href: "/dashboard",           icon: LayoutDashboard, requiresPlan: false },
-  { label: "Download Plugin", href: "/dashboard/downloads", icon: Download,        requiresPlan: true  },
-  { label: "Devices",         href: "/dashboard/devices",   icon: Monitor,         requiresPlan: true  },
-  { label: "Billing",         href: "/dashboard/billing",   icon: CreditCard,      requiresPlan: false },
-  { label: "Settings",        href: "/dashboard/settings",  icon: Settings,        requiresPlan: true  },
-  { label: "Support",         href: "/dashboard/support",   icon: LifeBuoy,        requiresPlan: false },
+  { label: "Overview",        href: "/dashboard",             icon: LayoutDashboard, requiresPlan: false },
+  { label: "Playground",      href: "/dashboard/playground",  icon: Sparkles,        requiresPlan: false },
+  { label: "Download Plugin", href: "/dashboard/downloads",   icon: Download,        requiresPlan: true  },
+  { label: "Devices",         href: "/dashboard/devices",     icon: Monitor,         requiresPlan: true  },
+  { label: "Billing",         href: "/dashboard/billing",     icon: CreditCard,      requiresPlan: false },
+  { label: "Settings",        href: "/dashboard/settings",    icon: Settings,        requiresPlan: true  },
+  { label: "Support",         href: "/dashboard/support",     icon: LifeBuoy,        requiresPlan: false },
 ];
 
 function NavLink({

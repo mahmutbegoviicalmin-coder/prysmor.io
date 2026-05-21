@@ -86,7 +86,10 @@ export async function GET(
     }
 
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = raw.includes('API_KEY') || raw.includes('api_key')
+      ? 'Generation service temporarily unavailable. Please try again.'
+      : raw;
     await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
     return NextResponse.json({ error: msg }, { status: 502 });
   }
