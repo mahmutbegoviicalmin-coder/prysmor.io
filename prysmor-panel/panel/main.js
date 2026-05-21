@@ -142,7 +142,7 @@ function stopClipAutoSelect() {
 
 // ─── Reference Image Store ────────────────────────────────────────────────────
 var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG), BG mode only
-var selectedMode = 'background';  // active generation mode: background | relight | outfit | vfx | omni
+var selectedMode = 'background';  // active generation mode: background | relight | vfx | omni
 var OMNI_PLANS   = ['pro', 'exclusive', 'creator', 'creator-suite'];
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
@@ -676,7 +676,6 @@ async function apiFetch(path, options) {
 var _enhanceSuggestMap = {
   background: 'Suggest BG',
   relight:    'Suggest lighting',
-  outfit:     'Suggest outfit',
   vfx:        'Suggest effect',
   omni:       'Suggest effect',
 };
@@ -1297,8 +1296,8 @@ async function mfGenerate() {
   try {
     var genBody = { prompt: prompt, mode: selectedMode };
     genBody.clipDuration = clipDurSec;
-    // Send user-uploaded reference image for background + outfit modes
-    if (storedReferenceImage && (selectedMode === 'background' || selectedMode === 'outfit')) genBody.referenceImage = storedReferenceImage;
+    // Send user-uploaded reference image only for background mode
+    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
@@ -3051,7 +3050,7 @@ function loadHistory() {
 }
 
 function renderHistoryCard(job) {
-    var modeLabel = { background: 'Background', relight: 'Relight', outfit: 'Outfit', vfx: 'VFX', omni: 'Omni' }[job.mode] || job.mode || '—';
+    var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX', omni: 'Omni' }[job.mode] || job.mode || '—';
   var statusClass = { completed: 'h-status-done', failed: 'h-status-fail', generating: 'h-status-gen' }[job.status] || 'h-status-gen';
   var statusLabel = { completed: 'Done', failed: 'Failed', generating: 'Processing', uploading: 'Uploading', created: 'Queued' }[job.status] || job.status;
 

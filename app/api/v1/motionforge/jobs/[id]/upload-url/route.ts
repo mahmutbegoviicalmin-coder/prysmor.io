@@ -42,10 +42,10 @@ export async function GET(
   try {
     await updateJob(userId, params.id, { status: 'uploading' });
 
-    if (mode === 'background' || mode === 'relight' || mode === 'outfit') {
+    if (mode === 'background' || mode === 'relight') {
       // ── Beeble SwitchX ────────────────────────────────────────────────────
       const slot = await createBeebleUploadSlot(`clip-${params.id}.mp4`);
-      console.log(`[upload-url] Beeble slot for job ${params.id} (mode=${mode})`);
+      console.log(`[upload-url] Beeble slot for job ${params.id}`);
       return NextResponse.json({
         uploadUrl:    slot.uploadUrl,
         beebleUri:    slot.beebleUri,

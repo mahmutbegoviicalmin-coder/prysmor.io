@@ -920,14 +920,6 @@
         Light
       </button>
 
-      <button class="mode-tab mode-pill" data-mode="outfit" onclick="prysmorSetMode('outfit')">
-        <!-- Shirt / clothing icon -->
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/>
-        </svg>
-        Outfit
-      </button>
-
       <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
         <!-- Sparkles / magic icon -->
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1058,7 +1050,6 @@
       <select id="mf-mode-select">
         <option value="background">Background</option>
         <option value="relight">Relight</option>
-        <option value="outfit">Outfit</option>
         <option value="vfx">VFX</option>
       </select>
       <a id="link-docs"  href="#"></a>
@@ -1240,13 +1231,12 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=44"></script>
+  <script src="main.js?v=45"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
       background: 'Describe the new background...',
       relight:    'Describe the lighting mood...',
-      outfit:     'Describe the outfit or style...',
       vfx:        'Describe the visual effect...',
     };
     function prysmorSetMode(mode) {
@@ -1274,16 +1264,9 @@
       /* disable generate button if omni (extra safety) */
       var genBtn = document.getElementById('btn-generate');
       if (genBtn) genBtn.disabled = false;
-      /* show reference image zone for background + outfit modes */
-      var refZone  = document.getElementById('ref-img-zone');
-      var refLabel = document.getElementById('ref-img-label');
-      var refLabelSpan = refLabel && refLabel.querySelector('span:last-child');
-      if (refZone) refZone.style.display = (mode === 'background' || mode === 'outfit') ? '' : 'none';
-      if (refLabelSpan) {
-        refLabelSpan.textContent = mode === 'outfit'
-          ? 'Upload outfit reference photo'
-          : 'Reference image';
-      }
+      /* show reference image zone only for background mode */
+      var refZone = document.getElementById('ref-img-zone');
+      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
       /* update enhance chip label for new mode */
       if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
     }

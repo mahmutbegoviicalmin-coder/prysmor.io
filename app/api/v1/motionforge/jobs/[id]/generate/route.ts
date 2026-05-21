@@ -76,7 +76,7 @@ export async function POST(
   if (!rawPrompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
 
   const mode         = (body.mode ?? 'background').trim();
-  const isBeebleMode = mode === 'background' || mode === 'relight' || mode === 'outfit';
+  const isBeebleMode = mode === 'background' || mode === 'relight';
   const isOmniMode   = mode === 'omni';
   const isRunwayMode = !isBeebleMode && !isOmniMode; // vfx + anything else → Runway
 
@@ -143,7 +143,7 @@ export async function POST(
         sourceUri:         beebleVideoUri,
         referenceImageUri: beebleRefImageUri,
         prompt,
-        alphaMode:         (mode === 'relight' || mode === 'outfit') ? 'fill' : 'auto',
+        alphaMode:         mode === 'relight' ? 'fill' : 'auto',
         maxResolution:     720,
       });
 
