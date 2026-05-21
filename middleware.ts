@@ -17,6 +17,8 @@ export default authMiddleware({
     "/api/webhooks(.*)",
     "/api/firebase/test",
     "/panel-auth(.*)",
+    // Dashboard — auth handled client-side in layout (avoids Clerk custom-domain session detection issues)
+    "/dashboard(.*)",
     // Analytics — must be public so anonymous visitors can be tracked
     "/api/track",
     // Panel API — own auth via validatePanelToken, must not require Clerk session
