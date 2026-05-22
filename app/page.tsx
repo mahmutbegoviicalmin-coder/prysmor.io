@@ -1,14 +1,21 @@
 "use client";
 
 import { useRef, useEffect, useState, Fragment } from "react";
+import Image from "next/image";
+import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "framer-motion";
 import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
 import { track } from "@vercel/analytics";
-import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
-import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
-import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
-import FAQ, { type FAQItem } from "@/components/sections/FAQ";
-import FinalCTA from "@/components/sections/FinalCTA";
+import type { FeatureItem } from "@/components/sections/FeatureGrid";
+import type { PriceTier } from "@/components/sections/PricingSection";
+import type { Testimonial } from "@/components/sections/Testimonials";
+import type { FAQItem } from "@/components/sections/FAQ";
+
+const FeatureGrid    = dynamic(() => import("@/components/sections/FeatureGrid"));
+const PricingSection = dynamic(() => import("@/components/sections/PricingSection"));
+const Testimonials   = dynamic(() => import("@/components/sections/Testimonials"));
+const FAQ            = dynamic(() => import("@/components/sections/FAQ"));
+const FinalCTA       = dynamic(() => import("@/components/sections/FinalCTA"));
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -48,7 +55,7 @@ function PanelMockup() {
         <video
           ref={videoRef}
           src="/editovani/1.mp4"
-          loop muted playsInline preload="auto"
+          loop muted playsInline preload="metadata"
           onCanPlay={() => setLoaded(true)}
           style={{
             position: "absolute", inset: 0, width: "100%", height: "100%",
@@ -1104,7 +1111,7 @@ function HeroVideo() {
       <video
         ref={ref}
         src="/vfx.mp4"
-        loop muted playsInline preload="auto"
+        loop muted playsInline preload="metadata"
         style={{ width: "100%", display: "block", maxHeight: "440px", objectFit: "cover" }}
       />
 
@@ -1227,8 +1234,7 @@ export default function PrysmorPage() {
                   position: "relative", zIndex: 4 - i,
                   background: "#1a1a1a",
                 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <Image src={src} alt="" fill sizes="28px" style={{ objectFit: "cover" }} priority />
                 </div>
               ))}
             </div>

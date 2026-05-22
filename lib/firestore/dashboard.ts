@@ -138,16 +138,11 @@ export async function getDashboardData(
       .doc(userId)
       .collection("jobs")
       .orderBy("createdAt", "desc")
-      .limit(200)
+      .limit(5)
       .get(),
   ]);
 
-  // Already ordered by createdAt desc from the query
   const sortedJobs = jobsSnap.docs;
-  const cycleStartMs = cycleStart().getTime();
-  const thisMonthJobs = sortedJobs.filter(
-    (d) => tsToDate(d.data().createdAt).getTime() >= cycleStartMs
-  );
 
   // ── License ────────────────────────────────────────────────────────────────
   const plan          = userDoc?.plan ?? "starter";

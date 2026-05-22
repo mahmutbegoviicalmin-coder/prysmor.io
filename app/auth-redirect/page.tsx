@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
-const MAX_RETRIES = 16;  // 16 × 400ms = ~6.5s
+const MAX_RETRIES = 6;   // 6 × 400ms = ~2.4s max wait
 const RETRY_MS   = 400;
 
 export default function AuthRedirectPage() {

@@ -11,9 +11,16 @@ export async function GET() {
 
   const userDoc = await getUser(userId).catch(() => null);
 
-  return NextResponse.json({
-    userId,
-    plan:          userDoc?.plan          ?? "starter",
-    licenseStatus: userDoc?.licenseStatus ?? "inactive",
-  });
+  return NextResponse.json(
+    {
+      userId,
+      plan:          userDoc?.plan          ?? "starter",
+      licenseStatus: userDoc?.licenseStatus ?? "inactive",
+    },
+    {
+      headers: {
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=45",
+      },
+    }
+  );
 }

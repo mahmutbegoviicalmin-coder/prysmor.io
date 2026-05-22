@@ -10,12 +10,15 @@ export default async function DevicesPage() {
   const user = await currentUser();
   if (!user) redirect("/");
 
-  const userDoc = await getUser(user.id).catch(() => null);
-  if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
-
   let data;
+  let licenseStatus: string | undefined;
   try {
-    data = await getDashboardData(user.id, user);
+    const [userDoc, dashboardData] = await Promise.all([
+      getUser(user.id).catch(() => null),
+      getDashboardData(user.id, user),
+    ]);
+    licenseStatus = userDoc?.licenseStatus;
+    data = dashboardData;
   } catch {
     data = {
       limits: { devicesUsed: 0, deviceLimit: 1, credits: 0, creditsTotal: 0, resetDate: "—" },
@@ -25,6 +28,8 @@ export default async function DevicesPage() {
       activity: [],
     };
   }
+
+  if (licenseStatus !== "active") redirect("/dashboard/billing");
 
   const { limits, panel } = data;
   const devices = panel.allDevices;

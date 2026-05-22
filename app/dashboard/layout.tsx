@@ -108,7 +108,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {});
 
-    fetch("/api/sync-location", { method: "POST" }).catch(() => {});
+    // Only sync location once per session to avoid duplicate calls with ConditionalShell
+    const syncKey = "prysmor_loc_synced";
+    if (!sessionStorage.getItem(syncKey)) {
+      sessionStorage.setItem(syncKey, "1");
+      fetch("/api/sync-location", { method: "POST" }).catch(() => {});
+    }
   }, []);
 
 
@@ -118,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!isLoaded || isSignedIn) return;
     const timer = setTimeout(() => {
       window.location.replace("/sign-in");
-    }, 2500);
+    }, 1000);
     return () => clearTimeout(timer);
   }, [isLoaded, isSignedIn]);
 
