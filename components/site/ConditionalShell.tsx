@@ -14,6 +14,7 @@ const PENDING_KEY = "prysmor_pending_checkout";
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname    = usePathname();
   const isDashboard = pathname.startsWith("/dashboard");
+  const isAuthFlow  = pathname === "/auth-redirect" || pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
   const isLanding   = pathname === "/";
   const { isSignedIn, isLoaded, user } = useUser();
 
@@ -73,13 +74,13 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
           <AnnouncementBar />
         </Suspense>
       )}
-      {!isDashboard && (
+      {!isDashboard && !isAuthFlow && (
         <Suspense fallback={null}>
           <Navbar />
         </Suspense>
       )}
       <main>{children}</main>
-      {!isDashboard && (
+      {!isDashboard && !isAuthFlow && (
         <Suspense fallback={null}>
           <Footer />
         </Suspense>
