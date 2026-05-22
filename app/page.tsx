@@ -2,20 +2,14 @@
 
 import { useRef, useEffect, useState, Fragment } from "react";
 import Image from "next/image";
-import dynamic from "next/dynamic";
 import { motion, MotionConfig } from "framer-motion";
 import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
 import { track } from "@vercel/analytics";
-import type { FeatureItem } from "@/components/sections/FeatureGrid";
-import type { PriceTier } from "@/components/sections/PricingSection";
-import type { Testimonial } from "@/components/sections/Testimonials";
-import type { FAQItem } from "@/components/sections/FAQ";
-
-const FeatureGrid    = dynamic(() => import("@/components/sections/FeatureGrid"));
-const PricingSection = dynamic(() => import("@/components/sections/PricingSection"));
-const Testimonials   = dynamic(() => import("@/components/sections/Testimonials"));
-const FAQ            = dynamic(() => import("@/components/sections/FAQ"));
-const FinalCTA       = dynamic(() => import("@/components/sections/FinalCTA"));
+import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
+import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
+import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
+import FAQ, { type FAQItem } from "@/components/sections/FAQ";
+import FinalCTA from "@/components/sections/FinalCTA";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
