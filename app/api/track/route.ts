@@ -1,34 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sessionId, userId, event, properties, page, referrer, userAgent } = body;
+    const { event, properties, page } = body;
 
     if (!event || typeof event !== 'string') {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
-    // Drop internal traffic before writing to Firestore
+    // Skip internal pages
     const pagePath = String(page ?? '/');
     if (pagePath.startsWith('/dashboard') || pagePath.startsWith('/admin')) {
       return NextResponse.json({ ok: true, skipped: true });
     }
 
-    await db.collection('events').add({
-      sessionId: sessionId ?? null,
-      userId:    userId    ?? null,
-      event,
-      properties: properties ?? {},
-      page:       page       ?? '/',
-      referrer:   referrer   ?? 'direct',
-      userAgent:  userAgent  ?? '',
-      timestamp:  FieldValue.serverTimestamp(),
-    });
+    // Log to Vercel function logs — no database writes needed
+    console.log(`[track] event=${event} page=${pagePath}`, JSON.stringify(properties ?? {}));
 
     return NextResponse.json({ ok: true });
   } catch (err) {
