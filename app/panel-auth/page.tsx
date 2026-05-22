@@ -37,8 +37,17 @@ function PanelAuthContent() {
 
   if (!isLoaded) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#09090B]">
-        <Loader2 className="w-6 h-6 text-[#A3FF12] animate-spin" />
+      <div className="min-h-screen bg-[#09090B] flex items-center justify-center px-4">
+        <div className="w-full max-w-[400px]">
+          <div className="flex items-center justify-center gap-2.5 mb-8">
+            <Image src="/logo/logo-icon.png" alt="Prysmor" width={32} height={32} className="rounded-[8px]" />
+            <span className="text-[18px] font-semibold text-white tracking-tight">Prysmor</span>
+          </div>
+          <div className="rounded-[18px] border border-white/[0.07] bg-[#111113] p-8 flex flex-col items-center gap-4">
+            <Loader2 className="w-6 h-6 text-[#A3FF12] animate-spin" />
+            <p className="text-[13px] text-[#6B7280]">Loading…</p>
+          </div>
+        </div>
       </div>
     );
   }

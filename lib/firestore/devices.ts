@@ -55,9 +55,9 @@ export async function registerDevice(
     // First time seeing this device — write all fields
     await deviceRef.set({
       platform,
-      name:           name ?? deviceId,
-      firstConnected: new Date(),
-      lastActive:     new Date(),
+      name:       name ?? deviceId,
+      firstSeen:  new Date(),
+      lastActive: new Date(),
       ...(extra?.hostApp        && { hostApp: extra.hostApp }),
       ...(extra?.hostAppVersion && { hostAppVersion: extra.hostAppVersion }),
       ...(extra?.cepVersion     && { cepVersion: extra.cepVersion }),

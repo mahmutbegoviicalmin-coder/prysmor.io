@@ -132,10 +132,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div style={{
         minHeight: "100vh", background: "#080808",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", gap: "20px",
       }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Image src="/logo/vecilogo.png" alt="Prysmor" width={24} height={24} style={{ objectFit: "contain" }} />
+          <span style={{ fontSize: "16px", fontWeight: 700, color: "white", letterSpacing: "-0.5px" }}>Prysmor</span>
+        </div>
         <div style={{
-          width: "32px", height: "32px", borderRadius: "50%",
+          width: "28px", height: "28px", borderRadius: "50%",
           border: "2px solid #1a1a1a", borderTopColor: "#39FF6A",
           animation: "spin 0.8s linear infinite",
         }} />
