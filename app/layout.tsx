@@ -136,6 +136,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       appearance={clerkAppearance}
     >
       <html lang="en" className={outfit.variable}>
+        <head>
+          {/* bfcache fix: force full reload when iOS Safari restores page from back-forward cache */}
+          <script dangerouslySetInnerHTML={{ __html: `
+            window.addEventListener('pageshow', function(e) {
+              if (e.persisted) { window.location.reload(); }
+            });
+          `}} />
+        </head>
         <body className="bg-background text-ink antialiased">
           <Suspense fallback={null}><PageTracker /></Suspense>
           <ConditionalShell>{children}</ConditionalShell>
