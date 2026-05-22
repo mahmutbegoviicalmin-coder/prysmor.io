@@ -103,7 +103,7 @@ export default function PricingSection({
   const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
     e.preventDefault();
     if (tierName && tierPrice !== undefined) {
-      track('pricing_click', { plan: tierName.toLowerCase(), price: tierPrice });
+      track(`pricing_click_${tierName.toLowerCase()}`, { plan: tierName.toLowerCase(), price: tierPrice });
     }
     if (!user) {
       // Not logged in — send to sign-in, after login Clerk returns to /#pricing
