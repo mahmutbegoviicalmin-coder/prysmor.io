@@ -7,7 +7,6 @@ import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
 import RefTracker from "@/components/site/RefTracker";
 import AnnouncementBar from "@/components/site/AnnouncementBar";
-const PENDING_KEY = "prysmor_pending_checkout";
 
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname    = usePathname();
