@@ -5,7 +5,6 @@ export default authMiddleware({
   publicRoutes: [
     "/",
     "/sign-out",
-    "/auth-redirect",
     "/cutsync",
     "/motionforge",
     "/pricing",
@@ -32,6 +31,7 @@ export default authMiddleware({
   // ignoredRoutes bypass ALL Clerk processing (incl. bot detection).
   // CEP browser requests can be fingerprinted as bots — ignore them entirely.
   ignoredRoutes: [
+    "/auth-redirect",
     "/api/track",
     "/api/panel/auth/start",
     "/api/panel/auth/poll",
