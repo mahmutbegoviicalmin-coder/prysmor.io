@@ -1,9 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
-import { clerkClient } from "@clerk/nextjs";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function SignOutPage() {
-  const { sessionId } = auth();
+  const { sessionId } = await auth();
 
   if (sessionId) {
     try {
