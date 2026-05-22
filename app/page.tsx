@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, Fragment } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { ArrowRight, Sparkles, Clock, Wand2 } from "lucide-react";
-import { track } from "@/lib/track";
+import { track } from "@vercel/analytics";
 import FeatureGrid, { type FeatureItem } from "@/components/sections/FeatureGrid";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
 import Testimonials, { type Testimonial } from "@/components/sections/Testimonials";
@@ -1306,7 +1306,7 @@ export default function PrysmorPage() {
             {/* Primary — Start Free Trial */}
             <a
               href="/sign-up"
-              onClick={() => track('cta_click', { location: 'hero_trial' })}
+              onClick={() => track("start_free_trial", { location: "hero" })}
               className="inline-flex items-center gap-2 cursor-pointer"
               style={{
                 background: "linear-gradient(160deg, #44ff74 0%, #29d955 55%, #22c24a 100%)",
@@ -1338,7 +1338,7 @@ export default function PrysmorPage() {
             {/* Secondary — See pricing */}
             <button
               onClick={() => {
-                track('cta_click', { location: 'hero_pricing' });
+                track("see_pricing", { location: "hero" });
                 document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
               }}
               className="inline-flex items-center gap-2 cursor-pointer"
@@ -1450,7 +1450,7 @@ export default function PrysmorPage() {
         subtitle="Generate cinematic VFX directly inside Adobe Premiere Pro."
         primaryLabel="Get Started"
         onPrimaryClick={() => {
-          track('cta_click', { location: 'bottom_cta' });
+          track("see_pricing", { location: "bottom_cta" });
           document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
         }}
       />

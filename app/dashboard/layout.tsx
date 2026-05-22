@@ -10,8 +10,6 @@ import {
   Settings, Download, ShieldCheck, TrendingUp, LifeBuoy, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { track } from "@/lib/track";
-
 const ADMIN_EMAIL      = "mahmutbegoviic.almin@gmail.com";
 const AFFILIATE_EMAILS = ["mahmutbegoviic.almin@gmail.com", "brzotrcipuska7@gmail.com"];
 
@@ -113,30 +111,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     fetch("/api/sync-location", { method: "POST" }).catch(() => {});
   }, []);
 
-  /* Track sign_in once per browser session */
-  useEffect(() => {
-    if (!user?.id) return;
-    try {
-      const sessionKey = `prysmor_si_${user.id}`;
-      if (sessionStorage.getItem(sessionKey)) return;
-      sessionStorage.setItem(sessionKey, "1");
-      track("sign_in", {
-        method: (user.externalAccounts?.length ?? 0) > 0 ? "google_oauth" : "email",
-        userId: user.id,
-      });
-    } catch { /* sessionStorage blocked */ }
-  }, [user?.id]);
-
-  /* Track dashboard_view once per browser session */
-  useEffect(() => {
-    if (!user?.id || pathname !== "/dashboard") return;
-    try {
-      const sessionKey = `prysmor_dv_${user.id}`;
-      if (sessionStorage.getItem(sessionKey)) return;
-      sessionStorage.setItem(sessionKey, "1");
-      track("dashboard_view", { userId: user.id });
-    } catch { /* sessionStorage blocked */ }
-  }, [user?.id, pathname]);
 
   // If Clerk loads but user is not signed in → wait briefly then redirect
   // (OAuth sessions can take a moment to establish after redirect)

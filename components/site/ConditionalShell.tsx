@@ -7,8 +7,6 @@ import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
 import RefTracker from "@/components/site/RefTracker";
 import AnnouncementBar from "@/components/site/AnnouncementBar";
-import { track } from "@/lib/track";
-
 const PENDING_KEY = "prysmor_pending_checkout";
 
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
@@ -43,26 +41,6 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
     fetch("/api/sync-location", { method: "POST" }).catch(() => {});
   }, [isLoaded, isSignedIn]);
 
-  /* Bug 2 fix — track sign_up only once, only for accounts created < 5 min ago */
-  useEffect(() => {
-    if (!isLoaded || !user?.id) return;
-    try {
-      const storageKey = `prysmor_signed_up_${user.id}`;
-      if (localStorage.getItem(storageKey)) return;
-      // Always mark to avoid repeated checks on every visit
-      localStorage.setItem(storageKey, "true");
-      const createdAt   = user.createdAt ? new Date(user.createdAt) : null;
-      const diffMinutes = createdAt ? (Date.now() - createdAt.getTime()) / 60_000 : 999;
-      if (diffMinutes < 5) {
-        track("sign_up", {
-          method:  (user.externalAccounts?.length ?? 0) > 0 ? "google_oauth" : "email",
-          userId:  user.id,
-        });
-      }
-    } catch {
-      // localStorage blocked (private mode / storage full)
-    }
-  }, [isLoaded, user?.id]);
 
   return (
     <>

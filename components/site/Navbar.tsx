@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Menu, X, LayoutDashboard, ArrowRight } from "lucide-react";
 import { useAuth, useClerk, UserButton } from "@clerk/nextjs";
-import { track } from "@/lib/track";
+import { track } from "@vercel/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export default function Navbar() {
 
   const handleSignIn = () => openSignIn({ afterSignInUrl: "/auth-redirect" });
   const handleSignUp = () => {
-    track('cta_click', { location: 'navbar' });
+    track("see_pricing", { location: "navbar" });
     const pricingEl = document.getElementById("pricing");
     if (pricingEl) {
       pricingEl.scrollIntoView({ behavior: "smooth" });
