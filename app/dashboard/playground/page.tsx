@@ -250,8 +250,8 @@ export default function PlaygroundPage() {
         borderBottom: "1px solid #111",
         display: "flex",
         alignItems: "center",
-        padding: "0 24px",
-        gap: "16px",
+        padding: "0 16px",
+        gap: "10px",
         flexShrink: 0,
       }}>
         <span style={{ fontSize: "13px", fontWeight: 600, color: "white", letterSpacing: "-0.2px" }}>
@@ -260,15 +260,15 @@ export default function PlaygroundPage() {
         <span style={{
           fontSize: "10px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase",
           color: GREEN, background: "rgba(57,255,106,0.08)", border: "1px solid rgba(57,255,106,0.18)",
-          padding: "3px 8px", borderRadius: "20px",
+          padding: "3px 8px", borderRadius: "20px", flexShrink: 0,
         }}>
           Free Trial
         </span>
 
         <div style={{ flex: 1 }} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="hidden sm:flex" style={{ alignItems: "center", gap: "5px" }}>
             <Clock style={{ width: 11, height: 11, color: "#333" }} />
             <span style={{ fontSize: "11px", color: "#333" }}>Max 2s · MP4 only</span>
           </div>
@@ -278,8 +278,8 @@ export default function PlaygroundPage() {
               style={{
                 display: "flex", alignItems: "center", gap: "5px",
                 fontSize: "12px", fontWeight: 600, color: "#000",
-                background: GREEN, padding: "5px 14px", borderRadius: "6px",
-                textDecoration: "none",
+                background: GREEN, padding: "5px 12px", borderRadius: "6px",
+                textDecoration: "none", flexShrink: 0,
               }}
             >
               Upgrade <ArrowRight style={{ width: 11, height: 11 }} />
@@ -289,18 +289,10 @@ export default function PlaygroundPage() {
       </div>
 
       {/* ── Main layout ─────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div className="pg-main">
 
         {/* Left — preview canvas */}
-        <div style={{
-          flex: 1,
-          background: "#050505",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "32px",
-          position: "relative",
-        }}>
+        <div className="pg-preview">
           {/* 16:9 canvas */}
           <div style={{
             width: "100%",
@@ -402,7 +394,7 @@ export default function PlaygroundPage() {
           {/* Output action overlay */}
           {job?.stage === "done" && job.outputUrl && (
             <div style={{
-              position: "absolute", bottom: "44px", left: "50%", transform: "translateX(-50%)",
+              position: "absolute", bottom: "16px", left: "50%", transform: "translateX(-50%)",
               display: "flex", gap: "8px",
             }}>
               <a href="/dashboard/billing" style={{
@@ -418,15 +410,7 @@ export default function PlaygroundPage() {
         </div>
 
         {/* Right — control panel */}
-        <div style={{
-          width: "300px",
-          borderLeft: "1px solid #111",
-          background: "#090909",
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0,
-          overflowY: "auto",
-        }}>
+        <div className="pg-panel">
 
           {/* Mode selector */}
           <div style={{ padding: "20px 20px 0" }}>
@@ -867,6 +851,53 @@ export default function PlaygroundPage() {
         textarea::-webkit-scrollbar { width: 4px; }
         textarea::-webkit-scrollbar-track { background: transparent; }
         textarea::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 2px; }
+
+        /* ── Playground responsive layout ── */
+        .pg-main {
+          flex: 1;
+          display: flex;
+          flex-direction: row;
+          overflow: hidden;
+        }
+        .pg-preview {
+          flex: 1;
+          background: #050505;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          position: relative;
+          min-height: 0;
+        }
+        .pg-panel {
+          width: 300px;
+          border-left: 1px solid #111;
+          background: #090909;
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+          overflow-y: auto;
+        }
+
+        /* Mobile — stack vertically */
+        @media (max-width: 640px) {
+          .pg-main {
+            flex-direction: column;
+            overflow: auto;
+          }
+          .pg-preview {
+            padding: 16px;
+            flex: none;
+            min-height: 0;
+          }
+          .pg-panel {
+            width: 100%;
+            border-left: none;
+            border-top: 1px solid #111;
+            overflow-y: visible;
+            flex-shrink: 0;
+          }
+        }
       `}</style>
     </div>
   );
