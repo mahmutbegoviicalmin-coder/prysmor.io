@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Monitor, Laptop, CheckCircle2, Circle, WifiOff, ShieldAlert } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";

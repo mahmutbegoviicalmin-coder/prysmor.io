@@ -1,44 +1,45 @@
-import { authMiddleware } from "@clerk/nextjs";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-export default authMiddleware({
-  signInUrl: "/sign-in",
-  publicRoutes: [
-    "/",
-    "/sign-out",
-    "/cutsync",
-    "/motionforge",
-    "/pricing",
-    "/docs",
-    "/docs/install",
-    "/autovfx",
-    "/sign-in(.*)",
-    "/sign-up(.*)",
-    "/api/webhooks(.*)",
-    "/api/firebase/test",
-    "/panel-auth(.*)",
-    // Dashboard — auth handled client-side in layout (avoids Clerk custom-domain session detection issues)
-    "/dashboard(.*)",
-    // Analytics — must be public so anonymous visitors can be tracked
-    "/api/track",
-    // Panel API — own auth via validatePanelToken, must not require Clerk session
-    "/api/panel/auth/start",
-    "/api/panel/auth/poll",
-    "/api/panel/heartbeat",
-    "/api/panel/version",
-    "/api/v1/motionforge(.*)",
-    // NOTE: /api/panel/auth/confirm is NOT here — it calls currentUser() and needs Clerk session.
-  ],
-  // ignoredRoutes bypass ALL Clerk processing (incl. bot detection).
-  // CEP browser requests can be fingerprinted as bots — ignore them entirely.
-  ignoredRoutes: [
-    "/auth-redirect",
-    "/api/track",
-    "/api/panel/auth/start",
-    "/api/panel/auth/poll",
-    "/api/panel/heartbeat",
-    "/api/panel/version",
-    "/api/v1/motionforge(.*)",
-  ],
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-out",
+  "/cutsync",
+  "/motionforge",
+  "/pricing",
+  "/docs(.*)",
+  "/autovfx",
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/webhooks(.*)",
+  "/api/firebase/test",
+  "/panel-auth(.*)",
+  // Dashboard — auth enforced client-side in layout (avoids custom-domain session edge cases)
+  "/dashboard(.*)",
+  // Analytics — must be public so anonymous visitors can be tracked
+  "/api/track",
+  // Panel API — uses its own validatePanelToken auth, must not require Clerk session
+  "/api/panel/auth/start",
+  "/api/panel/auth/poll",
+  "/api/panel/heartbeat",
+  "/api/panel/version",
+  "/api/v1/motionforge(.*)",
+]);
+
+const isIgnoredRoute = createRouteMatcher([
+  "/auth-redirect",
+  "/api/track",
+  "/api/panel/auth/start",
+  "/api/panel/auth/poll",
+  "/api/panel/heartbeat",
+  "/api/panel/version",
+  "/api/v1/motionforge(.*)",
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (isIgnoredRoute(req)) return;
+  if (!isPublicRoute(req)) {
+    await auth.protect();
+  }
 });
 
 export const config = {

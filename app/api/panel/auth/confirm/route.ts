@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse }  from "next/server";
-import { currentUser }               from "@clerk/nextjs";
+import { currentUser }               from "@clerk/nextjs/server";
 import { db }                        from "@/lib/firebaseAdmin";
 import { getUser, PLAN_LABELS, syncUserProfile } from "@/lib/firestore/users";
 import { registerDevice, DeviceLimitError }      from "@/lib/firestore/devices";
