@@ -131,8 +131,8 @@ const clerkAppearance = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider
-      signInFallbackRedirectUrl="/auth-redirect"
-      signUpFallbackRedirectUrl="/auth-redirect"
+      afterSignInUrl="/auth-redirect"
+      afterSignUpUrl="/auth-redirect"
       appearance={clerkAppearance}
     >
       <html lang="en" className={outfit.variable}>
