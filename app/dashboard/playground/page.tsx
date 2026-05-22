@@ -344,8 +344,9 @@ export default function PlaygroundPage() {
             ) : videoUrl && !job ? (
               <video
                 src={videoUrl}
-                muted playsInline
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                controls
+                playsInline
+                style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }}
               />
             ) : (
               /* Empty state */
@@ -505,10 +506,26 @@ export default function PlaygroundPage() {
                 overflow: "hidden", position: "relative",
               }}>
                 {/* 16:9 thumb */}
-                <div style={{ aspectRatio: "16/9", background: "#0a0a0a", overflow: "hidden" }}>
+                <div style={{ aspectRatio: "16/9", background: "#0a0a0a", overflow: "hidden", position: "relative" }}>
                   {videoUrl && (
                     <video src={videoUrl} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   )}
+                  {/* Play hint overlay */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(0,0,0,0.25)",
+                    pointerEvents: "none",
+                  }}>
+                    <div style={{
+                      width: "28px", height: "28px", borderRadius: "50%",
+                      background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}>
+                      <Play style={{ width: 10, height: 10, color: "rgba(255,255,255,0.7)", marginLeft: "2px" }} />
+                    </div>
+                  </div>
                 </div>
                 {/* Meta row */}
                 <div style={{
