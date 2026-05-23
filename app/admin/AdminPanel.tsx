@@ -1076,6 +1076,7 @@ export function AdminPanel() {
   const currentUserId = clerkUser?.id ?? '';
 
   const [users,         setUsers]         = useState<AdminUser[]>([]);
+  const [loadError,     setLoadError]     = useState<string | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [search,        setSearch]        = useState('');
   const [planFilter,    setPlanFilter]    = useState('all');
@@ -1090,10 +1091,17 @@ export function AdminPanel() {
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     try {
       const res  = await fetch('/api/admin/users');
       const json = await res.json();
-      if (json.users) setUsers(json.users);
+      if (!res.ok) {
+        setLoadError(`API error ${res.status}: ${json.error ?? 'Unknown error'}`);
+      } else if (json.users) {
+        setUsers(json.users);
+      }
+    } catch (err) {
+      setLoadError(String(err));
     } finally {
       setLoading(false);
       setLastRefresh(Date.now());
@@ -1446,7 +1454,10 @@ export function AdminPanel() {
               <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading…
             </div>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && loadError && (
+            <div className="text-center py-16 text-[13px] text-red-400">{loadError}</div>
+          )}
+          {!loading && !loadError && filtered.length === 0 && (
             <div className="text-center py-16 text-[13px] text-[#4B5563]">No users found</div>
           )}
           {!loading && (
@@ -1496,7 +1507,14 @@ export function AdminPanel() {
                     </td>
                   </tr>
                 )}
-                {!loading && filtered.length === 0 && (
+                {!loading && loadError && (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-12 text-center text-[13px] text-red-400">
+                      {loadError}
+                    </td>
+                  </tr>
+                )}
+                {!loading && !loadError && filtered.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-12 text-center text-[13px] text-[#4B5563]">
                       No users found

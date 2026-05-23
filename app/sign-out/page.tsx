@@ -6,7 +6,8 @@ export default async function SignOutPage() {
 
   if (sessionId) {
     try {
-      await clerkClient.sessions.revokeSession(sessionId);
+      const clerk = await clerkClient();
+      await clerk.sessions.revokeSession(sessionId);
     } catch {
       // Session already invalid — proceed to sign-in anyway
     }

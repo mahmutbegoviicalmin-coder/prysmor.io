@@ -43,9 +43,9 @@ async function fetchClerkCountry(userId: string): Promise<{ country: string | nu
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
 async function checkAdmin() {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  return ADMIN_EMAILS.includes(email);
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  return emails.some(e => ADMIN_EMAILS.includes(e));
 }
 
 // ─── PATCH — update user ──────────────────────────────────────────────────────
@@ -212,7 +212,8 @@ export async function DELETE(
     await ref.delete();
 
     // Delete from Clerk (last — so we can retry if Firestore fails)
-    await clerkClient.users.deleteUser(params.id);
+    const clerk = await clerkClient();
+    await clerk.users.deleteUser(params.id);
 
     console.log(`[admin] Deleted user ${params.id}`);
     return NextResponse.json({ ok: true });

@@ -62,15 +62,20 @@ function countryNameToCode(name: string): string | null {
 
 export async function GET() {
   const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) {
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const clerk = await clerkClient();
 
   // Fetch Firestore docs + Clerk users in parallel
   const [snap, clerkRes] = await Promise.all([
     db.collection('users').limit(500).get(),
-    clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
+    clerk.users.getUserList({ limit: 500 }).catch((err) => {
+      console.error('[admin GET] getUserList error:', err);
+      return { data: [] };
+    }),
   ]);
 
   type ClerkUserShape = {
@@ -154,14 +159,16 @@ export async function GET() {
 /** DELETE /api/admin/users — purge all Firestore users with no Clerk account */
 export async function DELETE() {
   const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) {
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const clerk = await clerkClient();
+
   const [snap, clerkUsersRes] = await Promise.all([
     db.collection('users').get(),
-    clerkClient.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
+    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
   ]);
 
   const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : (clerkUsersRes as { data: { id: string }[] }).data ?? [];
