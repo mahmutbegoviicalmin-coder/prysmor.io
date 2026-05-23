@@ -39,20 +39,28 @@ export default function AuthRedirectPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: "16px",
+        gap: "20px",
       }}
     >
+      {/* Logo — gives visual context so it doesn't look like a black screen */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo/vecilogo.png" alt="Prysmor" width={26} height={26} style={{ objectFit: "contain" }} />
+        <span style={{ fontSize: "17px", fontWeight: 700, color: "white", letterSpacing: "-0.5px" }}>
+          Prysmor
+        </span>
+      </div>
       <div
         style={{
-          width: "32px",
-          height: "32px",
+          width: "28px",
+          height: "28px",
           borderRadius: "50%",
-          border: "2px solid #2a2a2a",
+          border: "2px solid #1a1a1a",
           borderTopColor: "#39FF6A",
           animation: "spin 0.8s linear infinite",
         }}
       />
-      <p style={{ margin: 0, fontSize: "13px", color: "#555" }}>
+      <p style={{ margin: 0, fontSize: "13px", color: "#4B5563" }}>
         Signing you in&hellip;
       </p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

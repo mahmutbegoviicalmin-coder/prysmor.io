@@ -74,7 +74,7 @@ function PanelAuthContent() {
               Sign in to authorize the Premiere Pro panel.
             </p>
             <SignIn
-              afterSignInUrl={`/panel-auth?code=${code}`}
+              forceRedirectUrl={`/panel-auth?code=${code}`}
               appearance={{
                 variables: {
                   colorBackground: "#111113",
