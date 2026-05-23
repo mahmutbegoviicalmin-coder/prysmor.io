@@ -28,7 +28,7 @@ export default function Navbar() {
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
 
-  const handleSignIn = () => openSignIn({ afterSignInUrl: "/auth-redirect" });
+  const handleSignIn = () => openSignIn({ fallbackRedirectUrl: "/auth-redirect" });
   const handleSignUp = () => {
     track("see_pricing", { location: "navbar" });
     const pricingEl = document.getElementById("pricing");

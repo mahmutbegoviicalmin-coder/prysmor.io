@@ -6,6 +6,8 @@ const isPublicRoute = createRouteMatcher([
   "/cutsync",
   "/motionforge",
   "/pricing",
+  "/privacy",
+  "/terms",
   "/docs(.*)",
   "/autovfx",
   "/sign-in(.*)",

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { getUser } from "@/lib/firestore/users";
+import { getUser, createUser } from "@/lib/firestore/users";
 
 export async function GET() {
   const { userId } = await auth();
@@ -9,7 +9,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userDoc = await getUser(userId).catch(() => null);
+  let userDoc = await getUser(userId).catch(() => null);
+
+  // If user document doesn't exist (e.g. Clerk webhook not configured, or doc
+  // was accidentally deleted), create it now so the dashboard works correctly.
+  if (!userDoc) {
+    await createUser(userId).catch(() => {});
+    userDoc = await getUser(userId).catch(() => null);
+  }
 
   return NextResponse.json(
     {
