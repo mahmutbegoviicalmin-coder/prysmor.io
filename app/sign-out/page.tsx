@@ -1,4 +1,6 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth, createClerkClient } from "@clerk/nextjs/server";
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 import { redirect } from "next/navigation";
 
 export default async function SignOutPage() {
@@ -6,7 +8,6 @@ export default async function SignOutPage() {
 
   if (sessionId) {
     try {
-      const clerk = await clerkClient();
       await clerk.sessions.revokeSession(sessionId);
     } catch {
       // Session already invalid — proceed to sign-in anyway

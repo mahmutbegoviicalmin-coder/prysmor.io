@@ -1094,11 +1094,15 @@ export function AdminPanel() {
     setLoadError(null);
     try {
       const res  = await fetch('/api/admin/users');
-      const json = await res.json();
+      const text = await res.text();
+      let json: Record<string, unknown> = {};
+      try { json = JSON.parse(text); } catch { /* non-JSON response */ }
       if (!res.ok) {
-        setLoadError(`API error ${res.status}: ${json.error ?? 'Unknown error'}`);
-      } else if (json.users) {
-        setUsers(json.users);
+        setLoadError(`API error ${res.status}: ${(json.error as string) ?? text.slice(0, 120)}`);
+      } else if (Array.isArray(json.users)) {
+        setUsers(json.users as AdminUser[]);
+      } else {
+        setLoadError(`Unexpected response: ${text.slice(0, 120)}`);
       }
     } catch (err) {
       setLoadError(String(err));

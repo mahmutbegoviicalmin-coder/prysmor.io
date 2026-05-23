@@ -1,4 +1,6 @@
-import { currentUser, clerkClient } from '@clerk/nextjs/server';
+import { currentUser, createClerkClient } from '@clerk/nextjs/server';
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 import { NextResponse }              from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { PLAN_LABELS, PLAN_CREDITS } from '@/lib/firestore/users';
@@ -61,13 +63,12 @@ function countryNameToCode(name: string): string | null {
 }
 
 export async function GET() {
+  try {
   const user  = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
   if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  const clerk = await clerkClient();
 
   // Fetch Firestore docs + Clerk users in parallel
   const [snap, clerkRes] = await Promise.all([
@@ -154,6 +155,10 @@ export async function GET() {
   });
 
   return NextResponse.json({ users });
+  } catch (err) {
+    console.error('[admin GET /api/admin/users]', err);
+    return NextResponse.json({ error: 'Internal server error', detail: String(err) }, { status: 500 });
+  }
 }
 
 /** DELETE /api/admin/users — purge all Firestore users with no Clerk account */
@@ -163,8 +168,6 @@ export async function DELETE() {
   if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
-
-  const clerk = await clerkClient();
 
   const [snap, clerkUsersRes] = await Promise.all([
     db.collection('users').get(),

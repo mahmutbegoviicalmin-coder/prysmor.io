@@ -1,4 +1,6 @@
-import { currentUser, clerkClient } from '@clerk/nextjs/server';
+import { currentUser, createClerkClient } from '@clerk/nextjs/server';
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 import { NextRequest, NextResponse }  from 'next/server';
 import { db }                         from '@/lib/firebaseAdmin';
 import { PLAN_CREDITS }               from '@/lib/firestore/users';
@@ -212,7 +214,6 @@ export async function DELETE(
     await ref.delete();
 
     // Delete from Clerk (last — so we can retry if Firestore fails)
-    const clerk = await clerkClient();
     await clerk.users.deleteUser(params.id);
 
     console.log(`[admin] Deleted user ${params.id}`);
