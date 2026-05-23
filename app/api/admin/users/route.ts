@@ -169,21 +169,42 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const [snap, clerkUsersRes] = await Promise.all([
-    db.collection('users').get(),
-    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] })),
-  ]);
+  let clerkUsersRes;
+  try {
+    clerkUsersRes = await clerk.users.getUserList({ limit: 500 });
+  } catch (err) {
+    console.error('[admin purge] getUserList failed:', err);
+    return NextResponse.json({ error: 'Cannot purge: Clerk API unavailable. Refusing to delete to avoid data loss.' }, { status: 503 });
+  }
 
-  const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : (clerkUsersRes as { data: { id: string }[] }).data ?? [];
+  const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : ((clerkUsersRes as { data: { id: string }[] }).data ?? []);
   const clerkIds = new Set(clerkUsers.map((cu: { id: string }) => cu.id));
 
+  // Safety guard: if Clerk returned 0 users, refuse to purge — it means the API call
+  // failed silently and purging would delete ALL Firestore users incorrectly.
+  if (clerkIds.size === 0) {
+    return NextResponse.json({
+      error: 'Safety check failed: Clerk returned 0 users. Refusing to purge to prevent data loss.',
+      deleted: 0,
+    }, { status: 503 });
+  }
+
+  const snap = await db.collection('users').get();
   const orphans = snap.docs.filter(doc => !clerkIds.has(doc.id));
 
   if (orphans.length === 0) {
     return NextResponse.json({ deleted: 0, message: 'No orphaned users found.' });
   }
 
-  // Delete in batches of 500
+  // Safety guard: never delete more than 50% of Firestore users at once
+  const threshold = Math.ceil(snap.docs.length * 0.5);
+  if (orphans.length > threshold) {
+    return NextResponse.json({
+      error: `Safety check failed: ${orphans.length} of ${snap.docs.length} users would be deleted (>${threshold}). This looks wrong. Use Firestore console if you really need this.`,
+      deleted: 0,
+    }, { status: 400 });
+  }
+
   const batch = db.batch();
   for (const doc of orphans) {
     batch.delete(doc.ref);

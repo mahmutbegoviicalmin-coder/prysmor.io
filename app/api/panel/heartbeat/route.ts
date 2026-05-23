@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePanelToken }        from '@/lib/motionforge/auth';
-import { registerDevice }            from '@/lib/firestore/devices';
+import { db }                        from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 
@@ -41,8 +41,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (deviceId) {
-    // Fire-and-forget — don't block the response on the write
-    registerDevice(userId, deviceId, 'Unknown').catch(() => {});
+    // Just update lastActive — 1 write, no reads needed for a heartbeat.
+    // Full device registration (with limit checks) only happens at panel auth/start.
+    db.collection('users').doc(userId)
+      .collection('devices').doc(deviceId)
+      .update({ lastActive: new Date() })
+      .catch(() => {});
   }
 
   return NextResponse.json({ ok: true, ts: Date.now() });
