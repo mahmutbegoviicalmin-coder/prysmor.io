@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { Resend } from "resend";
@@ -6,15 +6,14 @@ import { Resend } from "resend";
 const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-async function isAdmin(userId: string): Promise<boolean> {
-  const { clerkClient } = await import("@clerk/nextjs/server");
-  const user = await clerkClient.users.getUser(userId);
+async function checkAdmin(): Promise<boolean> {
+  const user = await currentUser();
+  if (!user) return false;
   return user.emailAddresses.some((e) => e.emailAddress === ADMIN_EMAIL);
 }
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
-  if (!userId || !(await isAdmin(userId))) {
+  if (!(await checkAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -85,8 +84,7 @@ ${body.trim()}
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
-  if (!userId || !(await isAdmin(userId))) {
+  if (!(await checkAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -1,9 +1,11 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth, createClerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
 export async function DELETE() {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -15,7 +17,7 @@ export async function DELETE() {
     // 2. Delete the user from Clerk using the server-side admin API.
     //    This bypasses the "additional verification required" error that
     //    occurs when the client SDK tries to delete the user directly.
-    await clerkClient.users.deleteUser(userId);
+    await clerk.users.deleteUser(userId);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

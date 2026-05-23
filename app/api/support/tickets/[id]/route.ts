@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ticketRef = db.collection("support_tickets").doc(params.id);

@@ -1,4 +1,4 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { Resend } from "resend";
@@ -6,8 +6,9 @@ import { Resend } from "resend";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { userId } = auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = user.id;
 
   const { body } = await req.json();
   if (!body?.trim()) return NextResponse.json({ error: "Empty message" }, { status: 400 });
@@ -18,8 +19,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!ticketSnap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (ticketSnap.data()!.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const user = await clerkClient.users.getUser(userId);
-  const authorName = user.firstName ?? user.emailAddresses[0]?.emailAddress ?? "User";
+  const authorName =
+    user.firstName ??
+    user.emailAddresses?.[0]?.emailAddress ??
+    "User";
 
   const message = {
     body: body.trim(),

@@ -5,7 +5,7 @@ import { db } from "@/lib/firebaseAdmin";
 // Accepts { imageBase64: string } JSON body
 // Stores compressed image in Firestore and returns a served URL
 export async function POST(req: Request) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let imageBase64: string;
