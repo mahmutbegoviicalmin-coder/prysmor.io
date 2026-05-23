@@ -6,10 +6,9 @@ const AFFILIATE_EMAILS = ['mahmutbegoviic.almin@gmail.com', 'brzotrcipuska7@gmai
 
 /** GET /api/affiliate/stats — returns stats for the current user's affiliate profile */
 export async function GET() {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-
-  if (!AFFILIATE_EMAILS.includes(email)) {
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => AFFILIATE_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

@@ -7,9 +7,9 @@ const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
 /** PATCH /api/admin/affiliates/[id] — update affiliate */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body: Partial<{
     commissionPercent:     number;
@@ -39,9 +39,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 /** DELETE /api/admin/affiliates/[id] — delete affiliate */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   await db.collection('affiliates').doc(params.id).delete();
   return NextResponse.json({ ok: true });
@@ -49,9 +49,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
 /** POST /api/admin/affiliates/[id]/mark-paid — mark referrals as paid */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const affDoc = await db.collection('affiliates').doc(params.id).get();
   if (!affDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });

@@ -6,8 +6,8 @@ const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 export const metadata = { title: 'Admin — Prysmor' };
 
 export default async function DashboardAdminLayout({ children }: { children: React.ReactNode }) {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) redirect('/dashboard');
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) redirect('/dashboard');
   return <>{children}</>;
 }

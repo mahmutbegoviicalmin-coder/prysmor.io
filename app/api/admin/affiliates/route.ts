@@ -5,15 +5,14 @@ import { getAllAffiliates, getReferralsByCode, generateCode } from '@/lib/affili
 
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
-function isAdmin(email: string) {
-  return ADMIN_EMAILS.includes(email);
+function isAdminUser(user: Awaited<ReturnType<typeof currentUser>>) {
+  return user?.emailAddresses?.some(e => ADMIN_EMAILS.includes(e.emailAddress)) ?? false;
 }
 
 /** GET /api/admin/affiliates — list all affiliates with referral counts */
 export async function GET() {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!isAdmin(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user = await currentUser();
+  if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const affiliates = await getAllAffiliates();
 
@@ -32,9 +31,8 @@ export async function GET() {
 
 /** POST /api/admin/affiliates — create a new affiliate */
 export async function POST(req: NextRequest) {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!isAdmin(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const user = await currentUser();
+  if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body: { email: string; userId: string; code?: string; commissionPercent?: number } = await req.json();
   if (!body.email || !body.userId) {

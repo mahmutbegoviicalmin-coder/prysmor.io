@@ -78,9 +78,9 @@ export interface RevenueData {
 }
 
 export async function GET() {
-  const user  = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? '';
-  if (!ADMIN_EMAILS.includes(email)) {
+  const user   = await currentUser();
+  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
+  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
