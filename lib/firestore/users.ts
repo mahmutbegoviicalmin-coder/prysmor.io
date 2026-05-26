@@ -55,7 +55,7 @@ export async function createUser(userId: string) {
     // New accounts start INACTIVE with 0 credits.
     // licenseStatus → 'active' only after a successful payment webhook.
     await ref.set({
-      plan:           "starter",
+      plan:           "unpaid",
       licenseStatus:  "inactive",
       deviceLimit:    1,
       credits:        0,
