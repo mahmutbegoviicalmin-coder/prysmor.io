@@ -8,13 +8,13 @@ import {
   ExternalLink, RotateCcw, Package, Zap, Cpu,
 } from "lucide-react";
 
-const PANEL_VERSION = "5.4.2";
+const PANEL_VERSION = "5.4.3";
 
 /** Permanent download URLs — GitHub Releases (not committed to `public/`) */
 const DOWNLOAD_WIN =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.2/PrysmrSetup.exe";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.3/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
-  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.2/Prysmor-5.4.2.pkg";
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.3/Prysmor-5.4.3.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 

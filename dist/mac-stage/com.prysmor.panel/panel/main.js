@@ -2294,6 +2294,37 @@ function checkForUpdates() {
     });
 }
 
+/**
+ * Manual update check triggered by user pressing "Check for Updates".
+ * Shows a toast with the result so the user gets visible feedback.
+ */
+function manualCheckForUpdates() {
+  var localVersion = readLocalVersion();
+  showToast('Checking for updates…', 'info');
+
+  nodeHttpGet(VERSION_API)
+    .then(function (body) {
+      var data;
+      try { data = JSON.parse(body); } catch (e) {
+        showToast('Could not reach update server. Check your connection.', 'error');
+        return;
+      }
+      if (!data || !data.version) {
+        showToast('Update check failed — invalid response.', 'error');
+        return;
+      }
+      if (isNewerVersion(data.version, localVersion)) {
+        showToast('Update available — downloading v' + data.version + '…', 'info');
+        applyUpdate(data);
+      } else {
+        showToast('Panel is up to date (v' + localVersion + ')', 'success');
+      }
+    })
+    .catch(function () {
+      showToast('Update check failed. Check your connection.', 'error');
+    });
+}
+
 // ─── Path normalisation ───────────────────────────────────────────────────────
 /**
  * Normalises a file path returned by Premiere Pro / ExtendScript on any OS.
@@ -2611,11 +2642,14 @@ function populateDiagnostics() {
 }
 
 function toggleDiagnostics() {
-  const panel     = el('diag-panel');
-  const label     = el('btn-diagnostics-label');
-  const nowHidden = panel.classList.toggle('hidden');
-  if (nowHidden) { label.textContent = 'Diagnostics'; }
-  else           { populateDiagnostics(); label.textContent = 'Hide Diagnostics'; }
+  var panel     = el('diag-panel');
+  var label     = el('btn-diagnostics-label');
+  if (!panel) return;
+  var nowHidden = panel.classList.toggle('hidden');
+  if (label) {
+    if (nowHidden) { label.textContent = 'Diagnostics'; }
+    else           { populateDiagnostics(); label.textContent = 'Hide Diagnostics'; }
+  }
 }
 
 function copyDiagnostics() {
@@ -2943,16 +2977,26 @@ function bindEvents() {
     if (promptEl) setTimeout(function () { promptEl.focus(); }, 150);
   });
 
-  // Settings
+  // Settings — open
   el('btn-scroll-settings').addEventListener('click', function () {
     var overlay = el('section-settings');
     if (overlay) overlay.classList.add('settings-visible');
   });
+  // Settings — close (X button + backdrop tap)
+  var settingsOverlay = el('section-settings');
+  var settingsCloseBtn = el('settings-close-btn');
+  if (settingsCloseBtn && settingsOverlay) {
+    settingsCloseBtn.addEventListener('click', function () {
+      settingsOverlay.classList.remove('settings-visible');
+    });
+    settingsOverlay.addEventListener('click', function (e) {
+      if (e.target === settingsOverlay) settingsOverlay.classList.remove('settings-visible');
+    });
+  }
   el('settings-trigger').addEventListener('click', function () { toggleSettings(); });
   el('btn-diagnostics').addEventListener('click', toggleDiagnostics);
   el('btn-copy-diag').addEventListener('click', copyDiagnostics);
   el('btn-logout').addEventListener('click', logout);
-
 
   el('btn-dashboard').addEventListener('click', function () {
     cs.openURLInDefaultBrowser(SITE_URL + '/dashboard');
@@ -2966,8 +3010,9 @@ function bindEvents() {
       cs.openURLInDefaultBrowser(SITE_URL + '/dashboard/billing');
     });
   }
+  // Check for Updates — runs version check and shows result as toast
   el('btn-updates').addEventListener('click', function () {
-    cs.openURLInDefaultBrowser(SITE_URL + '/downloads');
+    manualCheckForUpdates();
   });
   el('link-docs').addEventListener('click', function (e) {
     e.preventDefault();

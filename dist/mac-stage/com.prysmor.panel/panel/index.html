@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=20"/>
+  <link rel="stylesheet" href="styles.css?v=21"/>
   <style>
     /* ─────────────────────────────────────────────
        DESIGN TOKENS
@@ -808,7 +808,7 @@
         <div class="lv-stat-sep"></div>
         <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.2</span></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.3</span></div>
       </div>
     </div>
   </div>
@@ -1231,7 +1231,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=46"></script>
+  <script src="main.js?v=47"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
@@ -1292,16 +1292,6 @@
     /* ── Bind overlays (script is at end of body so all elements exist) ── */
     (function () {
 
-      /* Settings overlay */
-      var overlay  = document.getElementById('section-settings');
-      var closeBtn = document.getElementById('settings-close-btn');
-      var openBtn  = document.getElementById('btn-scroll-settings');
-      if (openBtn && overlay)  openBtn.addEventListener('click', function () { overlay.classList.add('settings-visible'); });
-      if (closeBtn && overlay) {
-        closeBtn.addEventListener('click', function () { overlay.classList.remove('settings-visible'); });
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
-      }
-
       /* History overlay */
       var historyOverlay  = document.getElementById('section-history');
       var historyOpenBtn  = document.getElementById('btn-history');
@@ -1317,7 +1307,7 @@
         historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
       }
 
-      /* Initial mode */
+      /* Initial mode — runs after main.js so prysmorSetMode is available */
       prysmorSetMode('background');
     }());
   </script>
