@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=19"/>
+  <link rel="stylesheet" href="styles.css?v=20"/>
   <style>
     /* ─────────────────────────────────────────────
        DESIGN TOKENS
@@ -808,7 +808,7 @@
         <div class="lv-stat-sep"></div>
         <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v3.9.3</span></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.2</span></div>
       </div>
     </div>
   </div>
@@ -939,11 +939,11 @@
 
     </div>
 
-    <!-- ─ REFERENCE IMAGE UPLOAD — visible only in BG mode ─── -->
+    <!-- ─ REFERENCE IMAGE UPLOAD — visible for BG + Relight modes ─── -->
     <div class="v2-ref-img-zone" id="ref-img-zone">
       <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
         <span class="v2-ref-img-icon">＋</span>
-        <span>Reference image</span>
+        <span id="ref-img-label-text">Reference image <span style="color:var(--text-3);font-weight:400">(optional — improves output)</span></span>
       </label>
       <input type="file" id="ref-img-input" accept="image/*" class="sr-only">
       <div id="ref-img-preview" class="v2-ref-img-preview hidden">
@@ -1231,7 +1231,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=45"></script>
+  <script src="main.js?v=46"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
@@ -1264,9 +1264,9 @@
       /* disable generate button if omni (extra safety) */
       var genBtn = document.getElementById('btn-generate');
       if (genBtn) genBtn.disabled = false;
-      /* show reference image zone only for background mode */
+      /* show reference image zone for background and relight modes */
       var refZone = document.getElementById('ref-img-zone');
-      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
+      if (refZone) refZone.style.display = (mode === 'background' || mode === 'relight') ? '' : 'none';
       /* update enhance chip label for new mode */
       if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
     }

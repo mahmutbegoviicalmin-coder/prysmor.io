@@ -7,13 +7,13 @@ const SITE_URL  = 'https://prysmor.io';
 // API_BASE: localhost for dev, production domain when deployed.
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
-const POLL_MS         = 2000;
-const POLL_MS_SLOW    = 10000;              // slower after 10 min
+const POLL_MS         = 5000;
+const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 
 // Auth polling
-const AUTH_POLL_MS  = 2500;  // how often to check if browser auth completed
+const AUTH_POLL_MS  = 6000;  // how often to check if browser auth completed
 const AUTH_MAX_MS   = 5 * 60 * 1000; // 5 min before code expires
 
 // Generation status labels by elapsed time (no vendor names)
@@ -39,6 +39,7 @@ const LS_MACHINE_ID     = 'prysmor_machine_id';
 
 function getMachineFingerprint() {
   var stored = localStorage.getItem(LS_MACHINE_ID);
+  // Return any existing stored ID unchanged — preserves device registration across OTA updates.
   if (stored) return stored;
   try {
     var os  = require('os');
@@ -53,7 +54,8 @@ function getMachineFingerprint() {
       hash = ((hash << 5) - hash) + raw.charCodeAt(i);
       hash |= 0;
     }
-    var id = 'mfp-' + Math.abs(hash).toString(36) + '-' + Date.now().toString(36);
+    // No Date.now() — fingerprint must be stable across reinstalls and updates.
+    var id = 'mfp-' + Math.abs(hash).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id);
     return id;
   } catch (e) {
@@ -69,7 +71,8 @@ function getMachineFingerprint() {
       hash2 = ((hash2 << 5) - hash2) + raw2.charCodeAt(j);
       hash2 |= 0;
     }
-    var id2 = 'mfp-' + Math.abs(hash2).toString(36) + '-' + Date.now().toString(36);
+    // No Date.now() — stable fingerprint.
+    var id2 = 'mfp-' + Math.abs(hash2).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id2);
     return id2;
   }
@@ -139,7 +142,8 @@ function stopClipAutoSelect() {
 
 // ─── Reference Image Store ────────────────────────────────────────────────────
 var storedReferenceImage  = null; // user-uploaded reference image (base64 JPEG), BG mode only
-var selectedMode = 'background';  // active generation mode: background | relight | vfx
+var selectedMode = 'background';  // active generation mode: background | relight | vfx | omni
+var OMNI_PLANS   = ['pro', 'exclusive', 'creator', 'creator-suite'];
 // { width: number, height: number } — from the same video element, used for
 // aspect ratio validation before the S3 upload starts.
 var storedVideoInfo = null;
@@ -634,7 +638,7 @@ function showClipInfo(info) {
   var warnEl = el('clip-trim-warning');
   if (warnEl) {
     if (willTrim) {
-      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's — only first ' + effectiveDur.toFixed(0) + 's will be processed (Runway limit). Trim your selection to max 8s for best results.';
+      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's — only the first ' + effectiveDur.toFixed(0) + 's will be processed. Trim your selection to max 8s for best results.';
       warnEl.style.display = '';
     } else {
       warnEl.style.display = 'none';
@@ -673,6 +677,7 @@ var _enhanceSuggestMap = {
   background: 'Suggest BG',
   relight:    'Suggest lighting',
   vfx:        'Suggest effect',
+  omni:       'Suggest effect',
 };
 
 /** Returns the correct chip label based on textarea content and current mode. */
@@ -1213,13 +1218,42 @@ async function mfGenerate() {
     try {
       var blob = base64ToBlob(fileBase64, 'video/mp4');
       var uploadRes;
-      if (uploadSlot.uploadMethod === 'put') {
-        // Beeble: raw PUT with binary body
+
+      if (uploadSlot.uploadMethod === 'blob-direct') {
+        // ── Vercel Blob direct upload (Omni mode) ─────────────────────────
+        // Upload straight to Vercel Blob CDN — no 4.5 MB serverless limit.
+        // Encode each path segment individually — don't encode the '/' separator
+        var blobUrl = 'https://blob.vercel-storage.com/' +
+          uploadSlot.blobPathname.split('/').map(encodeURIComponent).join('/');
+        uploadRes = await fetch(blobUrl, {
+          method:  'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + uploadSlot.blobClientToken,
+            'x-content-type': 'video/mp4',
+            'Content-Type':   'video/mp4',
+          },
+          body: blob,
+        });
+        if (!uploadRes.ok) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 200) : ''));
+        }
+        // Vercel Blob returns JSON with the public URL
+        var blobData = await uploadRes.json().catch(function () { return {}; });
+        uploadSlot.kieAssetUrl = blobData.url || ('https://blob.vercel-storage.com/' + uploadSlot.blobPathname);
+
+      } else if (uploadSlot.uploadMethod === 'put') {
+        // For Beeble: PUT to external S3 (no auth headers — they invalidate presigned URLs)
         uploadRes = await fetch(uploadSlot.uploadUrl, {
           method:  'PUT',
           headers: { 'Content-Type': 'video/mp4' },
           body:    blob,
         });
+        if (!uploadRes.ok && uploadRes.status !== 204) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+        }
+
       } else {
         // Runway: multipart FormData POST to S3
         var formData = new FormData();
@@ -1227,11 +1261,12 @@ async function mfGenerate() {
         Object.keys(fields).forEach(function (k) { formData.append(k, fields[k]); });
         formData.append('file', blob, 'clip.mp4');
         uploadRes = await fetch(uploadSlot.uploadUrl, { method: 'POST', body: formData });
+        if (!uploadRes.ok && uploadRes.status !== 204) {
+          var errText = await uploadRes.text().catch(function () { return ''; });
+          throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
+        }
       }
-      if (!uploadRes.ok && uploadRes.status !== 204) {
-        var errText = await uploadRes.text().catch(function () { return ''; });
-        throw new Error('Upload HTTP ' + uploadRes.status + (errText ? ': ' + errText.slice(0, 120) : ''));
-      }
+
     } catch (err) {
       return fail('Upload failed: ' + err.message);
     }
@@ -1242,6 +1277,8 @@ async function mfGenerate() {
     var completeBody = { mediaInSec: mediaInSec, clipDurSec: clipDurSec };
     if (uploadSlot.beebleUri) {
       completeBody.beebleUri = uploadSlot.beebleUri;
+    } else if (uploadSlot.kieAssetUrl) {
+      completeBody.kieAssetUrl = uploadSlot.kieAssetUrl;
     } else {
       completeBody.runwayUri = uploadSlot.runwayUri;
     }
@@ -1259,8 +1296,8 @@ async function mfGenerate() {
   try {
     var genBody = { prompt: prompt, mode: selectedMode };
     genBody.clipDuration = clipDurSec;
-    // Send user-uploaded reference image only for background mode
-    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
+    // Send user-uploaded reference image for background and relight modes
+    if (storedReferenceImage && (selectedMode === 'background' || selectedMode === 'relight')) genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
@@ -1573,142 +1610,86 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
   // Trim output to match original clip duration (Runway may generate 5 or 10s regardless of input)
   var trimSec = (typeof clipDurSec === 'number' && clipDurSec > 0) ? clipDurSec : 0;
 
-  if (!needsScale && trimSec <= 0) {
-    console.log('[Prysmor:postprocess] Runway output already 1920×1080, no trim needed — skipping re-encode');
-  } else {
-    if (needsScale) {
-      console.log('[Prysmor:postprocess] Runway output ' +
-        (runwayDims ? runwayDims.width + 'x' + runwayDims.height : 'unknown') +
-        ' → scaling to 1920×1080' + (trimSec > 0 ? ' + trim to ' + trimSec.toFixed(3) + 's' : ''));
-    } else {
-      console.log('[Prysmor:postprocess] Runway output already 1920×1080 — trimming to ' + trimSec.toFixed(3) + 's');
-    }
-
-    var processedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-processed-' + Date.now() + '.mp4';
-    var ffmpegBin  = getFFmpegBin();
+  // Post-process: generate TWO files:
+  //   1. video-only MP4  (-an)  → placed on V2
+  //   2. silent AAC file        → placed on A1 separately, so overwriteClip on A1
+  //      only puts audio there and never touches V1.
+  // Using a single file with video+silent-audio caused Premiere to also overwrite V1
+  // when we called audioTracks[0].overwriteClip(), deleting the original clip.
+  {
+    var ts = Date.now();
+    var sep = (tmpDir.endsWith('/') || tmpDir.endsWith('\\')) ? '' : '/';
+    var processedPath  = tmpDir + sep + 'mf-processed-' + ts + '.mp4';
+    var silentAacPath  = tmpDir + sep + 'mf-silence-'   + ts + '.aac';
+    var ffmpegBin = getFFmpegBin();
 
     setStatus('Processing video\u2026', 98);
 
+    // ── Step 1: video-only ───────────────────────────────────────────────────
     var postDone = await new Promise(function (resolve) {
       try {
         var spawn = require('child_process').spawn;
         var args = ['-y', '-i', outPath];
-        // Add output duration trim before video filter so ffmpeg stops at clipDurSec
         if (trimSec > 0) { args.push('-t', String(parseFloat(trimSec.toFixed(6)))); }
         if (needsScale) {
-          // Direct scale to 1920:1080 with high quality re-encode
-          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-c:a', 'copy');
+          console.log('[Prysmor:postprocess] scale to 1920x1080 + strip audio');
+          args.push('-vf', 'scale=1920:1080', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-an');
         } else {
-          // Only trimming needed — stream copy is fast and lossless
-          args.push('-c', 'copy');
+          console.log('[Prysmor:postprocess] stream copy + strip audio');
+          args.push('-c:v', 'copy', '-an');
         }
         args.push(processedPath);
-        console.log('[Prysmor:postprocess] ffmpeg args:', args.join(' '));
+        console.log('[Prysmor:postprocess] video args:', args.join(' '));
         var proc = spawn(ffmpegBin, args);
-
         var stderr = '';
         proc.stderr.on('data', function (d) { stderr += d.toString(); });
-
         proc.on('close', function (code) {
           if (code === 0) {
             var nfs = require('fs');
             if (nfs.existsSync(processedPath)) {
-              console.log('[Prysmor:postprocess] done — 1920×1080 output ready');
               try { nfs.unlinkSync(outPath); } catch (_) {}
               resolve(processedPath);
-            } else {
-              console.warn('[Prysmor:postprocess] output file missing after ffmpeg exit 0');
-              resolve(null);
-            }
+            } else { resolve(null); }
           } else {
-            console.warn('[Prysmor:postprocess] ffmpeg exited', code, '— stderr:', stderr.slice(-400));
+            console.warn('[Prysmor:postprocess] video ffmpeg exit', code, stderr.slice(-400));
             resolve(null);
           }
         });
-        proc.on('error', function (err) {
-          console.warn('[Prysmor:postprocess] spawn error:', err.message);
-          resolve(null);
-        });
-      } catch (spawnErr) {
-        console.warn('[Prysmor:postprocess] exception:', spawnErr.message);
-        resolve(null);
-      }
+        proc.on('error', function (err) { console.warn('[Prysmor:postprocess] video spawn error:', err.message); resolve(null); });
+      } catch (e) { console.warn('[Prysmor:postprocess] video exception:', e.message); resolve(null); }
     });
 
     if (postDone) {
       finalPath = postDone;
-      console.log('[Prysmor:postprocess] using processed path:', finalPath);
+      console.log('[Prysmor:postprocess] video-only ready:', finalPath);
     } else {
-      console.warn('[Prysmor:postprocess] ffmpeg failed — inserting raw Runway output');
+      console.warn('[Prysmor:postprocess] video ffmpeg failed — using raw output');
     }
-  }
 
-  // ── Audio merge: take video from Runway output, audio from original clip ──────
-  // Runway generates video-only (no audio). Re-attach audio from the source clip
-  // so the timeline clip has its original sound.
-  var originalSourcePath = state.mf.selInfo && state.mf.selInfo.sourcePath
-    ? state.mf.selInfo.sourcePath : null;
+    // ── Step 2: silent AAC (exact same duration) ─────────────────────────────
+    // Duration: prefer trimSec, fall back to runwayDims probe (usually 5 or 10s).
+    var silDur = trimSec > 0 ? trimSec : 10;
+    var silenceDone = await new Promise(function (resolve) {
+      try {
+        var spawn2 = require('child_process').spawn;
+        var sArgs = [
+          '-y', '-f', 'lavfi', '-i', 'aevalsrc=0:c=stereo',
+          '-t', String(parseFloat(silDur.toFixed(6))),
+          '-c:a', 'aac', '-ar', '44100', '-ac', '2',
+          silentAacPath
+        ];
+        console.log('[Prysmor:postprocess] silence args:', sArgs.join(' '));
+        var sProc = spawn2(ffmpegBin, sArgs);
+        sProc.on('close', function (code) {
+          var nfs2 = require('fs');
+          resolve(code === 0 && nfs2.existsSync(silentAacPath) ? silentAacPath : null);
+        });
+        sProc.on('error', function () { resolve(null); });
+      } catch (e) { resolve(null); }
+    });
 
-  if (originalSourcePath) {
-    var nfsCheck = require('fs');
-    if (nfsCheck.existsSync(originalSourcePath)) {
-      var audioMergedPath = tmpDir + (tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/') + 'mf-audio-' + Date.now() + '.mp4';
-      var ffmpegBinAudio  = getFFmpegBin();
-
-      var audioDone = await new Promise(function (resolve) {
-        try {
-          var spawn = require('child_process').spawn;
-          // -map 0:v  → video from Runway output (finalPath)
-          // -map 1:a? → audio from original clip (? = optional, skips if no audio track)
-          // -c:v copy → no re-encode of video
-          // -c:a aac  → encode audio to AAC
-          // -shortest → stop at the shorter of the two streams
-          var args = [
-            '-y',
-            '-i', finalPath,
-            '-i', originalSourcePath,
-            '-map', '0:v',
-            '-map', '1:a?',
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            '-shortest',
-            audioMergedPath,
-          ];
-          console.log('[MotionForge] Audio merge — ffmpeg args:', args.join(' '));
-          var proc = spawn(ffmpegBinAudio, args);
-
-          var stderr = '';
-          proc.stderr.on('data', function (d) { stderr += d.toString(); });
-
-          proc.on('close', function (code) {
-            var nfs2 = require('fs');
-            if (code === 0 && nfs2.existsSync(audioMergedPath)) {
-              console.log('[MotionForge] Audio merged from original clip');
-              try { nfs2.unlinkSync(finalPath); } catch (_) {}
-              resolve(audioMergedPath);
-            } else {
-              // No audio track in source or ffmpeg error — use video-only output silently
-              console.warn('[MotionForge] Audio merge skipped (no audio track or ffmpeg error) — stderr:', stderr.slice(-200));
-              try { if (nfs2.existsSync(audioMergedPath)) nfs2.unlinkSync(audioMergedPath); } catch (_) {}
-              resolve(null);
-            }
-          });
-          proc.on('error', function (err) {
-            console.warn('[MotionForge] Audio merge spawn error:', err.message);
-            resolve(null);
-          });
-        } catch (e) {
-          console.warn('[MotionForge] Audio merge exception:', e.message);
-          resolve(null);
-        }
-      });
-
-      if (audioDone) finalPath = audioDone;
-    } else {
-      console.warn('[MotionForge] Audio merge skipped — source file not found:', originalSourcePath);
-    }
-  } else {
-    console.log('[MotionForge] Audio merge skipped — no source path available');
+    state.mf.silentAudioPath = silenceDone || null;
+    console.log('[Prysmor:postprocess] silent audio:', state.mf.silentAudioPath);
   }
 
   state.mf.outputPath  = finalPath;
@@ -1973,8 +1954,19 @@ async function addToTimeline() {
   var replaceMode  = state.mf.replaceMode;
   var startTimeSec = state.mf.startTimeSec || (state.mf.selInfo && state.mf.selInfo.startTimeSec) || 0;
 
+  // History "Use" case: outputUrl is set but outputPath is not yet downloaded to disk
+  if (!finalPath && state.mf.outputUrl) {
+    showToast('Downloading clip\u2026', 'info');
+    try {
+      await downloadAndInsert(state.mf.outputUrl, startTimeSec, replaceMode, (state.mf.selInfo && state.mf.selInfo.durationSec) || 0);
+    } catch (err) {
+      showToast('Download failed: ' + err.message, 'error');
+    }
+    return;
+  }
+
   if (!finalPath) {
-    showToast('No output available — generate first', 'error');
+    showToast('Generate a clip first', 'error');
     return;
   }
 
@@ -1987,18 +1979,59 @@ async function addToTimeline() {
   await new Promise(function (resolve) {
     var fn;
     if (replaceMode) {
-      fn = 'replaceSelection("' + esc + '")';
+      // Replace mode: place on V2 via replaceSelection, then also silence A1
+      // using the dedicated silent AAC file (different file from the video-only clip).
+      var silPathR = (state.mf.silentAudioPath || '').replace(/\\/g, '/').replace(/"/g, '\\"');
+      fn = '(function() {' +
+        'try {' +
+        'var result = replaceSelection("' + esc + '");' +
+        (silPathR ? (
+          'if (result === "success") {' +
+          '  try {' +
+          '    var seq2 = app.project.activeSequence;' +
+          '    app.project.importFiles(["' + silPathR + '"], true, app.project.rootItem, false);' +
+          '    var silR = findProjectItemByPath(app.project.rootItem, "' + silPathR + '");' +
+          '    if (!silR) { var sn="' + silPathR + '".split("/").pop(); silR=findProjectItemByName(app.project.rootItem,sn); }' +
+          '    if (silR && seq2 && seq2.audioTracks.numTracks > 0) {' +
+          '      var a1r = seq2.audioTracks[0];' +
+          '      if (a1r && a1r.overwriteClip) { a1r.overwriteClip(silR, ' + startTimeSec + '); }' +
+          '    }' +
+          '  } catch(_) {}' +
+          '}') : '') +
+        'return result;' +
+        '} catch(e) { return "error: " + e.toString(); }' +
+        '})()';
+
     } else {
-      // Insert video-only: temporarily untarget all audio tracks so Premiere
-      // does not insert audio from the generated clip into the timeline.
+      // Place VIDEO-ONLY clip on V2. Then separately place a SILENT AAC file on A1.
+      // Using two distinct files prevents Premiere from also touching V1 when we
+      // call overwriteClip on the audio track (which happened with a combined file).
+      var silPath = (state.mf.silentAudioPath || '').replace(/\\/g, '/').replace(/"/g, '\\"');
       fn = '(function() {' +
         'try {' +
         'var seq = app.project.activeSequence;' +
         'if (!seq) return "error: no active sequence";' +
+        // Untarget ALL audio tracks so inserting video-only clip on V2 never writes to any A track.
         'var i, n = seq.audioTracks.numTracks;' +
         'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(false, false); } catch(_) {} }' +
         'var result = insertClipOnV2("' + esc + '", ' + startTimeSec + ');' +
         'for (i = 0; i < n; i++) { try { seq.audioTracks[i].setTargeted(true,  false); } catch(_) {} }' +
+        (silPath ? (
+          // Now place the separate silent AAC on A1 only.
+          'if (result === "success") {' +
+          '  try {' +
+          '    app.project.importFiles(["' + silPath + '"], true, app.project.rootItem, false);' +
+          '    var silItem = findProjectItemByPath(app.project.rootItem, "' + silPath + '");' +
+          '    if (!silItem) {' +
+          '      var silName = "' + silPath + '".split("/").pop();' +
+          '      silItem = findProjectItemByName(app.project.rootItem, silName);' +
+          '    }' +
+          '    if (silItem && seq.audioTracks.numTracks > 0) {' +
+          '      var a1 = seq.audioTracks[0];' +
+          '      if (a1 && a1.overwriteClip) { a1.overwriteClip(silItem, ' + startTimeSec + '); }' +
+          '    }' +
+          '  } catch(_sil) { /* non-fatal */ }' +
+          '}') : '') +
         'return result;' +
         '} catch(e) { return "error: " + e.toString(); }' +
         '})()';
@@ -2154,6 +2187,7 @@ function applyUpdate(data) {
     { url: data.main_js_url,    dest: nodePath.join(root, 'panel', 'main.js')    },
     { url: data.styles_css_url, dest: nodePath.join(root, 'panel', 'styles.css') },
     { url: data.index_html_url, dest: nodePath.join(root, 'panel', 'index.html') },
+    { url: data.host_jsx_url,   dest: nodePath.join(root, 'panel', 'host.jsx')   },
   ].filter(function (j) { return !!j.url; });
 
   var pending = jobs.length;
@@ -2757,10 +2791,32 @@ function bindEvents() {
     refreshClip(false);
   });
 
+  // Mark Omni tab based on plan
+  (function () {
+    var omniTab = el('omni-tab');
+    if (!omniTab) return;
+    var plan = state.auth.plan || '';
+    if (OMNI_PLANS.indexOf(plan) !== -1) {
+      omniTab.classList.add('plan-ok');
+    } else {
+      omniTab.classList.add('plan-locked');
+    }
+  }());
+
   // Mode selector pills
   document.querySelectorAll('.mode-pill').forEach(function (pill) {
     pill.addEventListener('click', function () {
-      selectedMode = this.getAttribute('data-mode');
+      var mode = this.getAttribute('data-mode');
+      // Omni is coming soon — block entirely, don't change active tab
+      if (mode === 'omni') {
+        showToast('Gemini Omni is coming soon. Stay tuned!', 'info');
+        // Keep active highlight on the previously selected tab
+        document.querySelectorAll('.mode-pill').forEach(function (p) {
+          p.classList.toggle('active', p.getAttribute('data-mode') === selectedMode);
+        });
+        return;
+      }
+      selectedMode = mode;
       document.querySelectorAll('.mode-pill').forEach(function (p) { p.classList.remove('active'); });
       this.classList.add('active');
       console.log('[Prysmor] Mode changed to:', selectedMode);
@@ -2994,7 +3050,7 @@ function loadHistory() {
 }
 
 function renderHistoryCard(job) {
-  var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX' }[job.mode] || job.mode || '—';
+    var modeLabel = { background: 'Background', relight: 'Relight', vfx: 'VFX', omni: 'Omni' }[job.mode] || job.mode || '—';
   var statusClass = { completed: 'h-status-done', failed: 'h-status-fail', generating: 'h-status-gen' }[job.status] || 'h-status-gen';
   var statusLabel = { completed: 'Done', failed: 'Failed', generating: 'Processing', uploading: 'Uploading', created: 'Queued' }[job.status] || job.status;
 

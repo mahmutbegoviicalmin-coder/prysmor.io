@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=19"/>
+  <link rel="stylesheet" href="styles.css?v=20"/>
   <style>
     /* ─────────────────────────────────────────────
        DESIGN TOKENS
@@ -318,6 +318,21 @@
       filter: drop-shadow(0 0 4px rgba(0,230,118,0.5));
     }
     .mode-tab:active { transform: scale(0.96); }
+    /* Omni PRO badge */
+    .omni-pro-badge {
+      position: absolute; top: 4px; right: 4px;
+      font-size: 7px; font-weight: 700; letter-spacing: 0.4px;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed);
+      color: #fff;
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.4;
+      pointer-events: none;
+    }
+    #omni-tab.plan-ok .omni-pro-badge { display: none; }
+    #omni-tab.plan-locked { opacity: 0.55; }
+    .mode-tab-soon { opacity: 0.5; cursor: not-allowed; }
+    .mode-tab-soon .omni-pro-badge { background: linear-gradient(135deg, #6b7280, #4b5563); }
 
     /* ─────────────────────────────────────────────
        PROMPT GLASS CARD
@@ -793,7 +808,7 @@
         <div class="lv-stat-sep"></div>
         <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
         <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v3.0.5</span></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.2</span></div>
       </div>
     </div>
   </div>
@@ -822,7 +837,7 @@
         <span id="topbar-plan" style="display:none"></span>
 
         <!-- History button -->
-        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px">
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </button>
 
@@ -913,13 +928,22 @@
         VFX
       </button>
 
+      <button class="mode-tab mode-pill mode-tab-soon" data-mode="omni" id="omni-tab" onclick="prysmorSetMode('omni')">
+        <!-- Wand / AI icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/>
+        </svg>
+        Omni
+        <span class="omni-pro-badge" id="omni-pro-badge">SOON</span>
+      </button>
+
     </div>
 
-    <!-- ─ REFERENCE IMAGE UPLOAD — visible only in BG mode ─── -->
+    <!-- ─ REFERENCE IMAGE UPLOAD — visible for BG + Relight modes ─── -->
     <div class="v2-ref-img-zone" id="ref-img-zone">
       <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
         <span class="v2-ref-img-icon">＋</span>
-        <span>Reference image</span>
+        <span id="ref-img-label-text">Reference image <span style="color:var(--text-3);font-weight:400">(optional — improves output)</span></span>
       </label>
       <input type="file" id="ref-img-input" accept="image/*" class="sr-only">
       <div id="ref-img-preview" class="v2-ref-img-preview hidden">
@@ -1065,7 +1089,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Generation History
         </span>
-        <button class="history-close" id="history-close-btn" aria-label="Close">✕</button>
+        <button class="history-close" id="history-close-btn" aria-label="Close" onclick="document.getElementById('section-history').classList.remove('history-visible')">✕</button>
       </div>
       <div id="history-list" class="history-list">
         <div class="history-loading" id="history-loading">
@@ -1131,12 +1155,12 @@
   <!-- ── History overlay styles ─────────────────────── -->
   <style>
     #section-history {
-      position: fixed; inset: 0; z-index: 200;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
       background: rgba(0,0,0,0.55);
       opacity: 0; pointer-events: none;
       transition: opacity 0.18s ease;
     }
-    #section-history.history-visible { opacity: 1; pointer-events: all; }
+    #section-history.history-visible { opacity: 1; pointer-events: auto; }
     .history-sheet {
       position: absolute; bottom: 0; left: 0; right: 0;
       max-height: 88%;
@@ -1207,7 +1231,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=35"></script>
+  <script src="main.js?v=46"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
@@ -1216,6 +1240,11 @@
       vfx:        'Describe the visual effect...',
     };
     function prysmorSetMode(mode) {
+      /* Omni is coming soon — block entirely */
+      if (mode === 'omni') {
+        if (typeof showToast === 'function') showToast('Gemini Omni is coming soon. Stay tuned!', 'info');
+        return;
+      }
       /* update global used by main.js */
       if (typeof selectedMode !== 'undefined') selectedMode = mode;
       /* toggle active class on all tab+pill buttons */
@@ -1228,10 +1257,16 @@
       if (sel) sel.value = mode;
       /* update prompt placeholder */
       var prompt = document.getElementById('mf-prompt');
-      if (prompt) prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
-      /* show reference image zone only for background mode */
+      if (prompt) {
+        prompt.disabled = false;
+        prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+      }
+      /* disable generate button if omni (extra safety) */
+      var genBtn = document.getElementById('btn-generate');
+      if (genBtn) genBtn.disabled = false;
+      /* show reference image zone for background and relight modes */
       var refZone = document.getElementById('ref-img-zone');
-      if (refZone) refZone.style.display = (mode === 'background') ? '' : 'none';
+      if (refZone) refZone.style.display = (mode === 'background' || mode === 'relight') ? '' : 'none';
       /* update enhance chip label for new mode */
       if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
     }
@@ -1254,9 +1289,10 @@
       draw();
     }());
 
-    document.addEventListener('DOMContentLoaded', function () {
+    /* ── Bind overlays (script is at end of body so all elements exist) ── */
+    (function () {
 
-      /* ── Settings overlay ──────────────────────────────────── */
+      /* Settings overlay */
       var overlay  = document.getElementById('section-settings');
       var closeBtn = document.getElementById('settings-close-btn');
       var openBtn  = document.getElementById('btn-scroll-settings');
@@ -1266,14 +1302,14 @@
         overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('settings-visible'); });
       }
 
-      /* ── History overlay ──────────────────────────────────── */
-      var historyOverlay = document.getElementById('section-history');
-      var historyOpenBtn = document.getElementById('btn-history');
+      /* History overlay */
+      var historyOverlay  = document.getElementById('section-history');
+      var historyOpenBtn  = document.getElementById('btn-history');
       var historyCloseBtn = document.getElementById('history-close-btn');
       if (historyOpenBtn && historyOverlay) {
         historyOpenBtn.addEventListener('click', function () {
           historyOverlay.classList.add('history-visible');
-          loadHistory();
+          if (typeof loadHistory === 'function') loadHistory();
         });
       }
       if (historyCloseBtn && historyOverlay) {
@@ -1281,9 +1317,9 @@
         historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
       }
 
-      /* Initial placeholder on load */
+      /* Initial mode */
       prysmorSetMode('background');
-    });
+    }());
   </script>
 </body>
 </html>

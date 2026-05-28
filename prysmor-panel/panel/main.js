@@ -1296,8 +1296,8 @@ async function mfGenerate() {
   try {
     var genBody = { prompt: prompt, mode: selectedMode };
     genBody.clipDuration = clipDurSec;
-    // Send user-uploaded reference image only for background mode
-    if (storedReferenceImage && selectedMode === 'background') genBody.referenceImage = storedReferenceImage;
+    // Send user-uploaded reference image for background and relight modes
+    if (storedReferenceImage && (selectedMode === 'background' || selectedMode === 'relight')) genBody.referenceImage = storedReferenceImage;
     // If ffmpeg extraction ran, send probed dimensions of the cropped output file.
     // Otherwise send stored sequence dimensions as a best-effort hint.
     if (extractionSucceeded) {
