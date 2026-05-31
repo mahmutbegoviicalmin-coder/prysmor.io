@@ -1,5 +1,8 @@
+import { createClerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/firebaseAdmin';
 import type { FunnelId } from './constants';
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 import { getFunnel, renderStepHtml } from './funnels';
 import { getEmailSettings, incrementDailyMarketingSent, getDailyMarketingSentCount } from './settings';
 import { sendMarketingEmail } from './send';
@@ -45,16 +48,41 @@ export async function loadUserEmailProfile(userId: string): Promise<UserEmailPro
   };
 }
 
+/** Matches Users tab: missing licenseStatus counts as inactive. */
+export function effectiveLicenseStatus(raw: string | undefined): string {
+  return raw ?? 'inactive';
+}
+
+export function isUnpaidUser(rawLicenseStatus: string | undefined): boolean {
+  return effectiveLicenseStatus(rawLicenseStatus) !== 'active';
+}
+
 export function isEligibleForFunnel(profile: UserEmailProfile, funnelId: FunnelId): boolean {
   if (!profile.marketingOptIn || profile.marketingUnsubscribedAt) return false;
 
   if (funnelId === 'unpaid-starter') {
-    return profile.licenseStatus !== 'active';
+    return isUnpaidUser(profile.licenseStatus);
   }
   if (funnelId === 'starter-pro') {
     return profile.licenseStatus === 'active' && profile.plan === 'starter';
   }
   return false;
+}
+
+function profileFromUserDoc(userId: string, d: FirebaseFirestore.DocumentData): UserEmailProfile | null {
+  const email = ((d.email as string | undefined) ?? (d.userEmail as string | undefined))?.trim();
+  if (!email) return null;
+  return {
+    userId,
+    email,
+    firstName: (d.firstName as string | undefined)?.trim()
+      || (d.displayName as string | undefined)?.split(' ')[0]
+      || 'there',
+    plan:             (d.plan as string) ?? 'unpaid',
+    licenseStatus:    effectiveLicenseStatus(d.licenseStatus as string | undefined),
+    marketingOptIn:   d.marketingOptIn !== false,
+    marketingUnsubscribedAt: d.marketingUnsubscribedAt ?? null,
+  };
 }
 
 /** Enroll user in a funnel (idempotent — won't reset active enrollment). */
@@ -74,6 +102,17 @@ export async function enrollInFunnel(userId: string, funnelId: FunnelId): Promis
   const enrolledAt = new Date();
   const nextSendAt = computeNextSendAt(enrolledAt, funnel.steps[0]?.delayDays ?? 0);
 
+  await writeEnrollment(ref, userId, funnelId, profile.email, enrolledAt, nextSendAt);
+}
+
+async function writeEnrollment(
+  ref: FirebaseFirestore.DocumentReference,
+  userId: string,
+  funnelId: FunnelId,
+  email: string,
+  enrolledAt: Date,
+  nextSendAt: Date,
+): Promise<void> {
   await ref.set({
     userId,
     funnelId,
@@ -81,9 +120,114 @@ export async function enrollInFunnel(userId: string, funnelId: FunnelId): Promis
     currentStep:  0,
     enrolledAt,
     nextSendAt,
-    email:        profile.email,
+    email,
     updatedAt:    new Date(),
   });
+}
+
+export interface EnrollAllUnpaidResult {
+  enrolled: number;
+  skipped:  number;
+  total:    number;
+  errors:   string[];
+}
+
+interface UnpaidCandidate {
+  userId: string;
+  email: string;
+  createdAt: number;
+}
+
+/** Same source as Admin Users tab: Clerk list + Firestore profile. */
+async function listUnpaidCandidates(funnelId: FunnelId): Promise<UnpaidCandidate[]> {
+  const [snap, clerkRes] = await Promise.all([
+    db.collection('users').limit(1000).get(),
+    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string; emailAddresses?: { emailAddress: string }[]; firstName?: string | null; createdAt?: number }[] })),
+  ]);
+
+  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
+
+  const candidates: UnpaidCandidate[] = [];
+
+  for (const cu of clerkRes.data) {
+    const d = fsMap.get(cu.id) ?? {};
+    if (!isUnpaidUser(d.licenseStatus as string | undefined)) continue;
+
+    const clerkEmail = cu.emailAddresses?.[0]?.emailAddress ?? '';
+    const merged = {
+      ...d,
+      email: clerkEmail || d.email,
+      userEmail: d.userEmail,
+      firstName: cu.firstName ?? d.firstName,
+    };
+
+    const profile = profileFromUserDoc(cu.id, merged);
+    if (!profile || !isEligibleForFunnel(profile, funnelId)) continue;
+
+    let createdAt = 0;
+    if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().getTime();
+    else if (d.createdAt instanceof Date) createdAt = d.createdAt.getTime();
+    else if (cu.createdAt) createdAt = new Date(cu.createdAt).getTime();
+
+    candidates.push({ userId: cu.id, email: profile.email, createdAt });
+  }
+
+  candidates.sort((a, b) => a.createdAt - b.createdAt);
+  return candidates;
+}
+
+/**
+ * Enroll all unpaid users into a funnel, oldest signups first.
+ * Staggers first-send day by daily cap so the queue respects Resend limits.
+ */
+export async function enrollAllUnpaidInFunnel(funnelId: FunnelId): Promise<EnrollAllUnpaidResult> {
+  const settings = await getEmailSettings();
+  if (!settings.funnels[funnelId]?.enabled) {
+    throw new Error(`Funnel "${funnelId}" is disabled`);
+  }
+  if (funnelId !== 'unpaid-starter') {
+    throw new Error('Bulk enroll is only supported for unpaid-starter');
+  }
+
+  const cap = settings.dailyMarketingCap;
+  const funnel = getFunnel(funnelId);
+  const step0Delay = funnel.steps[0]?.delayDays ?? 0;
+
+  const candidates = await listUnpaidCandidates(funnelId);
+
+  const now = new Date();
+  const result: EnrollAllUnpaidResult = {
+    enrolled: 0,
+    skipped:  0,
+    total:    candidates.length,
+    errors:   [],
+  };
+
+  for (let i = 0; i < candidates.length; i++) {
+    const { userId, email } = candidates[i];
+    const ref = db.collection('email_enrollments').doc(enrollmentDocId(userId, funnelId));
+
+    try {
+      const existing = await ref.get();
+      const status = existing.data()?.status as string | undefined;
+      if (existing.exists && (status === 'active' || status === 'completed')) {
+        result.skipped++;
+        continue;
+      }
+
+      const dayOffset = Math.floor(i / cap);
+      const enrolledAt = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      const nextSendAt = computeNextSendAt(enrolledAt, step0Delay);
+
+      await writeEnrollment(ref, userId, funnelId, email, enrolledAt, nextSendAt);
+      result.enrolled++;
+    } catch (e) {
+      result.errors.push(`${userId}: ${e instanceof Error ? e.message : 'enroll failed'}`);
+    }
+  }
+
+  return result;
 }
 
 /** Stop funnel — e.g. user subscribed or unsubscribed. */
@@ -261,12 +405,30 @@ export async function processEmailQueue(maxBatch = 30): Promise<ProcessQueueResu
   return result;
 }
 
+async function computeUnpaidBreakdown() {
+  const [snap, clerkRes] = await Promise.all([
+    db.collection('users').limit(1000).get(),
+    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string }[] })),
+  ]);
+  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
+
+  let unpaidTotal = 0;
+  for (const cu of clerkRes.data) {
+    const d = fsMap.get(cu.id) ?? {};
+    if (isUnpaidUser(d.licenseStatus as string | undefined)) unpaidTotal++;
+  }
+
+  const eligibleList = await listUnpaidCandidates('unpaid-starter');
+  return { unpaidTotal, unpaidEligible: eligibleList.length };
+}
+
 /** Stats for admin dashboard */
 export async function getEmailAdminStats() {
-  const [activeSnap, logsSnap, unpaidSnap] = await Promise.all([
+  const [activeSnap, logsSnap, unpaidBreakdown] = await Promise.all([
     db.collection('email_enrollments').where('status', '==', 'active').count().get(),
     db.collection('email_logs').orderBy('createdAt', 'desc').limit(50).get(),
-    db.collection('users').where('licenseStatus', '==', 'inactive').count().get(),
+    computeUnpaidBreakdown(),
   ]);
 
   const settings = await getEmailSettings();
@@ -297,11 +459,16 @@ export async function getEmailAdminStats() {
     enrollmentCounts[fid] = c.data().count;
   }
 
+  const unpaidInCampaign = enrollmentCounts['unpaid-starter'] ?? 0;
+
   return {
     settings,
     dailySent,
     activeEnrollments: activeSnap.data().count,
-    unpaidUsers:       unpaidSnap.data().count,
+    unpaidUsers:       unpaidBreakdown.unpaidTotal,
+    unpaidEligible:    unpaidBreakdown.unpaidEligible,
+    unpaidInCampaign,
+    unpaidPending:     Math.max(0, unpaidBreakdown.unpaidEligible - unpaidInCampaign),
     enrollmentCounts,
     logs,
   };

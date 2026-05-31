@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin/auth';
-import { getEmailAdminStats } from '@/lib/email/enrollments';
+import {
+  getEmailAdminStats,
+  processEmailQueue,
+  enrollAllUnpaidInFunnel,
+} from '@/lib/email/enrollments';
 import { updateEmailSettings } from '@/lib/email/settings';
-import { processEmailQueue } from '@/lib/email/enrollments';
 import type { FunnelId } from '@/lib/email/constants';
 import { FUNNEL_IDS } from '@/lib/email/constants';
 
@@ -57,16 +60,42 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-/** Manual trigger — process queue now (respects daily cap) */
-export async function POST() {
+/** POST { action?: 'process-queue' | 'start-campaign', funnelId?: FunnelId } */
+export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin.ok) return admin.response;
 
+  let body: { action?: string; funnelId?: FunnelId } = {};
   try {
-    const result = await processEmailQueue(30);
-    return NextResponse.json({ ok: true, ...result });
+    const raw = await req.text();
+    if (raw) body = JSON.parse(raw);
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const action = body.action ?? 'process-queue';
+  const funnelId = body.funnelId ?? 'unpaid-starter';
+
+  try {
+    if (action === 'start-campaign') {
+      const enroll = await enrollAllUnpaidInFunnel(funnelId);
+      const queue = await processEmailQueue(30);
+      return NextResponse.json({ ok: true, action, enroll, queue });
+    }
+
+    if (action === 'enroll-unpaid') {
+      const enroll = await enrollAllUnpaidInFunnel(funnelId);
+      return NextResponse.json({ ok: true, action, enroll });
+    }
+
+    const queue = await processEmailQueue(30);
+    return NextResponse.json({ ok: true, action: 'process-queue', ...queue });
   } catch (err) {
-    console.error('[admin/email] POST run', err);
-    return NextResponse.json({ error: 'Queue processing failed' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Request failed';
+    console.error('[admin/email] POST', action, err);
+    const hint = /index/i.test(message)
+      ? 'Deploy Firestore indexes: firebase deploy --only firestore:indexes'
+      : undefined;
+    return NextResponse.json({ error: message, hint }, { status: 500 });
   }
 }
