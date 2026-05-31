@@ -8,10 +8,11 @@ import {
   ShieldCheck, MoreHorizontal, ArrowUpDown,
   Eye, Plus, Minus, TrendingUp, DollarSign, Activity,
   UserPlus, UserMinus, BarChart2, Package,
-  Trash2, MapPin, Download, Copy, Globe, LifeBuoy, Sparkles, Mail,
+  Trash2, MapPin, Download, Copy, Globe, LifeBuoy, Sparkles, Mail, Megaphone,
 } from 'lucide-react';
 import Link from 'next/link';
 import { EmailSection } from '@/app/admin/EmailSection';
+import { CampaignsSection } from '@/app/admin/CampaignsSection';
 
 import type { RevenueData, LsSub } from '@/app/api/admin/revenue/route';
 
@@ -1279,9 +1280,10 @@ export function AdminPanel() {
   }
 
   const tabs = [
-    { id: 'users',   label: 'Users',   icon: Users },
-    { id: 'revenue', label: 'Revenue', icon: BarChart2 },
-    { id: 'email',   label: 'Email',   icon: Mail },
+    { id: 'users',     label: 'Users',     icon: Users },
+    { id: 'revenue',   label: 'Revenue',   icon: BarChart2 },
+    { id: 'email',     label: 'Email',     icon: Mail },
+    { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
   ] as const;
   type TabId = typeof tabs[number]['id'];
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -1297,7 +1299,7 @@ export function AdminPanel() {
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">Admin</span>
           </div>
           <h1 className="text-[24px] sm:text-[28px] font-bold text-white tracking-tight leading-none mb-1.5">Control Panel</h1>
-          <p className="text-[12px] text-[#4B5563]">Users · Revenue · Email</p>
+          <p className="text-[12px] text-[#4B5563]">Users · Revenue · Email · Campaigns</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={load} disabled={loading}
@@ -1351,7 +1353,12 @@ export function AdminPanel() {
       {activeTab === 'revenue' && <RevenueSection />}
 
       {/* ── Email Tab ── */}
-      {activeTab === 'email' && <EmailSection />}
+      {activeTab === 'email' && (
+        <EmailSection onOpenCampaigns={() => setActiveTab('campaigns')} />
+      )}
+
+      {/* ── Campaigns Tab ── */}
+      {activeTab === 'campaigns' && <CampaignsSection />}
 
       {/* ── Users Tab ── */}
       {activeTab === 'users' && <div>
