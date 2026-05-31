@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Mail, Loader2, RefreshCw, Play, ToggleLeft, ToggleRight,
-  Users, Send, AlertCircle, Rocket, ListOrdered,
+  Loader2, RefreshCw, Play, ToggleLeft, ToggleRight,
+  Users, Send, AlertCircle, Rocket, BarChart3, Eye, MousePointerClick,
+  ChevronDown, ChevronUp, Save, Pencil,
 } from 'lucide-react';
-import { FUNNEL_DEFINITIONS } from '@/lib/email/funnels';
 import type { FunnelId } from '@/lib/email/constants';
+import type { FunnelDefinition } from '@/lib/email/funnels';
 
 interface EmailLog {
   id: string;
@@ -17,6 +18,9 @@ interface EmailLog {
   status: string;
   subject: string;
   error?: string;
+  openedAt?: string | null;
+  clickedAt?: string | null;
+  openCount?: number;
   createdAt: string | null;
 }
 
@@ -31,7 +35,16 @@ interface EmailStats {
   unpaidEligible?: number;
   unpaidInCampaign?: number;
   unpaidPending?: number;
+  starterEligible?: number;
+  starterInCampaign?: number;
   enrollmentCounts: Record<string, number>;
+  campaigns: FunnelDefinition[];
+  analytics?: {
+    sent: number;
+    opened: number;
+    clicked: number;
+    openRate: number;
+  };
   logs: EmailLog[];
 }
 
@@ -44,6 +57,8 @@ export function EmailSection() {
   const [runResult, setRunResult]     = useState<string | null>(null);
   const [error, setError]             = useState('');
   const [errorHint, setErrorHint]     = useState('');
+  const [expanded, setExpanded]       = useState<FunnelId | null>('unpaid-starter');
+  const [editing, setEditing]         = useState<Record<string, FunnelDefinition>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,6 +69,9 @@ export function EmailSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Failed to load');
       setData(json);
+      const editMap: Record<string, FunnelDefinition> = {};
+      for (const c of json.campaigns ?? []) editMap[c.id] = c;
+      setEditing(editMap);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -64,15 +82,16 @@ export function EmailSection() {
   useEffect(() => { load(); }, [load]);
 
   async function toggleFunnel(id: FunnelId, enabled: boolean) {
-    setSaving(id);
+    setSaving(`toggle-${id}`);
     try {
       const res = await fetch('/api/admin/email', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ funnels: { [id]: { enabled } } }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? 'Save failed');
-      await load();
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Save failed');
+      setData(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -82,14 +101,54 @@ export function EmailSection() {
 
   async function updateDailyCap(cap: number) {
     setSaving('cap');
+    setData((prev) =>
+      prev ? { ...prev, settings: { ...prev.settings, dailyMarketingCap: cap } } : prev,
+    );
     try {
       const res = await fetch('/api/admin/email', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ dailyMarketingCap: cap }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? 'Save failed');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Save failed');
+      setData(json);
+      setRunResult(`Daily cap saved: ${cap}/day (applies to next queue runs; already-scheduled sends keep their day slot).`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error');
       await load();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveCampaign(id: FunnelId) {
+    const camp = editing[id];
+    if (!camp) return;
+    setSaving(`save-${id}`);
+    try {
+      const res = await fetch('/api/admin/email', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          campaign: {
+            id,
+            override: {
+              name:        camp.name,
+              description: camp.description,
+              steps: camp.steps.map((s) => ({
+                delayDays: s.delayDays,
+                subject:   s.subject,
+                html:      s.html,
+              })),
+            },
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Save failed');
+      setData(json);
+      setRunResult(`Campaign "${camp.name}" saved.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -97,8 +156,8 @@ export function EmailSection() {
     }
   }
 
-  async function postAction(action: 'process-queue' | 'start-campaign', funnelId?: FunnelId) {
-    if (action === 'start-campaign' && funnelId) setStarting(funnelId);
+  async function postAction(action: 'process-queue' | 'start-campaign', funnelId: FunnelId) {
+    if (action === 'start-campaign') setStarting(funnelId);
     else setRunning(true);
     setRunResult(null);
     setError('');
@@ -118,18 +177,15 @@ export function EmailSection() {
       if (action === 'start-campaign' && json.enroll) {
         const e = json.enroll;
         const q = json.queue;
-        const errNote = q.errors?.length ? ` Errors: ${q.errors.slice(0, 2).join('; ')}` : '';
-        const skipNote = q.skipped > 0 && q.sent === 0
-          ? ' (skipped = could not resolve email or user no longer unpaid — fixed in latest deploy; click Run queue only)'
-          : '';
         setRunResult(
-          `Campaign started: enrolled ${e.enrolled} new (${e.skipped} already in funnel). ` +
-          `Queue: sent ${q.sent}, skipped ${q.skipped}${q.dailyCapHit ? ' — daily cap hit' : ''}${skipNote}${errNote}`,
+          `Started "${funnelId}": enrolled ${e.enrolled} (${e.skipped} already in funnel). ` +
+          `Queue: sent ${q.sent}, skipped ${q.skipped}, cap ${data?.settings.dailyMarketingCap ?? '?'}/day` +
+          `${q.dailyCapHit ? ' — daily cap reached' : ''}.`,
         );
       } else {
         setRunResult(
-          `Sent ${json.sent}, skipped ${json.skipped}, processed ${json.processed}` +
-          `${json.dailyCapHit ? ' (daily cap reached)' : ''}`,
+          `Queue: sent ${json.sent}, skipped ${json.skipped}` +
+          `${json.dailyCapHit ? ' (daily cap reached)' : ''}.`,
         );
       }
       await load();
@@ -139,6 +195,16 @@ export function EmailSection() {
       setRunning(false);
       setStarting(null);
     }
+  }
+
+  function updateEditStep(campaignId: FunnelId, stepIdx: number, field: 'subject' | 'html' | 'delayDays', value: string | number) {
+    setEditing((prev) => {
+      const camp = prev[campaignId];
+      if (!camp) return prev;
+      const steps = [...camp.steps];
+      steps[stepIdx] = { ...steps[stepIdx], [field]: value };
+      return { ...prev, [campaignId]: { ...camp, steps } };
+    });
   }
 
   if (loading && !data) {
@@ -152,11 +218,9 @@ export function EmailSection() {
 
   const cap = data?.settings.dailyMarketingCap ?? 40;
   const sent = data?.dailySent ?? 0;
-  const capPct = Math.min((sent / cap) * 100, 100);
-  const unpaidTotal = data?.unpaidUsers ?? 0;
-  const unpaidEligible = data?.unpaidEligible ?? unpaidTotal;
-  const unpaidPending = data?.unpaidPending ?? unpaidEligible;
-  const daysToReachAll = unpaidPending > 0 ? Math.ceil(unpaidPending / cap) : 0;
+  const capPct = cap > 0 ? Math.min((sent / cap) * 100, 100) : 0;
+  const campaigns = data?.campaigns ?? [];
+  const analytics = data?.analytics ?? { sent: 0, opened: 0, clicked: 0, openRate: 0 };
 
   return (
     <div className="space-y-6">
@@ -166,9 +230,7 @@ export function EmailSection() {
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {error}
           </div>
-          {errorHint && (
-            <p className="mt-2 text-[12px] text-[#9CA3AF] pl-6">{errorHint}</p>
-          )}
+          {errorHint && <p className="mt-2 text-[12px] text-[#9CA3AF] pl-6">{errorHint}</p>}
         </div>
       )}
 
@@ -178,35 +240,14 @@ export function EmailSection() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Analytics */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          {
-            icon: Users,
-            label: 'Unpaid users',
-            value: unpaidTotal,
-            sub: 'Same as Users tab (no active license)',
-          },
-          {
-            icon: Mail,
-            label: 'Ready for email',
-            value: unpaidEligible,
-            sub: unpaidPending > 0
-              ? `${unpaidPending} not in campaign yet`
-              : 'All eligible users enrolled',
-          },
-          {
-            icon: ListOrdered,
-            label: 'In campaign queue',
-            value: data?.unpaidInCampaign ?? data?.enrollmentCounts['unpaid-starter'] ?? 0,
-            sub: 'Active unpaid-starter enrollments',
-          },
-          {
-            icon: Send,
-            label: 'Sent today',
-            value: `${sent} / ${cap}`,
-            sub: 'Resend free: stay under 100/day total',
-          },
+          { icon: Users, label: 'Unpaid users', value: data?.unpaidUsers ?? 0, sub: 'No active license' },
+          { icon: Send, label: 'Sent today', value: `${sent} / ${cap}`, sub: 'Saved cap applies to queue' },
+          { icon: BarChart3, label: 'Total sent', value: analytics.sent, sub: 'Last 200 log entries' },
+          { icon: Eye, label: 'Opened', value: analytics.opened, sub: `${analytics.openRate}% open rate` },
+          { icon: MousePointerClick, label: 'Clicked', value: analytics.clicked, sub: 'Resend webhook required' },
         ].map((c) => (
           <div key={c.label} className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -225,10 +266,7 @@ export function EmailSection() {
           <div>
             <h3 className="text-[14px] font-semibold text-white">Daily marketing cap</h3>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
-              Unpaid campaign sends up to {cap} welcome emails per day, then continues on following days.
-              {daysToReachAll > 1 && (
-                <span className="text-[#9CA3AF]"> ~{daysToReachAll} days to reach all {unpaidPending} pending.</span>
-              )}
+              Max sends per day when you run the queue. Changing cap does not reschedule users already enrolled.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -256,122 +294,138 @@ export function EmailSection() {
         </div>
       </div>
 
-      {/* Manual queue only */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => postAction('process-queue')}
+          onClick={() => postAction('process-queue', 'unpaid-starter')}
           disabled={running || !!starting}
           className="flex items-center gap-2 px-4 py-2.5 rounded-[9px] border border-white/[0.08] text-[13px] text-[#9CA3AF] hover:text-white disabled:opacity-50"
         >
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Run queue only
+          Run queue (up to {cap} left today)
         </button>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-[9px] border border-white/[0.08] text-[13px] text-[#9CA3AF] hover:text-white"
-        >
+        <button onClick={load} disabled={loading} className="flex items-center gap-2 px-4 py-2.5 rounded-[9px] border border-white/[0.08] text-[13px] text-[#9CA3AF] hover:text-white">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
 
-      {/* Campaigns */}
+      {/* All campaigns */}
       <div>
-        <h3 className="text-[14px] font-semibold text-white mb-1">Campaigns</h3>
+        <h3 className="text-[14px] font-semibold text-white mb-1">All campaigns</h3>
         <p className="text-[12px] text-[#6B7280] mb-3">
-          Each campaign is an automated email sequence. Select one and start it for all unpaid users (oldest signups first).
+          Upsell sequences stored in your project. Edit subjects and body HTML, then Save. Opens/clicks need Resend webhook → /api/webhooks/resend
         </p>
         <div className="space-y-3">
-          {(Object.keys(FUNNEL_DEFINITIONS) as FunnelId[]).map((id) => {
-            const def = FUNNEL_DEFINITIONS[id];
+          {campaigns.map((def) => {
+            const id = def.id as FunnelId;
             const enabled = data?.settings.funnels[id]?.enabled ?? false;
             const active = data?.enrollmentCounts[id] ?? 0;
-            const isUnpaidCampaign = id === 'unpaid-starter';
-            const canStart = isUnpaidCampaign && enabled && unpaidPending > 0;
+            const isOpen = expanded === id;
+            const camp = editing[id] ?? def;
+            const isUnpaid = id === 'unpaid-starter';
+            const pending = isUnpaid
+              ? (data?.unpaidPending ?? 0)
+              : Math.max(0, (data?.starterEligible ?? 0) - (data?.starterInCampaign ?? 0));
 
             return (
               <div
                 key={id}
                 className={`rounded-[12px] border p-5 ${
-                  isUnpaidCampaign
-                    ? 'border-[#A3FF12]/20 bg-[#A3FF12]/[0.03]'
-                    : 'border-white/[0.07] bg-[#111113]'
+                  isUnpaid ? 'border-[#A3FF12]/20 bg-[#A3FF12]/[0.03]' : 'border-white/[0.07] bg-[#111113]'
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="flex-1 min-w-[200px]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-[15px] font-semibold text-white">{def.name}</h4>
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(isOpen ? null : id)}
+                      className="flex items-center gap-2 mb-1 text-left"
+                    >
+                      {isOpen ? <ChevronUp className="w-4 h-4 text-[#6B7280]" /> : <ChevronDown className="w-4 h-4 text-[#6B7280]" />}
+                      <h4 className="text-[15px] font-semibold text-white">{camp.name}</h4>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                        enabled
-                          ? 'text-[#A3FF12] border-[#A3FF12]/25 bg-[#A3FF12]/[0.08]'
-                          : 'text-[#6B7280] border-white/[0.06]'
+                        enabled ? 'text-[#A3FF12] border-[#A3FF12]/25 bg-[#A3FF12]/[0.08]' : 'text-[#6B7280] border-white/[0.06]'
                       }`}>
                         {enabled ? 'ON' : 'OFF'}
                       </span>
-                      {isUnpaidCampaign && (
-                        <span className="text-[10px] text-[#6B7280]">
-                          → {unpaidTotal} unpaid
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[12px] text-[#6B7280] mb-3">{def.description}</p>
-                    <p className="text-[11px] text-[#4B5563]">
-                      {active} in queue · {def.steps.length} emails in sequence
+                      <span className="text-[10px] text-[#4B5563]">{id}</span>
+                    </button>
+                    <p className="text-[12px] text-[#6B7280] mb-2 ml-6">{camp.description}</p>
+                    <p className="text-[11px] text-[#4B5563] ml-6">
+                      {active} in queue · {camp.steps.length} emails
                     </p>
-                    <ol className="mt-3 space-y-1.5">
-                      {def.steps.map((step, i) => (
-                        <li key={i} className="text-[11px] text-[#9CA3AF] flex gap-2">
-                          <span className="text-[#4B5563] w-16 flex-shrink-0">
-                            {step.delayDays === 0 ? 'Day 0' : `Day +${step.delayDays}`}
-                          </span>
-                          <span>{step.subject}</span>
-                        </li>
-                      ))}
-                    </ol>
                   </div>
 
-                  <div className="flex flex-col items-end gap-3">
+                  <div className="flex flex-col items-end gap-2">
                     <button
-                      disabled={saving === id}
+                      disabled={saving === `toggle-${id}`}
                       onClick={() => toggleFunnel(id, !enabled)}
-                      className="flex items-center gap-2 text-[12px] text-[#9CA3AF] hover:text-white transition-colors"
-                      title={enabled ? 'Disable campaign' : 'Enable campaign'}
+                      className="flex items-center gap-2 text-[12px] text-[#9CA3AF] hover:text-white"
                     >
-                      {saving === id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : enabled ? (
+                      {saving === `toggle-${id}` ? <Loader2 className="w-5 h-5 animate-spin" /> : enabled ? (
                         <ToggleRight className="w-8 h-8 text-[#A3FF12]" />
                       ) : (
                         <ToggleLeft className="w-8 h-8 text-[#4B5563]" />
                       )}
                     </button>
-
-                    {isUnpaidCampaign && (
+                    {enabled && pending > 0 && (
                       <button
-                        disabled={!enabled || starting === id || unpaidPending === 0}
+                        disabled={starting === id}
                         onClick={() => postAction('start-campaign', id)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-[9px] bg-[#A3FF12] text-black text-[13px] font-semibold hover:opacity-90 disabled:opacity-40 whitespace-nowrap"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-[9px] bg-[#A3FF12] text-black text-[13px] font-semibold hover:opacity-90 disabled:opacity-40"
                       >
-                        {starting === id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Rocket className="w-4 h-4" />
-                        )}
-                        {unpaidPending > 0
-                          ? `Start for ${unpaidPending} unpaid`
-                          : 'All enrolled'}
+                        {starting === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
+                        Start for {pending}
                       </button>
+                    )}
+                    {enabled && pending === 0 && (
+                      <span className="text-[11px] text-[#4B5563]">All enrolled</span>
                     )}
                   </div>
                 </div>
 
-                {isUnpaidCampaign && enabled && unpaidPending > 0 && (
-                  <p className="mt-4 text-[11px] text-[#6B7280] border-t border-white/[0.06] pt-3">
-                    Order: oldest signup first · {cap} emails/day · follow-ups at +2d and +5d from each user&apos;s start day.
-                    Stops if they subscribe or unsubscribe.
-                  </p>
+                {isOpen && (
+                  <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-4">
+                    {camp.steps.map((step, i) => (
+                      <div key={i} className="rounded-[10px] border border-white/[0.06] bg-black/20 p-4 space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-[#A3FF12] font-medium w-20">
+                            {step.delayDays === 0 ? 'Day 0' : `Day +${step.delayDays}`}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={step.delayDays}
+                            onChange={(e) => updateEditStep(id, i, 'delayDays', Number(e.target.value))}
+                            className="w-16 px-2 py-1 rounded bg-[#0a0a0a] border border-white/[0.08] text-[12px] text-white"
+                            title="Days after enrollment"
+                          />
+                          <span className="text-[10px] text-[#4B5563]">days after start</span>
+                        </div>
+                        <input
+                          value={step.subject}
+                          onChange={(e) => updateEditStep(id, i, 'subject', e.target.value)}
+                          className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-white/[0.08] text-[13px] text-white"
+                          placeholder="Subject"
+                        />
+                        <textarea
+                          value={step.html.trim()}
+                          onChange={(e) => updateEditStep(id, i, 'html', e.target.value)}
+                          rows={5}
+                          className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-white/[0.08] text-[12px] text-[#9CA3AF] font-mono"
+                          placeholder="HTML body (use {{firstName}})"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      disabled={saving === `save-${id}`}
+                      onClick={() => saveCampaign(id)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-[8px] border border-[#A3FF12]/30 text-[#A3FF12] text-[12px] font-medium hover:bg-[#A3FF12]/10"
+                    >
+                      {saving === `save-${id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save campaign
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -379,9 +433,9 @@ export function EmailSection() {
         </div>
       </div>
 
-      {/* Logs */}
+      {/* Recent sends */}
       <div>
-        <h3 className="text-[14px] font-semibold text-white mb-3">Recent sends</h3>
+        <h3 className="text-[14px] font-semibold text-white mb-3">Recent sends & opens</h3>
         <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
@@ -391,6 +445,7 @@ export function EmailSection() {
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Campaign</th>
                   <th className="px-4 py-3 font-medium">Step</th>
+                  <th className="px-4 py-3 font-medium">Opened</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Subject</th>
                 </tr>
@@ -398,8 +453,8 @@ export function EmailSection() {
               <tbody>
                 {(data?.logs ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-[#4B5563]">
-                      No emails sent yet. Start the unpaid campaign above.
+                    <td colSpan={7} className="px-4 py-8 text-center text-[#4B5563]">
+                      No sends yet.
                     </td>
                   </tr>
                 ) : (
@@ -414,11 +469,19 @@ export function EmailSection() {
                       <td className="px-4 py-2.5 text-[#9CA3AF]">{log.funnelId}</td>
                       <td className="px-4 py-2.5 text-[#9CA3AF]">{log.step + 1}</td>
                       <td className="px-4 py-2.5">
-                        <span className={log.status === 'sent' ? 'text-[#A3FF12]' : 'text-red-400'}>
-                          {log.status}
-                        </span>
+                        {log.openedAt ? (
+                          <span className="text-[#A3FF12] flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            Yes{(log.openCount ?? 0) > 1 ? ` (${log.openCount})` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-[#4B5563]">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-[#9CA3AF] max-w-[200px] truncate">{log.subject}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={log.status === 'sent' ? 'text-[#A3FF12]' : 'text-red-400'}>{log.status}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-[#9CA3AF] max-w-[180px] truncate">{log.subject}</td>
                     </tr>
                   ))
                 )}
@@ -429,9 +492,9 @@ export function EmailSection() {
       </div>
 
       <p className="text-[11px] text-[#374151] leading-relaxed">
-        Hourly cron: <code className="text-[#6B7280]">/api/cron/email-funnels</code>.
-        If queue fails with an index error, deploy{' '}
-        <code className="text-[#6B7280]">firestore.indexes.json</code> in Firebase Console.
+        <Pencil className="w-3 h-3 inline mr-1" />
+        Resend → Webhooks → URL <code className="text-[#6B7280]">https://prysmor.io/api/webhooks/resend</code> — events: delivered, opened, clicked.
+        Set <code className="text-[#6B7280]">RESEND_WEBHOOK_SECRET</code> on Vercel.
       </p>
     </div>
   );

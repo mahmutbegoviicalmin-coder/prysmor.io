@@ -5,9 +5,22 @@ export interface FunnelSettings {
   enabled: boolean;
 }
 
+export interface CampaignStepOverride {
+  delayDays?: number;
+  subject?:   string;
+  html?:      string;
+}
+
+export interface CampaignOverride {
+  name?:        string;
+  description?: string;
+  steps?:       CampaignStepOverride[];
+}
+
 export interface EmailSettings {
   dailyMarketingCap: number;
   funnels: Record<FunnelId, FunnelSettings>;
+  campaignOverrides?: Partial<Record<FunnelId, CampaignOverride>>;
   updatedAt?: Date;
 }
 
@@ -32,12 +45,17 @@ export async function getEmailSettings(): Promise<EmailSettings> {
     if (raw) funnels[id] = { enabled: raw.enabled !== false };
   }
 
+  const campaignOverrides = (data.campaignOverrides ?? {}) as Partial<
+    Record<FunnelId, CampaignOverride>
+  >;
+
   return {
     dailyMarketingCap:
       typeof data.dailyMarketingCap === 'number' && data.dailyMarketingCap > 0
         ? data.dailyMarketingCap
         : DEFAULT_DAILY_MARKETING_CAP,
     funnels,
+    campaignOverrides,
     updatedAt: data.updatedAt instanceof Date ? data.updatedAt : undefined,
   };
 }
@@ -45,6 +63,7 @@ export async function getEmailSettings(): Promise<EmailSettings> {
 export async function updateEmailSettings(
   patch: Partial<Pick<EmailSettings, 'dailyMarketingCap'>> & {
     funnels?: Partial<Record<FunnelId, Partial<FunnelSettings>>>;
+    campaignOverrides?: Partial<Record<FunnelId, CampaignOverride>>;
   },
 ): Promise<EmailSettings> {
   const current = await getEmailSettings();
@@ -57,9 +76,22 @@ export async function updateEmailSettings(
     }
   }
 
+  let campaignOverrides = { ...current.campaignOverrides };
+  if (patch.campaignOverrides) {
+    for (const id of FUNNEL_IDS) {
+      if (patch.campaignOverrides[id]) {
+        campaignOverrides[id] = {
+          ...campaignOverrides[id],
+          ...patch.campaignOverrides[id],
+        };
+      }
+    }
+  }
+
   const next: EmailSettings = {
     dailyMarketingCap: patch.dailyMarketingCap ?? current.dailyMarketingCap,
     funnels,
+    campaignOverrides,
     updatedAt: new Date(),
   };
 

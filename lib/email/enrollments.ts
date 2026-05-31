@@ -3,7 +3,8 @@ import { db } from '@/lib/firebaseAdmin';
 import type { FunnelId } from './constants';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-import { getFunnel, renderStepHtml } from './funnels';
+import { getMergedFunnel } from './campaigns';
+import { renderStepHtml } from './funnels';
 import { getEmailSettings, incrementDailyMarketingSent, getDailyMarketingSentCount } from './settings';
 import { sendMarketingEmail } from './send';
 import { buildUnsubscribeUrl } from './unsubscribe';
@@ -111,7 +112,7 @@ export async function enrollInFunnel(userId: string, funnelId: FunnelId): Promis
   if (existing.exists && existing.data()?.status === 'active') return;
   if (existing.exists && existing.data()?.status === 'completed') return;
 
-  const funnel = getFunnel(funnelId);
+  const funnel = await getMergedFunnel(funnelId);
   const enrolledAt = new Date();
   const nextSendAt = computeNextSendAt(enrolledAt, funnel.steps[0]?.delayDays ?? 0);
 
@@ -204,7 +205,7 @@ export async function enrollAllUnpaidInFunnel(funnelId: FunnelId): Promise<Enrol
   }
 
   const cap = settings.dailyMarketingCap;
-  const funnel = getFunnel(funnelId);
+  const funnel = await getMergedFunnel(funnelId);
   const step0Delay = funnel.steps[0]?.delayDays ?? 0;
 
   const candidates = await listUnpaidCandidates(funnelId);
@@ -286,11 +287,45 @@ export async function onUserBecamePaid(userId: string, plan: string): Promise<vo
   }
 }
 
-async function logEmail(data: Record<string, unknown>): Promise<void> {
-  await db.collection('email_logs').add({
+async function logEmail(data: Record<string, unknown>): Promise<string> {
+  const ref = await db.collection('email_logs').add({
     ...data,
-    createdAt: new Date(),
+    openCount:  0,
+    clickCount: 0,
+    createdAt:  new Date(),
   });
+  return ref.id;
+}
+
+/** Update log when Resend reports delivery / open / click */
+export async function trackResendEmailEvent(
+  resendId: string,
+  event: 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained',
+): Promise<boolean> {
+  const snap = await db.collection('email_logs')
+    .where('resendId', '==', resendId)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return false;
+
+  const ref = snap.docs[0].ref;
+  const now = new Date();
+  const patch: Record<string, unknown> = { updatedAt: now };
+
+  if (event === 'delivered') patch.deliveredAt = now;
+  if (event === 'opened') {
+    patch.openedAt = snap.docs[0].data().openedAt ?? now;
+    patch.openCount = ((snap.docs[0].data().openCount as number) ?? 0) + 1;
+  }
+  if (event === 'clicked') {
+    patch.clickedAt = snap.docs[0].data().clickedAt ?? now;
+    patch.clickCount = ((snap.docs[0].data().clickCount as number) ?? 0) + 1;
+  }
+  if (event === 'bounced' || event === 'complained') patch.status = event;
+
+  await ref.update(patch);
+  return true;
 }
 
 export interface ProcessQueueResult {
@@ -301,25 +336,28 @@ export interface ProcessQueueResult {
   dailyCapHit: boolean;
 }
 
-export async function processEmailQueue(maxBatch = 30): Promise<ProcessQueueResult> {
+export async function processEmailQueue(requestedBatch?: number): Promise<ProcessQueueResult> {
   const settings = await getEmailSettings();
   const dailySent = await getDailyMarketingSentCount();
+  const remaining = Math.max(0, settings.dailyMarketingCap - dailySent);
   const result: ProcessQueueResult = {
     processed: 0,
     sent:      0,
     skipped:   0,
     errors:    [],
-    dailyCapHit: dailySent >= settings.dailyMarketingCap,
+    dailyCapHit: remaining === 0,
   };
 
   if (result.dailyCapHit) return result;
+
+  const batchLimit = Math.min(requestedBatch ?? remaining, remaining);
 
   const now = new Date();
   const snap = await db.collection('email_enrollments')
     .where('status', '==', 'active')
     .where('nextSendAt', '<=', now)
     .orderBy('nextSendAt', 'asc')
-    .limit(maxBatch)
+    .limit(batchLimit)
     .get();
 
   for (const doc of snap.docs) {
@@ -351,7 +389,7 @@ export async function processEmailQueue(maxBatch = 30): Promise<ProcessQueueResu
       continue;
     }
 
-    const funnel = getFunnel(funnelId);
+    const funnel = await getMergedFunnel(funnelId);
     const step = funnel.steps[currentStep];
     if (!step) {
       await doc.ref.update({ status: 'completed', completedAt: new Date(), updatedAt: new Date() });
@@ -419,6 +457,67 @@ export async function processEmailQueue(maxBatch = 30): Promise<ProcessQueueResu
   return result;
 }
 
+/** Enroll all active Starter users into starter-pro upsell */
+export async function enrollAllStarterPro(): Promise<EnrollAllUnpaidResult> {
+  const funnelId = 'starter-pro' as const;
+  const settings = await getEmailSettings();
+  if (!settings.funnels[funnelId]?.enabled) {
+    throw new Error('Funnel "starter-pro" is disabled');
+  }
+
+  const cap = settings.dailyMarketingCap;
+  const funnel = await getMergedFunnel(funnelId);
+  const step0Delay = funnel.steps[0]?.delayDays ?? 0;
+
+  const [snap, clerkRes] = await Promise.all([
+    db.collection('users').limit(1000).get(),
+    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string; emailAddresses?: { emailAddress: string }[]; firstName?: string | null; createdAt?: number }[] })),
+  ]);
+  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
+
+  const candidates: UnpaidCandidate[] = [];
+  for (const cu of clerkRes.data) {
+    const d = fsMap.get(cu.id) ?? {};
+    const merged = {
+      ...d,
+      email: cu.emailAddresses?.[0]?.emailAddress || d.email,
+      firstName: cu.firstName ?? d.firstName,
+    };
+    const profile = profileFromUserDoc(cu.id, merged);
+    if (!profile || !isEligibleForFunnel(profile, funnelId)) continue;
+    let createdAt = 0;
+    if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().getTime();
+    else if (cu.createdAt) createdAt = new Date(cu.createdAt).getTime();
+    candidates.push({ userId: cu.id, email: profile.email, createdAt });
+  }
+  candidates.sort((a, b) => a.createdAt - b.createdAt);
+
+  const now = new Date();
+  const result: EnrollAllUnpaidResult = { enrolled: 0, skipped: 0, total: candidates.length, errors: [] };
+
+  for (let i = 0; i < candidates.length; i++) {
+    const { userId, email } = candidates[i];
+    const ref = db.collection('email_enrollments').doc(enrollmentDocId(userId, funnelId));
+    try {
+      const existing = await ref.get();
+      const status = existing.data()?.status as string | undefined;
+      if (existing.exists && (status === 'active' || status === 'completed')) {
+        result.skipped++;
+        continue;
+      }
+      const dayOffset = Math.floor(i / cap);
+      const enrolledAt = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      const nextSendAt = computeNextSendAt(enrolledAt, step0Delay);
+      await writeEnrollment(ref, userId, funnelId, email, enrolledAt, nextSendAt);
+      result.enrolled++;
+    } catch (e) {
+      result.errors.push(`${userId}: ${e instanceof Error ? e.message : 'enroll failed'}`);
+    }
+  }
+  return result;
+}
+
 async function computeUnpaidBreakdown() {
   const [snap, clerkRes] = await Promise.all([
     db.collection('users').limit(1000).get(),
@@ -437,29 +536,52 @@ async function computeUnpaidBreakdown() {
   return { unpaidTotal, unpaidEligible: eligibleList.length };
 }
 
+async function countStarterEligible(): Promise<number> {
+  const list = await listUnpaidCandidates('starter-pro');
+  return list.length;
+}
+
 /** Stats for admin dashboard */
 export async function getEmailAdminStats() {
-  const [activeSnap, logsSnap, unpaidBreakdown] = await Promise.all([
+  const { getAllCampaigns } = await import('./campaigns');
+
+  const [activeSnap, logsSnap, unpaidBreakdown, campaigns, starterEligible] = await Promise.all([
     db.collection('email_enrollments').where('status', '==', 'active').count().get(),
-    db.collection('email_logs').orderBy('createdAt', 'desc').limit(50).get(),
+    db.collection('email_logs').orderBy('createdAt', 'desc').limit(200).get(),
     computeUnpaidBreakdown(),
+    getAllCampaigns(),
+    countStarterEligible(),
   ]);
 
   const settings = await getEmailSettings();
   const dailySent = await getDailyMarketingSentCount();
 
+  let analyticsSent = 0;
+  let analyticsOpened = 0;
+  let analyticsClicked = 0;
+
   const logs = logsSnap.docs.map((d) => {
     const x = d.data();
+    if (x.status === 'sent') {
+      analyticsSent++;
+      if (x.openedAt) analyticsOpened++;
+      if (x.clickedAt) analyticsClicked++;
+    }
     return {
-      id:        d.id,
-      userId:    x.userId as string,
-      email:     x.email as string,
-      funnelId:  x.funnelId as string,
-      step:      x.step as number,
-      status:    x.status as string,
-      subject:   x.subject as string,
-      error:     x.error as string | undefined,
-      createdAt: x.createdAt?.toDate?.()?.toISOString?.() ?? null,
+      id:         d.id,
+      userId:     x.userId as string,
+      email:      x.email as string,
+      funnelId:   x.funnelId as string,
+      step:       x.step as number,
+      status:     x.status as string,
+      subject:    x.subject as string,
+      error:      x.error as string | undefined,
+      resendId:   x.resendId as string | undefined,
+      openedAt:   x.openedAt?.toDate?.()?.toISOString?.() ?? null,
+      clickedAt:  x.clickedAt?.toDate?.()?.toISOString?.() ?? null,
+      deliveredAt: x.deliveredAt?.toDate?.()?.toISOString?.() ?? null,
+      openCount:  (x.openCount as number) ?? 0,
+      createdAt:  x.createdAt?.toDate?.()?.toISOString?.() ?? null,
     };
   });
 
@@ -475,6 +597,10 @@ export async function getEmailAdminStats() {
 
   const unpaidInCampaign = enrollmentCounts['unpaid-starter'] ?? 0;
 
+  const openRate = analyticsSent > 0
+    ? Math.round((analyticsOpened / analyticsSent) * 100)
+    : 0;
+
   return {
     settings,
     dailySent,
@@ -483,7 +609,16 @@ export async function getEmailAdminStats() {
     unpaidEligible:    unpaidBreakdown.unpaidEligible,
     unpaidInCampaign,
     unpaidPending:     Math.max(0, unpaidBreakdown.unpaidEligible - unpaidInCampaign),
+    starterEligible,
+    starterInCampaign: enrollmentCounts['starter-pro'] ?? 0,
     enrollmentCounts,
-    logs,
+    campaigns,
+    analytics: {
+      sent:     analyticsSent,
+      opened:   analyticsOpened,
+      clicked:  analyticsClicked,
+      openRate,
+    },
+    logs: logs.slice(0, 50),
   };
 }

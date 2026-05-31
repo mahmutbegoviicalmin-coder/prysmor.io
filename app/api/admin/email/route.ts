@@ -4,8 +4,9 @@ import {
   getEmailAdminStats,
   processEmailQueue,
   enrollAllUnpaidInFunnel,
+  enrollAllStarterPro,
 } from '@/lib/email/enrollments';
-import { updateEmailSettings } from '@/lib/email/settings';
+import { updateEmailSettings, type CampaignOverride } from '@/lib/email/settings';
 import type { FunnelId } from '@/lib/email/constants';
 import { FUNNEL_IDS } from '@/lib/email/constants';
 
@@ -29,6 +30,7 @@ export async function PATCH(req: NextRequest) {
   let body: {
     dailyMarketingCap?: number;
     funnels?: Partial<Record<FunnelId, { enabled?: boolean }>>;
+    campaign?: { id: FunnelId; override: CampaignOverride };
   };
   try {
     body = await req.json();
@@ -45,6 +47,11 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  const campaignOverrides: Partial<Record<FunnelId, CampaignOverride>> = {};
+  if (body.campaign?.id && body.campaign.override) {
+    campaignOverrides[body.campaign.id] = body.campaign.override;
+  }
+
   try {
     const settings = await updateEmailSettings({
       dailyMarketingCap:
@@ -52,15 +59,17 @@ export async function PATCH(req: NextRequest) {
           ? Math.min(body.dailyMarketingCap, 500)
           : undefined,
       funnels: Object.keys(funnelPatch).length ? funnelPatch : undefined,
+      campaignOverrides: Object.keys(campaignOverrides).length ? campaignOverrides : undefined,
     });
-    return NextResponse.json({ settings });
+    const stats = await getEmailAdminStats();
+    return NextResponse.json({ settings, ...stats });
   } catch (err) {
     console.error('[admin/email] PATCH', err);
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }
 }
 
-/** POST { action?: 'process-queue' | 'start-campaign', funnelId?: FunnelId } */
+/** POST { action, funnelId? } */
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin.ok) return admin.response;
@@ -78,8 +87,10 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === 'start-campaign') {
-      const enroll = await enrollAllUnpaidInFunnel(funnelId);
-      const queue = await processEmailQueue(60);
+      const enroll = funnelId === 'starter-pro'
+        ? await enrollAllStarterPro()
+        : await enrollAllUnpaidInFunnel(funnelId);
+      const queue = await processEmailQueue();
       return NextResponse.json({ ok: true, action, enroll, queue });
     }
 
@@ -88,7 +99,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, action, enroll });
     }
 
-    const queue = await processEmailQueue(60);
+    const queue = await processEmailQueue();
     return NextResponse.json({ ok: true, action: 'process-queue', ...queue });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';

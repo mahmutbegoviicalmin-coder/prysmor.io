@@ -42,6 +42,13 @@
       "fields": [
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "email_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "resendId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
