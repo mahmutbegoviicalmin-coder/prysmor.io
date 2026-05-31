@@ -1281,6 +1281,7 @@ export function AdminPanel() {
   const tabs = [
     { id: 'users',   label: 'Users',   icon: Users },
     { id: 'revenue', label: 'Revenue', icon: BarChart2 },
+    { id: 'email',   label: 'Email',   icon: Mail },
   ] as const;
   type TabId = typeof tabs[number]['id'];
   const [activeTab, setActiveTab] = useState<TabId>('users');
@@ -1296,7 +1297,7 @@ export function AdminPanel() {
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">Admin</span>
           </div>
           <h1 className="text-[24px] sm:text-[28px] font-bold text-white tracking-tight leading-none mb-1.5">Control Panel</h1>
-          <p className="text-[12px] text-[#4B5563]">Users · Revenue</p>
+          <p className="text-[12px] text-[#4B5563]">Users · Revenue · Email</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={load} disabled={loading}
