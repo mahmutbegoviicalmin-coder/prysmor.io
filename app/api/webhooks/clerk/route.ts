@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
         firstName: data.first_name  ?? undefined,
         lastName:  data.last_name   ?? undefined,
       });
+      const { enrollInFunnel } = await import('@/lib/email/enrollments');
+      await enrollInFunnel(userId, 'unpaid-starter').catch((e) => {
+        console.warn('[clerk-webhook] email enroll failed:', e);
+      });
       console.log(`[clerk-webhook] user.created synced: ${userId}`);
 
     } else if (type === 'user.updated') {

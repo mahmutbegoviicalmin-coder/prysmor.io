@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect }     from "next/navigation";
 import { ShieldAlert, Mail, Chrome } from "lucide-react";
 import { DeleteAccountButton } from "./DeleteAccountButton";
+import { MarketingPreferences } from "@/components/settings/MarketingPreferences";
 
 export const metadata = { title: "Settings — Dashboard" };
 
@@ -147,6 +148,12 @@ export default async function SettingsPage() {
             <Badge color="gray">No OAuth</Badge>
           </div>
         )}
+      </div>
+
+      {/* ── Email preferences ─────────────────────────────────────────────────── */}
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Email preferences</p>
+      <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-6">
+        <MarketingPreferences />
       </div>
 
       {/* ── Security ────────────────────────────────────────────────────────── */}

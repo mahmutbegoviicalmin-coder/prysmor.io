@@ -195,6 +195,10 @@ export async function POST(req: NextRequest) {
         // New subscription — set plan + top-up credits to plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
+        const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+        await onUserBecamePaid(userId, plan).catch((e) => {
+          console.warn('[ls-webhook] email funnel update failed:', e);
+        });
         console.log(`[ls-webhook] Credits topped up for new subscription: userId=${userId} plan=${plan}`);
         // Meta CAPI Purchase event
         await sendMetaPurchaseEvent({
@@ -228,12 +232,20 @@ export async function POST(req: NextRequest) {
         // Plan change (upgrade/downgrade) — update plan + top-up to new plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
+        {
+          const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+          await onUserBecamePaid(userId, plan).catch(() => {});
+        }
         console.log(`[ls-webhook] Credits updated on plan change: userId=${userId} plan=${plan}`);
         break;
 
       case 'subscription_resumed':
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
+        {
+          const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+          await onUserBecamePaid(userId, plan).catch(() => {});
+        }
         break;
 
       case 'subscription_cancelled':
@@ -253,6 +265,11 @@ export async function POST(req: NextRequest) {
         await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
           renewalDate: null,
         });
+        {
+          const { cancelAllFunnelsForUser, enrollInFunnel } = await import('@/lib/email/enrollments');
+          await cancelAllFunnelsForUser(userId, 'subscription_expired').catch(() => {});
+          await enrollInFunnel(userId, 'unpaid-starter').catch(() => {});
+        }
         console.log(`[ls-webhook] subscription expired, access revoked: userId=${userId}`);
         break;
 

@@ -8,9 +8,10 @@ import {
   ShieldCheck, MoreHorizontal, ArrowUpDown,
   Eye, Plus, Minus, TrendingUp, DollarSign, Activity,
   UserPlus, UserMinus, BarChart2, Package,
-  Trash2, MapPin, Download, Copy, Globe, LifeBuoy, Sparkles,
+  Trash2, MapPin, Download, Copy, Globe, LifeBuoy, Sparkles, Mail,
 } from 'lucide-react';
 import Link from 'next/link';
+import { EmailSection } from '@/app/admin/EmailSection';
 
 import type { RevenueData, LsSub } from '@/app/api/admin/revenue/route';
 
@@ -1347,6 +1348,9 @@ export function AdminPanel() {
 
       {/* ── Revenue Tab ── */}
       {activeTab === 'revenue' && <RevenueSection />}
+
+      {/* ── Email Tab ── */}
+      {activeTab === 'email' && <EmailSection />}
 
       {/* ── Users Tab ── */}
       {activeTab === 'users' && <div>

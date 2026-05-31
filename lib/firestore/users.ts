@@ -63,6 +63,7 @@ export async function createUser(userId: string) {
       trialUsed:      false,
       trialJobId:     null,
       trialUsedAt:    null,
+      marketingOptIn: true,
       createdAt:      new Date(),
     });
   }
