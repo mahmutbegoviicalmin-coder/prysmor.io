@@ -28,21 +28,34 @@ function computeNextSendAt(enrolledAt: Date, delayDays: number): Date {
   return new Date(enrolledAt.getTime() + delayDays * 24 * 60 * 60 * 1000);
 }
 
-export async function loadUserEmailProfile(userId: string): Promise<UserEmailProfile | null> {
-  const snap = await db.collection('users').doc(userId).get();
-  if (!snap.exists) return null;
-  const d = snap.data()!;
-  const email = (d.email as string | undefined)?.trim();
+export async function loadUserEmailProfile(
+  userId: string,
+  fallbackEmail?: string,
+): Promise<UserEmailProfile | null> {
+  const [snap, clerkUser] = await Promise.all([
+    db.collection('users').doc(userId).get(),
+    clerk.users.getUser(userId).catch(() => null),
+  ]);
+
+  const d = snap.exists ? snap.data()! : {};
+  const clerkEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
+  const email = (
+    clerkEmail
+    || (d.email as string | undefined)
+    || (d.userEmail as string | undefined)
+    || fallbackEmail
+  )?.trim();
   if (!email) return null;
 
   return {
     userId,
     email,
-    firstName: (d.firstName as string | undefined)?.trim()
+    firstName: (clerkUser?.firstName as string | undefined)?.trim()
+      || (d.firstName as string | undefined)?.trim()
       || (d.displayName as string | undefined)?.split(' ')[0]
       || 'there',
     plan:             (d.plan as string) ?? 'unpaid',
-    licenseStatus:    (d.licenseStatus as string) ?? 'inactive',
+    licenseStatus:    effectiveLicenseStatus(d.licenseStatus as string | undefined),
     marketingOptIn:   d.marketingOptIn !== false,
     marketingUnsubscribedAt: d.marketingUnsubscribedAt ?? null,
   };
@@ -326,11 +339,12 @@ export async function processEmailQueue(maxBatch = 30): Promise<ProcessQueueResu
       continue;
     }
 
-    const profile = await loadUserEmailProfile(userId);
+    const enrollmentEmail = (data.email as string | undefined)?.trim();
+    const profile = await loadUserEmailProfile(userId, enrollmentEmail);
     if (!profile || !isEligibleForFunnel(profile, funnelId)) {
       await doc.ref.update({
         status:       'cancelled',
-        cancelReason: 'ineligible',
+        cancelReason: profile ? 'ineligible' : 'no_email',
         updatedAt:    new Date(),
       });
       result.skipped++;

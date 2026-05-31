@@ -118,9 +118,13 @@ export function EmailSection() {
       if (action === 'start-campaign' && json.enroll) {
         const e = json.enroll;
         const q = json.queue;
+        const errNote = q.errors?.length ? ` Errors: ${q.errors.slice(0, 2).join('; ')}` : '';
+        const skipNote = q.skipped > 0 && q.sent === 0
+          ? ' (skipped = could not resolve email or user no longer unpaid — fixed in latest deploy; click Run queue only)'
+          : '';
         setRunResult(
-          `Campaign started: enrolled ${e.enrolled} unpaid (${e.skipped} already in funnel). ` +
-          `Queue: sent ${q.sent}, skipped ${q.skipped}${q.dailyCapHit ? ' — daily cap hit, rest sends tomorrow' : ''}.`,
+          `Campaign started: enrolled ${e.enrolled} new (${e.skipped} already in funnel). ` +
+          `Queue: sent ${q.sent}, skipped ${q.skipped}${q.dailyCapHit ? ' — daily cap hit' : ''}${skipNote}${errNote}`,
         );
       } else {
         setRunResult(

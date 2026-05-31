@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   try {
     if (action === 'start-campaign') {
       const enroll = await enrollAllUnpaidInFunnel(funnelId);
-      const queue = await processEmailQueue(30);
+      const queue = await processEmailQueue(60);
       return NextResponse.json({ ok: true, action, enroll, queue });
     }
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, action, enroll });
     }
 
-    const queue = await processEmailQueue(30);
+    const queue = await processEmailQueue(60);
     return NextResponse.json({ ok: true, action: 'process-queue', ...queue });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Request failed';
