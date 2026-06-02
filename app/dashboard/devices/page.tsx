@@ -89,7 +89,7 @@ export default async function DevicesPage() {
         <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] px-5 py-8 flex flex-col items-center gap-2">
           <WifiOff className="w-6 h-6 text-[#374151]" />
           <p className="text-[13px] text-[#4B5563]">No devices registered yet</p>
-          <p className="text-[12px] text-[#374151]">Open the Prysmor panel in Premiere Pro to connect.</p>
+          <p className="text-[12px] text-[#4B5563]">Open the Prysmor panel in Premiere Pro or After Effects to connect.</p>
         </div>
       ) : (
         <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] overflow-hidden">

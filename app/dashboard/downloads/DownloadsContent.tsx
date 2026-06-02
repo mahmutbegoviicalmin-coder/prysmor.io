@@ -9,12 +9,18 @@ import {
 } from "lucide-react";
 
 const PANEL_VERSION = "5.4.3";
+const PANEL_AE_VERSION = "1.0.0";
 
-/** Permanent download URLs — GitHub Releases (not committed to `public/`) */
+/** Permanent download URLs — GitHub Releases */
 const DOWNLOAD_WIN =
   "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.3/PrysmrSetup.exe";
 const DOWNLOAD_MAC =
   "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.3/Prysmor-5.4.3.pkg";
+
+const DOWNLOAD_AE_WIN =
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v1.0.0/PrysmorAE-Setup.exe";
+const DOWNLOAD_AE_MAC =
+  "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v1.0.0/PrysmorAE-1.0.0.pkg";
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -237,6 +243,86 @@ export default function DownloadsContent() {
           {["macOS 12+", "Premiere Pro 2022–2025", "CEP 11, 12, 13", "No admin rights needed"].map((tag) => (
             <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
               <CheckCircle2 className="w-3 h-3 text-[#39FF6A]/60" />
+              {tag}
+            </span>
+          ))}
+        </div>
+      </Card>
+
+      {/* ── AFTER EFFECTS ── */}
+      <SectionLabel>After Effects — v{PANEL_AE_VERSION}</SectionLabel>
+      <p className="text-[13px] text-[#6B7280] mb-4 -mt-1 leading-relaxed">
+        Separate CEP extension (<code className="text-[#39FF6A]/80 bg-white/[0.04] px-1 rounded text-[11px]">com.prysmor.panel.ae</code>).
+        Installs alongside the Premiere panel without conflicts. Select a layer in your active comp to generate VFX.
+      </p>
+
+      <Card className="p-5 mb-4">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-[10px] bg-[#6366F1]/[0.08] border border-[#6366F1]/15 flex items-center justify-center flex-shrink-0">
+            <Package className="w-6 h-6 text-[#818CF8]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-[15px] font-semibold text-white">Prysmor for After Effects — Windows</p>
+              <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/[0.10] border border-[#6366F1]/20 text-[10px] font-bold text-[#818CF8]">
+                v{PANEL_AE_VERSION}
+              </span>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
+              One-click installer for Adobe After Effects. Bundled ffmpeg, auto layer selection, same Prysmor account.
+            </p>
+            <a
+              href={DOWNLOAD_AE_WIN}
+              download="PrysmorAE-Setup.exe"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#818CF8] text-[#050505] text-[13px] font-bold hover:bg-[#A5B4FC] transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download AE for Windows
+            </a>
+            <p className="mt-3 text-[11px] text-[#4B5563]">
+              After installing: restart After Effects → Window → Extensions → Prysmor
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-[10px] bg-[#6366F1]/[0.08] border border-[#6366F1]/15 flex items-center justify-center flex-shrink-0">
+            <MacIcon className="w-6 h-6 text-[#818CF8]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-[15px] font-semibold text-white">Prysmor for After Effects — macOS</p>
+              <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/[0.10] border border-[#6366F1]/20 text-[10px] font-bold text-[#818CF8]">
+                v{PANEL_AE_VERSION}
+              </span>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mb-4 leading-relaxed">
+              macOS <code className="text-[#818CF8]/80 bg-white/[0.04] px-1 rounded text-[11px]">.pkg</code> installer.
+              Installs to <code className="text-[#818CF8]/80 bg-white/[0.04] px-1 rounded text-[11px]">com.prysmor.panel.ae</code> — separate from the Premiere extension.
+            </p>
+            <a
+              href={DOWNLOAD_AE_MAC}
+              download="PrysmorAE-1.0.0.pkg"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#818CF8] text-[#050505] text-[13px] font-bold hover:bg-[#A5B4FC] transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download AE for macOS
+            </a>
+            <p className="mt-3 text-[11px] text-[#4B5563]">
+              After installing: restart After Effects → Window → Extensions → Prysmor
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 pt-4 border-t border-[#111] flex flex-wrap items-center gap-x-5 gap-y-2">
+          {["After Effects 2020+", "Windows 10 / 11 & macOS 12+", "CEP 11–13", "Separate device slot from Premiere"].map((tag) => (
+            <span key={tag} className="flex items-center gap-1.5 text-[11px] text-[#4B5563]">
+              <CheckCircle2 className="w-3 h-3 text-[#818CF8]/60" />
               {tag}
             </span>
           ))}

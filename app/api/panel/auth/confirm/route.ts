@@ -64,11 +64,13 @@ export async function POST(req: NextRequest) {
   const plan      = userDoc?.plan ?? "starter";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
-  // Machine-locked deviceId
+  // Machine-locked deviceId — AE panels use a separate prefix from Premiere
   const machineFingerprint = codeData.machineFingerprint;
+  const isAE = (codeData.hostApp || '').toUpperCase() === 'AEFT';
+  const idPrefix = isAE ? 'panel-ae' : 'panel';
   const deviceId = machineFingerprint
-    ? `panel-${user.id}-${machineFingerprint.slice(0, 12)}`
-    : `panel-${user.id}`;
+    ? `${idPrefix}-${user.id}-${machineFingerprint.slice(0, 12)}`
+    : `${idPrefix}-${user.id}`;
 
   // Register device in Firestore
   try {

@@ -58,6 +58,16 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
+function formatHostAppLabel(hostApp?: string): string {
+  if (!hostApp || hostApp === "—") return "—";
+  const code = hostApp.toUpperCase();
+  if (code === "AEFT") return "After Effects";
+  if (code === "PPRO") return "Premiere Pro";
+  if (hostApp.includes("After Effects")) return hostApp;
+  if (hostApp.includes("Premiere")) return hostApp;
+  return hostApp;
+}
+
 function cycleStart(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -174,7 +184,7 @@ export async function getDashboardData(
       id:              d.id,
       name:            d.name ?? d.id,
       platform:        d.platform ?? "—",
-      hostApp:         (d as any).hostApp        ?? "Adobe Premiere Pro",
+      hostApp:         formatHostAppLabel((d as { hostApp?: string }).hostApp),
       hostAppVersion:  (d as any).hostAppVersion ?? "—",
       cepVersion:      (d as any).cepVersion     ?? "—",
       firstSeenAt:     formatDateTime(firstSeen),

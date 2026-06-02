@@ -49,8 +49,13 @@ export async function registerDevice(
   }
 
   if (existing.exists) {
-    // Device already registered — only refresh lastActive timestamp
-    await deviceRef.update({ lastActive: new Date() });
+    await deviceRef.update({
+      lastActive: new Date(),
+      ...(name                  && { name }),
+      ...(extra?.hostApp        && { hostApp: extra.hostApp }),
+      ...(extra?.hostAppVersion && { hostAppVersion: extra.hostAppVersion }),
+      ...(extra?.cepVersion     && { cepVersion: extra.cepVersion }),
+    });
   } else {
     // First time seeing this device — write all fields
     await deviceRef.set({

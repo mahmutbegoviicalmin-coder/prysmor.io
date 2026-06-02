@@ -1,0 +1,153 @@
+# Build After Effects panel installers (Windows .exe + macOS .pkg) and publish GitHub Release.
+# Tag: panel-ae-v{version}  →  assets: PrysmorAE-Setup.exe, PrysmorAE-{version}.pkg
+name: Build AE installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: AE panel semver (matches version.txt)
+        required: true
+        default: "1.0.0"
+        type: string
+  push:
+    tags:
+      - "panel-ae-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: windows-ae
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Download ffmpeg for Windows
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "prysmor-panel-ae\panel\ffmpeg\win" | Out-Null
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          Invoke-WebRequest -Uri $url -OutFile "ffmpeg-win.zip" -TimeoutSec 180
+          Expand-Archive "ffmpeg-win.zip" -DestinationPath "ffmpeg-win-extracted" -Force
+          $exe = Get-ChildItem -Path "ffmpeg-win-extracted" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          Copy-Item $exe.FullName "prysmor-panel-ae\panel\ffmpeg\win\ffmpeg.exe"
+          Write-Host "ffmpeg.exe: $((Get-Item 'prysmor-panel-ae\panel\ffmpeg\win\ffmpeg.exe').Length) bytes"
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Compile AE NSIS installer
+        shell: pwsh
+        run: |
+          $makensis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Test-Path $makensis)) { $makensis = "$env:ProgramFiles\NSIS\makensis.exe" }
+          if (-not (Test-Path $makensis)) { throw "makensis not found" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          & $makensis "prysmor-panel-ae\installer\windows\installer.nsi"
+          if (-not (Test-Path "dist\PrysmorAE-Setup.exe")) { throw "dist\PrysmorAE-Setup.exe not produced" }
+          Get-Item "dist\PrysmorAE-Setup.exe" | Format-List Name, Length
+
+      - name: Upload windows-ae-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ae-installer
+          path: dist/PrysmorAE-Setup.exe
+
+  macos:
+    name: macos-ae
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Download ffmpeg for macOS
+        run: |
+          mkdir -p prysmor-panel-ae/panel/ffmpeg/mac
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o ffmpeg-mac.zip --max-time 180
+          unzip -o ffmpeg-mac.zip -d ffmpeg-mac-extracted
+          cp ffmpeg-mac-extracted/ffmpeg prysmor-panel-ae/panel/ffmpeg/mac/ffmpeg
+          chmod +x prysmor-panel-ae/panel/ffmpeg/mac/ffmpeg
+          ls -lh prysmor-panel-ae/panel/ffmpeg/mac/ffmpeg
+
+      - name: Build macOS AE .pkg
+        run: |
+          chmod +x prysmor-panel-ae/installer/build-mac-pkg.sh
+          bash prysmor-panel-ae/installer/build-mac-pkg.sh
+          test -f dist/PrysmorAE-1.0.0.pkg
+          ls -lh dist/PrysmorAE-*.pkg
+
+      - name: Upload mac-ae-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-ae-installer
+          path: dist/PrysmorAE-1.0.0.pkg
+
+  release:
+    name: release-ae
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            V="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref_name }}" == panel-ae-v* ]]; then
+            V="${GITHUB_REF_NAME#panel-ae-v}"
+          else
+            V="1.0.0"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=panel-ae-v${V}" >> "$GITHUB_OUTPUT"
+          echo "AE panel version: $V (tag: panel-ae-v${V})"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          TAG="${{ steps.ver.outputs.tag }}"
+          WIN="assets/windows-ae-installer/PrysmorAE-Setup.exe"
+          MAC="assets/mac-ae-installer/PrysmorAE-${V}.pkg"
+          test -f "$WIN"
+          test -f "$MAC"
+          REPO="${GITHUB_REPOSITORY}"
+
+          NOTES="## Prysmor for After Effects v${V}
+
+          One-click CEP panel installer for **Adobe After Effects** (bundle \`com.prysmor.panel.ae\`).
+
+          | Platform | File | Install |
+          |----------|------|---------|
+          | Windows | \`PrysmorAE-Setup.exe\` | Run installer → restart AE → Window → Extensions → Prysmor |
+          | macOS | \`PrysmorAE-${V}.pkg\` | Open pkg → restart AE → Window → Extensions → Prysmor |
+
+          Separate from the Premiere Pro panel — same Prysmor account and credits."
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$WIN" "$MAC" --repo "$REPO" --clobber
+            gh release edit "$TAG" --repo "$REPO" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$WIN" "$MAC" \
+              --repo "$REPO" \
+              --title "Prysmor After Effects Panel ${TAG}" \
+              --notes "$NOTES"
+          fi
+
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          NAME="${GITHUB_REPOSITORY#*/}"
+          echo "Windows: https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmorAE-Setup.exe"
+          echo "macOS:   https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmorAE-${V}.pkg"

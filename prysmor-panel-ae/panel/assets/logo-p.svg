@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="g" x1="20" y1="28" x2="75" y2="74" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#AAFF00"/>
+      <stop offset="60%" stop-color="#5DFF18"/>
+      <stop offset="100%" stop-color="#00E86A"/>
+    </linearGradient>
+  </defs>
+  <!-- Upper P body: angled left edge + rounded bowl -->
+  <path d="M 37 28 L 64 28 Q 78 28 78 46 Q 78 63 64 63 L 44 63 L 33 47 Z" fill="url(#g)"/>
+  <!-- Lower descender (bottom-left angular piece) -->
+  <path d="M 38 58 L 44 63 L 34 73 L 24 73 L 30 63 Z" fill="url(#g)"/>
+</svg>

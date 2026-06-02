@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Prysmor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css?v=21"/>
+  <style>
+    /* ─────────────────────────────────────────────
+       DESIGN TOKENS
+    ───────────────────────────────────────────── */
+    :root {
+      --bg:              #080808;
+      --bg2:             #0d0d0d;
+      --surface:         #111111;
+      --surface2:        #181818;
+      --surface3:        #1e1e1e;
+      --border:          rgba(255,255,255,0.07);
+      --border-med:      rgba(255,255,255,0.11);
+      --border-strong:   rgba(255,255,255,0.16);
+      --accent:          #00e676;
+      --accent-hi:       #26ffb0;
+      --accent-dim:      rgba(0,230,118,0.10);
+      --accent-glow:     rgba(0,230,118,0.18);
+      --accent-border:   rgba(0,230,118,0.30);
+      --accent-border-hi:rgba(0,230,118,0.55);
+      --text:            #f0f0f0;
+      --text-2:          rgba(240,240,240,0.55);
+      --text-3:          rgba(240,240,240,0.28);
+      --red:             #ff4545;
+      --r:               10px;
+      --r-sm:            6px;
+      --r-xs:            4px;
+      --font:            'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      /* backward-compat aliases */
+      --card:            #111111;
+      --text-1:          #f0f0f0;
+      --text-muted:      rgba(240,240,240,0.55);
+      --text-dim:        rgba(240,240,240,0.28);
+      --border-strong-old: rgba(255,255,255,0.16);
+      --radius:          10px;
+      --radius-sm:       6px;
+    }
+
+    /* ─────────────────────────────────────────────
+       RESET
+    ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    textarea { font-family: inherit; }
+    .hidden        { display: none !important; }
+    .sr-only       { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }
+    .compat-hidden { display: none !important; }
+
+    /* ─────────────────────────────────────────────
+       TOAST
+    ───────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 12px; left: 12px; right: 12px; z-index: 9999;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      background: rgba(18,18,18,0.97);
+      border: 1px solid var(--border-med);
+      border-radius: 10px;
+      font-size: 12px; font-weight: 500;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03);
+      opacity: 0; transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .22s ease;
+    }
+    .toast.toast-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .toast-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .toast.success .toast-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+    .toast.error   .toast-dot { background: var(--red); }
+    .toast.info    .toast-dot { background: #3b82f6; }
+    #toast-icon { display: none; }
+    #toast-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+
+    /* ─────────────────────────────────────────────
+       VIEWS
+    ───────────────────────────────────────────── */
+    .view { position: absolute; inset: 0; overflow: hidden; }
+
+    /* ─────────────────────────────────────────────
+       MAIN PANEL SHELL
+    ───────────────────────────────────────────── */
+    .v2-panel {
+      display: flex; flex-direction: column;
+      height: 100%;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ─────────────────────────────────────────────
+       HEADER
+    ───────────────────────────────────────────── */
+    .v2-hdr {
+      height: 44px; flex-shrink: 0;
+      display: flex; align-items: center;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
+    }
+
+    /* Logo */
+    .v2-hdr-logo {
+      font-size: 14px; font-weight: 700; letter-spacing: -0.5px;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .v2-hdr-logo span {
+      /* subtle green tint on the last letter */
+      background: linear-gradient(135deg, #ffffff 40%, #6effc2 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Credits badge (JS reveals via style.display='') */
+    #topbar-credits {
+      display: flex;
+      align-items: center; gap: 5px;
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px;
+      padding: 3px 9px 3px 7px;
+      transition: border-color .2s, background .2s;
+    }
+    #topbar-credits:hover {
+      background: rgba(0,230,118,0.13);
+      border-color: rgba(0,230,118,0.38);
+    }
+    #topbar-credits svg { flex-shrink: 0; }
+    #topbar-credits-val {
+      font-size: 12px; font-weight: 700; letter-spacing: -0.3px;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 12px rgba(0,230,118,0.5);
+    }
+    #topbar-credits.low {
+      background: rgba(255,159,10,0.08);
+      border-color: rgba(255,159,10,0.25);
+    }
+    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; text-shadow: none; }
+
+    /* Right side of header */
+    .v2-hdr-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+    /* Plan badge (JS reveals via style.display='') */
+    #topbar-plan {
+      display: inline-block;
+      font-size: 9px; font-weight: 600;
+      letter-spacing: 0.8px; text-transform: uppercase;
+      color: var(--text-3);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 2px 8px;
+    }
+
+    /* Gear button */
+    .v2-gear-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      color: var(--text-3);
+      transition: color .15s, background .15s;
+    }
+    .v2-gear-btn:hover { color: var(--text-2); background: var(--surface3); }
+    .v2-gear-btn:active { transform: scale(0.9); }
+
+    /* ─────────────────────────────────────────────
+       VIDEO PREVIEW  (16:9)
+    ───────────────────────────────────────────── */
+    .v2-preview {
+      position: relative; flex-shrink: 0;
+      width: 100%; aspect-ratio: 16/9;
+      background: #0a0a0a;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* EMPTY STATE */
+    #clip-empty {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 6px;
+      background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(0,230,118,0.04) 0%, transparent 70%);
+    }
+    .pv-empty-icon {
+      position: relative; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pv-empty-glow {
+      position: absolute; inset: -14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,230,118,0.12) 0%, transparent 70%);
+      animation: glow-pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.5; transform: scale(0.9); }
+      50%       { opacity: 1;   transform: scale(1.1); }
+    }
+    .pv-empty-icon svg {
+      position: relative; z-index: 1;
+      animation: icon-float 3s ease-in-out infinite;
+    }
+    @keyframes icon-float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-2px); }
+    }
+    .pv-empty-title {
+      font-size: 13px; font-weight: 600; color: var(--text-2);
+      letter-spacing: -0.2px;
+    }
+    .pv-empty-sub {
+      font-size: 11px; color: var(--text-3); margin-bottom: 8px;
+    }
+    .v2-watching-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
+      color: var(--accent);
+      background: rgba(0,230,118,0.08);
+      border: 1px solid rgba(0,230,118,0.22);
+      border-radius: 20px; padding: 3px 9px;
+    }
+    .v2-watching-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.7)} }
+
+    /* FILLED STATE */
+    #clip-info { position: absolute; inset: 0; }
+    #clip-thumbnail { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* LIVE badge */
+    .v2-preview-live {
+      position: absolute; top: 10px; right: 10px;
+      display: flex; align-items: center; gap: 5px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+      color: var(--accent);
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,230,118,0.35);
+      border-radius: var(--r-xs); padding: 4px 8px;
+    }
+    .v2-preview-live-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+
+    /* Bottom info overlay */
+    .v2-preview-bar {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: flex; align-items: flex-end;
+      padding: 24px 12px 10px;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    }
+    #clip-name {
+      flex: 1; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.9);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-right: 10px;
+    }
+    #clip-dur-badge {
+      flex-shrink: 0;
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─────────────────────────────────────────────
+       MODE TABS  (replaces dropdown)
+    ───────────────────────────────────────────── */
+    .v2-mode-tabs {
+      flex-shrink: 0;
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-tab {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 3px;
+      padding: 8px 4px;
+      color: var(--text-3);
+      font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
+      border-bottom: 2px solid transparent;
+      transition: color .2s ease, border-color .2s ease, background .2s ease;
+      position: relative;
+    }
+    .mode-tab svg { transition: opacity .2s; opacity: 0.5; }
+    .mode-tab:hover { color: var(--text-2); background: rgba(255,255,255,0.02); }
+    .mode-tab:hover svg { opacity: 0.75; }
+    .mode-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: rgba(0,230,118,0.04);
+    }
+    .mode-tab.active svg {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px rgba(0,230,118,0.5));
+    }
+    .mode-tab:active { transform: scale(0.96); }
+    /* Omni PRO badge */
+    .omni-pro-badge {
+      position: absolute; top: 4px; right: 4px;
+      font-size: 7px; font-weight: 700; letter-spacing: 0.4px;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed);
+      color: #fff;
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.4;
+      pointer-events: none;
+    }
+    #omni-tab.plan-ok .omni-pro-badge { display: none; }
+    #omni-tab.plan-locked { opacity: 0.55; }
+    .mode-tab-soon { opacity: 0.5; cursor: not-allowed; }
+    .mode-tab-soon .omni-pro-badge { background: linear-gradient(135deg, #6b7280, #4b5563); }
+
+    /* ─────────────────────────────────────────────
+       PROMPT GLASS CARD
+    ───────────────────────────────────────────── */
+    .v2-prompt-outer {
+      flex: 1; min-height: 80px;
+      display: flex; flex-direction: column;
+      padding: 10px 12px 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    /* Top decorative sparkle */
+    .v2-prompt-sparkle {
+      position: absolute; top: 13px; left: 14px;
+      color: var(--text-3);
+      pointer-events: none;
+      transition: color .2s;
+      display: flex; align-items: center;
+      z-index: 2;
+    }
+    .v2-prompt-outer:focus-within .v2-prompt-sparkle { color: var(--accent); }
+
+    /* Glass container around textarea — relative for chip positioning */
+    .v2-prompt-glass {
+      flex: 1; min-height: 60px;
+      display: flex; flex-direction: column;
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .v2-prompt-glass:focus-within {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 1px rgba(0,230,118,0.12), 0 0 20px rgba(0,230,118,0.06);
+    }
+    .v2-prompt-glass textarea {
+      flex: 1; min-height: 60px;
+      width: 100%;
+      background: transparent; border: none; outline: none; resize: none;
+      color: var(--text); font-size: 13px; font-family: var(--font);
+      padding: 10px 112px 6px 30px; /* right pad reserves space for enhance chip */
+      line-height: 1.6;
+      caret-color: var(--accent);
+    }
+    .v2-prompt-glass textarea::placeholder { color: var(--text-3); }
+
+    /* Footer: char count only */
+    .v2-prompt-foot {
+      display: flex; align-items: center;
+      padding: 6px 2px 0; flex-shrink: 0;
+    }
+    .v2-char-count {
+      font-size: 10px; color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── AI Enhance chip — floats inside textarea glass, top-right ── */
+    .v2-enhance-chip {
+      position: absolute; top: 8px; right: 8px; z-index: 5;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 20px;
+      background: rgba(4,10,7,0.80);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,230,118,0.28);
+      color: var(--accent);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.05px;
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 0 0 12px rgba(0,230,118,0.10), 0 2px 8px rgba(0,0,0,0.45);
+      transition: background .18s ease, border-color .18s ease,
+                  box-shadow .18s ease, transform .14s ease;
+    }
+    .v2-enhance-chip:hover {
+      background: rgba(0,230,118,0.11);
+      border-color: rgba(0,230,118,0.55);
+      box-shadow: 0 0 24px rgba(0,230,118,0.26), 0 2px 10px rgba(0,0,0,0.5);
+      transform: scale(1.04);
+    }
+    .v2-enhance-chip:active { transform: scale(0.96); }
+    .v2-enhance-chip:disabled { opacity: 0.35; cursor: wait; pointer-events: none; }
+    .v2-enhance-chip.ai-btn--done {
+      background: rgba(0,230,118,0.12);
+      border-color: rgba(0,230,118,0.65);
+      box-shadow: 0 0 24px rgba(0,230,118,0.30), 0 2px 8px rgba(0,0,0,0.45);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes chipGlow {
+      0%,100% { box-shadow: 0 0 12px rgba(0,230,118,0.10), 0 2px 8px rgba(0,0,0,0.45); }
+      50%      { box-shadow: 0 0 28px rgba(0,230,118,0.34), 0 2px 8px rgba(0,0,0,0.45); }
+    }
+    .v2-enhance-chip.enhancing {
+      animation: chipGlow 1.1s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .v2-enhance-chip.enhancing .ai-btn-icon svg { animation: spin 0.85s linear infinite; }
+    .ai-btn-icon { display: flex; align-items: center; }
+
+    /* ─────────────────────────────────────────────
+       OUTPUT OPTIONS
+    ───────────────────────────────────────────── */
+    .v2-output-opts {
+      flex-shrink: 0;
+      padding: 10px 12px 9px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-opt-row { display: flex; align-items: center; }
+    .v2-opt-label {
+      font-size: 11px; font-weight: 600; color: var(--text-3);
+      letter-spacing: 0.3px; text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .v2-opt-seg {
+      display: flex;
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+    .v2-opt-pill {
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 4px;
+      color: var(--text-3);
+      background: transparent;
+      transition: all .2s ease;
+    }
+    .v2-opt-pill:hover { color: var(--text-2); }
+    .v2-opt-pill.seg-active {
+      background: var(--surface3);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .v2-opt-hint {
+      font-size: 10px; color: var(--text-3);
+      margin-top: 5px; letter-spacing: 0.1px;
+    }
+
+    /* ─────────────────────────────────────────────
+       ERRORS / NO CREDITS
+    ───────────────────────────────────────────── */
+    .v2-inline-error {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px;
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      font-size: 12px; color: rgba(255,80,70,0.9);
+    }
+    .v2-err-retry {
+      margin-left: auto; flex-shrink: 0;
+      border: 1px solid rgba(255,69,58,0.3);
+      color: var(--red); font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      transition: background .15s;
+    }
+    .v2-err-retry:hover { background: rgba(255,69,58,0.1); }
+
+    .no-credits-bar {
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,69,58,0.05);
+      border-bottom: 1px solid rgba(255,69,58,0.12);
+      padding: 9px 14px; font-size: 12px; color: var(--red);
+    }
+    .no-credits-link {
+      color: var(--accent); text-decoration: none;
+      margin-left: auto; font-weight: 600; font-size: 11px;
+      transition: opacity .15s;
+    }
+    .no-credits-link:hover { opacity: 0.8; }
+
+    /* ─────────────────────────────────────────────
+       GENERATE BUTTON  — the hero CTA
+    ───────────────────────────────────────────── */
+    .v2-gen-btn {
+      flex-shrink: 0;
+      position: relative; overflow: hidden;
+      width: 100%; height: 54px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #008f4a 0%, #00c864 50%, #00e676 100%);
+      color: #000;
+      font-size: 14px; font-weight: 700; letter-spacing: -0.2px;
+      cursor: pointer;
+      transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+    }
+    .v2-gen-btn::before {
+      /* Top specular highlight */
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .v2-gen-btn:hover:not(:disabled):not(.v2-generating) {
+      filter: brightness(1.08);
+      box-shadow: 0 0 28px rgba(0,230,118,0.3), 0 4px 20px rgba(0,0,0,0.5);
+      transform: translateY(-1px);
+    }
+    .v2-gen-btn:active:not(.v2-generating) {
+      transform: translateY(0) scale(0.995);
+      filter: brightness(0.96);
+    }
+    .v2-gen-btn:disabled:not(.v2-generating) { opacity: .35; cursor: not-allowed; }
+    .v2-gen-btn.v2-generating {
+      background: var(--surface2); color: var(--text-2);
+      cursor: default; transform: none; box-shadow: none; filter: none;
+    }
+    .v2-gen-cost {
+      background: rgba(0,0,0,0.18);
+      border-radius: 20px; padding: 2px 9px;
+      font-size: 11px; font-weight: 700;
+    }
+    .v2-generating .v2-gen-cost { display: none; }
+    .v2-gen-pline {
+      position: absolute; bottom: 0; left: 0;
+      height: 2px; width: 0%;
+      background: var(--accent);
+      transition: width .35s ease;
+      box-shadow: 0 0 10px rgba(0,230,118,0.7);
+    }
+
+    /* ─────────────────────────────────────────────
+       REFERENCE IMAGE UPLOAD ZONE
+    ───────────────────────────────────────────── */
+    .v2-ref-img-zone {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-ref-img-label {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; color: var(--text-3);
+      font-size: 11px; font-weight: 500;
+      padding: 6px 10px;
+      border: 1px dashed var(--border-med);
+      border-radius: var(--r-sm);
+      width: 100%;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .v2-ref-img-label:hover {
+      color: var(--text-2); border-color: var(--border-strong);
+      background: rgba(255,255,255,0.02);
+    }
+    .v2-ref-img-icon { font-size: 13px; line-height: 1; }
+    .v2-ref-img-preview {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0;
+    }
+    .v2-ref-img-thumb {
+      height: 40px; width: auto; max-width: 80px;
+      object-fit: cover;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border);
+    }
+    .v2-ref-img-name {
+      flex: 1; font-size: 11px; color: var(--text-2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .v2-ref-img-clear {
+      color: var(--text-3); font-size: 14px; line-height: 1;
+      padding: 2px 7px; border-radius: var(--r-xs);
+      transition: color .15s, background .15s;
+    }
+    .v2-ref-img-clear:hover { color: var(--red); background: rgba(255,69,58,0.08); }
+
+    /* ─────────────────────────────────────────────
+       RESULT OVERLAY
+    ───────────────────────────────────────────── */
+    #mf-section-result {
+      position: absolute; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+    }
+    .v2-result-preview {
+      flex: 1; min-height: 0;
+      position: relative;
+      background: #050505; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .v2-result-preview img,
+    .v2-result-preview video {
+      width: 100%; height: 100%; object-fit: contain; display: block;
+    }
+    .v2-result-preview img.hidden,
+    .v2-result-preview video.hidden { display: none; }
+
+    /* Result action buttons */
+    .v2-output-actions {
+      flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .v2-timeline-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 16px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 700; letter-spacing: -0.1px;
+      background: var(--accent); color: #000;
+      transition: filter .2s, transform .15s, box-shadow .2s;
+    }
+    .v2-timeline-btn:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 0 18px rgba(0,230,118,0.25);
+      transform: translateY(-1px);
+    }
+    .v2-timeline-btn:active { transform: scale(0.98); filter: brightness(0.96); }
+    .v2-timeline-btn:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+
+    .v2-new-effect-btn {
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 11px 16px; border-radius: var(--r-sm);
+      font-size: 12px; font-weight: 600; letter-spacing: -0.1px;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      transition: all .2s;
+    }
+    .v2-new-effect-btn:hover { border-color: var(--border-med); color: var(--text); background: var(--surface3); }
+    .v2-new-effect-btn:active { transform: scale(0.97); }
+
+    /* ─────────────────────────────────────────────
+       SETTINGS OVERLAY
+    ───────────────────────────────────────────── */
+    #section-settings {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(14px);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      opacity: 0; pointer-events: none;
+      transition: opacity .22s ease;
+    }
+    #section-settings.settings-visible { opacity: 1; pointer-events: auto; }
+    .settings-sheet {
+      background: rgba(14,14,14,0.98);
+      border: 1px solid var(--border-med); border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -32px 80px rgba(0,0,0,0.6);
+      transform: translateY(20px);
+      transition: transform .24s ease;
+    }
+    #section-settings.settings-visible .settings-sheet { transform: translateY(0); }
+    .settings-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 16px 10px; border-bottom: 1px solid var(--border);
+    }
+    .settings-title { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
+    .settings-close {
+      background: rgba(255,255,255,0.07); color: var(--text-3);
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      transition: background .15s, color .15s;
+    }
+    .settings-close:hover { background: rgba(255,255,255,0.13); color: var(--text); }
+    .settings-toggle { display: none; }
+    .settings-menu   { display: none; }
+    .sm-item {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-2); font-size: 13px; font-weight: 500;
+      padding: 13px 16px; width: 100%; text-align: left;
+      border-bottom: 1px solid var(--border);
+      transition: color .12s, background .12s;
+    }
+    .sm-item:last-child { border-bottom: none; }
+    .sm-item:hover { color: var(--text); background: rgba(255,255,255,0.025); }
+    .sm-danger:hover { color: var(--red); }
+    .sm-item-icon {
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      background: rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); flex-shrink: 0;
+    }
+    .diag-box {
+      background: rgba(255,255,255,0.018); border-top: 1px solid var(--border);
+      padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .diag-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .diag-ttl { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.6px; }
+    .diag-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+    .dk { color: var(--text-3); }
+    .dv {
+      color: var(--text-2); font-family: 'SF Mono', ui-monospace, monospace;
+      font-size: 10px; text-align: right;
+      max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ghost-lnk {
+      background: none; border: none; color: var(--accent);
+      font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.1px;
+    }
+    .chip { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+    .chip-green { background: var(--accent-dim); color: var(--accent); }
+    .chip-gray  { background: rgba(255,255,255,0.06); color: var(--text-2); }
+    .chip-amber { background: rgba(255,159,10,0.10); color: #ff9f0a; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════
+       TOAST
+  ════════════════════════════════ -->
+  <div id="toast" class="toast hidden" role="alert" aria-live="polite">
+    <span class="toast-dot"></span>
+    <span id="toast-icon"></span>
+    <span id="toast-text"></span>
+  </div>
+
+  <!-- ════════════════════════════════
+       LOGIN VIEW  (untouched)
+  ════════════════════════════════ -->
+  <div id="view-login" class="view login-view">
+    <div class="lbg" aria-hidden="true">
+      <div class="lbg-glow-center"></div>
+      <div class="lbg-glow-br"></div>
+    </div>
+    <canvas id="grain" aria-hidden="true"></canvas>
+
+    <header class="lv-topbar">
+      <div class="lv-tb-brand">
+        <img src="assets/vecilogo.png" class="lv-tb-logo" alt=""/>
+        <span class="lv-tb-name">Prysmor</span>
+      </div>
+      <div class="lv-tb-right">
+        <span class="lv-status-dot" title="Not connected"></span>
+      </div>
+    </header>
+
+    <div class="lv-content">
+      <div class="lv-brand">
+        <div class="lv-brand-glow" aria-hidden="true"></div>
+        <img src="assets/vecilogo.png" class="lv-brand-logo" alt="Prysmor"/>
+        <div class="lv-brand-text">
+          <h1 class="lv-brand-title">Prysmor</h1>
+          <div class="lv-brand-pills">
+            <span class="lv-brand-pill">Text to VFX</span>
+            <span class="lv-brand-pill">AI Generation</span>
+            <span class="lv-brand-pill">Timeline Ready</span>
+          </div>
+        </div>
+      </div>
+      <div class="lv-workspace-card">
+        <div class="lwc-header">
+          <div class="lwc-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <div>
+            <p class="lwc-title">Access Workspace</p>
+            <p class="lwc-desc">Sign in to sync your subscription, credits and generation tools.</p>
+          </div>
+        </div>
+        <button id="btn-continue" class="lv-cta-btn">
+          <span class="lv-cta-label">Continue with Prysmor</span>
+          <span class="lv-cta-arrow" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </button>
+        <div class="lv-trust-row">
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Secure login</span>
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Credits sync</span>
+          <span class="lv-trust-item"><span class="lv-trust-dot"></span>After Effects ready</span>
+        </div>
+        <p id="login-status" style="display:none"></p>
+      </div>
+      <div class="lv-stats">
+        <div class="lv-stat"><span class="lv-stat-label">Plan</span><span class="lv-stat-value">Not connected</span></div>
+        <div class="lv-stat-sep"></div>
+        <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
+        <div class="lv-stat-sep"></div>
+        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       MAIN PANEL VIEW
+  ════════════════════════════════ -->
+  <div id="view-main" class="view v2-panel hidden">
+
+    <!-- ─ HEADER ──────────────────── -->
+    <header class="v2-hdr">
+
+      <!-- Logo — left -->
+      <div class="v2-hdr-logo">Pr<span>ysmor</span></div>
+
+      <!-- Credits + plan + gear — right -->
+      <div class="v2-hdr-right">
+
+        <!-- Credits badge (JS reveals via style.display='') -->
+        <div id="topbar-credits" style="display:none">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span id="topbar-credits-val">—</span>
+        </div>
+
+        <!-- Plan pill (JS reveals via style.display='') -->
+        <span id="topbar-plan" style="display:none"></span>
+
+        <!-- History button -->
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+
+        <!-- Settings gear -->
+        <button class="v2-gear-btn" id="btn-scroll-settings" title="Settings" aria-label="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ─ VIDEO PREVIEW (16:9) ─────── -->
+    <div class="v2-preview">
+
+      <!-- Empty: no clip selected -->
+      <div id="clip-empty">
+        <div class="pv-empty-icon">
+          <div class="pv-empty-glow"></div>
+          <!-- Film frame icon -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,230,118,0.7)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2.5"/>
+            <path d="M7 3v14M17 3v14M2 8h2M20 8h2M2 13h2M20 13h2"/>
+          </svg>
+        </div>
+        <span class="pv-empty-title">Select a clip to start</span>
+        <span class="pv-empty-sub">Apply AI-powered effects in seconds</span>
+        <div class="v2-watching-badge">
+          <span class="v2-watching-dot"></span>
+          Watching timeline
+        </div>
+      </div>
+
+      <!-- Filled: clip loaded -->
+      <div id="clip-info" class="hidden">
+        <img id="clip-thumbnail" src="" alt="Clip preview" style="width:100%;height:100%;object-fit:cover;display:block"/>
+        <!-- Live badge -->
+        <div class="v2-preview-live">
+          <span class="v2-preview-live-dot"></span>
+          LIVE
+        </div>
+        <!-- Info bar -->
+        <div class="v2-preview-bar">
+          <span id="clip-name">clip.mp4</span>
+          <span id="clip-dur-badge">—</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ─ MODE TABS ────────────────── -->
+    <!--
+      Each button has BOTH class="mode-tab mode-pill" — mode-pill preserves
+      JS compat (bindEvents querySelectorAll('.mode-pill')).
+      mode-tab is for new visual styling.
+    -->
+    <div class="v2-mode-tabs">
+
+      <button class="mode-tab mode-pill active" data-mode="background" onclick="prysmorSetMode('background')">
+        <!-- Landscape / background icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 16l5-5 4 4 3-3 4 4"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+        </svg>
+        BG
+      </button>
+
+      <button class="mode-tab mode-pill" data-mode="relight" onclick="prysmorSetMode('relight')">
+        <!-- Sun / light rays icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2"  x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/>
+          <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/>
+          <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        Light
+      </button>
+
+      <button class="mode-tab mode-pill" data-mode="vfx" onclick="prysmorSetMode('vfx')">
+        <!-- Sparkles / magic icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+        </svg>
+        VFX
+      </button>
+
+      <button class="mode-tab mode-pill mode-tab-soon" data-mode="omni" id="omni-tab" onclick="prysmorSetMode('omni')">
+        <!-- Wand / AI icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M3 21l9-9M12.2 6.2L11 5"/>
+        </svg>
+        Omni
+        <span class="omni-pro-badge" id="omni-pro-badge">SOON</span>
+      </button>
+
+    </div>
+
+    <!-- ─ REFERENCE IMAGE UPLOAD — visible for BG + Relight modes ─── -->
+    <div class="v2-ref-img-zone" id="ref-img-zone">
+      <label for="ref-img-input" class="v2-ref-img-label" id="ref-img-label">
+        <span class="v2-ref-img-icon">＋</span>
+        <span id="ref-img-label-text">Reference image <span style="color:var(--text-3);font-weight:400">(optional — improves output)</span></span>
+      </label>
+      <input type="file" id="ref-img-input" accept="image/*" class="sr-only">
+      <div id="ref-img-preview" class="v2-ref-img-preview hidden">
+        <img id="ref-img-thumb" class="v2-ref-img-thumb" alt="Reference">
+        <span id="ref-img-name" class="v2-ref-img-name"></span>
+        <button id="ref-img-clear" class="v2-ref-img-clear" title="Remove reference image">×</button>
+      </div>
+    </div>
+
+    <!-- ─ PROMPT ────────────────────── -->
+    <div class="v2-prompt-outer">
+      <!-- Decorative sparkle icon — top-left of glass -->
+      <span class="v2-prompt-sparkle" aria-hidden="true">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2l2.09 6.44L21 10l-6.91 1.56L12 18l-2.09-6.44L3 10l6.91-1.56z"/>
+        </svg>
+      </span>
+
+      <div class="v2-prompt-glass">
+        <textarea id="mf-prompt" maxlength="1000"
+          placeholder="Describe the new background…"></textarea>
+
+        <!-- AI Enhance chip — top-right, inside glass -->
+        <button id="btn-compile-prompt" class="v2-enhance-chip"
+          title="AI will improve your prompt for better results">
+          <span class="ai-btn-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+            </svg>
+          </span>
+          <span id="compile-label">Suggest</span>
+        </button>
+      </div>
+
+      <div class="v2-prompt-foot">
+        <span class="v2-char-count"><span id="mf-char-count">0</span> / 1000</span>
+      </div>
+    </div>
+
+    <!-- ─ OUTPUT OPTIONS ────────────── -->
+    <div class="v2-output-opts">
+      <div class="v2-opt-row">
+        <span class="v2-opt-label">Output</span>
+        <div class="v2-opt-seg">
+          <button id="out-btn-v2" class="v2-opt-pill seg-active">New track</button>
+          <button id="out-btn-replace" class="v2-opt-pill">Replace</button>
+        </div>
+      </div>
+      <div id="output-hint" class="v2-opt-hint">Added on V2 — original clip untouched</div>
+      <input type="checkbox" id="mf-replace-toggle" class="sr-only"/>
+    </div>
+
+    <!-- ─ ERRORS ────────────────────── -->
+    <div id="mf-gen-failed" class="v2-inline-error hidden">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="gen-fail-msg">Something went wrong.</span>
+      <button id="gen-retry-btn" class="v2-err-retry">Retry</button>
+    </div>
+
+    <div id="no-credits-banner" class="no-credits-bar hidden">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>No credits remaining.</span>
+      <a id="no-credits-upgrade-link" href="#" class="no-credits-link">Upgrade ↗</a>
+    </div>
+
+    <!-- ─ GENERATE CTA ──────────────── -->
+    <button id="mf-btn-generate" class="v2-gen-btn">
+      <span id="gen-btn-label">Generate Effect</span>
+      <span id="gen-btn-cost" class="v2-gen-cost" style="display:none">
+        <span id="gen-btn-cost-val">—</span> cr
+      </span>
+      <div class="v2-gen-pline" id="v2-gen-pline"></div>
+    </button>
+
+    <!-- ─ HIDDEN COMPAT ELEMENTS (all IDs JS references) ── -->
+    <div style="display:none" aria-hidden="true">
+      <div id="credits-card"><b id="usage-used">—</b>/<span id="usage-limit">1000</span><span id="usage-seconds"></span></div>
+      <div id="progress-fill" style="width:0%"></div>
+      <button id="btn-refresh-clip"></button>
+      <span id="clip-thumb-placeholder"></span>
+      <span id="clip-trim-badge"></span>
+      <span id="clip-start-badge"></span>
+      <p id="clip-trim-warning"></p>
+      <div class="clip-live"></div>
+      <div id="mf-gen-state">
+        <span id="gp-phase-label"></span>
+        <div id="gp-fill" style="width:0%"></div>
+        <span id="gp-pct">0%</span>
+        <span id="gp-estimate"></span>
+        <span id="gp-elapsed"></span>
+        <div id="mf-gen-bar"></div>
+        <span id="mf-status-text"></span>
+        <span id="mf-gen-pct"></span>
+        <span id="mf-gen-elapsed"></span>
+        <span id="gs-upload"></span>
+        <span id="gs-generate"></span>
+        <span id="gs-done"></span>
+        <span id="gs-line-1"></span>
+        <span id="gs-line-2"></span>
+      </div>
+      <div id="gen-cost-preview"></div>
+      <video id="mf-result-video" src="" muted loop playsinline></video>
+      <!-- Dropdown kept for inline-script applyMode() compat -->
+      <select id="mf-mode-select">
+        <option value="background">Background</option>
+        <option value="relight">Relight</option>
+        <option value="vfx">VFX</option>
+      </select>
+      <a id="link-docs"  href="#"></a>
+      <a id="link-terms" href="#"></a>
+    </div>
+
+    <!-- ─ RESULT OVERLAY ────────────── -->
+    <div id="mf-section-result" class="hidden">
+      <div class="v2-result-preview">
+        <img id="result-preview-img" class="hidden" alt="Generated output">
+        <video id="result-preview-video" class="hidden" muted autoplay loop playsinline></video>
+      </div>
+      <div class="v2-output-actions">
+        <button id="btn-add-to-timeline" class="v2-timeline-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          ↓ Add to Timeline
+        </button>
+        <button id="mf-btn-new-gen" class="v2-new-effect-btn">✦ New Effect</button>
+      </div>
+    </div>
+
+    <!-- hidden compat: keep ba-* IDs so any lingering references don't throw -->
+    <div style="display:none" aria-hidden="true">
+      <img id="ba-before" src="" alt=""><img id="ba-after" src="" alt="">
+      <div id="ba-divider"></div><input type="range" id="ba-slider" value="50" min="0" max="100">
+    </div>
+
+  </div><!-- /view-main -->
+
+  <!-- ════════════════════════════════
+       HISTORY OVERLAY
+  ════════════════════════════════ -->
+  <div id="section-history">
+    <div class="history-sheet">
+      <div class="history-handle">
+        <span class="history-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Generation History
+        </span>
+        <button class="history-close" id="history-close-btn" aria-label="Close" onclick="document.getElementById('section-history').classList.remove('history-visible')">✕</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="history-loading" id="history-loading">
+          <div class="history-spinner"></div>
+          <span>Loading…</span>
+        </div>
+        <div id="history-empty" class="history-empty hidden">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>No generations yet.</p>
+        </div>
+        <div id="history-error" class="history-empty hidden" style="color:var(--red)">
+          <p id="history-error-msg">Failed to load history.</p>
+        </div>
+        <!-- Job cards injected by JS here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       SETTINGS OVERLAY
+  ════════════════════════════════ -->
+  <div id="section-settings">
+    <div class="settings-sheet">
+      <div class="settings-handle">
+        <span class="settings-title">Settings</span>
+        <button class="settings-close" id="settings-close-btn" aria-label="Close">✕</button>
+      </div>
+      <button class="settings-toggle" id="settings-trigger" style="display:none"></button>
+      <div    class="settings-menu"   id="settings-menu"    style="display:none"></div>
+      <span                           id="settings-chevron" style="display:none"></span>
+
+      <button class="sm-item" id="btn-dashboard">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+        Open Dashboard
+      </button>
+      <button class="sm-item" id="btn-updates">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></span>
+        Check for Updates
+      </button>
+      <button class="sm-item" id="btn-diagnostics">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
+        <span id="btn-diagnostics-label">Diagnostics</span>
+      </button>
+      <div class="diag-box hidden" id="diag-panel">
+        <div class="diag-top">
+          <span class="diag-ttl">Environment</span>
+          <button class="ghost-lnk" id="btn-copy-diag">Copy JSON</button>
+        </div>
+        <div class="diag-row"><span class="dk">Ext Root</span><span class="dv" id="diag-root">…</span></div>
+        <div class="diag-row"><span class="dk">Host App</span><span class="dv" id="diag-host">…</span></div>
+        <div class="diag-row"><span class="dk">CEP</span>     <span class="dv" id="diag-cep">…</span></div>
+        <div class="diag-row"><span class="dk">cep.fs</span>  <span class="dv" id="diag-cepfs">…</span></div>
+        <div class="diag-row"><span class="dk">Backend</span> <span class="dv" id="diag-backend">…</span></div>
+        <div class="diag-row"><span class="dk">Last Job</span><span class="dv" id="diag-jobid">—</span></div>
+      </div>
+      <button class="sm-item sm-danger" id="btn-logout">
+        <span class="sm-item-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        Sign Out
+      </button>
+    </div>
+  </div>
+
+  <!-- ── History overlay styles ─────────────────────── -->
+  <style>
+    #section-history {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+      background: rgba(0,0,0,0.55);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    #section-history.history-visible { opacity: 1; pointer-events: auto; }
+    .history-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      max-height: 88%;
+      background: #111113;
+      border-top: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px 14px 0 0;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.32,0.72,0,1);
+    }
+    #section-history.history-visible .history-sheet { transform: translateY(0); }
+    .history-handle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .history-title { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; }
+    .history-close {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,255,255,0.06); border: none;
+      color: var(--text-2); font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .history-close:hover { background: rgba(255,255,255,0.11); }
+    .history-list {
+      overflow-y: auto; flex: 1;
+      padding: 10px 12px 16px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .history-loading, .history-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 32px 0;
+      color: var(--text-2); font-size: 11px;
+    }
+    .history-spinner {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .h-card {
+      background: #18181b; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 11px 13px;
+    }
+    .h-card-top { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+    .h-mode-badge {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--accent);
+      background: var(--accent-dim); border: 1px solid var(--accent-border);
+      border-radius: 4px; padding: 2px 6px;
+    }
+    .h-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+    .h-status-done { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .h-status-fail { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+    .h-status-gen  { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+    .h-prompt { font-size: 11px; color: var(--text-2); line-height: 1.45; margin-bottom: 8px; word-break: break-word; }
+    .h-card-foot { display: flex; align-items: center; justify-content: space-between; }
+    .h-date { font-size: 10px; color: var(--text-3); }
+    .h-use-btn {
+      font-size: 10px; font-weight: 600; padding: 4px 10px;
+      background: var(--accent-dim); color: var(--accent);
+      border: 1px solid var(--accent-border); border-radius: 5px;
+      cursor: pointer; transition: background 0.12s;
+    }
+    .h-use-btn:hover { background: rgba(0,230,118,0.18); }
+  </style>
+
+  <script src="lib/CSInterface.js"></script>
+  <script src="main.js?v=47"></script>
+  <script>
+    /* ── Mode switching — global so onclick= attributes can call it ── */
+    var _modePromptMap = {
+      background: 'Describe the new background...',
+      relight:    'Describe the lighting mood...',
+      vfx:        'Describe the visual effect...',
+    };
+    function prysmorSetMode(mode) {
+      /* Omni is coming soon — block entirely */
+      if (mode === 'omni') {
+        if (typeof showToast === 'function') showToast('Gemini Omni is coming soon. Stay tuned!', 'info');
+        return;
+      }
+      /* update global used by main.js */
+      if (typeof selectedMode !== 'undefined') selectedMode = mode;
+      /* toggle active class on all tab+pill buttons */
+      var tabs = document.querySelectorAll('.mode-tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', tabs[i].getAttribute('data-mode') === mode);
+      }
+      /* sync hidden select */
+      var sel = document.getElementById('mf-mode-select');
+      if (sel) sel.value = mode;
+      /* update prompt placeholder */
+      var prompt = document.getElementById('mf-prompt');
+      if (prompt) {
+        prompt.disabled = false;
+        prompt.placeholder = _modePromptMap[mode] || 'Describe the effect...';
+      }
+      /* disable generate button if omni (extra safety) */
+      var genBtn = document.getElementById('btn-generate');
+      if (genBtn) genBtn.disabled = false;
+      /* show reference image zone for background and relight modes */
+      var refZone = document.getElementById('ref-img-zone');
+      if (refZone) refZone.style.display = (mode === 'background' || mode === 'relight') ? '' : 'none';
+      /* update enhance chip label for new mode */
+      if (typeof updateEnhanceLabel === 'function') updateEnhanceLabel();
+    }
+
+    /* ── Login grain canvas ────────────────────────────────────── */
+    (function () {
+      var c = document.getElementById('grain');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      function draw() {
+        c.width = c.offsetWidth; c.height = c.offsetHeight;
+        var img = ctx.createImageData(c.width, c.height), d = img.data;
+        for (var i = 0; i < d.length; i += 4) {
+          var v = Math.random() * 22 | 0;
+          d[i] = d[i+1] = d[i+2] = v; d[i+3] = 16;
+        }
+        ctx.putImageData(img, 0, 0);
+        setTimeout(draw, 80);
+      }
+      draw();
+    }());
+
+    /* ── Bind overlays (script is at end of body so all elements exist) ── */
+    (function () {
+
+      /* History overlay */
+      var historyOverlay  = document.getElementById('section-history');
+      var historyOpenBtn  = document.getElementById('btn-history');
+      var historyCloseBtn = document.getElementById('history-close-btn');
+      if (historyOpenBtn && historyOverlay) {
+        historyOpenBtn.addEventListener('click', function () {
+          historyOverlay.classList.add('history-visible');
+          if (typeof loadHistory === 'function') loadHistory();
+        });
+      }
+      if (historyCloseBtn && historyOverlay) {
+        historyCloseBtn.addEventListener('click', function () { historyOverlay.classList.remove('history-visible'); });
+        historyOverlay.addEventListener('click', function (e) { if (e.target === historyOverlay) historyOverlay.classList.remove('history-visible'); });
+      }
+
+      /* Initial mode — runs after main.js so prysmorSetMode is available */
+      prysmorSetMode('background');
+    }());
+  </script>
+</body>
+</html>
