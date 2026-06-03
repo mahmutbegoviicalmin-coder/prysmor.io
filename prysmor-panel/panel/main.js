@@ -582,9 +582,16 @@ function showClipEmpty() {
   showClipThumbnail(null); // clear thumbnail
 }
 
-function calcCostPreview(durationSec) {
-  var dur  = Math.min(durationSec || 0, 8); // Runway caps at 8s
-  return Math.ceil(Math.max(dur, 1)) * 4;   // 4 credits per second
+function creditsPerSecond(mode) {
+  return (mode || selectedMode) === 'vfx' ? 10 : 4;
+}
+
+function calcCostPreview(durationSec, mode) {
+  mode = mode || selectedMode || 'background';
+  var maxDur = mode === 'vfx' ? 30 : 8;
+  var dur    = Math.min(durationSec || 0, maxDur);
+  var billable = Math.max(Math.ceil(Math.max(dur, 0.5)), mode === 'vfx' ? 2 : 1);
+  return billable * creditsPerSecond(mode);
 }
 
 function updateCostPreview() {
@@ -596,8 +603,9 @@ function updateCostPreview() {
     return;
   }
 
-  var dur  = Math.min(state.mf.selInfo.durationSec || 0, 8);
-  var cost = calcCostPreview(dur);
+  var maxDur = selectedMode === 'vfx' ? 30 : 8;
+  var dur    = Math.min(state.mf.selInfo.durationSec || 0, maxDur);
+  var cost   = calcCostPreview(dur, selectedMode);
   var bal  = state.usage.credits || 0;
   var canAfford = bal >= cost;
 
@@ -1134,6 +1142,7 @@ async function mfGenerate() {
       headers: apiHeaders({
         'Content-Type':    'application/json',
         'X-Clip-Duration': clipDurSec.toFixed(6),
+        'X-Mode':          selectedMode,
       }),
       body: JSON.stringify({ userId: state.auth.userId }),
     });
@@ -2708,7 +2717,7 @@ function renderUsage() {
   var credits = state.usage.credits      || 0;
   var total   = state.usage.creditsTotal || 1000;
   var pct     = total > 0 ? Math.min(Math.round((credits / total) * 100), 100) : 0;
-  var seconds = Math.floor(credits / 4);
+  var seconds = Math.floor(credits / creditsPerSecond(selectedMode));
   var isLow   = pct < 20;
 
   // Animate the big number

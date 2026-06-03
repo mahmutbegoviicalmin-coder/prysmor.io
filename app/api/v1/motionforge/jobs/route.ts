@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
   // The panel sends X-Clip-Duration (seconds). If missing, default to 8s max.
   const clipDurHeader = req.headers.get('x-clip-duration');
   const clipDurSec    = clipDurHeader ? Math.max(0.5, parseFloat(clipDurHeader) || 8) : 8;
-  const creditCost    = calcCreditCost(clipDurSec);
+  const mode          = (req.headers.get('x-mode') ?? 'background').trim();
+  const creditCost    = calcCreditCost(clipDurSec, mode);
 
   // ── Atomically deduct credits ─────────────────────────────────────────────
   let creditsRemaining: number;

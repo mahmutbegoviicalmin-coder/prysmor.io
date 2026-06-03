@@ -77,9 +77,21 @@ export function planHasVFXAccess(plan: string): boolean {
   return ['starter', 'pro', 'exclusive', 'creator', 'creator-suite'].includes(plan);
 }
 
-/** Credits per second of video generated */
+/** Default credits per second (background, relight) */
 export const CREDITS_PER_SECOND = 4;
 
-export function calcCreditCost(durationSec: number): number {
-  return Math.ceil(Math.max(durationSec, 1)) * CREDITS_PER_SECOND;
+/** VFX (Runway Aleph 2) credits per second */
+export const CREDITS_PER_SECOND_VFX = 10;
+
+export function creditsPerSecond(mode?: string): number {
+  if (mode === 'vfx') return CREDITS_PER_SECOND_VFX;
+  return CREDITS_PER_SECOND;
+}
+
+export function calcCreditCost(durationSec: number, mode = 'background'): number {
+  const rate   = creditsPerSecond(mode);
+  const maxDur = mode === 'vfx' ? 30 : 8;
+  const dur    = Math.min(Math.max(durationSec, 0.5), maxDur);
+  const billableSec = Math.max(Math.ceil(dur), mode === 'vfx' ? 2 : 1);
+  return billableSec * rate;
 }
