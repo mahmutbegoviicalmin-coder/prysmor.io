@@ -6,7 +6,7 @@
 Unicode True
 
 !define PRODUCT_NAME      "Prysmor for After Effects"
-!define PRODUCT_VERSION   "1.0.0"
+!define PRODUCT_VERSION   "2.0.0"
 !define PRODUCT_PUBLISHER "Prysmor"
 !define PRODUCT_URL       "https://prysmor.io"
 !define BUNDLE_ID         "com.prysmor.panel.ae"

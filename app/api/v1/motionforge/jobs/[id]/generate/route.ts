@@ -5,7 +5,8 @@ import { NextRequest, NextResponse }  from 'next/server';
 import { getJob, getJobAny, updateJob } from '@/lib/motionforge/jobs';
 import {
   createVideoToVideoTask,
-  pickRunwayRatio,
+  uploadImageToRunway,
+  type Aleph2Keyframe,
 }                                      from '@/lib/motionforge/runway';
 import {
   createKieOmniVideoTask,
@@ -18,11 +19,14 @@ import {
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
+import * as fs   from 'fs';
 import * as os   from 'os';
 import * as path from 'path';
 
 const TAG              = 'generate';
 const RUNWAY_MAX_RATIO = 2.358;
+const RUNWAY_MIN_SEC   = 2;
+const RUNWAY_MAX_SEC   = 30;
 const ASPECT_RATIO_RE  = /aspect\s*ratio/i;
 const ASPECT_RATIO_MSG =
   'Video is too wide for AI processing. Please crop your clip to 16:9 or narrower before generating.';
@@ -213,22 +217,40 @@ export async function POST(
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // RUNWAY PATH — legacy (runway:// asset URL)
+    // RUNWAY PATH — Aleph 2.0 (runway:// asset URL)
     // ══════════════════════════════════════════════════════════════════════
-    const runwayRatio = pickRunwayRatio(clientW, clientH);
+    if (clipDuration < RUNWAY_MIN_SEC || clipDuration > RUNWAY_MAX_SEC) {
+      const msg = `Clip must be between ${RUNWAY_MIN_SEC} and ${RUNWAY_MAX_SEC} seconds for Aleph 2.0.`;
+      await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
     if (clientW > 0 && clientH > 0) {
       const clientRatio = clientW / clientH;
-      console.log(`[generate:earlyCheck] client dimensions ${clientW}x${clientH} ratio=${clientRatio.toFixed(4)} → runway ratio="${runwayRatio}"`);
+      console.log(`[generate:earlyCheck] client dimensions ${clientW}x${clientH} ratio=${clientRatio.toFixed(4)}`);
       if (clientRatio > RUNWAY_MAX_RATIO) {
         await updateJob(userId, params.id, { status: 'failed', error: ASPECT_RATIO_MSG }).catch(() => {});
         return NextResponse.json({ error: ASPECT_RATIO_MSG }, { status: 400 });
       }
     }
 
-    const resolvedDuration = Math.min(Math.ceil(clipDuration), 16);
+    let keyframes: Aleph2Keyframe[] | undefined;
+    if (referenceImageB64) {
+      const refPath = tmpPath(`aleph2-ref-${params.id}.jpg`);
+      try {
+        fs.writeFileSync(refPath, Buffer.from(referenceImageB64, 'base64'));
+        const refUri = await uploadImageToRunway(refPath);
+        keyframes = [{ uri: refUri, seconds: 0 }];
+        log(TAG, `[aleph2] Keyframe anchor uploaded at t=0`);
+      } catch (e) {
+        warn(TAG, '[aleph2] Keyframe upload failed — continuing prompt-only', { err: (e as Error).message });
+      } finally {
+        try { fs.unlinkSync(refPath); } catch { /* ignore */ }
+      }
+    }
 
-    const task = await createVideoToVideoTask(assetUrl, prompt, [], resolvedDuration, runwayRatio);
-    log(TAG, `Runway task started: ${task.id}`);
+    const task = await createVideoToVideoTask(assetUrl, prompt, keyframes);
+    log(TAG, `Aleph 2 task started: ${task.id}`);
 
     await updateJob(userId, params.id, {
       status:       'generating',

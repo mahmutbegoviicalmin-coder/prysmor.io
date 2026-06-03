@@ -42,14 +42,10 @@ export async function createRunwayUploadSlot(filename: string): Promise<RunwayUp
 /**
  * Uploads a local video file to Runway's ephemeral upload storage
  * and returns a runway:// URI valid for 24 hours.
- *
- * Uses the native Node 18+ Web APIs (FormData, Blob, fetch) which work
- * correctly with undici — no npm form-data package needed.
  */
 export async function uploadToRunway(filePath: string): Promise<string> {
   const filename = `clip-${Date.now()}.mp4`;
 
-  // Step 1 — request an upload slot
   const initRes = await fetch(`${RUNWAY_API_BASE}/v1/uploads`, {
     method:  'POST',
     headers: runwayHeaders(),
@@ -65,13 +61,9 @@ export async function uploadToRunway(filePath: string): Promise<string> {
     runwayUri: string;
   };
 
-  // Step 2 — multipart POST to the pre-signed S3 URL.
-  // Use native FormData + Blob (Node 18+ / undici) so that fetch can compute
-  // the correct Content-Type boundary and Content-Length automatically.
   const fileBytes = fs.readFileSync(filePath);
   const formData  = new FormData();
   for (const [k, v] of Object.entries(fields)) formData.append(k, v);
-  // 'file' MUST be the last field for S3 pre-signed POST uploads
   formData.append('file', new Blob([fileBytes], { type: 'video/mp4' }), filename);
 
   const uploadRes = await fetch(uploadUrl, { method: 'POST', body: formData });
@@ -86,8 +78,7 @@ export async function uploadToRunway(filePath: string): Promise<string> {
 
 /**
  * Uploads a single image file (JPEG/PNG) to Runway ephemeral storage
- * and returns a runway:// URI. Used to pass a reference frame for
- * identity/style conditioning in video_to_video.
+ * and returns a runway:// URI. Used for Aleph 2 keyframe anchors.
  */
 export async function uploadImageToRunway(imagePath: string): Promise<string> {
   const ext      = path.extname(imagePath).toLowerCase();
@@ -120,42 +111,17 @@ export async function uploadImageToRunway(imagePath: string): Promise<string> {
     throw new Error(`Runway image S3 upload failed ${uploadRes.status}: ${body}`);
   }
 
-  console.log(`[runway] Reference image uploaded → ${runwayUri}`);
+  console.log(`[runway] Keyframe image uploaded → ${runwayUri}`);
   return runwayUri;
 }
 
-// ─── Ratio picker ────────────────────────────────────────────────────────────
-
-/**
- * All aspect ratios supported by Runway gen4_aleph video_to_video.
- * Stored as [label, numeric ratio (w/h)] pairs for fast comparison.
- */
-const RUNWAY_RATIOS: [string, number][] = [
-  ['1280:720',  1280 / 720],   // 1.7778 — 16:9 landscape
-  ['720:1280',  720  / 1280],  // 0.5625 — 9:16 portrait
-  ['1104:832',  1104 / 832],   // 1.3269 — 4:3-ish landscape
-  ['960:960',   960  / 960],   // 1.0000 — square
-  ['832:1104',  832  / 1104],  // 0.7536 — 3:4-ish portrait
-  ['1584:672',  1584 / 672],   // 2.3571 — 21:9 ultrawide
-  ['848:480',   848  / 480],   // 1.7667 — 16:9 SD-ish
-  ['640:480',   640  / 480],   // 1.3333 — 4:3 SD
-];
-
-/**
- * Returns the Runway ratio string (e.g. "1280:720") whose aspect ratio is
- * closest to the input video's dimensions. Falls back to "1280:720" if
- * dimensions are unknown or invalid.
- */
-export function pickRunwayRatio(w: number, h: number): string {
-  if (w <= 0 || h <= 0) return '1280:720';
-  const input = w / h;
-  let best     = RUNWAY_RATIOS[0][0];
-  let bestDiff = Math.abs(RUNWAY_RATIOS[0][1] - input);
-  for (const [label, ratio] of RUNWAY_RATIOS) {
-    const diff = Math.abs(ratio - input);
-    if (diff < bestDiff) { bestDiff = diff; best = label; }
-  }
-  return best;
+/** Aleph 2 keyframe anchor — pin a reference image to a point in the clip. */
+export interface Aleph2Keyframe {
+  uri: string;
+  /** Absolute seconds from clip start (0.01 precision). */
+  seconds?: number;
+  /** Fraction of clip duration [0.0, 1.0]. */
+  at?: number;
 }
 
 export interface RunwayTaskCreated {
@@ -167,65 +133,50 @@ export interface RunwayTaskStatus {
   id: string;
   status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
   output?: string[];
-  /** Runway uses "failure" (not "error") for the failure description */
   failure?: string;
   failureCode?: string;
   progress?: number;
 }
 
 /**
- * Starts a Runway video-to-video generation task.
+ * Starts a Runway Aleph 2 video-to-video edit task.
  *
- * API shape (gen4_aleph):
- *   model:          "gen4_aleph"
- *   videoUri:       HTTPS URL or runway:// URI of the input video
- *   promptText:     generation prompt (max 1000 chars)
- *   references:     optional array of reference images for identity conditioning.
- *                   Callers control which refs to pass — relight/style send frames
- *                   for identity preservation; background/vfx pass none.
+ * API shape (aleph2):
+ *   model:          "aleph2"
+ *   videoUri:       runway:// or HTTPS URL of input video (2–30 s, ≤1080p, ≤30 fps)
+ *   promptText:     edit instruction (max 1000 chars) — describe only what changes
+ *   keyframes:      optional, up to 5 anchored reference images
  *
- * Duration is optional — pass durationSec to request 5 or 10 s output (rounded up).
- * If omitted, Runway uses its default (typically matches input length).
+ * Output preserves input resolution and aspect ratio (no ratio/duration params).
  */
 export async function createVideoToVideoTask(
   inputVideoUrl: string,
   prompt: string,
-  referenceImageUris?: string | string[],
-  durationSec?: number,
-  ratio?: string,
+  keyframes?: Aleph2Keyframe[],
 ): Promise<RunwayTaskCreated> {
 
-  // Normalise single URI or array to a clean string[]
-  const refUris: string[] = referenceImageUris
-    ? (Array.isArray(referenceImageUris) ? referenceImageUris : [referenceImageUris])
-        .filter(u => typeof u === 'string' && u.length > 0)
-    : [];
-
-  // Runway gen4_aleph supports duration 5 or 10 seconds.
-  // Round up to the nearest supported value so output is never shorter than the clip.
-  const resolvedDuration = durationSec && durationSec > 0
-    ? (durationSec <= 5 ? 5 : 10)
-    : undefined;
-
-  const resolvedRatio = ratio ?? '1280:720';
+  const anchors = (keyframes ?? [])
+    .filter(k => k.uri && k.uri.length > 0)
+    .slice(0, 5)
+    .map(k => {
+      if (k.seconds !== undefined) return { seconds: k.seconds, uri: k.uri };
+      if (k.at !== undefined) return { at: k.at, uri: k.uri };
+      return { seconds: 0, uri: k.uri };
+    });
 
   const body: Record<string, unknown> = {
-    model:      'gen4_aleph',
+    model:      'aleph2',
     videoUri:   inputVideoUrl,
     promptText: prompt,
-    ratio:      resolvedRatio,
-    ...(resolvedDuration !== undefined ? { duration: resolvedDuration } : {}),
+    contentModeration: { publicFigureThreshold: 'low' },
+    ...(anchors.length > 0 ? { keyframes: anchors } : {}),
   };
 
-  console.log(`[runway] createVideoToVideoTask — prompt="${prompt.slice(0, 80)}…" refs=${refUris.length} duration=${resolvedDuration ?? 'unset'} ratio=${resolvedRatio}`);
-
-  if (refUris.length > 0) {
-    body.references = refUris.map(uri => ({ type: 'image', uri }));
-    console.log(`[runway] Using ${refUris.length} reference image(s) for identity conditioning`);
-  }
-
-  console.log('[runway] references being sent to Runway:', body.references ? JSON.stringify(body.references) : 'NONE');
-  console.log('[runway] full request body (no video data):', JSON.stringify({ ...body, videoUri: '[redacted]' }));
+  console.log(
+    `[runway] createVideoToVideoTask aleph2 — prompt="${prompt.slice(0, 80)}…" ` +
+    `keyframes=${anchors.length}`,
+  );
+  console.log('[runway] request body (no video data):', JSON.stringify({ ...body, videoUri: '[redacted]' }));
 
   const res = await fetch(`${RUNWAY_API_BASE}/v1/video_to_video`, {
     method:  'POST',
@@ -244,21 +195,12 @@ export async function createVideoToVideoTask(
 
 /**
  * Starts a Runway image-to-video task using gen3a_turbo.
- * Much faster than video_to_video gen4_aleph (~30-60s vs 5-10 min).
- *
- * API shape (gen3a_turbo):
- *   model:       "gen3a_turbo"
- *   promptImage: runway:// URI of the input frame (JPEG/PNG)
- *   promptText:  generation prompt
- *   duration:    5 | 10 (seconds)
- *   ratio:       "1280:768" | "768:1280" | "1104:832" | "832:1104" | "960:960"
  */
 export async function createImageToVideoTask(
   frameUri: string,
   prompt: string,
   durationSec: number,
 ): Promise<RunwayTaskCreated> {
-  // gen3a_turbo supports 5s or 10s — pick the nearest
   const duration = durationSec <= 5 ? 5 : 10;
 
   const body = {
@@ -266,7 +208,7 @@ export async function createImageToVideoTask(
     promptImage: frameUri,
     promptText:  prompt,
     duration,
-    ratio:       '1280:768', // standard 16:9 landscape
+    ratio:       '1280:768',
     contentModeration: { publicFigureThreshold: 'low' },
   };
 
@@ -296,7 +238,7 @@ export async function getRunwayTaskStatus(
       Authorization: runwayHeaders().Authorization,
       'X-Runway-Version': RUNWAY_VERSION,
     },
-    signal: AbortSignal.timeout(50_000), // 50s — maxDuration=60s, Firebase overhead ~5s, leaves 5s buffer
+    signal: AbortSignal.timeout(50_000),
   });
 
   if (!res.ok) {
@@ -306,4 +248,3 @@ export async function getRunwayTaskStatus(
 
   return res.json() as Promise<RunwayTaskStatus>;
 }
-

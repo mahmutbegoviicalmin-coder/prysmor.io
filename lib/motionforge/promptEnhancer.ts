@@ -68,24 +68,23 @@ Rules:
 - Max 50 words
 - Plain text only. No quotes. No markdown.`,
 
-  vfx: `You are a Runway Gen-4 Aleph video-to-video prompt writer.
-Runway reads descriptive prompts, not commands.
-Describe HOW the effect looks and moves in the scene, not what to "add" or "keep".
+  vfx: `You are a Runway Aleph 2.0 video edit prompt writer.
+Aleph 2.0 edits existing footage — write edit instructions, not scene captions.
 
 OUTPUT FORMAT:
-Describe only the visual effect as if it already exists in the scene.
-Present tense. Visual and motion detail. Max 15 words.
+[Transformation verb + what changes]. Keep [unchanged elements] exactly as in the source.
+Max 2 sentences.
 
 Examples:
-- Input: "add fire" → Output: "Flames flickering and rising from the ground, orange and red fire spreading upward"
-- Input: "money rain" → Output: "Green dollar bills floating and drifting downward through the air, paper money falling"
-- Input: "lightning storm" → Output: "Bright lightning bolts flashing across the sky, electric arcs illuminating the scene"
+- Input: "add fire" → Output: "Add bright orange flames flickering upward from the ground with ember particles rising. Keep all subjects, camera motion, and surroundings exactly as in the source."
+- Input: "money rain" → Output: "Add green dollar bills drifting and falling slowly through the air. Keep the subject, framing, lighting, and background exactly as in the source."
+- Input: "winter scene" → Output: "Replace the background with a snowy winter landscape. Keep the subject, motion, and framing exactly as in the source."
 
 Rules:
-- Never use: Add, Remove, Keep, Change, Make, Create
-- Never use: cinematic, photorealistic, footage, film-quality
-- Never use preservation phrases like "keep people unchanged"
-- Describe the effect in present tense as if it exists in the scene
+- Lead with: Change, Replace, Swap, Add, Remove, Restyle, Relight
+- Describe ONLY what changes — the clip already has framing, lighting, and motion
+- Always end with a keep clause naming what must stay unchanged
+- Never write full scene descriptions or camera directions
 - Plain text only. No quotes. No markdown.`,
 };
 
@@ -136,8 +135,16 @@ export function fallbackEnhance(userPrompt: string, mode?: string): string {
       return stmt;
     case 'relight':
       return stmt;
-    case 'vfx':
-      return `${body} visible in the scene, overlaid on existing footage.`;
+    case 'vfx': {
+      const lower = cleaned.toLowerCase();
+      const verb  = /\b(remove|delete)\b/.test(lower) ? 'Remove'
+        : /\b(replace|swap|background)\b/.test(lower) ? 'Replace'
+        : /\b(relight|lighting)\b/.test(lower) ? 'Relight'
+        : /\b(restyle|style)\b/.test(lower) ? 'Restyle'
+        : /\b(change|color|colour)\b/.test(lower) ? 'Change'
+        : 'Add';
+      return `${verb} ${lower}. Keep the subject, framing, lighting, motion, and background exactly as in the source.`;
+    }
     default:
       return stmt;
   }

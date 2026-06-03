@@ -1,21 +1,10 @@
 /**
- * MotionForge VFX Prompt Compiler
+ * MotionForge VFX Prompt Compiler — Runway Aleph 2.0
  *
- * Rewrites a short user input into a precise Runway VFX transformation
- * instruction that preserves subject identity and applies only the
- * requested effect to the existing clip.
+ * Rewrites short user input into Aleph 2 edit instructions:
+ *   [Verb + change]. Keep [unchanged elements] exactly as in the source.
  *
- * Primary path: Claude Haiku (fast + cheap) — strict VFX-only system prompt.
- * Fallback path: lightweight template that wraps the user's own words with
- *   the identity-preservation header. Activated when Claude is unavailable.
- *
- * Final prompt structure (enforced by normalizeCompiled):
- *   [ANTI_ARTIFACT_PREFIX] [identity sentence]. [VFX instruction].
- *
- * The anti-artifact prefix is a hard backend rule prepended to every compiled
- * prompt unconditionally. It is never user-configurable. Runway gives highest
- * weight to the beginning of a prompt, so placing the clean-frame constraint
- * first maximises its effect on the generated output.
+ * Primary path: Claude Haiku. Fallback: lightweight template.
  */
 
 import { log, warn } from './logger';
@@ -23,53 +12,42 @@ import { validatePrompt, client } from './promptEnhancer';
 
 const TAG = 'promptCompiler';
 
-// ─── Claude config ────────────────────────────────────────────────────────────
-
 const MODEL      = 'claude-haiku-4-5-20251001';
-const MAX_TOKENS = 160;  // identity + VFX only; prefix is prepended by us
+const MAX_TOKENS = 200;
 
-// ANTI_ARTIFACT_PREFIX removed — Claude output is used directly as the final prompt.
+const SYSTEM_PROMPT = `You are a Runway Aleph 2.0 video edit prompt writer.
 
-// ─── System prompt ────────────────────────────────────────────────────────────
+Aleph 2.0 receives an existing video and applies a targeted edit. The clip already contains framing, lighting, camera motion, and subjects — do NOT redescribe the scene.
 
-const SYSTEM_PROMPT = `You are a Runway Gen-4 Aleph video-to-video prompt writer.
-
-Runway is a video-to-video model. It receives an existing video and transforms it based on your description.
-Describe HOW the effect looks and moves in the scene — not commands like "add" or "keep".
-Write in present tense as if the effect already exists in the video.
+Write like a compositor giving an edit note, not like an image caption.
 
 Rules:
-- Describe only the visual effect: what it looks like, its color, motion, and intensity
-- Never use command words: Add, Remove, Keep, Change, Make, Create, Apply, Transform
-- Never use quality words: cinematic, photorealistic, film-quality, professional, rendering
-- Never use preservation phrases: "keep people unchanged", "preserve identity", "leave background"
-- Never describe camera: no shot types, angles, or camera movements
-- Output 1-2 sentences maximum. Plain text only. No quotes. No markdown.
+- Lead with a transformation verb: Change, Replace, Swap, Add, Remove, Restyle, Relight
+- Describe ONLY what should change — one clear edit target
+- End with a short keep clause: "Keep [subject/framing/lighting/motion/background] exactly as in the source."
+- Max 2 sentences. Plain text only. No quotes. No markdown.
+- Never write full scene descriptions or camera directions
+- Never use quality words: cinematic, photorealistic, film-quality, professional
 
 Examples:
-- "money rain" → "Green dollar bills floating and drifting downward through the air, paper money falling slowly across the scene."
-- "fire effect" → "Bright orange and red flames flickering upward from the ground, fire spreading with glowing ember particles rising."
-- "lightning" → "Electric white lightning bolts flashing across the dark sky, bright arcs of energy illuminating the scene."
-- "fog" → "Thick white mist rolling across the ground, dense atmospheric fog filling the lower half of the scene."`;
+- "money rain" → "Add green dollar bills drifting and falling slowly through the air. Keep the subject, framing, lighting, and background exactly as in the source."
+- "fire effect" → "Add bright orange flames flickering upward from the ground with ember particles rising. Keep all subjects, camera motion, and surroundings exactly as in the source."
+- "winter background" → "Replace the background with a snowy winter landscape and overcast sky. Keep the subject, motion, and framing exactly as in the source."
+- "make sneakers red" → "Change the sneakers to a deep glossy crimson red. Keep the rest of the outfit, background, and motion exactly as in the source."`;
 
-// ─── Effect type classifier ───────────────────────────────────────────────────
+const KEEP_CLAUSE =
+  'Keep the subject, framing, lighting, motion, and background exactly as in the source.';
+
+const TRANSFORM_VERBS =
+  /^(change|replace|swap|add|remove|restyle|relight|make|apply)\b/i;
 
 /**
- * Classifies a prompt as either:
- *
- * 'overlay'    — lighting, atmosphere, particles, color grade applied ON TOP of
- *                the existing scene. Runway naturally preserves identity here.
- *                → use RAW_ACCEPT (pure Runway output, no compositing needed)
- *
- * 'background' — environment, scene, or background replacement where Runway
- *                rebuilds the entire frame. Face identity must be protected by
- *                compositing the original subject back.
- *                → use FULL_SUBJECT_COMPOSITE
+ * Classifies a prompt as overlay (effect on top) or background (environment swap).
+ * Used for downstream compositing hints — both use the same Aleph 2 prompt style.
  */
 export function classifyPromptEffect(prompt: string): 'overlay' | 'background' {
   const p = prompt.toLowerCase();
 
-  // Strong background/environment keywords — these rebuild the scene
   const BACKGROUND_PATTERNS = [
     /\bfireworks?\b/,
     /\bwinter\b/, /\bsnow(y|ing|fall)?\b/, /\bsnowflakes?\b/,
@@ -92,7 +70,6 @@ export function classifyPromptEffect(prompt: string): 'overlay' | 'background' {
     /\bwild(life|erness)\b/, /\bnature\s+scene\b/,
   ];
 
-  // Strong overlay/lighting keywords — these modify on top of existing scene
   const OVERLAY_PATTERNS = [
     /\bgod\s*rays?\b/, /\bvolumetric\s+light\b/, /\blight\s+rays?\b/,
     /\blens\s+flare\b/, /\bglow\s+(bloom|effect|around)\b/, /\bbloom\b/,
@@ -115,12 +92,9 @@ export function classifyPromptEffect(prompt: string): 'overlay' | 'background' {
     if (re.test(p)) overlayScore++;
   }
 
-  // Background wins if it has more matches OR if it has any matches and overlay has none
   if (backgroundScore > 0 && backgroundScore >= overlayScore) return 'background';
   return 'overlay';
 }
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CompileResult {
   compiledPrompt: string;
@@ -128,12 +102,6 @@ export interface CompileResult {
   effectType: 'overlay' | 'background';
 }
 
-// ─── Runway moderation sanitizer ─────────────────────────────────────────────
-
-/**
- * Trademarked / IP-protected character names that trigger Runway moderation.
- * Maps to a generic visual description of the costume/appearance.
- */
 const TRADEMARK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bspider[\s-]?man\b/gi,    'hero in a form-fitting bodysuit with geometric web texture pattern'],
   [/\bbatman\b/gi,             'hero in a sleek black armoured bodysuit with pointed cowl'],
@@ -154,23 +122,9 @@ const TRADEMARK_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bnaruto\b/gi,             'ninja in an orange jumpsuit with a blue headband'],
 ];
 
-/**
- * Words that trigger Runway content moderation even in "no X" context.
- * These are replaced with neutral filler or removed.
- */
 const BANNED_WORD_PATTERN =
   /\b(scanlines?|horizontal\s+lines?|banding|crt|interlac(ing|ed)?|glitch(ed|ing)?|vhs|corrupted?|static|distorted?|artifacts?|compression\s+artifacts?|shutter\s+artifact|signal\s+interference|data[\s-]?moshing|noise\s+pattern|digital\s+defects?|video\s+distortion|tape\s+artifacts?|scan\s+effects?)\b/gi;
 
-/**
- * Final safety pass over any prompt before it reaches Runway.
- *
- * Applies in order:
- *   1. Replace trademarked character names with visual descriptions.
- *   2. Strip any remaining moderation-triggering words.
- *   3. Collapse any double-spaces left behind.
- *
- * Idempotent — safe to call multiple times.
- */
 export function sanitizeForRunway(text: string): string {
   let result = text;
 
@@ -184,48 +138,43 @@ export function sanitizeForRunway(text: string): string {
   return result;
 }
 
-// ─── Normalisation helper ─────────────────────────────────────────────────────
-
-/**
- * Normalises a raw compiled string before it is returned to the caller.
- *
- * Steps:
- *   1. Collapse repeated whitespace.
- *   2. Check for the artifact fingerprint — skip prepending if already present
- *      (idempotent: safe to call on already-compiled prompts).
- *   3. Ensure the VFX body ends with clean punctuation.
- *   4. Prepend ANTI_ARTIFACT_PREFIX so it becomes the first instruction
- *      Runway reads.
- *
- * Final structure: [ANTI_ARTIFACT_PREFIX] [identity sentence]. [VFX sentence].
- */
+/** Ensures the prompt ends with a keep clause if missing. */
 export function normalizeCompiled(raw: string): string {
   let text = raw.replace(/\s{2,}/g, ' ').trim();
   if (text && !text.endsWith('.') && !text.endsWith('!') && !text.endsWith('?')) {
     text += '.';
   }
+  if (!/\bkeep\b.*\bas in the source\b/i.test(text)) {
+    text = text.replace(/\.$/, '') + '. ' + KEEP_CLAUSE;
+  }
   return text;
 }
 
-// ─── Fallback compile (no Claude) ────────────────────────────────────────────
-
-/**
- * Minimal template-based fallback: produces an identity-preservation header
- * + the user's own VFX words, then routes through normalizeCompiled() so
- * the anti-artifact prefix is always prepended.
- *
- * Final structure:
- *   [ANTI_ARTIFACT_PREFIX] Preserve the subject's identity... [user stmt].
- *   Keep all other aspects of the shot unchanged.
- */
-export function fallbackCompile(userPrompt: string): string {
-  const cleaned = userPrompt.trim();
-  const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  const stmt    = body.endsWith('.') ? body : body + '.';
-  return normalizeCompiled(stmt);
+/** Infer the best leading verb from user intent when missing. */
+function inferVerb(userPrompt: string, effectType: 'overlay' | 'background'): string {
+  const p = userPrompt.toLowerCase();
+  if (/\b(remove|delete|erase|hide)\b/.test(p)) return 'Remove';
+  if (/\b(replace|swap|change\s+(the\s+)?background|transport)\b/.test(p) || effectType === 'background') {
+    return 'Replace';
+  }
+  if (/\b(relight|lighting|light\s+ing)\b/.test(p)) return 'Relight';
+  if (/\b(restyle|style|anime|cartoon|noir|vintage)\b/.test(p)) return 'Restyle';
+  if (/\b(change|color|colour|make)\b/.test(p)) return 'Change';
+  return 'Add';
 }
 
-// ─── Claude call ──────────────────────────────────────────────────────────────
+export function fallbackCompile(userPrompt: string, effectType: 'overlay' | 'background' = 'overlay'): string {
+  const cleaned = userPrompt.trim();
+  const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  const stmt    = body.endsWith('.') ? body.slice(0, -1) : body;
+
+  if (TRANSFORM_VERBS.test(stmt)) {
+    return normalizeCompiled(stmt);
+  }
+
+  const verb = inferVerb(cleaned, effectType);
+  return normalizeCompiled(`${verb} ${stmt.toLowerCase()}`);
+}
 
 async function callClaude(userPrompt: string): Promise<string> {
   const response = await client.messages.create({
@@ -233,7 +182,7 @@ async function callClaude(userPrompt: string): Promise<string> {
     max_tokens: MAX_TOKENS,
     system:     SYSTEM_PROMPT,
     messages: [
-      { role: 'user', content: `Compile this VFX instruction: "${userPrompt}"` },
+      { role: 'user', content: `Compile this Aleph 2 edit instruction: "${userPrompt}"` },
     ],
   });
 
@@ -243,53 +192,21 @@ async function callClaude(userPrompt: string): Promise<string> {
   return raw.replace(/^["']|["']$/g, '').trim();
 }
 
-// ─── Main export ──────────────────────────────────────────────────────────────
-
-/**
- * Compiles a user's VFX idea into a production-ready Runway transformation prompt.
- *
- * Primary path: Claude Haiku (fast, cheap).
- * Fallback path: lightweight template when Claude is unavailable.
- *
- * ANTI_ARTIFACT_PREFIX is always prepended via normalizeCompiled() so that
- * Runway's highest-weight instruction slot contains the clean-frame constraint.
- *
- * @param userPrompt - Short user input ("frozen background", "add diamond chain", etc.)
- * @returns          - CompileResult with the compiled prompt and method used.
- *
- * Never throws: on any failure the fallback result is returned.
- */
 export async function compileVfxPrompt(userPrompt: string): Promise<CompileResult> {
   const prompt     = validatePrompt(userPrompt);
   const effectType = classifyPromptEffect(prompt);
 
   log(TAG, 'Compile request', { promptLen: prompt.length, effectType });
 
-  /**
-   * Builds the final compiled prompt.
-   * Overlay effects: [ANTI_ARTIFACT_PREFIX] [VFX instruction].
-   * Background effects: just the VFX instruction — Runway Aleph sees the video
-   *   directly so no identity/clothing descriptions are needed.
-   */
   function assemble(vfxBody: string): string {
-    if (effectType === 'background') {
-      return sanitizeForRunway(vfxBody.trim()).slice(0, 1000);
-    }
-    return normalizeCompiled(vfxBody);
+    return sanitizeForRunway(normalizeCompiled(vfxBody)).slice(0, 1000);
   }
 
   try {
-    const raw     = await callClaude(prompt);
+    const raw      = await callClaude(prompt);
     const compiled = assemble(raw);
 
-    const wordCount = compiled.split(/\s+/).length;
-    if (wordCount < 8) {
-      warn(TAG, `Unusually short output after normalisation (${wordCount} words)`, {
-        output: compiled.slice(0, 100),
-      });
-    }
-
-    log(TAG, 'Compile complete via claude', { wordCount, effectType });
+    log(TAG, 'Compile complete via claude', { wordCount: compiled.split(/\s+/).length, effectType });
     return { compiledPrompt: compiled, method: 'claude', effectType };
 
   } catch (err) {
@@ -297,14 +214,7 @@ export async function compileVfxPrompt(userPrompt: string): Promise<CompileResul
       err: (err as Error).message,
     });
 
-    const cleaned = prompt.trim();
-    const body    = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-    const stmt    = body.endsWith('.') ? body : body + '.';
-    const fallbackBody =
-      `Transform the scene — ${stmt} ` +
-      `Preserve all existing characters and objects. Leave all other elements unchanged.`;
-
-    const compiled = assemble(fallbackBody);
+    const compiled = assemble(fallbackCompile(prompt, effectType));
     log(TAG, 'Fallback compile used', { wordCount: compiled.split(/\s+/).length, effectType });
     return { compiledPrompt: compiled, method: 'fallback', effectType };
   }

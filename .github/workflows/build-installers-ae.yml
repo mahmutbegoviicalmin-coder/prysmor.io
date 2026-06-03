@@ -8,7 +8,7 @@ on:
       version:
         description: AE panel semver (matches version.txt)
         required: true
-        default: "1.0.0"
+        default: "2.0.0"
         type: string
   push:
     tags:
@@ -75,17 +75,19 @@ jobs:
           ls -lh prysmor-panel-ae/panel/ffmpeg/mac/ffmpeg
 
       - name: Build macOS AE .pkg
+        id: macpkg
         run: |
           chmod +x prysmor-panel-ae/installer/build-mac-pkg.sh
           bash prysmor-panel-ae/installer/build-mac-pkg.sh
-          test -f dist/PrysmorAE-1.0.0.pkg
-          ls -lh dist/PrysmorAE-*.pkg
+          PKG=$(ls dist/PrysmorAE-*.pkg | head -1)
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+          ls -lh "$PKG"
 
       - name: Upload mac-ae-installer
         uses: actions/upload-artifact@v4
         with:
           name: mac-ae-installer
-          path: dist/PrysmorAE-1.0.0.pkg
+          path: ${{ steps.macpkg.outputs.pkg }}
 
   release:
     name: release-ae
@@ -102,7 +104,7 @@ jobs:
           elif [[ "${{ github.ref_name }}" == panel-ae-v* ]]; then
             V="${GITHUB_REF_NAME#panel-ae-v}"
           else
-            V="1.0.0"
+            V="2.0.0"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=panel-ae-v${V}" >> "$GITHUB_OUTPUT"
@@ -121,21 +123,19 @@ jobs:
           V="${{ steps.ver.outputs.version }}"
           TAG="${{ steps.ver.outputs.tag }}"
           WIN="assets/windows-ae-installer/PrysmorAE-Setup.exe"
-          MAC="assets/mac-ae-installer/PrysmorAE-${V}.pkg"
+          MAC=$(find assets/mac-ae-installer -name 'PrysmorAE-*.pkg' | head -1)
           test -f "$WIN"
-          test -f "$MAC"
+          test -n "$MAC" && test -f "$MAC"
           REPO="${GITHUB_REPOSITORY}"
 
           NOTES="## Prysmor for After Effects v${V}
 
-          One-click CEP panel installer for **Adobe After Effects** (bundle \`com.prysmor.panel.ae\`).
+          Same Aleph 2.0 VFX backend as Premiere — separate CEP bundle (\`com.prysmor.panel.ae\`).
 
           | Platform | File | Install |
           |----------|------|---------|
           | Windows | \`PrysmorAE-Setup.exe\` | Run installer → restart AE → Window → Extensions → Prysmor |
-          | macOS | \`PrysmorAE-${V}.pkg\` | Open pkg → restart AE → Window → Extensions → Prysmor |
-
-          Separate from the Premiere Pro panel — same Prysmor account and credits."
+          | macOS | \`PrysmorAE-${V}.pkg\` | Open pkg → restart AE → Window → Extensions → Prysmor |"
 
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release upload "$TAG" "$WIN" "$MAC" --repo "$REPO" --clobber

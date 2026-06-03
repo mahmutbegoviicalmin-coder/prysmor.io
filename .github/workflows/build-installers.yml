@@ -1,9 +1,18 @@
-# Build Windows (.exe) + macOS (.pkg) installers and attach to GitHub Release
-# ffmpeg is downloaded from official sources — no Git LFS dependency
+# Build Windows (.exe) + macOS (.pkg) Premiere installers and publish GitHub Release.
+# Tag: v{version}  →  assets: PrysmrSetup.exe, Prysmor-{version}.pkg
 name: Build installers
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Premiere panel semver (matches version.txt)
+        required: true
+        default: "5.4.4"
+        type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: read
@@ -70,17 +79,19 @@ jobs:
           echo "ffmpeg ready: $(du -sh prysmor-panel/panel/ffmpeg/mac/ffmpeg)"
 
       - name: Build macOS .pkg
+        id: macpkg
         run: |
           chmod +x prysmor-panel/installer/build-mac-pkg.sh
           bash prysmor-panel/installer/build-mac-pkg.sh
-          test -f dist/Prysmor-3.9.0.pkg
-          ls -lh dist/Prysmor-3.9.0.pkg
+          PKG=$(ls dist/Prysmor-*.pkg | head -1)
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+          ls -lh "$PKG"
 
       - name: Upload mac-installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: mac-installer
-          path: dist/Prysmor-3.9.0.pkg
+          path: ${{ steps.macpkg.outputs.pkg }}
 
   release:
     name: release
@@ -89,35 +100,59 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            V="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref_name }}" == v* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="5.4.4"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v${V}" >> "$GITHUB_OUTPUT"
+          echo "Premiere panel version: $V (tag: v${V})"
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: assets
 
-      - name: Create or update GitHub Release v3.9.0
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          V="${{ steps.ver.outputs.version }}"
+          TAG="${{ steps.ver.outputs.tag }}"
           WIN="assets/windows-installer/PrysmrSetup.exe"
-          MAC="assets/mac-installer/Prysmor-3.9.0.pkg"
+          MAC=$(find assets/mac-installer -name 'Prysmor-*.pkg' | head -1)
           test -f "$WIN"
-          test -f "$MAC"
-          TAG="v3.9.0"
+          test -n "$MAC" && test -f "$MAC"
           REPO="${GITHUB_REPOSITORY}"
 
+          NOTES="## Prysmor for Premiere Pro v${V}
+
+          - VFX mode migrated to **Runway Aleph 2.0** (\`aleph2\`)
+          - Updated Aleph 2 prompt system (edit verbs + keep clauses)
+
+          | Platform | File |
+          |----------|------|
+          | Windows | \`PrysmrSetup.exe\` |
+          | macOS | \`Prysmor-${V}.pkg\` |"
+
           if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            echo "Release $TAG exists — uploading / replacing assets"
             gh release upload "$TAG" "$WIN" "$MAC" --repo "$REPO" --clobber
+            gh release edit "$TAG" --repo "$REPO" --notes "$NOTES"
           else
-            echo "Creating release $TAG"
             gh release create "$TAG" "$WIN" "$MAC" \
               --repo "$REPO" \
-              --title "Prysmor Panel $TAG" \
-              --notes "Windows (PrysmrSetup.exe) + macOS (Prysmor-3.9.0.pkg)"
+              --title "Prysmor Panel ${TAG}" \
+              --notes "$NOTES"
           fi
 
           OWNER="${GITHUB_REPOSITORY%%/*}"
           NAME="${GITHUB_REPOSITORY#*/}"
           echo "Windows: https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/PrysmrSetup.exe"
-          echo "macOS:   https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-3.9.0.pkg"
+          echo "macOS:   https://github.com/${OWNER}/${NAME}/releases/download/${TAG}/Prysmor-${V}.pkg"
