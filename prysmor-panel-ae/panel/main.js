@@ -33,12 +33,22 @@ const LS_USER_ID        = 'prysmor_ae_user_id';
 const LS_PLAN           = 'prysmor_ae_plan';
 const LS_PLAN_LABEL     = 'prysmor_ae_plan_label';
 const LS_TOKEN_EXP      = 'prysmor_ae_token_exp';
-const LS_MACHINE_ID     = 'prysmor_ae_machine_id';
+// Same key as Premiere — one physical machine, one fingerprint
+const LS_MACHINE_ID       = 'prysmor_machine_id';
+const LS_MACHINE_ID_LEGACY  = 'prysmor_ae_machine_id';
 
 // ─── Machine Fingerprint ──────────────────────────────────────────────────────
 
 function getMachineFingerprint() {
   var stored = localStorage.getItem(LS_MACHINE_ID);
+  if (!stored) {
+    var legacy = localStorage.getItem(LS_MACHINE_ID_LEGACY);
+    if (legacy) {
+      stored = legacy.replace(/^ae-/i, '');
+      if (stored.indexOf('mfp-') !== 0) stored = 'mfp-' + stored.replace(/^mfp-/i, '');
+      localStorage.setItem(LS_MACHINE_ID, stored);
+    }
+  }
   // Return any existing stored ID unchanged — preserves device registration across OTA updates.
   if (stored) return stored;
   try {
@@ -55,7 +65,7 @@ function getMachineFingerprint() {
       hash |= 0;
     }
     // No Date.now() — fingerprint must be stable across reinstalls and updates.
-    var id = 'ae-mfp-' + Math.abs(hash).toString(36);
+    var id = 'mfp-' + Math.abs(hash).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id);
     return id;
   } catch (e) {
@@ -72,7 +82,7 @@ function getMachineFingerprint() {
       hash2 |= 0;
     }
     // No Date.now() — stable fingerprint.
-    var id2 = 'ae-mfp-' + Math.abs(hash2).toString(36);
+    var id2 = 'mfp-' + Math.abs(hash2).toString(36);
     localStorage.setItem(LS_MACHINE_ID, id2);
     return id2;
   }
@@ -1965,10 +1975,13 @@ async function addToTimeline() {
 
     cs.evalScript(fn, function (r) {
       console.log('[Prysmor] addToTimeline evalScript result:', r);
-      if (r && (r.indexOf('error') === 0 || r.indexOf('Error') === 0)) {
-        showToast(r.replace(/^error:\s*/i, ''), 'error');
-      } else {
+      var res = (r || '').toString().replace(/^\s+|\s+$/g, '');
+      if (!res || res.indexOf('error') === 0 || res.indexOf('Error') === 0) {
+        showToast(res ? res.replace(/^error:\s*/i, '') : 'Add to timeline failed — open the comp in Timeline and retry.', 'error');
+      } else if (res === 'success') {
         showToast('AI clip added to comp!', 'success');
+      } else {
+        showToast(res, 'error');
       }
       resolve();
     });

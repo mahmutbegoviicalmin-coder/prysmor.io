@@ -51,6 +51,19 @@ function getActiveComp() {
   if (typeof app === 'undefined' || !app.project) return null;
   var item = app.project.activeItem;
   if (item && item instanceof CompItem) return item;
+
+  // Footage selected in Project panel — activeItem is not the comp (Adobe community #61517)
+  var i;
+  for (i = 1; i <= app.project.numItems; i++) {
+    var openComp = app.project.item(i);
+    if (openComp instanceof CompItem && openComp.openInViewer) return openComp;
+  }
+  for (i = 1; i <= app.project.numItems; i++) {
+    var withSel = app.project.item(i);
+    if (withSel instanceof CompItem && withSel.selectedLayers && withSel.selectedLayers.length > 0) {
+      return withSel;
+    }
+  }
   return null;
 }
 
@@ -67,7 +80,11 @@ function getPrimarySelectedLayer(comp) {
 function importFootageItem(filePath) {
   var item = findProjectItemByPath(app.project.rootItem, filePath);
   if (!item) {
-    item = findProjectItemByName(app.project.rootItem, fileNameFromPath(filePath));
+    var base = fileNameFromPath(filePath);
+    // Prysmor temp files are unique per run — never reuse a different gen by filename
+    if (base.indexOf('mf-processed-') !== 0 && base.indexOf('mf-output-') !== 0) {
+      item = findProjectItemByName(app.project.rootItem, base);
+    }
   }
   if (item) return item;
 
@@ -155,7 +172,8 @@ function getSelectionInfo() {
       return JSON.stringify({ error: 'Selected layer has zero duration.' });
     }
     var durSec = visibleDur > MAX_SEC ? MAX_SEC : visibleDur;
-    var startSec = layer.startTime;
+    // inPoint = where the layer is visible on the comp timeline (not startTime alone)
+    var startSec = layer.inPoint;
 
     var mediaInSec = 0;
     var _debugTimes = {};
@@ -227,23 +245,54 @@ function getTempDir() {
 
 // ─── insertClipOnV2 (layer above selection) ───────────────────────────────────
 
+function alignNewLayerToRef(newLayer, refLayer, compTimeSec) {
+  newLayer.startTime = compTimeSec;
+  if (refLayer) {
+    try {
+      newLayer.inPoint  = refLayer.inPoint;
+      newLayer.outPoint = refLayer.outPoint;
+    } catch (_) {}
+  } else {
+    try {
+      var dur = newLayer.source ? newLayer.source.duration : compTimeSec;
+      if (dur && dur > 0) newLayer.outPoint = newLayer.inPoint + dur;
+    } catch (_) {}
+  }
+}
+
 function insertClipOnV2(filePath, startTimeSec) {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
     if (!app.project) return 'error: No project open.';
     var comp = getActiveComp();
-    if (!comp) return 'error: No active composition.';
+    if (!comp) {
+      return 'error: Open your composition in the Timeline, then try again (footage selected in Project is not enough).';
+    }
 
-    // Capture selection BEFORE add — AE auto-selects the new layer after add,
-    // which caused moveBefore(self) → "Can not move a layer before or after itself."
+    app.beginUndoGroup('Prysmor Add to Timeline');
+
+    // Capture selection BEFORE add — AE auto-selects the new layer after add
     var refLayer = getPrimarySelectedLayer(comp);
     var refIndex = refLayer ? refLayer.index : -1;
+    var placeSec = (typeof startTimeSec === 'number' && !isNaN(startTimeSec)) ? startTimeSec : 0;
+    if (refLayer) {
+      try { placeSec = refLayer.inPoint; } catch (_) {}
+    }
 
     var item = importFootageItem(filePath);
-    if (!item) return 'error: Footage imported but not found: ' + fileNameFromPath(filePath);
+    if (!item) {
+      app.endUndoGroup();
+      return 'error: Footage imported but not found: ' + fileNameFromPath(filePath);
+    }
 
+    var layersBefore = comp.numLayers;
     var newLayer = comp.layers.add(item);
-    newLayer.startTime = startTimeSec;
+    if (!newLayer || comp.numLayers <= layersBefore) {
+      app.endUndoGroup();
+      return 'error: Could not add layer to composition.';
+    }
+
+    alignNewLayerToRef(newLayer, refLayer, placeSec);
 
     if (refIndex > 0) {
       try {
@@ -258,8 +307,15 @@ function insertClipOnV2(filePath, startTimeSec) {
       try { newLayer.moveToBeginning(); } catch (_) {}
     }
 
+    try {
+      newLayer.selected = true;
+      comp.openInViewer();
+    } catch (_) {}
+
+    app.endUndoGroup();
     return 'success';
   } catch (e) {
+    try { app.endUndoGroup(); } catch (_) {}
     return 'error: ' + e.message;
   }
 }
@@ -276,7 +332,7 @@ function replaceSelection(filePath) {
     var refLayer = getPrimarySelectedLayer(comp);
     if (!refLayer) return 'error: No layer selected.';
 
-    var startSec = refLayer.startTime;
+    var startSec = refLayer.inPoint;
     return insertClipOnV2(filePath, startSec);
   } catch (e) {
     return 'error: ' + e.message;
