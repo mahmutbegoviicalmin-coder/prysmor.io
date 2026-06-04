@@ -2,7 +2,11 @@ import { NextRequest, NextResponse }  from "next/server";
 import { currentUser }               from "@clerk/nextjs/server";
 import { db }                        from "@/lib/firebaseAdmin";
 import { getUser, PLAN_LABELS, syncUserProfile } from "@/lib/firestore/users";
-import { registerDevice, DeviceLimitError }      from "@/lib/firestore/devices";
+import {
+  registerDevice,
+  DeviceLimitError,
+  buildPanelDeviceId,
+} from "@/lib/firestore/devices";
 
 const SESSION_TTL_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
 
@@ -64,20 +68,17 @@ export async function POST(req: NextRequest) {
   const plan      = userDoc?.plan ?? "starter";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
-  // Machine-locked deviceId — AE panels use a separate prefix from Premiere
+  // One device seat per physical machine — Premiere + After Effects share the same slot
   const machineFingerprint = codeData.machineFingerprint;
-  const isAE = (codeData.hostApp || '').toUpperCase() === 'AEFT';
-  const idPrefix = isAE ? 'panel-ae' : 'panel';
-  const deviceId = machineFingerprint
-    ? `${idPrefix}-${user.id}-${machineFingerprint.slice(0, 12)}`
-    : `${idPrefix}-${user.id}`;
+  const deviceId = buildPanelDeviceId(user.id, machineFingerprint);
 
-  // Register device in Firestore
+  let resolvedDeviceId = deviceId;
   try {
-    await registerDevice(user.id, deviceId, codeData.platform ?? "Unknown", codeData.deviceName, {
-      hostApp:        codeData.hostApp,
-      hostAppVersion: codeData.hostAppVersion,
-      cepVersion:     codeData.cepVersion,
+    resolvedDeviceId = await registerDevice(user.id, deviceId, codeData.platform ?? "Unknown", codeData.deviceName, {
+      hostApp:            codeData.hostApp,
+      hostAppVersion:     codeData.hostAppVersion,
+      cepVersion:         codeData.cepVersion,
+      machineFingerprint,
     });
   } catch (err) {
     if (err instanceof DeviceLimitError) {
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     plan,
     planLabel,
     deviceCode:       code.toUpperCase(),
-    deviceId,
+    deviceId:         resolvedDeviceId,
     expiresAt,
     licenseStatus:    "active",
     createdAt:        now,
