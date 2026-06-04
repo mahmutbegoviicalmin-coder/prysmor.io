@@ -234,17 +234,28 @@ function insertClipOnV2(filePath, startTimeSec) {
     var comp = getActiveComp();
     if (!comp) return 'error: No active composition.';
 
+    // Capture selection BEFORE add — AE auto-selects the new layer after add,
+    // which caused moveBefore(self) → "Can not move a layer before or after itself."
+    var refLayer = getPrimarySelectedLayer(comp);
+    var refIndex = refLayer ? refLayer.index : -1;
+
     var item = importFootageItem(filePath);
     if (!item) return 'error: Footage imported but not found: ' + fileNameFromPath(filePath);
 
     var newLayer = comp.layers.add(item);
     newLayer.startTime = startTimeSec;
 
-    var refLayer = getPrimarySelectedLayer(comp);
-    if (refLayer) {
-      newLayer.moveBefore(refLayer);
+    if (refIndex > 0) {
+      try {
+        var target = comp.layer(refIndex + 1);
+        if (target && target !== newLayer) {
+          newLayer.moveBefore(target);
+        }
+      } catch (moveErr) {
+        try { newLayer.moveToBeginning(); } catch (_) {}
+      }
     } else {
-      newLayer.moveToBeginning();
+      try { newLayer.moveToBeginning(); } catch (_) {}
     }
 
     return 'success';
