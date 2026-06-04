@@ -65,8 +65,26 @@ function getPrimarySelectedLayer(comp) {
 }
 
 function importFootageItem(filePath) {
-  app.project.importFiles([filePath], true, app.project.rootItem, false);
   var item = findProjectItemByPath(app.project.rootItem, filePath);
+  if (!item) {
+    item = findProjectItemByName(app.project.rootItem, fileNameFromPath(filePath));
+  }
+  if (item) return item;
+
+  var file = new File(filePath);
+  if (!file.exists) file = new File(normalisePath(filePath));
+  if (!file.exists) return null;
+
+  var io = new ImportOptions(file);
+  if (io.canImportAs === ImportAsType.FOOTAGE) {
+    io.importAs = ImportAsType.FOOTAGE;
+  } else if (io.canImportAs === ImportAsType.COMP) {
+    io.importAs = ImportAsType.COMP;
+  }
+  item = app.project.importFile(io);
+  if (item) return item;
+
+  item = findProjectItemByPath(app.project.rootItem, filePath);
   if (!item) {
     item = findProjectItemByName(app.project.rootItem, fileNameFromPath(filePath));
   }
@@ -79,7 +97,8 @@ function importFile(filePath) {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
     if (!app.project) return 'error: No project open.';
-    app.project.importFiles([filePath], true, app.project.rootItem, false);
+    var item = importFootageItem(filePath);
+    if (!item) return 'error: Import failed: ' + fileNameFromPath(filePath);
     return 'success';
   } catch (e) {
     return 'error: ' + e.message;
