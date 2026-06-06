@@ -6,13 +6,11 @@ import { useUser } from "@clerk/nextjs";
 import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
 import RefTracker from "@/components/site/RefTracker";
-import AnnouncementBar from "@/components/site/AnnouncementBar";
 
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname    = usePathname();
   const isDashboard = pathname.startsWith("/dashboard");
   const isAuthFlow  = pathname === "/auth-redirect" || pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
-  const isLanding   = pathname === "/";
   const { isSignedIn, isLoaded, user } = useUser();
 
   /* Bug 1 fix, keep prysmor_user_id in localStorage in sync with Clerk auth state */
@@ -46,11 +44,6 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
       <Suspense fallback={null}>
         <RefTracker />
       </Suspense>
-      {isLanding && (
-        <Suspense fallback={null}>
-          <AnnouncementBar />
-        </Suspense>
-      )}
       {!isDashboard && !isAuthFlow && (
         <Suspense fallback={null}>
           <Navbar />

@@ -16,16 +16,17 @@ const pricingTiers: PriceTier[] = [
     yearlyPrice: 299,
     yearlyPerDay: "0.99",
     yearlySave: 49,
-    description: "For editors running 1–2 projects a month",
-    unit: "90s of AI VFX ≈ 1.5 min",
-    yearlyUnit: "3000s of AI VFX ≈ 48 min",
-    bullets: [
-      "Premiere Pro panel",
-      "After Effects panel",
-      "Relight, Background & VFX modes",
-      "4K output",
-      "7-day money-back guarantee",
-    ],
+    generation: {
+      monthly: {
+        shots: "≈ 20 shots",
+        seconds: "90 sec",
+      },
+      yearly: {
+        shots: "≈ 650 shots",
+        seconds: "3,000 sec",
+      },
+    },
+    highlights: ["Relight, Background, and VFX", "4K output", "Email support"],
     cta: "Get Started",
     ctaHref: "/checkout?plan=starter",
     lsMonthlyUrl:
@@ -40,19 +41,19 @@ const pricingTiers: PriceTier[] = [
     yearlyPrice: 499,
     yearlyPerDay: "1.66",
     yearlySave: 89,
-    description: "For active editors shipping weekly",
-    unit: "200s of AI VFX ≈ 3 min",
-    yearlyUnit: "6000s of AI VFX ≈ 98 min",
     featured: true,
-    badge: "Most Popular",
-    bullets: [
-      "Premiere Pro panel",
-      "After Effects panel",
-      "Everything in Starter",
-      "Priority render queue",
-      "Reference image support",
-      "Faster support response",
-    ],
+    badge: "Most popular",
+    generation: {
+      monthly: {
+        shots: "≈ 50 shots",
+        seconds: "200 sec",
+      },
+      yearly: {
+        shots: "≈ 1,300 shots",
+        seconds: "6,000 sec",
+      },
+    },
+    highlights: ["Priority render queue", "Reference images", "Faster support"],
     cta: "Get Started",
     ctaHref: "/checkout?plan=pro",
     lsMonthlyUrl:
@@ -67,18 +68,17 @@ const pricingTiers: PriceTier[] = [
     yearlyPrice: 1299,
     yearlyPerDay: "3.33",
     yearlySave: 249,
-    description: "For studios and production teams",
-    unit: "500s of AI VFX ≈ 8 min",
-    yearlyUnit: "12000s of AI VFX ≈ 204 min",
-    bullets: [
-      "Premiere Pro panel",
-      "After Effects panel",
-      "Everything in Pro",
-      "Multiple seats",
-      "Dedicated render lane",
-      "Direct line to engineering",
-      "Onboarding call",
-    ],
+    generation: {
+      monthly: {
+        shots: "≈ 120 shots",
+        seconds: "500 sec",
+      },
+      yearly: {
+        shots: "≈ 2,600 shots",
+        seconds: "12,000 sec",
+      },
+    },
+    highlights: ["Multiple seats", "Dedicated render lane", "Engineering support"],
     cta: "Get Started",
     ctaHref: "/checkout?plan=exclusive",
     lsMonthlyUrl:
@@ -103,7 +103,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Do my VFX credits expire?",
-    a: "Credits reset on your monthly billing date and do not roll over. Plans are sized for typical editing workflows.",
+    a: "Credits reset on your monthly billing date and do not roll over. Each plan includes a set number of seconds per cycle. Shot counts on the pricing page are estimates based on typical 4 to 6 second generations.",
   },
   {
     q: "What if I'm not happy with the result?",
@@ -178,13 +178,11 @@ export default function PrysmorPage() {
         <HowItWorks />
         <CapabilitiesSection />
 
-        <div id="pricing" />
         <PricingSection
-          title="Plans for every edit volume."
-          subtitle="Same Adobe panels on every plan. Different amounts of generation credits."
+          title="Plans for every editing workflow."
           tiers={pricingTiers}
           showToggle
-          footerNote="7-day money-back guarantee · Cancel anytime"
+          footerNote="Cancel anytime."
         />
 
         <div id="faq">

@@ -12,7 +12,7 @@ export default function HeroSection() {
   return (
     <section
       className="border-b border-white/[0.06] bg-[#080808]"
-      style={{ paddingTop: "calc(120px + var(--bar-h, 0px))" }}
+      style={{ paddingTop: "88px" }}
     >
       <div className="mx-auto grid max-w-[1200px] gap-12 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-14 lg:pb-20 lg:pt-14 xl:px-8">
         {/* Copy */}
@@ -77,13 +77,17 @@ export default function HeroSection() {
             <span>macOS & Windows</span>
           </div>
 
-          <div className="mt-10 flex flex-wrap items-center gap-3">
+          <p className="mt-10 text-[12px] tracking-[-0.01em] text-white/35">
+            Create an account and try Prysmor in Playground.
+          </p>
+
+          <div className="mt-3.5 flex flex-wrap items-center gap-3">
             <Link
               href="/sign-up"
               onClick={() => track("get_started", { location: "hero" })}
               className="inline-flex items-center gap-2 rounded-lg bg-[#39FF6A] px-5 py-3 text-[14px] font-semibold text-black transition-opacity hover:opacity-90"
             >
-              Get Started
+              Get Started Free
               <ArrowRight size={15} strokeWidth={2.5} />
             </Link>
             <button
@@ -94,12 +98,20 @@ export default function HeroSection() {
               }}
               className="inline-flex items-center rounded-lg border border-white/10 px-5 py-3 text-[14px] font-medium text-white/65 transition-colors hover:border-white/20 hover:text-white"
             >
-              See pricing
+              See Pricing
             </button>
           </div>
 
-          <p className="mt-4 text-[12px] text-white/30">
-            Free account · Install both panels · 7-day money-back on paid plans
+          <p className="mt-3.5 text-[11px] leading-relaxed tracking-[-0.01em] text-white/32">
+            <span>Free account</span>
+            <span className="mx-2 text-white/15" aria-hidden>
+              ·
+            </span>
+            <span>1 free generation included</span>
+            <span className="mx-2 text-white/15" aria-hidden>
+              ·
+            </span>
+            <span>No credit card required</span>
           </p>
         </div>
 

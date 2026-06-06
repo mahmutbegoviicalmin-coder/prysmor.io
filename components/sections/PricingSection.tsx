@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
+import { Check, ShieldCheck, Lock, Monitor } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
 import { track } from "@/lib/track";
 import { getRefCodeFromCookie } from "@/components/site/RefTracker";
-
 
 declare global {
   interface Window {
@@ -21,6 +20,16 @@ declare global {
   }
 }
 
+export interface GenerationAllowance {
+  shots: string;
+  seconds?: string;
+}
+
+export interface PlanFeatureGroup {
+  title: string;
+  items: string[];
+}
+
 export interface PriceTier {
   id: string;
   name: string;
@@ -28,12 +37,19 @@ export interface PriceTier {
   yearlyPrice?: number;
   yearlyPerDay?: string;
   yearlySave?: number;
-  description: string;
+  tagline?: string;
+  description?: string;
+  generation?: {
+    monthly: GenerationAllowance;
+    yearly?: GenerationAllowance;
+  };
+  highlights?: string[];
+  featureGroups?: PlanFeatureGroup[];
   unit?: string;
   yearlyUnit?: string;
+  bullets?: string[];
   featured?: boolean;
   badge?: string;
-  bullets: string[];
   cta: string;
   ctaHref: string;
   onCtaClick?: () => void;
@@ -47,537 +63,442 @@ interface PricingSectionProps {
   tiers: PriceTier[];
   showToggle?: boolean;
   footerNote?: string;
-  infoContent?: string;
   onCtaClick?: () => void;
 }
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const GREEN = "#39FF6A";
-
 
 const CTA_LABELS: Record<string, string> = {
-  starter: "Start creating",
-  pro: "Choose Pro",
-  exclusive: "Choose Exclusive",
+  starter: "Get Starter",
+  pro: "Get Pro",
+  exclusive: "Get Exclusive",
 };
 
-const FEATURES_LABEL: Record<string, string> = {
-  starter: "Plan includes",
-  pro: "All Starter features, plus",
-  exclusive: "All Pro features, plus",
-};
+const TRUST_ITEMS = [
+  { icon: Monitor, label: "macOS and Windows" },
+  { icon: Lock, label: "Secure checkout" },
+  { icon: ShieldCheck, label: "7-day money-back guarantee" },
+];
+
+const ADOBE_APPS = [
+  { src: "/pr.png", name: "Premiere Pro", alt: "Adobe Premiere Pro" },
+  { src: "/ae.png", name: "After Effects", alt: "Adobe After Effects" },
+] as const;
+
+function fmtPrice(n: number) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function resolveHighlights(tier: PriceTier): string[] {
+  if (tier.highlights?.length) return tier.highlights;
+  if (tier.featureGroups?.length) {
+    return tier.featureGroups.flatMap((g) => g.items);
+  }
+  return tier.bullets ?? [];
+}
+
+function legacyGeneration(tier: PriceTier, yearly: boolean): GenerationAllowance | null {
+  const raw = yearly && tier.yearlyUnit ? tier.yearlyUnit : tier.unit;
+  if (!raw) return null;
+  const [secondsPart] = raw.split("≈").map((s) => s.trim());
+  return { shots: raw, seconds: secondsPart };
+}
+
+function BillingToggle({
+  yearly,
+  onChange,
+}: {
+  yearly: boolean;
+  onChange: (yearly: boolean) => void;
+}) {
+  return (
+    <div
+      className="relative inline-flex rounded-[11px] border border-white/[0.12] bg-white/[0.03] p-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+      role="group"
+      aria-label="Billing period"
+    >
+      <motion.span
+        layoutId="billing-pill"
+        transition={{ type: "spring", stiffness: 480, damping: 34 }}
+        className="absolute inset-y-[3px] rounded-[8px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.9)]"
+        style={{
+          width: yearly ? "calc(50% - 3px)" : "calc(50% - 3px)",
+          left: yearly ? "calc(50%)" : "3px",
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          onChange(false);
+          track("pricing_toggle", { billing: "monthly" });
+        }}
+        className={`relative z-10 min-w-[108px] rounded-[8px] px-5 py-2 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
+          !yearly ? "text-black" : "text-white/50 hover:text-white/70"
+        }`}
+      >
+        Monthly
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          onChange(true);
+          track("pricing_toggle", { billing: "annual" });
+        }}
+        className={`relative z-10 flex min-w-[148px] items-center justify-center gap-1.5 rounded-[8px] px-4 py-2 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
+          yearly ? "text-black" : "text-white/50 hover:text-white/70"
+        }`}
+      >
+        <span>Annual</span>
+        <span
+          className={`text-[10px] font-semibold tracking-[0.02em] ${
+            yearly ? "text-black/55" : "text-[#39FF6A]/75"
+          }`}
+        >
+          · Save 30%
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function AdobeTrustBar() {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.02] px-5 py-5 backdrop-blur-sm sm:px-6 sm:py-5">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-80"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(57,255,106,0.06) 0%, transparent 65%)",
+        }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+        aria-hidden
+      />
+
+      <div className="relative">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
+          Included in every plan
+        </p>
+
+        <div className="mt-4 flex flex-col gap-4 sm:mt-5 sm:flex-row sm:items-stretch sm:justify-center sm:gap-0">
+          {ADOBE_APPS.map((app, i) => (
+            <div key={app.name} className="flex flex-1 items-center sm:justify-center">
+              {i > 0 && (
+                <div
+                  className="mx-6 hidden h-10 w-px shrink-0 bg-white/[0.08] sm:block"
+                  aria-hidden
+                />
+              )}
+              <div className="flex w-full items-center gap-3.5 sm:w-auto sm:justify-center">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-black/40">
+                  <Image
+                    src={app.src}
+                    alt={app.alt}
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 object-contain"
+                  />
+                </div>
+                <div className="text-left">
+                  <p className="text-[13px] font-medium tracking-[-0.01em] text-white/80">
+                    {app.name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-white/35">Native Adobe panel</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-center text-[13px] tracking-[-0.01em] text-white/45 sm:mt-5">
+          One subscription.{" "}
+          <span className="text-white/65">Both panels included.</span>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function PricingSection({
-  title = "Pick a plan",
+  title = "Plans for every editing workflow.",
   subtitle,
   tiers,
   showToggle = false,
   footerNote,
-  infoContent,
   onCtaClick,
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
   const { user } = useUser();
 
-  /** Directly open LS checkout for a logged-in user */
-  const openLSCheckout = useCallback((baseUrl: string, tierName?: string, tierPrice?: number) => {
-    if (!user) return;
-    try {
-      if (typeof window !== 'undefined' && window.fbq && tierName && tierPrice !== undefined) {
-        initiateCheckout(tierName, tierPrice);
+  const openLSCheckout = useCallback(
+    (baseUrl: string, tierName?: string, tierPrice?: number) => {
+      if (!user) return;
+      try {
+        if (typeof window !== "undefined" && window.fbq && tierName && tierPrice !== undefined) {
+          initiateCheckout(tierName, tierPrice);
+        }
+      } catch {
+        /* pixel optional */
       }
-    } catch (_) {}
-    const refCode = getRefCodeFromCookie();
-    let url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
-    if (refCode) url += `&checkout[custom][ref_code]=${encodeURIComponent(refCode)}`;
-    if (window.LemonSqueezy?.Url?.Open) {
-      window.LemonSqueezy.Url.Open(url);
-    } else if (window.createLemonSqueezy) {
-      window.createLemonSqueezy();
-      window.LemonSqueezy?.Url?.Open(url);
-    } else {
-      window.location.href = url;
-    }
-  }, [user]);
+      const refCode = getRefCodeFromCookie();
+      let url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
+      if (refCode) url += `&checkout[custom][ref_code]=${encodeURIComponent(refCode)}`;
+      if (window.LemonSqueezy?.Url?.Open) {
+        window.LemonSqueezy.Url.Open(url);
+      } else if (window.createLemonSqueezy) {
+        window.createLemonSqueezy();
+        window.LemonSqueezy?.Url?.Open(url);
+      } else {
+        window.location.href = url;
+      }
+    },
+    [user],
+  );
 
-  const openLSOverlay = useCallback((baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
-    e.preventDefault();
-    if (tierName && tierPrice !== undefined) {
-      track(`pricing_click_${tierName.toLowerCase()}`, { plan: tierName.toLowerCase(), price: tierPrice });
-    }
-    if (!user) {
-      // Not logged in, send to sign-in, after login Clerk returns to /#pricing
-      window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/#pricing');
-      return;
-    }
-    openLSCheckout(baseUrl, tierName, tierPrice);
-  }, [user, openLSCheckout]);
+  const openLSOverlay = useCallback(
+    (baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
+      e.preventDefault();
+      if (tierName && tierPrice !== undefined) {
+        track(`pricing_click_${tierName.toLowerCase()}`, {
+          plan: tierName.toLowerCase(),
+          price: tierPrice,
+        });
+      }
+      if (!user) {
+        window.location.href =
+          "/sign-in?redirect_url=" + encodeURIComponent("/#pricing");
+        return;
+      }
+      openLSCheckout(baseUrl, tierName, tierPrice);
+    },
+    [user, openLSCheckout],
+  );
 
   return (
     <section
       id="pricing"
-      style={{
-        background: "#0a0a0a",
-        padding: "100px 20px 120px",
-        borderTop: "1px solid #111",
-        textAlign: "center",
-      }}
+      className="border-t border-white/[0.06] bg-[#080808] px-4 py-14 sm:px-6 lg:px-8 lg:py-20"
     >
-      <div className="mx-auto" style={{ maxWidth: "1060px" }}>
-
-        {/* Adobe panels included */}
+      <div className="mx-auto max-w-[1080px]">
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-60px" }}
-          transition={{ duration: 0.45 }}
-          className="mx-auto mb-14 max-w-2xl rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-8 text-center"
+          transition={{ duration: 0.45, ease }}
+          className="mx-auto max-w-2xl"
         >
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">
-            Included in every plan
-          </p>
-          <h3 className="mt-3 text-xl font-semibold tracking-tight text-white sm:text-2xl">
-            One subscription. Both Adobe panels.
-          </h3>
-          <div className="mt-5 flex items-center justify-center gap-6">
-            <div className="flex items-center gap-2 text-[13px] text-white/55">
-              <Image src="/pr.png" alt="Premiere Pro" width={20} height={20} className="opacity-80" />
-              Premiere Pro panel
-            </div>
-            <div className="flex items-center gap-2 text-[13px] text-white/55">
-              <Image src="/ae.png" alt="After Effects" width={20} height={20} className="opacity-80" />
-              After Effects panel
-            </div>
+          <div className="text-center">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
+              Pricing
+            </p>
+            <h2 className="mx-auto mt-2.5 max-w-lg text-[clamp(1.875rem,4.2vw,2.625rem)] font-semibold leading-[1.06] tracking-[-0.035em] text-white">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="mx-auto mt-3 max-w-md text-[14px] leading-6 text-white/42">
+                {subtitle}
+              </p>
+            )}
+            {showToggle && (
+              <div className="mt-6 flex justify-center">
+                <BillingToggle yearly={yearly} onChange={setYearly} />
+              </div>
+            )}
+          </div>
+
+          <div className="mt-7 sm:mt-8">
+            <AdobeTrustBar />
           </div>
         </motion.div>
 
-        {/* ── Heading ───────────────────────────────────────────────────── */}
-        <motion.div
-          initial={{ opacity: 1, y: 0 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.5 }}
-          style={{ marginBottom: "56px" }}
-        >
-          <p style={{
-            fontSize: "11px",
-            fontWeight: 500,
-            textTransform: "uppercase",
-            letterSpacing: "0.18em",
-            color: "rgba(255,255,255,0.4)",
-            marginBottom: "20px",
-          }}>
-            Pricing
-          </p>
-          <h2 style={{
-            fontSize: "clamp(28px, 4vw, 44px)",
-            fontWeight: 600,
-            color: "white",
-            letterSpacing: "-1px",
-            lineHeight: 1.1,
-            margin: "0 0 16px",
-          }}>
-            {title}
-          </h2>
-          {subtitle && (
-            <p style={{ fontSize: "15px", color: "#666", fontWeight: 400, lineHeight: 1.6, margin: 0 }}>
-              {subtitle}
-            </p>
-          )}
-
-          {/* Radio toggle */}
-          {showToggle && (
-            <div className="inline-flex items-center gap-6" style={{ marginTop: "36px" }}>
-              {([false, true] as const).map((isYr) => (
-                <label
-                  key={String(isYr)}
-                  className="inline-flex items-center gap-2 cursor-pointer select-none"
-                  onClick={() => { setYearly(isYr); track('pricing_toggle', { billing: isYr ? 'annual' : 'monthly' }); }}
-                >
-                  <span style={{
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    border: `2px solid ${yearly === isYr ? GREEN : "#333"}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    transition: "border-color 0.15s",
-                  }}>
-                    {yearly === isYr && (
-                      <span style={{
-                        width: "9px",
-                        height: "9px",
-                        borderRadius: "50%",
-                        background: GREEN,
-                      }} />
-                    )}
-                  </span>
-                  <span style={{
-                    fontSize: "14px",
-                    fontWeight: yearly === isYr ? 600 : 400,
-                    color: yearly === isYr ? "white" : "#555",
-                    transition: "color 0.15s",
-                  }}>
-                    {isYr ? "Annually" : "Monthly"}
-                  </span>
-                  {isYr && (
-                    <span style={{
-                      background: "rgba(57,255,106,0.12)",
-                      border: "1px solid rgba(57,255,106,0.2)",
-                      color: GREEN,
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "2px 8px",
-                      borderRadius: "4px",
-                    }}>
-                      Save 30%
-                    </span>
-                  )}
-                </label>
-              ))}
-            </div>
-          )}
-        </motion.div>
-
-        {/* ── Cards ─────────────────────────────────────────────────────── */}
-        <div
-          className={tiers.length === 2 ? "grid sm:grid-cols-2" : "grid sm:grid-cols-2 lg:grid-cols-3"}
-          style={{ gap: "16px", alignItems: "stretch" }}
-        >
+        <div className="mt-8 grid gap-3 lg:mt-9 lg:grid-cols-3 lg:items-end lg:gap-3.5">
           {tiers.map((tier, i) => {
-            const isYearly    = yearly && !!tier.yearlyPrice;
-            const price       = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
-            const origYr      = tier.monthlyPrice * 12;
-            const fmtPrice    = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
-            const fmtOrigYr   = Number.isInteger(origYr) ? String(origYr) : origYr.toFixed(2);
+            const isYearly = yearly && !!tier.yearlyPrice;
+            const price = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
             const resolvedHref = tier.ctaHref.startsWith("/checkout")
               ? `${tier.ctaHref}&billing=${isYearly ? "yearly" : "monthly"}`
               : tier.ctaHref;
-            const lsBaseUrl   = isYearly ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl) : tier.lsMonthlyUrl;
-            const activeUnit  = isYearly && tier.yearlyUnit ? tier.yearlyUnit : tier.unit;
-            const ctaLabel    = CTA_LABELS[tier.id] ?? tier.cta;
-            const featLabel   = FEATURES_LABEL[tier.id] ?? "Plan includes";
+            const lsBaseUrl = isYearly
+              ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl)
+              : tier.lsMonthlyUrl;
+            const ctaLabel = CTA_LABELS[tier.id] ?? tier.cta;
+            const generation =
+              (isYearly && tier.generation?.yearly) ||
+              tier.generation?.monthly ||
+              legacyGeneration(tier, isYearly);
+            const highlights = resolveHighlights(tier);
+            const featured = tier.featured;
 
-            const [unitMain, unitSub] = activeUnit
-              ? activeUnit.split("≈").map((s) => s.trim())
-              : ["", ""];
-
-            /* CTA button */
-            const renderBtn = () => {
-              const btnStyle: React.CSSProperties = tier.featured ? {
-                width: "100%",
-                padding: "14px 20px",
-                fontSize: "14px",
-                fontWeight: 600,
-                borderRadius: "9px",
-                cursor: "pointer",
-                letterSpacing: "0.01em",
-                transition: "opacity 0.15s",
-                background: "white",
-                color: "#080808",
-                border: "none",
-              } : {
-                width: "100%",
-                padding: "13px 20px",
-                fontSize: "14px",
-                fontWeight: 500,
-                borderRadius: "9px",
-                cursor: "pointer",
-                letterSpacing: "0.01em",
-                transition: "background 0.15s, border-color 0.15s",
-                background: "transparent",
-                color: "rgba(255,255,255,0.6)",
-                border: "1px solid #2a2a2a",
-              };
-
-              const enter = (e: React.MouseEvent) => {
-                const el = e.currentTarget as HTMLElement;
-                if (tier.featured) {
-                  el.style.opacity = "0.9";
-                } else {
-                  el.style.background = "rgba(255,255,255,0.04)";
-                  el.style.borderColor = "#3a3a3a";
-                  el.style.color = "white";
-                }
-              };
-              const leave = (e: React.MouseEvent) => {
-                const el = e.currentTarget as HTMLElement;
-                if (tier.featured) {
-                  el.style.opacity = "1";
-                } else {
-                  el.style.background = "transparent";
-                  el.style.borderColor = "#2a2a2a";
-                  el.style.color = "rgba(255,255,255,0.6)";
-                }
-              };
-
-              if (lsBaseUrl) {
-                return (
-                  <button
-                    onClick={(e) => openLSOverlay(lsBaseUrl, e, tier.name, price)}
-                    className="inline-flex items-center justify-center"
-                    style={btnStyle}
-                    onMouseEnter={enter}
-                    onMouseLeave={leave}
-                  >
-                    {ctaLabel}
-                  </button>
-                );
+            const handleCta = (e: React.MouseEvent) => {
+              if (lsBaseUrl) openLSOverlay(lsBaseUrl, e, tier.name, price);
+              else if (tier.onCtaClick ?? onCtaClick) {
+                e.preventDefault();
+                (tier.onCtaClick ?? onCtaClick)?.();
               }
-              if (tier.onCtaClick ?? onCtaClick) {
-                return (
-                  <button
-                    onClick={tier.onCtaClick ?? onCtaClick}
-                    className="inline-flex items-center justify-center"
-                    style={btnStyle}
-                    onMouseEnter={enter}
-                    onMouseLeave={leave}
-                  >
-                    {ctaLabel}
-                  </button>
-                );
-              }
-              return (
-                <Link
-                  href={resolvedHref}
-                  className="inline-flex items-center justify-center"
-                  style={{ ...btnStyle, textDecoration: "none" }}
-                >
-                  {ctaLabel}
-                </Link>
-              );
             };
 
+            const ctaClass = featured
+              ? "bg-[#39FF6A] text-black hover:opacity-90"
+              : "border border-white/[0.08] bg-white/[0.02] text-white/55 hover:border-white/14 hover:text-white/80";
+
             return (
-              <motion.div
+              <motion.article
                 key={tier.id}
-                initial={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 14 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.55, delay: i * 0.08, ease }}
-                className={`pricing-card${tier.featured ? " pricing-card--featured" : ""}`}
-                style={{
-                  position: "relative",
-                  borderRadius: "16px",
-                  padding: "32px 28px 28px",
-                  textAlign: "left",
-                  display: "flex",
-                  flexDirection: "column",
-                  background: tier.featured ? "#0c0c0c" : "#0f0f0f",
-                  border: tier.featured
-                    ? "1px solid rgba(255,255,255,0.12)"
-                    : "1px solid #1d1d1d",
-                  borderTop: tier.featured
-                    ? "1px solid rgba(255,255,255,0.12)"
-                    : "1px solid #1d1d1d",
-                  boxShadow: tier.featured
-                    ? "0 8px 40px rgba(0,0,0,0.35)"
-                    : "0 4px 24px rgba(0,0,0,0.3)",
-                  transform: tier.featured ? "translateY(-6px)" : "none",
-                }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.45, delay: i * 0.06, ease }}
+                className={`relative flex flex-col overflow-hidden rounded-xl border ${
+                  featured
+                    ? "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7 lg:-translate-y-4 lg:scale-[1.05] lg:origin-bottom"
+                    : "border-white/[0.06] px-5 py-5 sm:px-5 sm:py-6"
+                }`}
               >
-                {/* Subtle radial glow from top for featured */}
-                {tier.featured && (
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, right: 0, height: "120px",
-                    background: "radial-gradient(ellipse 80% 60px at 50% 0%, rgba(57,255,106,0.07), transparent)",
-                    borderRadius: "16px 16px 0 0",
-                    pointerEvents: "none",
-                  }} />
+                {featured && (
+                  <>
+                    <div
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#39FF6A]/[0.08] via-[#0a0d0a] to-[#080808]"
+                      aria-hidden
+                    />
+                    <div
+                      className="pointer-events-none absolute -top-20 left-1/2 h-40 w-full -translate-x-1/2 opacity-70 blur-3xl"
+                      style={{
+                        background:
+                          "radial-gradient(ellipse at center, rgba(57,255,106,0.12) 0%, transparent 72%)",
+                      }}
+                      aria-hidden
+                    />
+                    <div className="absolute inset-x-0 top-0 flex justify-center">
+                      <span className="rounded-b-lg border border-t-0 border-white/[0.10] bg-[#0a0f0a]/90 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#39FF6A]/80 backdrop-blur-sm">
+                        {tier.badge ?? "Most popular"}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {!featured && (
+                  <div
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0e0e0e] to-[#080808]"
+                    aria-hidden
+                  />
                 )}
 
-                <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-
-                  {/* ① Plan name + badge */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "22px" }}>
-                    <span style={{
-                      fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: tier.featured ? GREEN : "#4a4a4a",
-                    }}>
-                      {tier.name}
+                <div className={`relative flex flex-col ${featured ? "pt-5" : ""}`}>
+                  <p
+                    className={`text-[11px] font-medium uppercase tracking-[0.14em] ${
+                      featured ? "text-white/45" : "text-white/28"
+                    }`}
+                  >
+                    {tier.name}
+                  </p>
+                  <div className="mt-2.5 flex items-baseline gap-0.5">
+                    <span className="text-[13px] text-white/25">$</span>
+                    <span
+                      className={`font-semibold tracking-[-0.04em] ${
+                        featured
+                          ? "text-[clamp(2.25rem,4vw,3rem)] text-white"
+                          : "text-[clamp(1.875rem,3.5vw,2.375rem)] text-white/90"
+                      }`}
+                    >
+                      {fmtPrice(price)}
                     </span>
-                    {tier.featured && (
-                      <span style={{
-                        fontSize: "10px", fontWeight: 500,
-                        color: "rgba(57,255,106,0.65)",
-                        background: "rgba(57,255,106,0.07)",
-                        border: "1px solid rgba(57,255,106,0.18)",
-                        borderRadius: "20px", padding: "3px 9px",
-                      }}>
-                        Most popular
-                      </span>
-                    )}
+                    <span className="ml-1 text-[13px] text-white/25">
+                      /{isYearly ? "yr" : "mo"}
+                    </span>
                   </div>
 
-                  {/* ② Price block */}
-                  <div key={isYearly ? "yr" : "mo"} style={{ marginBottom: "20px" }}>
-                    <div style={{ display: "flex", alignItems: "flex-end", gap: "5px", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.25)", paddingBottom: "9px" }}>$</span>
-                      <span style={{
-                        fontSize: "clamp(46px, 9vw, 60px)",
-                        fontWeight: 700,
-                        color: "white",
-                        letterSpacing: "-3px",
-                        lineHeight: 1,
-                      }}>
-                        {fmtPrice(price)}
-                      </span>
-                      <span style={{ fontSize: "13px", color: "#3a3a3a", paddingBottom: "7px" }}>
-                        /{isYearly ? "yr" : "mo"}
-                      </span>
-                    </div>
-
-                    {/* Per-day + description inline */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      {tier.yearlyPerDay && (
-                        <span style={{
-                          fontSize: "13px", fontWeight: 600,
-                          color: tier.featured ? "rgba(57,255,106,0.8)" : "rgba(57,255,106,0.45)",
-                        }}>
-                          ${tier.yearlyPerDay}/day
+                  {generation && (
+                    <div className="mt-3">
+                      <p
+                        className={`font-semibold tracking-[-0.02em] ${
+                          featured
+                            ? "text-[18px] text-white sm:text-[19px]"
+                            : "text-[16px] text-white/75 sm:text-[17px]"
+                        }`}
+                      >
+                        {generation.shots}
+                        <span className="font-normal text-white/30">
+                          {" "}
+                          / {isYearly ? "yr" : "mo"}
                         </span>
-                      )}
-                      <span style={{ fontSize: "12px", color: "#383838" }}>·</span>
-                      <span style={{ fontSize: "12px", color: "#484848" }}>{tier.description}</span>
-                    </div>
-                    {isYearly && tier.yearlySave && (
-                      <span style={{ fontSize: "11px", color: "rgba(57,255,106,0.5)", fontWeight: 500, display: "block", marginTop: "5px" }}>
-                        Save ${tier.yearlySave} vs monthly
-                      </span>
-                    )}
-                  </div>
-
-                  {/* ③ CTA */}
-                  <div style={{ marginBottom: "26px" }}>
-                    {renderBtn()}
-                  </div>
-
-                  {/* ④ Divider */}
-                  <div style={{ height: "1px", background: tier.featured ? "rgba(57,255,106,0.1)" : "rgba(255,255,255,0.05)", marginBottom: "22px" }} />
-
-                  {/* ⑤ Credits callout */}
-                  {unitMain && (
-                    <div key={isYearly ? "unit-yr" : "unit-mo"} style={{
-                      display: "flex", alignItems: "center", gap: "10px",
-                      marginBottom: "20px",
-                      padding: "12px 14px",
-                      background: tier.featured ? "rgba(57,255,106,0.05)" : "rgba(255,255,255,0.02)",
-                      border: tier.featured ? "1px solid rgba(57,255,106,0.12)" : "1px solid rgba(255,255,255,0.05)",
-                      borderRadius: "10px",
-                    }}>
-                      <span style={{
-                        fontSize: "32px", fontWeight: 800,
-                        color: tier.featured ? "white" : "rgba(255,255,255,0.9)",
-                        letterSpacing: "-1.5px", lineHeight: 1, flexShrink: 0,
-                      }}>
-                        {unitMain.split(" ")[0]}
-                      </span>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-                        <p style={{ fontSize: "13px", fontWeight: 600, color: tier.featured ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)", margin: 0 }}>
-                          {unitMain.split(" ").slice(1).join(" ")}
+                      </p>
+                      {generation.seconds && (
+                        <p className="mt-0.5 text-[11px] text-white/20">
+                          {generation.seconds}
                         </p>
-                        {unitSub && (
-                          <p style={{ fontSize: "12px", fontWeight: 500, color: tier.featured ? "rgba(57,255,106,0.6)" : "rgba(255,255,255,0.3)", margin: 0 }}>
-                            ≈ {unitSub} of footage
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
 
-                  {/* ⑥ Features label */}
-                  <p style={{ fontSize: "10px", color: "#3d3d3d", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px" }}>
-                    {featLabel}
-                  </p>
+                  {highlights.length > 0 && (
+                    <ul className="mt-4 flex flex-1 flex-col gap-1.5 border-t border-white/[0.06] pt-4">
+                      {highlights.map((item) => (
+                        <li key={item} className="flex items-center gap-2.5">
+                          <Check
+                            size={13}
+                            strokeWidth={2}
+                            className={`shrink-0 ${
+                              featured ? "text-[#39FF6A]/45" : "text-white/15"
+                            }`}
+                            aria-hidden
+                          />
+                          <span
+                            className={`text-[12px] leading-snug ${
+                              featured ? "text-white/55" : "text-white/38"
+                            }`}
+                          >
+                            {item}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-                  {/* ⑦ Features list */}
-                  <ul style={{ listStyle: "none", padding: 0, margin: "0 0 auto", display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {tier.bullets.map((b) => (
-                      <li key={b} style={{ display: "flex", alignItems: "flex-start", gap: "9px" }}>
-                        <Check
-                          size={12}
-                          color={tier.featured ? "rgba(57,255,106,0.7)" : "#3a3a3a"}
-                          strokeWidth={2.5}
-                          style={{ flexShrink: 0, marginTop: "2px" }}
-                        />
-                        <span style={{
-                          fontSize: "13px",
-                          color: tier.featured ? "rgba(255,255,255,0.65)" : "#5e5e5e",
-                          lineHeight: 1.5,
-                        }}>
-                          {b}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* ⑧ Billing note */}
-                  <p style={{ fontSize: "11px", color: "#282828", margin: "22px 0 0", textAlign: "center" }}>
-                    Billed {isYearly ? "annually" : "monthly"} · Cancel anytime
-                  </p>
-
+                  <div className="mt-5">
+                    {lsBaseUrl || tier.onCtaClick || onCtaClick ? (
+                      <button
+                        type="button"
+                        onClick={handleCta}
+                        className={`inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-[13px] font-semibold transition-colors ${ctaClass}`}
+                      >
+                        {ctaLabel}
+                      </button>
+                    ) : (
+                      <Link
+                        href={resolvedHref}
+                        className={`inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-[13px] font-semibold transition-colors ${ctaClass}`}
+                      >
+                        {ctaLabel}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </motion.div>
+              </motion.article>
             );
           })}
         </div>
 
-        {footerNote && (
-          <div style={{
-            marginTop: "36px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "6px",
-            fontSize: "12px",
-            color: "rgba(255,255,255,0.25)",
-          }}>
-            <ShieldCheck size={12} color="rgba(57,255,106,0.5)" strokeWidth={2} />
-            {footerNote}
-          </div>
-        )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4, ease }}
+          className="mt-10 border-t border-white/[0.06] pt-7 lg:mt-11"
+        >
+          <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+            {TRUST_ITEMS.map(({ icon: Icon, label }) => (
+              <li key={label} className="flex items-center gap-2">
+                <Icon size={13} strokeWidth={2} className="text-white/22" aria-hidden />
+                <span className="text-[12px] text-white/35">{label}</span>
+              </li>
+            ))}
+          </ul>
+          {footerNote && (
+            <p className="mt-5 text-center text-[12px] text-white/25">{footerNote}</p>
+          )}
+        </motion.div>
       </div>
-
-      {/* Info modal */}
-      <AnimatePresence>
-        {infoOpen && (
-          <motion.div
-            initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-            onClick={() => setInfoOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 8 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative max-w-sm w-full p-7"
-              style={{ background: "#0c0c0c", border: "1px solid #1e1e1e", borderRadius: "16px" }}
-            >
-              <button
-                onClick={() => setInfoOpen(false)}
-                className="absolute top-4 right-4"
-                style={{ color: "#444" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "white"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#444"; }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "white", marginBottom: "12px" }}>
-                What are seconds?
-              </h3>
-              <p style={{ fontSize: "13px", color: "#555", lineHeight: 1.7 }}>
-                {infoContent ?? 'In Prysmor, "seconds" refers to the total duration of video effects you can generate per month. Credits reset on your billing date.'}
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </section>
   );
 }

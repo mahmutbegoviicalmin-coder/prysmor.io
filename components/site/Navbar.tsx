@@ -4,16 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, X, LayoutDashboard, ArrowRight } from "lucide-react";
+import { Menu, X, LayoutDashboard } from "lucide-react";
 import { useAuth, useClerk, UserButton } from "@clerk/nextjs";
 import { track } from "@vercel/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-const GREEN = "#39FF6A";
-
 const navLinks = [
-  { label: "How it works", href: "/#how-it-works" },
+  { label: "How it Works", href: "/#how-it-works" },
   { label: "Capabilities", href: "/#examples" },
   { label: "Pricing", href: "/#pricing" },
   { label: "FAQ", href: "/#faq" },
@@ -21,10 +19,25 @@ const navLinks = [
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+function NavLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="group relative px-3.5 py-2 text-[13px] font-medium tracking-[-0.015em] text-white/38 transition-colors duration-200 hover:text-white/90"
+    >
+      {label}
+      <span
+        className="absolute inset-x-3.5 -bottom-px h-px bg-white/25 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        aria-hidden
+      />
+    </Link>
+  );
+}
+
 export default function Navbar() {
-  const [scrolled,   setScrolled]   = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname  = usePathname();
+  const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
 
@@ -35,207 +48,135 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 40);
+    const fn = () => setScrolled(window.scrollY > 16);
     fn();
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   return (
     <>
-      <header
-        className="fixed inset-x-0 z-[100] transition-all duration-[250ms] ease"
-        style={scrolled ? {
-          top: "var(--bar-h, 0px)",
-          background: "rgba(8,8,8,0.9)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          borderBottom: "1px solid #111",
-        } : {
-          top: "var(--bar-h, 0px)",
-          background: "transparent",
-        }}
-      >
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-[100] px-4 pt-2.5 sm:px-6 sm:pt-3">
         <div
-          className="flex items-center justify-between w-full"
-          style={{ padding: "20px 40px" }}
+          className={cn(
+            "pointer-events-auto relative mx-auto flex h-14 max-w-[1120px] items-center justify-between overflow-hidden rounded-xl px-5 transition-all duration-300 lg:px-6",
+            scrolled
+              ? "border border-white/[0.08] bg-[#080808]/72 shadow-[0_4px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+              : "border border-transparent bg-transparent shadow-none",
+          )}
         >
-          {/* Logo, icon + text */}
-          <Link href="/" className="flex items-center gap-2 focus-visible:outline-none flex-shrink-0">
+          {scrolled && (
+            <>
+              <div
+                className="pointer-events-none absolute inset-0 opacity-70"
+                style={{
+                  background:
+                    "radial-gradient(ellipse 60% 70% at 50% -30%, rgba(57,255,106,0.03) 0%, transparent 70%)",
+                }}
+                aria-hidden
+              />
+              <div
+                className="pointer-events-none absolute inset-0 rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                aria-hidden
+              />
+            </>
+          )}
+
+          <Link
+            href="/"
+            className="relative flex shrink-0 items-center gap-2 focus-visible:outline-none"
+          >
             <Image
               src="/logo/logo-icon.png"
               alt="Prysmor"
-              width={28}
-              height={28}
-              className="w-7 h-7 object-contain"
+              width={24}
+              height={24}
+              className="h-6 w-6 object-contain"
               priority
             />
-            <span
-              className="font-bold text-white"
-              style={{ fontSize: "18px", letterSpacing: "-0.5px" }}
-            >
+            <span className="text-[16px] font-semibold tracking-[-0.03em] text-white">
               Prysmor
             </span>
           </Link>
 
-          {/* Desktop nav, floating pill */}
-          <nav
-            className="hidden lg:inline-flex items-center"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.07)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              borderRadius: "100px",
-              padding: "5px",
-              gap: "2px",
-            }}
-          >
-            {navLinks.map((l) => {
-              const isActive = pathname === l.href;
-              return (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="transition-all duration-200"
-                  style={{
-                    color: isActive ? "white" : "#555",
-                    fontSize: "13px",
-                    fontWeight: 400,
-                    padding: "7px 16px",
-                    borderRadius: "100px",
-                    background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)";
-                      (e.currentTarget as HTMLElement).style.color = "white";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
-                      (e.currentTarget as HTMLElement).style.color = "#555";
-                    }
-                  }}
-                >
-                  {l.label}
-                </Link>
-              );
-            })}
+          <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center lg:flex">
+            {navLinks.map((l) => (
+              <NavLink key={l.href} href={l.href} label={l.label} />
+            ))}
           </nav>
 
-          {/* Right side */}
-          <div className="hidden lg:flex items-center flex-shrink-0" style={{ gap: "20px" }}>
+          <div className="relative hidden items-center gap-4 lg:flex">
             {isSignedIn ? (
               <>
                 <Link
                   href="https://prysmor.io/dashboard"
-                  className="flex items-center gap-2 transition-all duration-200"
-                  style={{
-                    padding: "7px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    fontSize: "13px",
-                    color: "rgba(255,255,255,0.7)",
-                    textDecoration: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
-                    (e.currentTarget as HTMLElement).style.color = "white";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
-                    (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.7)";
-                  }}
+                  className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/45 transition-colors duration-200 hover:text-white/85"
                 >
-                  <LayoutDashboard className="w-3.5 h-3.5" style={{ color: GREEN }} />
+                  <LayoutDashboard className="h-3.5 w-3.5 text-white/35" />
                   Dashboard
                 </Link>
                 <UserButton
                   afterSignOutUrl="/"
                   appearance={{
                     elements: {
-                      avatarBox: "w-8 h-8 rounded-[9px] ring-1 ring-white/[0.10] hover:ring-[#39FF6A]/40 transition-all",
+                      avatarBox:
+                        "w-7 h-7 rounded-[8px] ring-1 ring-white/[0.08] hover:ring-white/[0.16] transition-all",
                     },
                   }}
                 />
               </>
             ) : (
               <>
-                {/* Sign in */}
                 <button
+                  type="button"
                   onClick={handleSignIn}
-                  className="transition-colors duration-200 cursor-pointer"
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 400,
-                    color: "#3a3a3a",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    textDecoration: "none",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#888"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#3a3a3a"; }}
+                  className="cursor-pointer px-1 text-[13px] font-medium tracking-[-0.015em] text-white/40 transition-colors duration-200 hover:text-white/80"
                 >
-                  Sign in
+                  Sign In
                 </button>
-
-                {/* Get Started CTA */}
                 <button
+                  type="button"
                   onClick={handleSignUp}
-                  className="inline-flex items-center gap-1.5 font-bold cursor-pointer transition-colors duration-200"
-                  style={{
-                    background: GREEN,
-                    color: "#000",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#52ff7e";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = GREEN;
-                  }}
+                  className="inline-flex cursor-pointer items-center rounded-md bg-[#39FF6A] px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] text-black transition-opacity duration-200 hover:opacity-90"
                 >
-                  Get Started
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  Get Started Free
                 </button>
               </>
             )}
           </div>
 
-          {/* Mobile toggle */}
           <button
-            className="lg:hidden w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.08] transition-colors"
-            style={{ color: "#666" }}
+            type="button"
+            className="relative flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.07] text-white/40 transition-colors duration-200 hover:border-white/[0.12] hover:text-white/80 lg:hidden"
             onClick={() => setMobileOpen((o) => !o)}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "white"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#666"; }}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
             <AnimatePresence mode="wait" initial={false}>
               {mobileOpen ? (
-                <motion.span key="x"
-                  initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.14 }}
-                  className="flex">
-                  <X className="w-4 h-4" />
+                <motion.span
+                  key="x"
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.14 }}
+                  className="flex"
+                >
+                  <X className="h-4 w-4" />
                 </motion.span>
               ) : (
-                <motion.span key="menu"
-                  initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}
-                  exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.14 }}
-                  className="flex">
-                  <Menu className="w-4 h-4" />
+                <motion.span
+                  key="menu"
+                  initial={{ rotate: 90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: -90, opacity: 0 }}
+                  transition={{ duration: 0.14 }}
+                  className="flex"
+                >
+                  <Menu className="h-4 w-4" />
                 </motion.span>
               )}
             </AnimatePresence>
@@ -243,12 +184,13 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
               onClick={() => setMobileOpen(false)}
@@ -258,48 +200,55 @@ export default function Navbar() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.22, ease }}
-              className="fixed inset-x-3 z-40 lg:hidden rounded-[20px] border border-white/[0.09] backdrop-blur-2xl shadow-[0_32px_80px_rgba(0,0,0,0.85)] overflow-hidden"
-              style={{ background: "rgba(8,8,8,0.99)", top: "calc(76px + var(--bar-h, 0px))" }}
+              className="fixed inset-x-4 z-40 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a]/95 shadow-[0_24px_64px_rgba(0,0,0,0.8)] backdrop-blur-2xl lg:hidden"
+              style={{ top: "calc(74px + 8px)" }}
             >
-              <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GREEN}50 40%,${GREEN}50 60%,transparent)` }} />
-              <div className="p-5 space-y-1">
+              <div className="space-y-0.5 p-4">
                 {navLinks.map((l) => (
                   <Link
                     key={l.href}
                     href={l.href}
                     className={cn(
-                      "block px-3 py-3 rounded-[12px] text-[14px] font-medium transition-colors",
+                      "block rounded-lg px-3 py-2.5 text-[14px] font-medium tracking-[-0.015em] transition-colors duration-200",
                       pathname === l.href
-                        ? "text-white bg-white/[0.06]"
-                        : "text-[#666] hover:text-white hover:bg-white/[0.04]",
+                        ? "bg-white/[0.05] text-white"
+                        : "text-white/42 hover:bg-white/[0.03] hover:text-white/85",
                     )}
                   >
                     {l.label}
                   </Link>
                 ))}
-                <div className="!mt-5 flex flex-col gap-2.5">
+
+                <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
                   {isSignedIn ? (
                     <Link
                       href="https://prysmor.io/dashboard"
-                      className="flex items-center gap-3 px-4 py-3 rounded-[14px] border border-white/[0.08] hover:border-white/[0.16] transition-all"
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
                     >
-                      <LayoutDashboard className="w-4 h-4" style={{ color: GREEN }} />
-                      <span className="text-[14px] font-semibold text-white">Dashboard</span>
+                      <LayoutDashboard className="h-4 w-4 text-white/35" />
+                      <span className="text-[14px] font-medium text-white/85">Dashboard</span>
                     </Link>
                   ) : (
                     <>
                       <button
-                        onClick={() => { setMobileOpen(false); handleSignIn(); }}
-                        className="w-full py-3 rounded-[12px] text-[14px] font-medium border border-white/[0.08] text-[#666] hover:text-white hover:border-white/[0.16] transition-all"
+                        type="button"
+                        onClick={() => {
+                          setMobileOpen(false);
+                          handleSignIn();
+                        }}
+                        className="w-full rounded-lg py-2.5 text-[14px] font-medium text-white/42 transition-colors hover:text-white/80"
                       >
-                        Sign in
+                        Sign In
                       </button>
                       <button
-                        onClick={() => { setMobileOpen(false); handleSignUp(); }}
-                        className="w-full py-3 rounded-[12px] text-[14px] font-bold flex items-center justify-center gap-2 transition-all"
-                        style={{ background: GREEN, color: "#000" }}
+                        type="button"
+                        onClick={() => {
+                          setMobileOpen(false);
+                          handleSignUp();
+                        }}
+                        className="w-full rounded-lg bg-[#39FF6A] py-2 text-[13px] font-semibold text-black transition-opacity hover:opacity-90"
                       >
-                        Get Started <ArrowRight className="w-4 h-4" />
+                        Get Started Free
                       </button>
                     </>
                   )}
