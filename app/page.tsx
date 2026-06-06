@@ -4,6 +4,7 @@ import { MotionConfig } from "framer-motion";
 import HeroSection from "@/components/sections/HeroSection";
 import HowItWorks from "@/components/sections/HowItWorks";
 import CapabilitiesSection from "@/components/sections/CapabilitiesSection";
+import VFXRealitySection from "@/components/sections/VFXRealitySection";
 import PricingSection, { type PriceTier } from "@/components/sections/PricingSection";
 import FAQ, { type FAQItem } from "@/components/sections/FAQ";
 import FinalCTA from "@/components/sections/FinalCTA";
@@ -177,6 +178,7 @@ export default function PrysmorPage() {
         <HeroSection />
         <HowItWorks />
         <CapabilitiesSection />
+        <VFXRealitySection />
 
         <PricingSection
           title="Plans for every editing workflow."
