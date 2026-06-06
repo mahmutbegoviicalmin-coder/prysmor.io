@@ -50,7 +50,7 @@ async function checkAdmin() {
   return emails.some(e => ADMIN_EMAILS.includes(e));
 }
 
-// ─── PATCH — update user ──────────────────────────────────────────────────────
+// ─── PATCH, update user ──────────────────────────────────────────────────────
 
 export async function PATCH(
   req: NextRequest,
@@ -185,7 +185,7 @@ export async function PATCH(
   }
 }
 
-// ─── DELETE — permanently remove user ────────────────────────────────────────
+// ─── DELETE, permanently remove user ────────────────────────────────────────
 
 export async function DELETE(
   _req: NextRequest,
@@ -213,7 +213,7 @@ export async function DELETE(
     // Delete Firestore user doc
     await ref.delete();
 
-    // Delete from Clerk (last — so we can retry if Firestore fails)
+    // Delete from Clerk (last, so we can retry if Firestore fails)
     await clerk.users.deleteUser(params.id);
 
     console.log(`[admin] Deleted user ${params.id}`);

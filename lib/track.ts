@@ -5,6 +5,6 @@ export function track(event: string, properties: Record<string, unknown> = {}) {
   try {
     vaTrack(event, properties);
   } catch {
-    // always fail silently — never break the UI
+    // always fail silently, never break the UI
   }
 }

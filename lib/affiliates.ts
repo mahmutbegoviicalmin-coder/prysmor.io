@@ -6,7 +6,7 @@ export interface AffiliateProfile {
   userId: string;
   code: string;
   commissionPercent: number;    // e.g. 15 = 15%
-  // Manual fields set by admin — what the affiliate sees
+  // Manual fields set by admin, what the affiliate sees
   manualTotalEarnings: number;
   manualPendingEarnings: number;
   manualPaidEarnings: number;
@@ -64,7 +64,7 @@ export async function getAllAffiliates(): Promise<AffiliateProfile[]> {
 
 /** Get referrals for a specific affiliate */
 export async function getReferralsByCode(code: string): Promise<AffiliateReferral[]> {
-  // No orderBy here — avoids requiring a composite Firestore index
+  // No orderBy here, avoids requiring a composite Firestore index
   const snap = await db.collection('affiliateReferrals')
     .where('affiliateCode', '==', code)
     .get();
@@ -113,7 +113,7 @@ export async function recordReferral(params: {
     createdAt:        new Date(),
   });
 
-  // Note: earnings are managed manually by admin — only log the referral
+  // Note: earnings are managed manually by admin, only log the referral
   await db.collection('affiliates').doc(affiliate.id).update({
     updatedAt: new Date(),
   });

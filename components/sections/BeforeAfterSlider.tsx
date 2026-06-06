@@ -27,13 +27,13 @@ export default function BeforeAfterSlider({
   const afterLabelRef   = useRef<HTMLDivElement>(null);
   const animRef         = useRef<number>(0);
 
-  /* React state — only for things that change infrequently */
+  /* React state, only for things that change infrequently */
   const [dragging, setDragging]         = useState(false);
   const [hovered, setHovered]           = useState(false);
   const [ready, setReady]               = useState(false);
   const [userTouched, setUserTouched]   = useState(false);
 
-  /* Position bookkeeping — refs only, no React state */
+  /* Position bookkeeping, refs only, no React state */
   const readyCount  = useRef(0);
   const targetPos   = useRef(initialPos);
   const currentPos  = useRef(initialPos);
@@ -60,7 +60,7 @@ export default function BeforeAfterSlider({
     }
   }, []);
 
-  /* ── rAF lerp loop — touches DOM directly, never React state ── */
+  /* ── rAF lerp loop, touches DOM directly, never React state ── */
   useEffect(() => {
     function tick() {
       const diff = targetPos.current - currentPos.current;
@@ -203,7 +203,7 @@ export default function BeforeAfterSlider({
         </div>
       )}
 
-      {/* BEFORE — full frame */}
+      {/* BEFORE, full frame */}
       <video
         ref={beforeRef}
         src={beforeSrc}
@@ -218,7 +218,7 @@ export default function BeforeAfterSlider({
         }}
       />
 
-      {/* AFTER — clipped */}
+      {/* AFTER, clipped */}
       <div
         ref={afterClipRef}
         style={{

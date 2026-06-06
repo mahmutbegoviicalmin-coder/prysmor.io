@@ -1,136 +1,92 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
-
-interface FinalCTAProps {
-  title?: string;
-  subtitle?: string;
-  primaryLabel?: string;
-  primaryHref?: string;
-  onPrimaryClick?: () => void;
-}
+import { ArrowRight } from "lucide-react";
+import { track } from "@vercel/analytics";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
-const GREEN = "#39FF6A";
 
-export default function FinalCTA({
-  primaryLabel = "Get Started",
-  onPrimaryClick,
-}: FinalCTAProps) {
+export default function FinalCTA() {
   return (
-    <section
-      style={{
-        position: "relative",
-        overflow: "hidden",
-        padding: "120px 40px",
-        borderTop: "1px solid #0f0f0f",
-        background: [
-          "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(57,255,106,0.08) 0%, rgba(57,255,106,0.02) 40%, transparent 70%)",
-          "#080808",
-        ].join(", "),
-        textAlign: "center",
-      }}
-    >
-      {/* Grid lines */}
+    <section className="relative overflow-hidden border-t border-white/[0.06] bg-[#080808]">
       <div
-        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-1/2 h-[420px] -translate-y-1/2 opacity-70 blur-3xl"
         style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: [
-            "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)",
-            "linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
-          ].join(", "),
-          backgroundSize: "80px 80px",
-          pointerEvents: "none",
-          zIndex: 0,
+          background:
+            "radial-gradient(ellipse 70% 50% at 50% 50%, rgba(57,255,106,0.09) 0%, transparent 70%)",
         }}
+        aria-hidden
       />
 
-      {/* Edge fade */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: [
-            "linear-gradient(to right, #080808 0%, transparent 20%, transparent 80%, #080808 100%)",
-            "linear-gradient(to bottom, #080808 0%, transparent 20%, transparent 80%, #080808 100%)",
-          ].join(", "),
-          pointerEvents: "none",
-          zIndex: 1,
-        }}
-      />
-
-      {/* Content */}
-      <div style={{ position: "relative", zIndex: 10 }}>
+      <div className="relative mx-auto max-w-[1200px] px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <motion.div
-          initial={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, ease }}
-          className="flex flex-col items-center"
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45, ease }}
+          className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0a]/80 p-6 ring-1 ring-[#39FF6A]/10 sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:p-12"
         >
-          <h2
-            style={{
-              fontSize: "clamp(40px, 5.5vw, 72px)",
-              fontWeight: 800,
-              letterSpacing: "-2.5px",
-              lineHeight: 1.05,
-              textAlign: "center",
-              margin: 0,
-            }}
-          >
-            <span style={{ color: "white", display: "block" }}>
-              Stop hiring VFX artists.
-            </span>
-            <span style={{ color: GREEN, display: "block" }}>
-              Start typing.
-            </span>
-          </h2>
+          <div
+            className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full opacity-40 blur-3xl"
+            style={{ background: "rgba(57,255,106,0.12)" }}
+            aria-hidden
+          />
 
-          {onPrimaryClick ? (
-            <button
-              onClick={onPrimaryClick}
-              style={{
-                background: GREEN,
-                color: "#000",
-                borderRadius: "8px",
-                padding: "14px 36px",
-                fontSize: "15px",
-                fontWeight: 700,
-                border: "none",
-                cursor: "pointer",
-                marginTop: "36px",
-                boxShadow: "0 0 40px rgba(57,255,106,0.25)",
-                transition: "box-shadow 200ms, transform 200ms",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.boxShadow = "0 0 60px rgba(57,255,106,0.4)";
-                el.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.boxShadow = "0 0 40px rgba(57,255,106,0.25)";
-                el.style.transform = "translateY(0)";
-              }}
+          <div className="relative max-w-xl text-center lg:text-left">
+            <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#39FF6A]/55">
+                Get started
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Image
+                  src="/pr.png"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="h-4 w-4 object-contain opacity-75"
+                  aria-hidden
+                />
+                <Image
+                  src="/ae.png"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="h-4 w-4 object-contain opacity-75"
+                  aria-hidden
+                />
+              </div>
+            </div>
+
+            <h2 className="mt-4 text-[clamp(1.75rem,4vw,2.5rem)] font-semibold leading-[1.12] tracking-tight text-white">
+              Install the panel. Generate on{" "}
+              <span className="text-[#39FF6A]/90">your timeline</span>.
+            </h2>
+
+            <p className="mx-auto mt-4 max-w-md text-[15px] leading-7 text-white/55 lg:mx-0">
+              Create a free account, install the Premiere Pro and After Effects
+              panels, and start generating from your edit.
+            </p>
+
+            <p className="mt-4 hidden text-[12px] leading-5 text-white/30 lg:block">
+              7-day money-back guarantee on paid plans. Cancel anytime.
+            </p>
+          </div>
+
+          <div className="relative mt-8 flex flex-col items-center gap-3 lg:mt-0 lg:shrink-0 lg:items-end">
+            <Link
+              href="/sign-up"
+              onClick={() => track("get_started", { location: "final_cta" })}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#39FF6A] px-6 py-3.5 text-[14px] font-semibold text-black transition-opacity hover:opacity-90 sm:w-auto"
             >
-              {primaryLabel} →
-            </button>
-          ) : null}
-
-          <p style={{
-            fontSize: "12px",
-            color: "#2a2a2a",
-            marginTop: "14px",
-            fontWeight: 300,
-          }}>
-            7-day money-back guarantee · Cancel anytime
-          </p>
+              Get Started
+              <ArrowRight size={15} strokeWidth={2.5} />
+            </Link>
+            <p className="text-center text-[12px] leading-5 text-white/30 lg:hidden">
+              7-day money-back guarantee on paid plans. Cancel anytime.
+            </p>
+          </div>
         </motion.div>
       </div>
     </section>

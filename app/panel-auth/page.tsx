@@ -68,7 +68,7 @@ function PanelAuthContent() {
         </div>
 
         {!user ? (
-          /* ── Not signed in — show Clerk sign-in ── */
+          /* ── Not signed in, show Clerk sign-in ── */
           <div>
             <p className="text-center text-[14px] text-[#6B7280] mb-6">
               Sign in to authorize the Premiere Pro panel.

@@ -4,7 +4,7 @@ import { BookOpen, PanelLeft, Zap, Sparkles, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { getUser } from "@/lib/firestore/users";
 
-export const metadata = { title: "Docs — Dashboard" };
+export const metadata = { title: "Docs | Dashboard" };
 
 const sections = [
   {

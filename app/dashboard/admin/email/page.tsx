@@ -1,6 +1,6 @@
 import { EmailSection } from '@/app/admin/EmailSection';
 
-export const metadata = { title: 'Email — Admin' };
+export const metadata = { title: 'Email | Admin' };
 
 export default function AdminEmailPage() {
   return (

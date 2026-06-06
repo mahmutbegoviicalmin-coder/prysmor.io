@@ -42,7 +42,7 @@ export default function AuthRedirectPage() {
         gap: "20px",
       }}
     >
-      {/* Logo — gives visual context so it doesn't look like a black screen */}
+      {/* Logo, gives visual context so it doesn't look like a black screen */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo/vecilogo.png" alt="Prysmor" width={26} height={26} style={{ objectFit: "contain" }} />

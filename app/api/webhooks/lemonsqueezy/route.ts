@@ -109,10 +109,10 @@ async function setUserPlan(
   if (renewalDate) data.renewalDate = formatLsDate(renewalDate) ?? renewalDate;
 
   if (doc.exists) {
-    // Do NOT touch deviceLimit on existing docs — admin may have set a custom value.
+    // Do NOT touch deviceLimit on existing docs, admin may have set a custom value.
     await ref.update(data);
   } else {
-    // New user doc — seed deviceLimit to 1.
+    // New user doc, seed deviceLimit to 1.
     await ref.set({ ...data, deviceLimit: 1, createdAt: new Date() });
   }
 
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
   } else {
     const existingDoc = await db.collection('users').doc(userId).get();
     plan = (existingDoc.exists ? (existingDoc.data()?.plan as string) : undefined) ?? 'starter';
-    console.log(`[ls-webhook] variantId unknown — using existing plan="${plan}" for userId=${userId}`);
+    console.log(`[ls-webhook] variantId unknown, using existing plan="${plan}" for userId=${userId}`);
   }
 
   console.log(`[ls-webhook] resolved plan="${plan}" for event=${eventName}`);
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (eventName) {
       case 'subscription_created': {
-        // New subscription — set plan + top-up credits to plan cap
+        // New subscription, set plan + top-up credits to plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
         const { onUserBecamePaid } = await import('@/lib/email/enrollments');
@@ -222,14 +222,14 @@ export async function POST(req: NextRequest) {
       }
 
       case 'subscription_payment_success':
-        // Monthly renewal — set plan + reset credits to plan cap
+        // Monthly renewal, set plan + reset credits to plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
         console.log(`[ls-webhook] Credits reset on renewal: userId=${userId} plan=${plan}`);
         break;
 
       case 'subscription_updated':
-        // Plan change (upgrade/downgrade) — update plan + top-up to new plan cap
+        // Plan change (upgrade/downgrade), update plan + top-up to new plan cap
         await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
         await topUpCredits(userId, plan);
         {
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
 
       case 'subscription_cancelled':
         // User cancelled but keeps access until end of billing period.
-        // Do NOT revoke here — subscription_expired fires when access truly ends.
+        // Do NOT revoke here, subscription_expired fires when access truly ends.
         // Use set+merge so this is safe even if the user doc doesn't exist yet.
         await db.collection('users').doc(userId).set({
           lsCancelledAt:    new Date(),
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'subscription_expired':
-        // Billing period ended — revoke access, downgrade to free.
+        // Billing period ended, revoke access, downgrade to free.
         await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
           renewalDate: null,
         });
@@ -286,14 +286,14 @@ export async function POST(req: NextRequest) {
         // One-time credit top-up purchase
         const orderStatus = attrs?.status as string | undefined;
         if (orderStatus !== 'paid') {
-          console.log(`[ls-webhook] order_created skipped — status=${orderStatus}`);
+          console.log(`[ls-webhook] order_created skipped, status=${orderStatus}`);
           break;
         }
         // pack_id is embedded in custom_data when the checkout URL was built
         const packId       = customData?.pack_id;
         const creditsToAdd = packId ? CREDIT_PACK_ID_TO_CREDITS[packId] : undefined;
         if (!creditsToAdd) {
-          console.warn(`[ls-webhook] order_created — unknown pack_id "${packId}", no credits added`);
+          console.warn(`[ls-webhook] order_created, unknown pack_id "${packId}", no credits added`);
           break;
         }
         await addCredits(userId, creditsToAdd);

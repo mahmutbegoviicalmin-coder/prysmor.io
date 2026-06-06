@@ -99,7 +99,7 @@ function profileFromUserDoc(userId: string, d: FirebaseFirestore.DocumentData): 
   };
 }
 
-/** Enroll user in a funnel (idempotent — won't reset active enrollment). */
+/** Enroll user in a funnel (idempotent, won't reset active enrollment). */
 export async function enrollInFunnel(userId: string, funnelId: FunnelId): Promise<void> {
   const settings = await getEmailSettings();
   if (!settings.funnels[funnelId]?.enabled) return;
@@ -244,7 +244,7 @@ export async function enrollAllUnpaidInFunnel(funnelId: FunnelId): Promise<Enrol
   return result;
 }
 
-/** Stop funnel — e.g. user subscribed or unsubscribed. */
+/** Stop funnel, e.g. user subscribed or unsubscribed. */
 export async function completeFunnel(
   userId: string,
   funnelId: FunnelId,

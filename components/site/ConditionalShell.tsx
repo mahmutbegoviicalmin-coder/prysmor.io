@@ -15,7 +15,7 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
   const isLanding   = pathname === "/";
   const { isSignedIn, isLoaded, user } = useUser();
 
-  /* Bug 1 fix — keep prysmor_user_id in localStorage in sync with Clerk auth state */
+  /* Bug 1 fix, keep prysmor_user_id in localStorage in sync with Clerk auth state */
   useEffect(() => {
     if (!isLoaded) return;
     try {

@@ -72,12 +72,12 @@ const PLANS = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtRelative(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86_400_000);
   if (days === 0) return 'Today';
@@ -89,7 +89,7 @@ function fmtRelative(iso: string | null): string {
 
 /** Returns display label + Tailwind color class for a plan's renewal date. */
 function expiryInfo(dateStr: string | null): { label: string; color: string } {
-  if (!dateStr) return { label: '—', color: 'text-[#374151]' };
+  if (!dateStr) return { label: '-', color: 'text-[#374151]' };
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return { label: dateStr, color: 'text-[#9CA3AF]' };
   const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
@@ -102,7 +102,7 @@ function expiryInfo(dateStr: string | null): { label: string; color: string } {
 
 /** Renders a country code as a styled badge (avoids Windows emoji rendering issues) */
 function CountryBadge({ code, name }: { code: string | null; name: string | null }) {
-  if (!name) return <span className="text-[11px] text-[#2D2D35] italic">—</span>;
+  if (!name) return <span className="text-[11px] text-[#2D2D35] italic">-</span>;
   // If code missing, derive 2-letter abbreviation from name
   const upper = (code ?? name.slice(0, 2)).toUpperCase().slice(0, 2);
   // Simple deterministic color from code letters
@@ -469,16 +469,16 @@ function CreditsModal({ user, onClose, onSave }: {
 function DetailModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
   const rows = [
     ['User ID',       user.id],
-    ['Email',         user.email || '—'],
-    ['First name',    user.firstName || '—'],
-    ['Last name',     user.lastName  || '—'],
-    ['Country',       user.country ? `${user.countryCode ? `[${user.countryCode}] ` : ''}${user.country}` : '—'],
+    ['Email',         user.email || '-'],
+    ['First name',    user.firstName || '-'],
+    ['Last name',     user.lastName  || '-'],
+    ['Country',       user.country ? `${user.countryCode ? `[${user.countryCode}] ` : ''}${user.country}` : '-'],
     ['Plan',          user.planLabel],
     ['Status',        user.licenseStatus],
     ['Credits',       `${user.credits.toLocaleString()} / ${user.creditsTotal.toLocaleString()}`],
-    ['Renewal date',  user.renewalDate || '—'],
+    ['Renewal date',  user.renewalDate || '-'],
     ['Device limit',  String(user.deviceLimit)],
-    ['LS Sub ID',     user.lsSubscriptionId || '—'],
+    ['LS Sub ID',     user.lsSubscriptionId || '-'],
     ['Free trial',    user.trialUsed ? `Used ${user.trialUsedAt ? fmtDate(user.trialUsedAt) : ''}` : 'Not used'],
     ['Joined',        fmtDate(user.createdAt)],
     ['Last sign-in',  fmtDate(user.lastSignInAt)],
@@ -802,7 +802,7 @@ function getEventMeta(event: string) {
 }
 
 function fmtEventTime(iso: string | null) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · ' +
     d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
@@ -1046,12 +1046,12 @@ function RevenueSection() {
                   <td className="px-4 py-3"><PlanBadge plan={sub.plan} label={sub.planLabel} /></td>
                   <td className="px-4 py-3"><SubStatusBadge status={sub.status} /></td>
                   <td className="px-4 py-3 text-[#D1D5DB] font-medium">
-                    {sub.mrr > 0 ? `$${sub.mrr}` : '—'}
+                    {sub.mrr > 0 ? `$${sub.mrr}` : '-'}
                   </td>
                   <td className="px-4 py-3 text-[#A3FF12] font-semibold">
-                    {sub.mrr > 0 ? `$${PLAN_NET[sub.plan]?.toFixed(2) ?? '—'}` : '—'}
+                    {sub.mrr > 0 ? `$${PLAN_NET[sub.plan]?.toFixed(2) ?? '-'}` : '-'}
                   </td>
-                  <td className="px-4 py-3 text-[#6B7280]">{sub.renewsAt ? fmtDate(sub.renewsAt) : '—'}</td>
+                  <td className="px-4 py-3 text-[#6B7280]">{sub.renewsAt ? fmtDate(sub.renewsAt) : '-'}</td>
                   <td className="px-4 py-3 text-[#4B5563]">{fmtRelative(sub.createdAt)}</td>
                 </tr>
               ))}
@@ -1577,7 +1577,7 @@ export function AdminPanel() {
                         <CreditsMini credits={user.credits} total={user.creditsTotal} />
                       </td>
 
-                      {/* Expires — color-coded */}
+                      {/* Expires, color-coded */}
                       <td className="px-3 py-3">
                         <span className={`text-[11px] ${expiry.color}`}>{expiry.label}</span>
                       </td>

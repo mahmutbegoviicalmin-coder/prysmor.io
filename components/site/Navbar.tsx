@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 const GREEN = "#39FF6A";
 
 const navLinks = [
-  { label: "Features", href: "/#features" },
-  { label: "Examples", href: "/#examples" },
-  { label: "Pricing",  href: "/#pricing"  },
-  { label: "FAQ",      href: "/#faq"      },
+  { label: "How it works", href: "/#how-it-works" },
+  { label: "Capabilities", href: "/#examples" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -30,13 +30,8 @@ export default function Navbar() {
 
   const handleSignIn = () => openSignIn({ fallbackRedirectUrl: "/auth-redirect" });
   const handleSignUp = () => {
-    track("see_pricing", { location: "navbar" });
-    const pricingEl = document.getElementById("pricing");
-    if (pricingEl) {
-      pricingEl.scrollIntoView({ behavior: "smooth" });
-    } else {
-      window.location.href = "/#pricing";
-    }
+    track("get_started", { location: "navbar" });
+    window.location.href = "/sign-up";
   };
 
   useEffect(() => {
@@ -67,7 +62,7 @@ export default function Navbar() {
           className="flex items-center justify-between w-full"
           style={{ padding: "20px 40px" }}
         >
-          {/* Logo — icon + text */}
+          {/* Logo, icon + text */}
           <Link href="/" className="flex items-center gap-2 focus-visible:outline-none flex-shrink-0">
             <Image
               src="/logo/logo-icon.png"
@@ -85,7 +80,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop nav — floating pill */}
+          {/* Desktop nav, floating pill */}
           <nav
             className="hidden lg:inline-flex items-center"
             style={{

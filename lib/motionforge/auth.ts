@@ -80,7 +80,7 @@ export function planHasVFXAccess(plan: string): boolean {
 /** Default credits per second (background, relight) */
 export const CREDITS_PER_SECOND = 4;
 
-/** VFX (Runway Aleph 2) credits per second */
+/** VFX credits per second */
 export const CREDITS_PER_SECOND_VFX = 10;
 
 export function creditsPerSecond(mode?: string): number {

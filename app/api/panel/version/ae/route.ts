@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
-/** After Effects panel OTA version — bump to push updates to installed AE panels. */
+/** After Effects panel OTA version, bump to push updates to installed AE panels. */
 const PANEL_AE_VERSION = '2.0.4';
 
 const GITHUB_RAW =

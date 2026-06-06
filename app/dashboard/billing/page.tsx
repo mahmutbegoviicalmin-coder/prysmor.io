@@ -7,12 +7,12 @@ import { getCustomerPortalUrl } from '@/lib/lemonsqueezy';
 import { TopUpButton } from './TopUpButton';
 
 export const dynamic  = 'force-dynamic';
-export const metadata = { title: 'Billing — Dashboard' };
+export const metadata = { title: 'Billing | Dashboard' };
 
 /** Formats any date value: ISO string, Firestore .NET-style, or already-formatted string. */
 function formatDateDisplay(value: string | undefined | null): string | null {
   if (!value) return null;
-  // Already human-readable (e.g. "May 7, 2026") — contains no 'T' ISO separator
+  // Already human-readable (e.g. "May 7, 2026"), contains no 'T' ISO separator
   if (!value.includes('T') && !value.match(/^\d{4}-\d{2}-\d{2}$/)) return value;
   try {
     // Normalize .NET 7-digit fractional seconds
@@ -78,10 +78,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const licenseStatus = userDoc?.licenseStatus ?? 'inactive';
   const renewalDate   = formatDateDisplay(userDoc?.renewalDate);
   const isActive      = licenseStatus === 'active';
-  // Show "No Plan" until user actually purchases — stored plan is "starter" by default
+  // Show "No Plan" until user actually purchases, stored plan is "starter" by default
   const planName      = isActive ? (PLAN_LABELS[plan] ?? 'Starter') : 'No Plan';
 
-  // Default to 0 — never show phantom credits to unsubscribed users
+  // Default to 0, never show phantom credits to unsubscribed users
   const credits      = typeof userDoc?.credits      === 'number' ? userDoc.credits      : 0;
   const creditsTotal = typeof userDoc?.creditsTotal === 'number' ? userDoc.creditsTotal : 0;
 
@@ -106,7 +106,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#39FF6A]/20 bg-[#39FF6A]/[0.06] px-4 py-3">
           <CheckCircle2 className="w-4 h-4 text-[#39FF6A] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-semibold text-[#39FF6A]">Payment received — thank you!</p>
+            <p className="text-[13px] font-semibold text-[#39FF6A]">Payment received. Thank you!</p>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
               Your plan is being activated. If it doesn&apos;t appear as active within 30 seconds,{' '}
               <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
@@ -122,7 +122,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#39FF6A]/20 bg-[#39FF6A]/[0.06] px-4 py-3">
           <CheckCircle2 className="w-4 h-4 text-[#39FF6A] flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] font-semibold text-[#39FF6A]">Credits added — thank you!</p>
+            <p className="text-[13px] font-semibold text-[#39FF6A]">Credits added. Thank you!</p>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
               Your credits are being added. If your balance doesn&apos;t update within 30 seconds,{' '}
               <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
@@ -229,7 +229,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      {/* Upgrade CTAs — only for active subscribers not yet on Exclusive */}
+      {/* Upgrade CTAs, only for active subscribers not yet on Exclusive */}
       {isActive && plan !== 'exclusive' && (
         <>
           <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Upgrade for more credits</p>
@@ -239,7 +239,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                 href="/checkout?plan=pro&billing=monthly"
                 className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
               >
-                <span className="text-[14px] font-semibold text-white">Pro — $49/mo</span>
+                <span className="text-[14px] font-semibold text-white">Pro · $49/mo</span>
                 <span className="text-[12px] text-[#6B7280]">2 000 credits · 500s of AI VFX</span>
                 <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
               </Link>
@@ -248,7 +248,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
               href="/checkout?plan=exclusive&billing=monthly"
               className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
             >
-              <span className="text-[14px] font-semibold text-white">Exclusive — $149/mo</span>
+              <span className="text-[14px] font-semibold text-white">Exclusive · $149/mo</span>
               <span className="text-[12px] text-[#6B7280]">4 000 credits · 1 000s of AI VFX</span>
               <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
             </Link>

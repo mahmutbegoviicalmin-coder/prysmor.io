@@ -13,7 +13,7 @@ const products = [
     name: "CutSync",
     tagline: "AI Auto Editing Engine",
     description:
-      "Upload your footage, set the pacing — CutSync handles silence removal, beat-sync, smart jump cuts, and auto pacing automatically.",
+      "Upload your footage, set the pacing, CutSync handles silence removal, beat-sync, smart jump cuts, and auto pacing automatically.",
     icon: Zap,
     href: "/cutsync",
     featured: true,
@@ -33,7 +33,7 @@ const products = [
     name: "MotionForge",
     tagline: "AI VFX Generator",
     description:
-      "Type the effect you want. MotionForge generates cinematic particles, overlays, and tracking-ready VFX — ready to drop into your timeline.",
+      "Type the effect you want. MotionForge generates cinematic particles, overlays, and tracking-ready VFX, ready to drop into your timeline.",
     icon: Sparkles,
     href: "/motionforge",
     featured: false,

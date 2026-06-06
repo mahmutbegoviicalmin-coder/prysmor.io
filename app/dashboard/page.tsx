@@ -8,7 +8,7 @@ import {
 import { getDashboardData } from "@/lib/firestore/dashboard";
 
 export const dynamic  = "force-dynamic";
-export const metadata = { title: "Overview — Dashboard" };
+export const metadata = { title: "Overview | Dashboard" };
 
 const GREEN = "#39FF6A";
 
@@ -101,10 +101,10 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 /* ─── page ─── */
 const FALLBACK_DATA = {
-  license: { planName: "No Plan", status: "inactive" as const, renewalDate: "—", lastVerifiedAt: "—" },
-  panel: { connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—", allDevices: [] },
-  limits: { credits: 0, creditsTotal: 0, devicesUsed: 0, deviceLimit: 1, resetDate: "—" },
-  security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
+  license: { planName: "No Plan", status: "inactive" as const, renewalDate: "-", lastVerifiedAt: "-" },
+  panel: { connected: false, deviceName: "-", platform: "-", hostApp: "-", hostAppVersion: "-", cepVersion: "-", firstConnectedAt: "-", lastActiveAt: "-", allDevices: [] },
+  limits: { credits: 0, creditsTotal: 0, devicesUsed: 0, deviceLimit: 1, resetDate: "-" },
+  security: { mfaEnabled: false, lastLoginAt: "-", activeSessions: 1 },
   activity: [],
 };
 
@@ -292,7 +292,7 @@ export default async function DashboardOverviewPage() {
             </p>
           </div>
           <div>
-            <DataRow label="Host app"        value={panel.hostApp !== "—" ? `${panel.hostApp} ${panel.hostAppVersion}`.trim() : "—"} />
+            <DataRow label="Host app"        value={panel.hostApp !== "-" ? `${panel.hostApp} ${panel.hostAppVersion}`.trim() : "-"} />
             <DataRow label="Platform"        value={panel.platform} />
             <DataRow label="CEP version"     value={panel.cepVersion} />
             <DataRow label="First connected" value={panel.firstConnectedAt} />
@@ -543,9 +543,9 @@ export default async function DashboardOverviewPage() {
                       {device.name}
                     </p>
                     <p style={{ fontSize: "11px", color: "#444", margin: "2px 0 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-                      {device.hostApp !== "—" ? `${device.hostApp} ${device.hostAppVersion} · ` : ""}
+                      {device.hostApp !== "-" ? `${device.hostApp} ${device.hostAppVersion} · ` : ""}
                       {device.platform}
-                      {device.cepVersion !== "—" ? ` · CEP ${device.cepVersion}` : ""}
+                      {device.cepVersion !== "-" ? ` · CEP ${device.cepVersion}` : ""}
                     </p>
                   </div>
                 </div>

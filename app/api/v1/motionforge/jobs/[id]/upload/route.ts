@@ -17,7 +17,7 @@ function tmpPath(name: string) {
   return path.join(os.tmpdir(), name);
 }
 
-// ─── PUT handler — KIE.AI path (panel uploads binary directly to our server) ──
+// ─── PUT handler, KIE.AI path (panel uploads binary directly to our server) ──
 // The panel PUTs the raw video binary here; we upload to Vercel Blob and
 // return the public URL so the panel can pass it to upload-complete.
 

@@ -97,7 +97,7 @@ export async function GET() {
     fsMap.set(doc.id, doc.data());
   }
 
-  // Build user list — country comes from Firestore cache only.
+  // Build user list, country comes from Firestore cache only.
   // Per-user country refresh is available via the "Refresh location" action in the admin panel.
   // Bulk Clerk session fetching was removed because it caused route timeouts with large user lists.
   const users: AdminUser[] = clerkUserList.map((cu) => {
@@ -161,7 +161,7 @@ export async function GET() {
   }
 }
 
-/** DELETE /api/admin/users — purge all Firestore users with no Clerk account */
+/** DELETE /api/admin/users, purge all Firestore users with no Clerk account */
 export async function DELETE() {
   const user  = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
@@ -180,7 +180,7 @@ export async function DELETE() {
   const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : ((clerkUsersRes as { data: { id: string }[] }).data ?? []);
   const clerkIds = new Set(clerkUsers.map((cu: { id: string }) => cu.id));
 
-  // Safety guard: if Clerk returned 0 users, refuse to purge — it means the API call
+  // Safety guard: if Clerk returned 0 users, refuse to purge, it means the API call
   // failed silently and purging would delete ALL Firestore users incorrectly.
   if (clerkIds.size === 0) {
     return NextResponse.json({

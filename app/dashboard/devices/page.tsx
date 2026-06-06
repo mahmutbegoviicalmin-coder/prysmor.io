@@ -4,7 +4,7 @@ import { Monitor, Laptop, CheckCircle2, Circle, WifiOff, ShieldAlert } from "luc
 import { getDashboardData } from "@/lib/firestore/dashboard";
 import { getUser } from "@/lib/firestore/users";
 
-export const metadata = { title: "Devices — Dashboard" };
+export const metadata = { title: "Devices | Dashboard" };
 
 export default async function DevicesPage() {
   const user = await currentUser();
@@ -21,10 +21,10 @@ export default async function DevicesPage() {
     data = dashboardData;
   } catch {
     data = {
-      limits: { devicesUsed: 0, deviceLimit: 1, credits: 0, creditsTotal: 0, resetDate: "—" },
-      panel: { allDevices: [], connected: false, deviceName: "—", platform: "—", hostApp: "—", hostAppVersion: "—", cepVersion: "—", firstConnectedAt: "—", lastActiveAt: "—" },
-      license: { planName: "Starter", status: "active" as const, renewalDate: "—", lastVerifiedAt: "—" },
-      security: { mfaEnabled: false, lastLoginAt: "—", activeSessions: 1 },
+      limits: { devicesUsed: 0, deviceLimit: 1, credits: 0, creditsTotal: 0, resetDate: "-" },
+      panel: { allDevices: [], connected: false, deviceName: "-", platform: "-", hostApp: "-", hostAppVersion: "-", cepVersion: "-", firstConnectedAt: "-", lastActiveAt: "-" },
+      license: { planName: "Starter", status: "active" as const, renewalDate: "-", lastVerifiedAt: "-" },
+      security: { mfaEnabled: false, lastLoginAt: "-", activeSessions: 1 },
       activity: [],
     };
   }
@@ -115,8 +115,8 @@ export default async function DevicesPage() {
                     <p className="text-[13px] font-medium text-[#D1D5DB] truncate">{d.name}</p>
                     <p className="text-[11px] text-[#4B5563] mt-0.5 truncate">
                       {[
-                        d.hostApp !== "—" ? `${d.hostApp} ${d.hostAppVersion}`.trim() : null,
-                        d.platform !== "—" ? d.platform : null,
+                        d.hostApp !== "-" ? `${d.hostApp} ${d.hostAppVersion}`.trim() : null,
+                        d.platform !== "-" ? d.platform : null,
                       ]
                         .filter(Boolean)
                         .join(" · ")}

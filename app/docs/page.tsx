@@ -3,7 +3,7 @@ import { BookOpen, PanelLeft, Wand2 } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Docs",
-  description: "Prysmor documentation — install the VFXPilot panel and start generating AI VFX inside Adobe Premiere Pro.",
+  description: "Prysmor documentation. Install the panel and start generating AI VFX inside Adobe Premiere Pro.",
 };
 
 const sections = [
@@ -97,7 +97,7 @@ export default function DocsPage() {
             <h3 className="font-heading text-[15px] font-semibold text-white mb-3">How it works</h3>
             <p className="text-[13px] text-ink-subtle leading-relaxed">
               VFXPilot uses state-of-the-art AI video generation to transform your footage based on
-              a text prompt — directly inside Premiere Pro. Your clip is uploaded securely, processed
+              from a text prompt directly inside Premiere Pro. Your clip is uploaded securely, processed
               by the AI, and the result is inserted back into your timeline in seconds.
             </p>
           </div>
@@ -117,7 +117,7 @@ export default function DocsPage() {
           <div className="rounded-[16px] border border-white/[0.07] bg-surface-1 p-6">
             <h3 className="font-heading text-[15px] font-semibold text-white mb-3">Prompt tips</h3>
             <ul className="space-y-2.5 text-[13px] text-ink-subtle">
-              <li className="flex gap-2"><span className="text-accent mt-0.5">✦</span> Keep prompts focused — 2 to 3 key effects work best.</li>
+              <li className="flex gap-2"><span className="text-accent mt-0.5">✦</span> Keep prompts focused. Two or three key effects work best.</li>
               <li className="flex gap-2"><span className="text-accent mt-0.5">✦</span> Use "AI Enhance" to let the AI analyse your scene and write the prompt for you.</li>
               <li className="flex gap-2"><span className="text-accent mt-0.5">✦</span> For background changes (e.g. winter, sunset), identity preservation is applied automatically.</li>
               <li className="flex gap-2"><span className="text-accent mt-0.5">✦</span> For overlay effects (e.g. rain, fireworks), the AI applies them directly without altering faces.</li>

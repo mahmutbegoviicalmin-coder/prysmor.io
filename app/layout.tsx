@@ -11,7 +11,8 @@ import PageTracker from "@/components/PageTracker";
 
 const outfit = Outfit({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
   variable: "--font-outfit",
 });
 
@@ -19,18 +20,18 @@ const FB_PIXEL_ID = "4285435231716551";
 
 export const metadata: Metadata = {
   title: {
-    default: "Prysmor — AI VFX for Adobe Premiere Pro",
-    template: "%s — Prysmor",
+    default: "Prysmor | AI VFX for Premiere Pro & After Effects",
+    template: "%s | Prysmor",
   },
   description:
-    "Generate professional VFX from a text prompt, directly inside Adobe Premiere Pro. No After Effects. No VFX artists.",
+    "AI VFX panel for Adobe Premiere Pro and After Effects. Select a clip, describe the effect, get a 4K result on your timeline.",
   keywords: ["AI VFX", "Premiere Pro plugin", "AI video effects", "Prysmor", "text to VFX"],
   icons: {
     icon: "/favicon.png",
     apple: "/favicon.png",
   },
   openGraph: {
-    title: "Prysmor — AI VFX for Premiere Pro",
+    title: "Prysmor | AI VFX for Premiere Pro",
     description: "Generate professional VFX from a text prompt, directly inside Adobe Premiere Pro.",
     type: "website",
     images: [{ url: "/logo/logo-full.png", width: 800, height: 200 }],

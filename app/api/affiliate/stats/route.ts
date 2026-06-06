@@ -4,7 +4,7 @@ import { getAffiliateByUserId, getReferralsByCode } from '@/lib/affiliates';
 
 const AFFILIATE_EMAILS = ['mahmutbegoviic.almin@gmail.com', 'brzotrcipuska7@gmail.com'];
 
-/** GET /api/affiliate/stats — returns stats for the current user's affiliate profile */
+/** GET /api/affiliate/stats, returns stats for the current user's affiliate profile */
 export async function GET() {
   const user   = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];

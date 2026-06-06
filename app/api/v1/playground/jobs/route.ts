@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-  } catch { /* non-critical — proceed if Clerk call fails */ }
+  } catch { /* non-critical, proceed if Clerk call fails */ }
 
   // ── 5. IP-based dedup in Redis (30-day window) ───────────────────────────
   const ip = getClientIp(req);
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
           { status: 403 },
         );
       }
-    } catch { /* Redis unavailable — allow through */ }
+    } catch { /* Redis unavailable, allow through */ }
   }
 
   // ── 6. Create job ────────────────────────────────────────────────────────

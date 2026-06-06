@@ -84,9 +84,9 @@ const appearance = {
 };
 
 const STEPS = [
-  { n: "01", title: "Create your account",      desc: "Free — no credit card required"        },
-  { n: "02", title: "Download the panel",        desc: "One-click installer, Windows & Mac"    },
-  { n: "03", title: "Generate your first VFX",  desc: "Type a prompt, hit generate — done"    },
+  { n: "01", title: "Create your account",      desc: "Free. No credit card required."        },
+  { n: "02", title: "Download the panel",        desc: "One-click installer, Windows & Mac."    },
+  { n: "03", title: "Generate your first VFX",  desc: "Type a prompt, hit generate. Done."    },
 ];
 
 export default function SignUpPage() {
@@ -204,7 +204,7 @@ export default function SignUpPage() {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <p className="au-eyebrow">Get started</p>
             <h1 className="au-h1">AI VFX inside<br />Premiere Pro.</h1>
-            <p className="au-sub">Replace backgrounds, relight scenes and add VFX — all from a text prompt. No After Effects needed.</p>
+            <p className="au-sub">Replace backgrounds, relight scenes and add VFX from a text prompt. Works in Premiere Pro and After Effects.</p>
             <div className="au-steps">
               {STEPS.map(({ n, title, desc }) => (
                 <div key={n} className="au-step">

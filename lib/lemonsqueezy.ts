@@ -32,7 +32,7 @@ export interface CreditPack {
   popular?:     boolean;
 }
 
-/** Credit top-up packs — one-time LemonSqueezy products. */
+/** Credit top-up packs, one-time LemonSqueezy products. */
 export const CREDIT_PACKS: CreditPack[] = [
   {
     id:           'boost',
@@ -130,12 +130,12 @@ export async function createCheckout(variantId: string, userId: string, override
  * Builds a LemonSqueezy checkout URL for a credit top-up pack.
  * Embeds user_id and pack_id as custom data so the order_created webhook
  * can identify the buyer and the pack without needing a variant ID lookup.
- * No API call needed — just constructs the URL with query parameters.
+ * No API call needed, just constructs the URL with query parameters.
  */
 export function createTopUpCheckout(pack: CreditPack, userId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
   const base   = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${pack.checkoutUuid}`;
-  // Build query string manually — URLSearchParams encodes brackets (%5B%5D) which
+  // Build query string manually, URLSearchParams encodes brackets (%5B%5D) which
   // LemonSqueezy does not recognise. We need literal brackets for custom_data to
   // be forwarded correctly in the webhook payload.
   const query = [

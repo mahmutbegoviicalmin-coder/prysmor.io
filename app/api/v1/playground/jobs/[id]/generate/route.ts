@@ -30,8 +30,8 @@ export async function POST(
 
   const beebleUri = (job as any).beebleVideoUri as string | undefined;
   if (!beebleUri) {
-    await updateJob(userId, params.id, { status: "failed", error: "Asset not uploaded — call /upload-url first" });
-    return NextResponse.json({ error: "Asset not uploaded — call /upload-url first" }, { status: 400 });
+    await updateJob(userId, params.id, { status: "failed", error: "Asset not uploaded, call /upload-url first" });
+    return NextResponse.json({ error: "Asset not uploaded, call /upload-url first" }, { status: 400 });
   }
 
   let body: { prompt?: string; referenceImage?: string; mode?: string; clipDuration?: number };
@@ -63,7 +63,7 @@ export async function POST(
       try {
         const refBuf = Buffer.from(referenceImageB64, "base64");
         beebleRefImageUri = await uploadToBeeble(refBuf, `ref-playground-${params.id}.jpg`);
-      } catch { /* non-critical — proceed without reference image */ }
+      } catch { /* non-critical, proceed without reference image */ }
     }
 
     const beebleJobId = await createSwitchXTask({

@@ -1,7 +1,7 @@
 import { Download, CheckCircle2, AlertCircle } from "lucide-react";
 import { mockPanel } from "@/lib/mockData";
 
-export const metadata = { title: "Plugin — Dashboard" };
+export const metadata = { title: "Plugin | Dashboard" };
 
 const steps = [
   "Download the Prysmor panel installer for your OS.",

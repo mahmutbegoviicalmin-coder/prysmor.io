@@ -40,7 +40,7 @@ function formatDateTime(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** Formats any stored renewalDate — handles raw ISO, .NET 7-digit millis, or already-formatted strings. */
+/** Formats any stored renewalDate, handles raw ISO, .NET 7-digit millis, or already-formatted strings. */
 function formatRenewalDate(value: string | undefined): string {
   if (!value) return '';
   if (!value.includes('T') && !value.match(/^\d{4}-\d{2}-\d{2}$/)) return value; // already formatted
@@ -59,7 +59,7 @@ function formatDate(date: Date): string {
 }
 
 function formatHostAppLabel(hostApp?: string): string {
-  if (!hostApp || hostApp === "—") return "—";
+  if (!hostApp || hostApp === "-") return "-";
   const code = hostApp.toUpperCase();
   if (code === "AEFT") return "After Effects";
   if (code === "PPRO") return "Premiere Pro";
@@ -156,15 +156,15 @@ export async function getDashboardData(
 
   // ── License ────────────────────────────────────────────────────────────────
   const plan          = userDoc?.plan ?? "starter";
-  // IMPORTANT: default must be "inactive" — never grant free access to users
+  // IMPORTANT: default must be "inactive", never grant free access to users
   // whose Firestore doc hasn't been created yet (e.g. Clerk webhook delay).
   const licenseStatus = userDoc?.licenseStatus ?? "inactive";
-  // Show "No Plan" for inactive users — plan label is only meaningful after purchase.
+  // Show "No Plan" for inactive users, plan label is only meaningful after purchase.
   const planLabel = licenseStatus === "active"
     ? (PLAN_LABELS[plan] ?? plan)
     : "No Plan";
 
-  // Format renewal date — Firestore may contain raw ISO from old webhook calls
+  // Format renewal date, Firestore may contain raw ISO from old webhook calls
   const renewalDate = formatRenewalDate(userDoc?.renewalDate);
 
   const license: DashboardLicense = {
@@ -183,10 +183,10 @@ export async function getDashboardData(
     return {
       id:              d.id,
       name:            d.name ?? d.id,
-      platform:        d.platform ?? "—",
+      platform:        d.platform ?? "-",
       hostApp:         formatHostAppLabel((d as { hostApp?: string }).hostApp),
-      hostAppVersion:  (d as any).hostAppVersion ?? "—",
-      cepVersion:      (d as any).cepVersion     ?? "—",
+      hostAppVersion:  (d as any).hostAppVersion ?? "-",
+      cepVersion:      (d as any).cepVersion     ?? "-",
       firstSeenAt:     formatDateTime(firstSeen),
       lastActiveAt:    formatDateTime(lastActive),
       connected:       Date.now() - lastActive.getTime() < connectedThreshold,
@@ -211,18 +211,18 @@ export async function getDashboardData(
     panel = {
       connected: false,
       deviceName: "No device registered",
-      platform: "—",
-      hostApp: "—",
-      hostAppVersion: "—",
-      cepVersion: "—",
-      firstConnectedAt: "—",
-      lastActiveAt: "—",
+      platform: "-",
+      hostApp: "-",
+      hostAppVersion: "-",
+      cepVersion: "-",
+      firstConnectedAt: "-",
+      lastActiveAt: "-",
       allDevices: [],
     };
   }
 
   // ── Usage / Limits ─────────────────────────────────────────────────────────
-  // Default to 0 — never show phantom credits to users without an active plan.
+  // Default to 0, never show phantom credits to users without an active plan.
   const credits      = typeof userDoc?.credits      === "number" ? userDoc.credits      : 0;
   const creditsTotal = typeof userDoc?.creditsTotal === "number" ? userDoc.creditsTotal : 0;
 
@@ -247,7 +247,7 @@ export async function getDashboardData(
   // Clerk doesn't expose session list server-side easily; default to 1
   const security: DashboardSecurity = {
     mfaEnabled,
-    lastLoginAt: lastSignIn ? formatDateTime(lastSignIn) : "—",
+    lastLoginAt: lastSignIn ? formatDateTime(lastSignIn) : "-",
     activeSessions: 1,
   };
 

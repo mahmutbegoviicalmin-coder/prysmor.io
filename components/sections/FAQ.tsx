@@ -86,7 +86,7 @@ function AccordionItem({
         </span>
       </button>
 
-      {/* Answer — animated height */}
+      {/* Answer, animated height */}
       <div
         style={{
           height: `${height}px`,
@@ -137,20 +137,20 @@ export default function FAQ({ items }: FAQProps) {
         >
           <p style={{
             fontSize: "11px",
-            fontWeight: 600,
+            fontWeight: 500,
             textTransform: "uppercase",
-            letterSpacing: "3px",
-            color: GREEN,
+            letterSpacing: "0.18em",
+            color: "rgba(255,255,255,0.4)",
             marginBottom: "16px",
           }}>
-            // FAQ
+            FAQ
           </p>
           <h2 style={{
-            fontSize: "clamp(28px, 3.5vw, 48px)",
-            fontWeight: 800,
+            fontSize: "clamp(28px, 3.5vw, 40px)",
+            fontWeight: 600,
             color: "white",
-            letterSpacing: "-1.5px",
-            lineHeight: 1.05,
+            letterSpacing: "-1px",
+            lineHeight: 1.1,
             margin: 0,
           }}>
             Questions, answered.

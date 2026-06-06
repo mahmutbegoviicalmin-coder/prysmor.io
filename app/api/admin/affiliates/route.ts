@@ -9,7 +9,7 @@ function isAdminUser(user: Awaited<ReturnType<typeof currentUser>>) {
   return user?.emailAddresses?.some(e => ADMIN_EMAILS.includes(e.emailAddress)) ?? false;
 }
 
-/** GET /api/admin/affiliates — list all affiliates with referral counts */
+/** GET /api/admin/affiliates, list all affiliates with referral counts */
 export async function GET() {
   const user = await currentUser();
   if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -29,7 +29,7 @@ export async function GET() {
   return NextResponse.json({ affiliates: withStats });
 }
 
-/** POST /api/admin/affiliates — create a new affiliate */
+/** POST /api/admin/affiliates, create a new affiliate */
 export async function POST(req: NextRequest) {
   const user = await currentUser();
   if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

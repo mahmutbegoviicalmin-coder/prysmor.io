@@ -5,7 +5,7 @@ import { getReferralsByCode }        from '@/lib/affiliates';
 
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
-/** PATCH /api/admin/affiliates/[id] — update affiliate */
+/** PATCH /api/admin/affiliates/[id], update affiliate */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user   = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-/** DELETE /api/admin/affiliates/[id] — delete affiliate */
+/** DELETE /api/admin/affiliates/[id], delete affiliate */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const user   = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
@@ -47,7 +47,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ ok: true });
 }
 
-/** POST /api/admin/affiliates/[id]/mark-paid — mark referrals as paid */
+/** POST /api/admin/affiliates/[id]/mark-paid, mark referrals as paid */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user   = await currentUser();
   const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];

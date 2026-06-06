@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const session = await validatePanelToken(req);
   if (!session) {
     return NextResponse.json(
-      { error: 'Unauthorized — please sign in via the panel.' },
+      { error: 'Unauthorized, please sign in via the panel.' },
       { status: 401 }
     );
   }
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (e.code === 'insufficient_credits') {
       return NextResponse.json(
         {
-          error:             `Not enough credits — need ${e.needed}, have ${e.creditsRemaining}. Upgrade your plan to continue.`,
+          error:             `Not enough credits, need ${e.needed}, have ${e.creditsRemaining}. Upgrade your plan to continue.`,
           code:              'insufficient_credits',
           creditsRemaining:  e.creditsRemaining ?? 0,
           needed:            e.needed ?? creditCost,

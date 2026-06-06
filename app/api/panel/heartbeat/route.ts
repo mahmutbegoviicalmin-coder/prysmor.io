@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const { userId, deviceId, machineFingerprint } = session;
 
-  // Machine binding check — if the session was issued with a fingerprint,
+  // Machine binding check, if the session was issued with a fingerprint,
   // the request must come from the same machine.
   if (machineFingerprint) {
     const incomingMachineId = req.headers.get('x-machine-id') ?? '';
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (deviceId) {
-    // Just update lastActive — 1 write, no reads needed for a heartbeat.
+    // Just update lastActive, 1 write, no reads needed for a heartbeat.
     // Full device registration (with limit checks) only happens at panel auth/start.
     db.collection('users').doc(userId)
       .collection('devices').doc(deviceId)

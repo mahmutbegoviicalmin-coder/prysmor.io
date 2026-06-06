@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true });
     }
 
-    // Log to Vercel function logs — no database writes needed
+    // Log to Vercel function logs, no database writes needed
     console.log(`[track] event=${event} page=${pagePath}`, JSON.stringify(properties ?? {}));
 
     return NextResponse.json({ ok: true });

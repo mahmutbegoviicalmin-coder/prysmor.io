@@ -26,6 +26,13 @@ export function machineKeyFromFingerprint(fp?: string | null): string {
   return fp.replace(/^ae-/i, "").replace(/^mfp-/i, "").slice(0, 12);
 }
 
+/** True when keys match or differ only by legacy truncation / PR vs AE prefix drift. */
+export function machineKeysMatch(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return a.startsWith(b) || b.startsWith(a);
+}
+
 /** Preferred device doc id for new registrations. */
 export function buildPanelDeviceId(userId: string, fingerprint?: string | null): string {
   const key = machineKeyFromFingerprint(fingerprint);
@@ -69,7 +76,7 @@ export async function registerDevice(
   if (!existingSnap.exists && machineKey) {
     for (const doc of devicesSnap.docs) {
       const docKey = machineKeyFromDeviceDoc(doc.id, doc.data());
-      if (docKey && docKey === machineKey) {
+      if (docKey && machineKeysMatch(docKey, machineKey)) {
         resolvedDeviceId = doc.id;
         existingRef = doc.ref;
         existingSnap = doc;
@@ -87,11 +94,30 @@ export async function registerDevice(
     const distinctMachines = new Set<string>();
     for (const doc of devicesSnap.docs) {
       const key = machineKeyFromDeviceDoc(doc.id, doc.data());
-      if (key) distinctMachines.add(key);
+      if (!key) continue;
+      let merged = false;
+      for (const existing of distinctMachines) {
+        if (machineKeysMatch(existing, key)) {
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) distinctMachines.add(key);
     }
 
-    if (distinctMachines.size >= limit && (!machineKey || !distinctMachines.has(machineKey))) {
-      throw new DeviceLimitError(limit);
+    const keyAlreadyRegistered =
+      machineKey &&
+      [...distinctMachines].some((k) => machineKeysMatch(k, machineKey));
+
+    if (distinctMachines.size >= limit && !keyAlreadyRegistered) {
+      // One seat = one device doc; PR + AE on the same Mac may use different fingerprints
+      if (devicesSnap.docs.length === 1) {
+        resolvedDeviceId = devicesSnap.docs[0].id;
+        existingRef = devicesSnap.docs[0].ref;
+        existingSnap = devicesSnap.docs[0];
+      } else {
+        throw new DeviceLimitError(limit);
+      }
     }
   }
 

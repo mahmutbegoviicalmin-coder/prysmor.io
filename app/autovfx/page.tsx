@@ -41,7 +41,7 @@ function PromptDemo() {
           ))}
         </div>
         <span className="ml-3 text-[10px] text-ink-faint font-mono tracking-wider">
-          VFXPilot — generate
+          VFXPilot, generate
         </span>
         <span className="ml-auto flex items-center gap-1.5">
           <span
@@ -135,7 +135,7 @@ function PromptDemo() {
                 <div className="w-10 h-10 rounded-full bg-accent/[0.12] border border-accent/30 flex items-center justify-center">
                   <Check className="w-5 h-5 text-accent" />
                 </div>
-                <p className="text-[12px] font-medium text-accent">Effect applied — 3.2 seconds</p>
+                <p className="text-[12px] font-medium text-accent">Effect applied, 3.2 seconds</p>
                 <p className="text-[11px] text-ink-faint">Dropped directly into your timeline</p>
               </motion.div>
             )}
@@ -250,7 +250,7 @@ const steps: Step[] = [
     icon: Download,
     number: "03",
     title: "Apply to timeline",
-    desc: "Your effect renders and drops directly onto your timeline — no export, no round-tripping.",
+    desc: "Your effect renders and drops directly onto your timeline, no export, no round-tripping.",
   },
 ];
 
@@ -323,7 +323,7 @@ const pricingTiers: PriceTier[] = [
 const testimonials: Testimonial[] = [
   {
     quote:
-      "This is insane. I can literally finish an entire music video in under an hour now. The AI just gets it — I type \"add fire\" and boom, perfect fire that actually looks real. Game changer.",
+      "This is insane. I can literally finish an entire music video in under an hour now. The AI just gets it, I type \"add fire\" and boom, perfect fire that actually looks real. Game changer.",
     name: "Jakob / TINY TAPES",
     role: "Music Video Editor",
   },
@@ -374,7 +374,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "What types of effects can I create?",
-    a: "You can generate fire, explosions, smoke, lightning, glows, atmospheric effects, object replacements, removals, and much more — all from a text prompt.",
+    a: "You can generate fire, explosions, smoke, lightning, glows, atmospheric effects, object replacements, removals, and much more, all from a text prompt.",
   },
   {
     q: "How long does it take to generate effects?",
@@ -516,7 +516,7 @@ export default function VFXPilotPage() {
       {/* ── PRICING ── */}
       <PricingSection
         title="Pick your plan"
-        subtitle="Same features, different amounts of VFX credits. Start small or go big — you can always change later."
+        subtitle="Same features, different amounts of VFX credits. Start small or go big, you can always change later."
         tiers={pricingTiers}
         showToggle={true}
         footerNote="7-Day Money-Back Guarantee · Cancel Anytime"

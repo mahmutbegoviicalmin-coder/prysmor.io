@@ -100,7 +100,7 @@ export default function PlaygroundPage() {
     catch { setDurationErr("Could not read video duration. Try a different file."); return; }
 
     if (dur > MAX_SEC + 0.15) {
-      setDurationErr(`Video is ${dur.toFixed(1)}s — maximum is ${MAX_SEC}s. Please trim before uploading.`);
+      setDurationErr(`Video is ${dur.toFixed(1)}s, maximum is ${MAX_SEC}s. Please trim before uploading.`);
       return;
     }
 
@@ -291,7 +291,7 @@ export default function PlaygroundPage() {
       {/* ── Main layout ─────────────────────────────────────────────────────── */}
       <div className="pg-main">
 
-        {/* Left — preview canvas */}
+        {/* Left, preview canvas */}
         <div className="pg-preview">
           {/* 16:9 canvas */}
           <div style={{
@@ -409,7 +409,7 @@ export default function PlaygroundPage() {
           )}
         </div>
 
-        {/* Right — control panel */}
+        {/* Right, control panel */}
         <div className="pg-panel">
 
           {/* Mode selector */}
@@ -562,7 +562,7 @@ export default function PlaygroundPage() {
 
           <div style={{ height: "1px", background: "#111", margin: "18px 0" }} />
 
-          {/* Reference image — background only */}
+          {/* Reference image, background only */}
           {mode === "background" && (
             <>
               <div style={{ padding: "0 20px" }}>
@@ -711,7 +711,7 @@ export default function PlaygroundPage() {
         </div>
       </div>
 
-      {/* Trial complete — premium upsell overlay */}
+      {/* Trial complete, premium upsell overlay */}
       {trialUsed && !job && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 50,
@@ -879,7 +879,7 @@ export default function PlaygroundPage() {
           overflow-y: auto;
         }
 
-        /* Mobile — stack vertically */
+        /* Mobile, stack vertically */
         @media (max-width: 640px) {
           .pg-main {
             flex-direction: column;

@@ -3,7 +3,7 @@ import type { FunnelId } from './constants';
 export interface FunnelStep {
   delayDays: number;
   subject: string;
-  /** HTML body (inner content — wrapper added on send) */
+  /** HTML body (inner content, wrapper added on send) */
   html: string;
 }
 
@@ -21,20 +21,20 @@ export const FUNNEL_DEFINITIONS: Record<FunnelId, FunnelDefinition> = {
   'unpaid-starter': {
     id: 'unpaid-starter',
     name: 'Unpaid → Starter',
-    description: 'Signups without an active subscription — drive first purchase.',
+    description: 'Signups without an active subscription, drive first purchase.',
     steps: [
       {
         delayDays: 0,
-        subject: 'Welcome to Prysmor — your AI VFX panel',
+        subject: 'Welcome to Prysmor, your AI VFX panel',
         html: `
           <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#d1d5db;">
             Hi {{firstName}},
           </p>
           <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#d1d5db;">
-            You just created a Prysmor account. VFXPilot lets you generate professional effects inside Premiere Pro and After Effects — describe what you want, and AI does the rest.
+            You just created a Prysmor account. VFXPilot lets you generate professional effects inside Premiere Pro and After Effects, describe what you want, and AI does the rest.
           </p>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#d1d5db;">
-            Background swaps, relighting, and VFX overlays — without leaving your timeline.
+            Background swaps, relighting, and VFX overlays, without leaving your timeline.
           </p>
           <p style="margin:0 0 24px;">
             <a href="${PRICING}" style="display:inline-block;background:#39FF6A;color:#000;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">
@@ -54,7 +54,7 @@ export const FUNNEL_DEFINITIONS: Record<FunnelId, FunnelDefinition> = {
             Most editors waste hours on stock overlays and manual compositing. With Prysmor you select a clip, type a prompt, and get a result back on your timeline.
           </p>
           <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#d1d5db;">
-            Starter includes enough monthly credits for real project work — not just a demo.
+            Starter includes enough monthly credits for real project work, not just a demo.
           </p>
           <p style="margin:0 0 24px;">
             <a href="${PRICING}" style="display:inline-block;background:#39FF6A;color:#000;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">
@@ -88,7 +88,7 @@ export const FUNNEL_DEFINITIONS: Record<FunnelId, FunnelDefinition> = {
   'starter-pro': {
     id: 'starter-pro',
     name: 'Starter → Pro',
-    description: 'Active Starter subscribers — upsell to Pro for more credits.',
+    description: 'Active Starter subscribers, upsell to Pro for more credits.',
     steps: [
       {
         delayDays: 14,
@@ -98,7 +98,7 @@ export const FUNNEL_DEFINITIONS: Record<FunnelId, FunnelDefinition> = {
             Hi {{firstName}},
           </p>
           <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#d1d5db;">
-            You are on Starter. Pro unlocks significantly more monthly credits and priority generation — built for editors who run VFX on every project.
+            You are on Starter. Pro unlocks significantly more monthly credits and priority generation, built for editors who run VFX on every project.
           </p>
           <p style="margin:0 0 24px;">
             <a href="${DASHBOARD}/billing" style="display:inline-block;background:#39FF6A;color:#000;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;text-decoration:none;">

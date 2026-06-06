@@ -150,11 +150,11 @@ export function EmailSection({ onOpenCampaigns }: EmailSectionProps) {
                 data!.logs.map((log) => (
                   <tr key={log.id} className="border-t border-white/[0.04]">
                     <td className="px-4 py-2.5 text-[#6B7280]">
-                      {log.createdAt ? new Date(log.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      {log.createdAt ? new Date(log.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
                     <td className="px-4 py-2.5 text-[#D1D5DB]">{log.email}</td>
                     <td className="px-4 py-2.5 text-[#9CA3AF]">{log.funnelId}</td>
-                    <td className="px-4 py-2.5">{log.openedAt ? <span className="text-[#A3FF12]">Yes</span> : '—'}</td>
+                    <td className="px-4 py-2.5">{log.openedAt ? <span className="text-[#A3FF12]">Yes</span> : '-'}</td>
                     <td className="px-4 py-2.5 text-[#9CA3AF] truncate max-w-[200px]">{log.subject}</td>
                   </tr>
                 ))

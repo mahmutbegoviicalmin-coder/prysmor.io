@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Download, Monitor, Terminal, FolderOpen, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
 
 export const metadata = {
-  title: "Install Premiere Panel — Prysmor Docs",
+  title: "Install Premiere Panel | Prysmor Docs",
   description:
     "Step-by-step guide to installing the Prysmor CEP extension panel inside Adobe Premiere Pro on Windows and macOS.",
 };
@@ -132,7 +132,7 @@ export default function InstallPanelPage() {
           </h1>
           <p className="text-[16px] text-[#6B7280] leading-relaxed max-w-[520px] mb-8">
             Get the Prysmor AI VFX extension running inside Adobe Premiere Pro in under
-            5 minutes — no build step, no signing required for local testing.
+            5 minutes, no build step, no signing required for local testing.
           </p>
 
           <div className="flex flex-wrap gap-3">
@@ -165,7 +165,7 @@ export default function InstallPanelPage() {
             <strong className="text-[#D1D5DB]">
               Common Extensibility Platform (CEP) extension
             </strong>{" "}
-            — the same technology used by Adobe-built panels. Installation requires two things:
+           , the same technology used by Adobe-built panels. Installation requires two things:
             enabling debug mode (so unsigned extensions load) and copying the panel folder to the
             right location.
           </Lead>
@@ -228,7 +228,7 @@ export default function InstallPanelPage() {
               <CodeBlock>{`Set-ItemProperty -Path "HKCU:\\Software\\Adobe\\CSXS.11" -Name "PlayerDebugMode" -Value 1`}</CodeBlock>
               <p className="text-[12px] text-[#4B5563]">
                 Alternatively, use Registry Editor (Win+R → regedit) and navigate to{" "}
-                <CodeLine>HKEY_CURRENT_USER\Software\Adobe\CSXS.10</CodeLine> — add a{" "}
+                <CodeLine>HKEY_CURRENT_USER\Software\Adobe\CSXS.10</CodeLine>, add a{" "}
                 <CodeLine>DWORD</CodeLine> named <CodeLine>PlayerDebugMode</CodeLine> with value{" "}
                 <CodeLine>1</CodeLine>.
               </p>
@@ -349,7 +349,7 @@ export default function InstallPanelPage() {
               },
               {
                 title: "Import to Project",
-                desc: "Calls Premiere's importFiles() on the bundled demo clip. Requires a real MP4 — see below.",
+                desc: "Calls Premiere's importFiles() on the bundled demo clip. Requires a real MP4, see below.",
               },
               {
                 title: "Insert to Timeline",
@@ -395,7 +395,7 @@ export default function InstallPanelPage() {
               {
                 q: "Import to Project / Insert fails with 'file not found'",
                 a: [
-                  "The bundled prysmor-demo.mp4 is a placeholder text file — replace it with a real MP4.",
+                  "The bundled prysmor-demo.mp4 is a placeholder text file, replace it with a real MP4.",
                   "The panel shows the exact ExtendScript error in a red toast message.",
                 ],
               },

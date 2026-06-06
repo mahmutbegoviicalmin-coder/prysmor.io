@@ -4,7 +4,7 @@ import { ShieldAlert, Mail, Chrome } from "lucide-react";
 import { DeleteAccountButton } from "./DeleteAccountButton";
 import { MarketingPreferences } from "@/components/settings/MarketingPreferences";
 
-export const metadata = { title: "Settings — Dashboard" };
+export const metadata = { title: "Settings | Dashboard" };
 
 function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -30,23 +30,23 @@ function Badge({ children, color = "gray" }: { children: React.ReactNode; color?
 }
 
 function formatDate(ts: number | Date | null | undefined): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   try {
     return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
-    return "—";
+    return "-";
   }
 }
 
 function formatDateTime(ts: number | Date | null | undefined): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   try {
     return new Date(ts).toLocaleString("en-US", {
       month: "short", day: "numeric", year: "numeric",
       hour: "2-digit", minute: "2-digit",
     });
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -86,7 +86,7 @@ export default async function SettingsPage() {
             <p className="text-[15px] font-semibold text-white">
               {[user.firstName, user.lastName].filter(Boolean).join(" ") || "No name set"}
             </p>
-            <p className="text-[12px] text-[#4B5563]">{primaryEmail?.emailAddress ?? "—"}</p>
+            <p className="text-[12px] text-[#4B5563]">{primaryEmail?.emailAddress ?? "-"}</p>
           </div>
         </div>
         <div className="space-y-0">
@@ -102,7 +102,7 @@ export default async function SettingsPage() {
             label="Email address"
             value={
               <span className="flex items-center gap-2">
-                {primaryEmail?.emailAddress ?? "—"}
+                {primaryEmail?.emailAddress ?? "-"}
                 {primaryEmail?.verification?.status === "verified" && (
                   <Badge color="green">Verified</Badge>
                 )}

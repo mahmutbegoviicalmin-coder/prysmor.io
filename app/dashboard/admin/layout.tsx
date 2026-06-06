@@ -3,7 +3,7 @@ import { redirect }    from 'next/navigation';
 
 const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 
-export const metadata = { title: 'Admin — Prysmor' };
+export const metadata = { title: 'Admin | Prysmor' };
 
 export default async function DashboardAdminLayout({ children }: { children: React.ReactNode }) {
   const user   = await currentUser();

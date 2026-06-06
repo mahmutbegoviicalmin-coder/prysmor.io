@@ -34,13 +34,13 @@ export const steps: Step[] = [
     number: "01",
     title: "Select a clip",
     description:
-      "Choose any footage from your Premiere timeline — one click links it to Prysmor.",
+      "Choose any footage from your Premiere timeline, one click links it to Prysmor.",
   },
   {
     number: "02",
     title: "Describe the effect",
     description:
-      "Type what you want. Cinematic grade, energy aura, smoke burst — plain language works.",
+      "Type what you want. Cinematic grade, energy aura, smoke burst, plain language works.",
   },
   {
     number: "03",
@@ -60,7 +60,7 @@ export const showcaseItems: ShowcaseItem[] = [
   {
     id: "halation-glow",
     title: "Halation Glow",
-    description: "Controlled color halation — presence without the gimmick.",
+    description: "Controlled color halation, presence without the gimmick.",
     gradient: "from-[#0f1a14] via-[#0d1f17] to-[#080f0d]",
   },
   {
@@ -160,7 +160,7 @@ export const faqItems: FAQItem[] = [
     id: "panel-login",
     question: "How does the panel login work?",
     answer:
-      "After installing the panel, click Sign In — it opens a browser window to authenticate with your Prysmor account. Your plan syncs automatically and only the tools you've unlocked will appear.",
+      "After installing the panel, click Sign In, it opens a browser window to authenticate with your Prysmor account. Your plan syncs automatically and only the tools you've unlocked will appear.",
   },
   {
     id: "what-files",

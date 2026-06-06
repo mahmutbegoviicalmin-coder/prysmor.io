@@ -182,7 +182,7 @@ export async function GET() {
       color: PLAN_COLOR[p],
     }));
 
-  // ── Process orders — only count credit pack one-time purchases ─────────────
+  // ── Process orders, only count credit pack one-time purchases ─────────────
   // Subscription payments also create orders in LS; we exclude them by checking
   // whether the order's first_order_item variant belongs to a subscription plan.
   let orderCount   = 0;
@@ -192,7 +192,7 @@ export async function GET() {
     const attrs = order.attributes as Record<string, unknown>;
     if (String(attrs.status ?? '') !== 'paid') continue;
 
-    // Check if this order contains a subscription plan variant — if so, skip it.
+    // Check if this order contains a subscription plan variant, if so, skip it.
     const firstItem = (attrs.first_order_item as Record<string, unknown> | null) ?? null;
     const itemVariantId = firstItem ? String(firstItem.variant_id ?? '') : '';
     if (PLAN_VARIANT_IDS.has(itemVariantId)) continue; // subscription payment, not a credit pack

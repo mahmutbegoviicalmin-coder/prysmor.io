@@ -5,7 +5,7 @@
  * optimised for Runway video-to-video generation.
  *
  * Request body:
- *   { prompt: string, frames?: string[] }   — frames = base64 JPEG scene frames
+ *   { prompt: string, frames?: string[] }  , frames = base64 JPEG scene frames
  *
  * Response:
  *   { enhancedPrompt: string, enhanced: string, method: string, sceneAnalysed: boolean }
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   }
 
   const mode = (body.mode ?? 'background').trim();
-  log(TAG, `Enhance request — mode=${mode}`, { promptLen: cleanPrompt.length });
+  log(TAG, `Enhance request, mode=${mode}`, { promptLen: cleanPrompt.length });
 
   // ── Enhance ─────────────────────────────────────────────────────────────────
   let result: Awaited<ReturnType<typeof enhanceMotionForgePrompt>>;

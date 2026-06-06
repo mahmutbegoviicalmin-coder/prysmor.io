@@ -143,7 +143,7 @@ export async function deductCredits(
 
     const throwInsufficient = (have: number) => {
       const err = new Error(
-        `Insufficient credits — need ${cost}, have ${have}`,
+        `Insufficient credits, need ${cost}, have ${have}`,
       ) as Error & { code: string; creditsRemaining: number; needed: number };
       err.code             = "insufficient_credits";
       err.creditsRemaining = have;
@@ -152,7 +152,7 @@ export async function deductCredits(
     };
 
     if (!doc.exists) {
-      // User doc missing entirely — treat as inactive with 0 credits
+      // User doc missing entirely, treat as inactive with 0 credits
       throwInsufficient(0);
     }
 
@@ -232,7 +232,7 @@ export async function addCredits(userId: string, amount: number): Promise<void> 
 
 /**
  * Resets a user's credits to their plan cap (called on subscription payment/renewal).
- * Always sets to the plan cap — this is the monthly reset, not an accumulation.
+ * Always sets to the plan cap, this is the monthly reset, not an accumulation.
  */
 export async function topUpCredits(
   userId: string,

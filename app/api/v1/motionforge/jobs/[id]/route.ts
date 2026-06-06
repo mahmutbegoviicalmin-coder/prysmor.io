@@ -22,10 +22,10 @@ async function refundWithRetry(userId: string, credits: number, jobId: string): 
       return;
     } catch (e) {
       if (attempt < MAX_ATTEMPTS) {
-        warn(TAG, `Credit refund attempt ${attempt}/${MAX_ATTEMPTS} failed for job ${jobId} — retrying`, e);
+        warn(TAG, `Credit refund attempt ${attempt}/${MAX_ATTEMPTS} failed for job ${jobId}, retrying`, e);
         await new Promise(r => setTimeout(r, DELAY_MS));
       } else {
-        warn(TAG, `Credit refund failed after ${MAX_ATTEMPTS} attempts for job ${jobId} — credits lost`, e);
+        warn(TAG, `Credit refund failed after ${MAX_ATTEMPTS} attempts for job ${jobId}, credits lost`, e);
       }
     }
   }
@@ -55,7 +55,7 @@ export async function GET(
   if (job.status === 'generating' && (job as any).beebleTaskId) {
     const beebleTaskId = (job as any).beebleTaskId as string;
 
-    // Rate-limit to once every 8 s — same as Runway
+    // Rate-limit to once every 8 s, same as Runway
     const lastPolled = (job as any).beeblePolledAt
       ? ((job as any).beeblePolledAt instanceof Date
           ? (job as any).beeblePolledAt
@@ -96,7 +96,7 @@ export async function GET(
       }
 
       if (result.status === 'completed' && result.outputUrl) {
-        log(TAG, `[beeble] Completed for job ${params.id} — outputUrl: ${result.outputUrl.slice(0, 80)}`);
+        log(TAG, `[beeble] Completed for job ${params.id}, outputUrl: ${result.outputUrl.slice(0, 80)}`);
         await updateJob(userId, params.id, {
           status:       'completed',
           outputUrl:    result.outputUrl,
@@ -106,8 +106,8 @@ export async function GET(
         return NextResponse.json({ status: 'completed', progress: 100, outputUrl: result.outputUrl });
       }
 
-      // Completed but outputUrl not yet populated — wait one more poll
-      warn(TAG, `[beeble] Task ${beebleTaskId} completed but outputUrl missing — waiting`);
+      // Completed but outputUrl not yet populated, wait one more poll
+      warn(TAG, `[beeble] Task ${beebleTaskId} completed but outputUrl missing, waiting`);
       await updateJob(userId, params.id, { beeblePolledAt: new Date(), runwayProgress: 95 } as any);
       return NextResponse.json({ status: 'generating', progress: 95 });
 
@@ -167,13 +167,13 @@ export async function GET(
 
       if (result.state === 'success') {
         if (!result.resultUrl) {
-          // URL not yet populated — retry next poll
-          warn(TAG, `[kieai] Task ${kieTaskId} succeeded but resultUrl missing — waiting`);
+          // URL not yet populated, retry next poll
+          warn(TAG, `[kieai] Task ${kieTaskId} succeeded but resultUrl missing, waiting`);
           await updateJob(userId, params.id, { kiePolledAt: new Date(), kieProgress: 95 } as any);
           return NextResponse.json({ status: 'generating', progress: 95 });
         }
 
-        log(TAG, `[kieai] Completed for job ${params.id} — outputUrl: ${result.resultUrl.slice(0, 80)}`);
+        log(TAG, `[kieai] Completed for job ${params.id}, outputUrl: ${result.resultUrl.slice(0, 80)}`);
         await updateJob(userId, params.id, {
           status:       'completed',
           outputUrl:    result.resultUrl,
@@ -196,7 +196,7 @@ export async function GET(
   // ── Poll Runway for generation status ──────────────────────────────────────
   if (job.status === 'generating' && job.runwayTaskId) {
     // Rate-limit Runway API calls to once every 8 s.
-    // The panel polls every 3.5 s — return cached progress between Runway polls
+    // The panel polls every 3.5 s, return cached progress between Runway polls
     // so Vercel functions stay fast and we don't hammer Runway.
     const lastPolled = job.runwayPolledAt
       ? (job.runwayPolledAt instanceof Date
@@ -245,9 +245,9 @@ export async function GET(
         return NextResponse.json({ status: 'failed', error: reason });
       }
 
-      // ── Runway succeeded — output array may be empty on first poll, retry ─
+      // ── Runway succeeded, output array may be empty on first poll, retry ─
       if (taskStatus === 'SUCCEEDED' && (!task.output || task.output.length === 0)) {
-        warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty — retrying next poll`);
+        warn(TAG, `Runway task ${job.runwayTaskId} SUCCEEDED but output empty, retrying next poll`);
         await updateJob(userId, params.id, { runwayPolledAt: new Date(), runwayProgress: 98 } as any);
         return NextResponse.json({ status: 'generating', progress: 98 });
       }
@@ -266,23 +266,23 @@ export async function GET(
           const candidate = (obj.url ?? obj.uri ?? obj.downloadUrl) as string | undefined;
           if (candidate && typeof candidate === 'string') {
             rawUrl = candidate;
-            warn(TAG, `task.output[0] was an object — extracted URL from key`, { key: Object.keys(obj).join(',') });
+            warn(TAG, `task.output[0] was an object, extracted URL from key`, { key: Object.keys(obj).join(',') });
           } else {
-            logError(TAG, `SUCCEEDED but task.output[0] has unrecognised shape — cannot extract URL`, {
+            logError(TAG, `SUCCEEDED but task.output[0] has unrecognised shape, cannot extract URL`, {
               shape: JSON.stringify(rawItem).slice(0, 200),
             });
             await updateJob(userId, params.id, {
               status: 'failed',
-              error:  `Runway output shape unrecognised: ${JSON.stringify(rawItem).slice(0, 200)}`,
+              error:  'Output could not be retrieved, try again',
             });
-            return NextResponse.json({ status: 'failed', error: 'Runway output URL could not be extracted' });
+            return NextResponse.json({ status: 'failed', error: 'Output could not be retrieved, try again' });
           }
         } else {
           logError(TAG, `SUCCEEDED but task.output[0] is neither string nor object`, {
             type: typeof rawItem, value: String(rawItem).slice(0, 100),
           });
           await updateJob(userId, params.id, { status: 'failed', error: `Unexpected output type: ${typeof rawItem}` });
-          return NextResponse.json({ status: 'failed', error: 'Runway output URL has unexpected type' });
+          return NextResponse.json({ status: 'failed', error: 'Output could not be retrieved, try again' });
         }
 
         log(TAG, `Runway SUCCEEDED for job ${params.id}`, { rawUrl: rawUrl.slice(0, 100) });
@@ -296,14 +296,14 @@ export async function GET(
           });
         } catch (updateErr) {
           logError(TAG, `Firestore write failed when marking job ${params.id} completed`, updateErr);
-          return NextResponse.json({ status: 'failed', error: 'Database write failed after Runway succeeded — retry generation' });
+          return NextResponse.json({ status: 'failed', error: 'Database write failed, retry generation' });
         }
 
         log(TAG, `Job ${params.id} marked completed`);
         return NextResponse.json({ status: 'completed', progress: 100, outputUrl: rawUrl });
       }
 
-      // Unexpected status — log it so we can diagnose
+      // Unexpected status, log it so we can diagnose
       warn(TAG, `Runway task ${job.runwayTaskId} returned unexpected status: "${task.status}"`);
       const progress = Math.round((task.progress ?? 0) * 100);
       return NextResponse.json({ status: 'generating', progress });

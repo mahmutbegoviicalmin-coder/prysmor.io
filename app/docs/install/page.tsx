@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Install Guide — Prysmor",
+  title: "Install Guide | Prysmor",
 };
 
 const steps = [

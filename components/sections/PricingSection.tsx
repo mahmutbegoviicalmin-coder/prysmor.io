@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, ShieldCheck } from "lucide-react";
@@ -106,7 +107,7 @@ export default function PricingSection({
       track(`pricing_click_${tierName.toLowerCase()}`, { plan: tierName.toLowerCase(), price: tierPrice });
     }
     if (!user) {
-      // Not logged in — send to sign-in, after login Clerk returns to /#pricing
+      // Not logged in, send to sign-in, after login Clerk returns to /#pricing
       window.location.href = '/sign-in?redirect_url=' + encodeURIComponent('/#pricing');
       return;
     }
@@ -125,6 +126,32 @@ export default function PricingSection({
     >
       <div className="mx-auto" style={{ maxWidth: "1060px" }}>
 
+        {/* Adobe panels included */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45 }}
+          className="mx-auto mb-14 max-w-2xl rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-8 text-center"
+        >
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">
+            Included in every plan
+          </p>
+          <h3 className="mt-3 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+            One subscription. Both Adobe panels.
+          </h3>
+          <div className="mt-5 flex items-center justify-center gap-6">
+            <div className="flex items-center gap-2 text-[13px] text-white/55">
+              <Image src="/pr.png" alt="Premiere Pro" width={20} height={20} className="opacity-80" />
+              Premiere Pro panel
+            </div>
+            <div className="flex items-center gap-2 text-[13px] text-white/55">
+              <Image src="/ae.png" alt="After Effects" width={20} height={20} className="opacity-80" />
+              After Effects panel
+            </div>
+          </div>
+        </motion.div>
+
         {/* ── Heading ───────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 1, y: 0 }}
@@ -135,20 +162,20 @@ export default function PricingSection({
         >
           <p style={{
             fontSize: "11px",
-            fontWeight: 600,
+            fontWeight: 500,
             textTransform: "uppercase",
-            letterSpacing: "3px",
-            color: GREEN,
+            letterSpacing: "0.18em",
+            color: "rgba(255,255,255,0.4)",
             marginBottom: "20px",
           }}>
             Pricing
           </p>
           <h2 style={{
-            fontSize: "clamp(32px, 4.5vw, 56px)",
-            fontWeight: 800,
+            fontSize: "clamp(28px, 4vw, 44px)",
+            fontWeight: 600,
             color: "white",
-            letterSpacing: "-2px",
-            lineHeight: 1.08,
+            letterSpacing: "-1px",
+            lineHeight: 1.1,
             margin: "0 0 16px",
           }}>
             {title}
@@ -248,11 +275,10 @@ export default function PricingSection({
                 borderRadius: "9px",
                 cursor: "pointer",
                 letterSpacing: "0.01em",
-                transition: "opacity 0.15s, box-shadow 0.15s",
-                background: GREEN,
-                color: "#040e06",
+                transition: "opacity 0.15s",
+                background: "white",
+                color: "#080808",
                 border: "none",
-                boxShadow: "0 0 24px rgba(57,255,106,0.2)",
               } : {
                 width: "100%",
                 padding: "13px 20px",
@@ -270,8 +296,7 @@ export default function PricingSection({
               const enter = (e: React.MouseEvent) => {
                 const el = e.currentTarget as HTMLElement;
                 if (tier.featured) {
-                  el.style.opacity = "0.88";
-                  el.style.boxShadow = "0 0 36px rgba(57,255,106,0.35)";
+                  el.style.opacity = "0.9";
                 } else {
                   el.style.background = "rgba(255,255,255,0.04)";
                   el.style.borderColor = "#3a3a3a";
@@ -282,7 +307,6 @@ export default function PricingSection({
                 const el = e.currentTarget as HTMLElement;
                 if (tier.featured) {
                   el.style.opacity = "1";
-                  el.style.boxShadow = "0 0 24px rgba(57,255,106,0.2)";
                 } else {
                   el.style.background = "transparent";
                   el.style.borderColor = "#2a2a2a";
@@ -342,17 +366,17 @@ export default function PricingSection({
                   textAlign: "left",
                   display: "flex",
                   flexDirection: "column",
-                  background: tier.featured ? "#0c1410" : "#0f0f0f",
+                  background: tier.featured ? "#0c0c0c" : "#0f0f0f",
                   border: tier.featured
-                    ? "1px solid rgba(57,255,106,0.22)"
+                    ? "1px solid rgba(255,255,255,0.12)"
                     : "1px solid #1d1d1d",
                   borderTop: tier.featured
-                    ? "2px solid rgba(57,255,106,0.55)"
+                    ? "1px solid rgba(255,255,255,0.12)"
                     : "1px solid #1d1d1d",
                   boxShadow: tier.featured
-                    ? "0 0 0 4px rgba(57,255,106,0.04), 0 24px 64px rgba(0,0,0,0.5), 0 0 60px rgba(57,255,106,0.08)"
+                    ? "0 8px 40px rgba(0,0,0,0.35)"
                     : "0 4px 24px rgba(0,0,0,0.3)",
-                  transform: tier.featured ? "translateY(-10px)" : "none",
+                  transform: tier.featured ? "translateY(-6px)" : "none",
                 }}
               >
                 {/* Subtle radial glow from top for featured */}

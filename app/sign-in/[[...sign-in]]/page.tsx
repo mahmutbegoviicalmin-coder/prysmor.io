@@ -83,7 +83,7 @@ const appearance = {
 };
 
 const FEATURES = [
-  { label: "Background replacement — no green screen"   },
+  { label: "Background replacement without a green screen"   },
   { label: "Relight any scene with a single sentence"   },
   { label: "Fire, rain, smoke, object removal from text" },
 ];
@@ -231,7 +231,7 @@ export default function SignInPage() {
               <div className="au-quote-avatar">
                 <Image src="/chris-boustet.jpg" alt="" fill sizes="24px" style={{ objectFit: "cover" }} />
               </div>
-              <span className="au-quote-name">Chris B. — Freelance Editor</span>
+              <span className="au-quote-name">Chris B., Freelance Editor</span>
             </div>
           </div>
         </div>

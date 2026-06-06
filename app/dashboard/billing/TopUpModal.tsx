@@ -104,7 +104,7 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
               Top up credits
             </h2>
             <p className="text-[13px] text-[#6B7280] mt-1">
-              One-time purchase — credits added instantly to your balance.
+              One-time purchase. Credits added instantly to your balance.
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-[14px] font-semibold text-white">{pack.label}</span>
-                      <span className="text-[12px] text-[#6B7280]">— {pack.credits.toLocaleString()} credits</span>
+                      <span className="text-[12px] text-[#6B7280]">{pack.credits.toLocaleString()} credits</span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
                       <Check className="w-3 h-3 text-[#39FF6A] flex-shrink-0" />

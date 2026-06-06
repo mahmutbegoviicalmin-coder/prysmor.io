@@ -182,7 +182,7 @@ export function CampaignsSection() {
 
       {/* Main editor layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(260px,300px)_1fr] gap-5 min-h-[520px]">
-        {/* Sidebar — all campaigns */}
+        {/* Sidebar, all campaigns */}
         <div className="space-y-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#4B5563] px-1">All campaigns</p>
           {campaigns.map((def) => {
@@ -317,7 +317,7 @@ export function CampaignsSection() {
 
                   <div>
                     <label className="block text-[11px] text-[#6B7280] uppercase tracking-wider mb-2">
-                      Email body (HTML) — use <code className="text-[#A3FF12]">{'{{firstName}}'}</code>
+                      Email body (HTML), use <code className="text-[#A3FF12]">{'{{firstName}}'}</code>
                     </label>
                     <textarea
                       value={camp.steps[stepIdx].html.trim()}

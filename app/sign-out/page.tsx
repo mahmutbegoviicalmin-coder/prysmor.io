@@ -10,7 +10,7 @@ export default async function SignOutPage() {
     try {
       await clerk.sessions.revokeSession(sessionId);
     } catch {
-      // Session already invalid — proceed to sign-in anyway
+      // Session already invalid, proceed to sign-in anyway
     }
   }
 

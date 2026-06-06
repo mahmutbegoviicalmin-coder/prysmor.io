@@ -418,7 +418,7 @@ function AdminAffiliateView() {
               {editId === aff.id && editState && (
                 <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #161616" }}>
                   <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "16px" }}>
-                    Edit — changes are visible to the affiliate immediately
+                    Edit, changes are visible to the affiliate immediately
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", marginBottom: "12px" }}>

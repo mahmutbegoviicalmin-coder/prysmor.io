@@ -25,7 +25,7 @@ export const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 /**
  * Mode-specific system prompts.
  * background + relight → Beeble SwitchX (descriptive scene/lighting prompts).
- * vfx → Runway Gen-4 Aleph (short action verb format).
+ * vfx → short action verb edit-instruction format.
  */
 // ─── Mode-specific system prompts ────────────────────────────────────────────
 
@@ -68,8 +68,8 @@ Rules:
 - Max 50 words
 - Plain text only. No quotes. No markdown.`,
 
-  vfx: `You are a Runway Aleph 2.0 video edit prompt writer.
-Aleph 2.0 edits existing footage — write edit instructions, not scene captions.
+  vfx: `You are a video edit prompt writer.
+The model edits existing footage — write edit instructions, not scene captions.
 
 OUTPUT FORMAT:
 [Transformation verb + what changes]. Keep [unchanged elements] exactly as in the source.
@@ -119,7 +119,7 @@ const TRANSFORMATION_VERBS = /\b(replace|change|make it|turn into|convert|transf
 /**
  * Mode-aware rule-based fallback. Activated only when Claude is unavailable.
  * background/relight (Beeble): pass cleaned prompt through as-is — descriptive format.
- * vfx (Runway): wrap in Runway's short action format.
+ * vfx: wrap in short action edit-instruction format.
  */
 export function fallbackEnhance(userPrompt: string, mode?: string): string {
   const cleaned = userPrompt

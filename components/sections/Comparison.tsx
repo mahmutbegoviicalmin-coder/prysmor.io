@@ -97,7 +97,7 @@ export default function Comparison({
           className="comparison-grid"
           style={{ display: "flex", flexDirection: "row", position: "relative" }}
         >
-          {/* Vertical divider — hidden on mobile via CSS */}
+          {/* Vertical divider, hidden on mobile via CSS */}
           <div
             className="comparison-divider"
             style={{
@@ -110,7 +110,7 @@ export default function Comparison({
             }}
           />
 
-          {/* LEFT — Hiring a VFX Artist */}
+          {/* LEFT, Hiring a VFX Artist */}
           <div className="comparison-col" style={{ paddingRight: "48px", flex: 1 }}>
             <p
               className="font-medium uppercase"
@@ -158,7 +158,7 @@ export default function Comparison({
             </ul>
           </div>
 
-          {/* RIGHT — Prysmor, subtle green panel */}
+          {/* RIGHT, Prysmor, subtle green panel */}
           <div
             className="comparison-col comparison-col-right"
             style={{

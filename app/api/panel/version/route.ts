@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 /**
- * Current panel version — bump this string to push an OTA update to all installed panels.
+ * Current panel version, bump this string to push an OTA update to all installed panels.
  * Panels compare their local version.txt against this value on every Premiere launch.
  */
 const PANEL_VERSION = '5.4.5';
@@ -15,7 +15,7 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
-  // Cache for 5 minutes — panels check on every launch so avoid hammering the API.
+  // Cache for 5 minutes, panels check on every launch so avoid hammering the API.
   'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
 };
 

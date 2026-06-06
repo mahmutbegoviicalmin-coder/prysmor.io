@@ -6,10 +6,10 @@ import { Instagram } from "lucide-react";
 
 const footerLinks = {
   Product: [
-    { label: "Features",  href: "/#features" },
-    { label: "Examples",  href: "/#examples" },
-    { label: "Pricing",   href: "/#pricing"  },
-    { label: "FAQ",       href: "/#faq"      },
+    { label: "How it works", href: "/#how-it-works" },
+    { label: "Capabilities", href: "/#examples" },
+    { label: "Pricing", href: "/#pricing" },
+    { label: "FAQ", href: "/#faq" },
   ],
   Support: [
     { label: "Documentation", href: "/docs/install" },
@@ -37,7 +37,7 @@ export default function Footer() {
         {/* Main grid: brand + 3 nav cols */}
         <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: "40px 32px" }}>
 
-          {/* Brand column — full width on mobile */}
+          {/* Brand column, full width on mobile */}
           <div className="col-span-2 sm:col-span-1">
             <Link href="/" style={{
               display: "inline-flex",
@@ -69,7 +69,7 @@ export default function Footer() {
               marginTop: "14px",
               lineHeight: 1.6,
             }}>
-              Text to VFX. Inside Adobe. Instantly.
+              AI VFX panel for Premiere Pro and After Effects.
             </p>
 
             <a

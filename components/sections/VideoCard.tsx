@@ -46,14 +46,14 @@ export default function VideoCard({ src, label }: VideoCardProps) {
         }}
       />
 
-      {/* Subtle vignette — no text overlay */}
+      {/* Subtle vignette, no text overlay */}
       <div aria-hidden style={{
         position: "absolute", inset: 0,
         background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)",
         pointerEvents: "none",
       }} />
 
-      {/* Label — top left */}
+      {/* Label, top left */}
       <div aria-hidden style={{
         position: "absolute", top: "14px", left: "14px",
         background: "rgba(5,5,5,0.55)",

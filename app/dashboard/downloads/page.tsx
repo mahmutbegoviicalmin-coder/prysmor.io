@@ -5,7 +5,7 @@ import { Lock, Zap, ArrowRight } from "lucide-react";
 import { getUser, PLAN_LABELS, PLAN_CREDITS } from "@/lib/firestore/users";
 import DownloadsContent from "./DownloadsContent";
 
-export const metadata = { title: "Download Plugin — Dashboard" };
+export const metadata = { title: "Download Plugin | Dashboard" };
 
 // ─── Paywall shown to users without an active subscription ───────────────────
 

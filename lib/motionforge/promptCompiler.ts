@@ -1,7 +1,7 @@
 /**
- * MotionForge VFX Prompt Compiler — Runway Aleph 2.0
+ * MotionForge VFX Prompt Compiler
  *
- * Rewrites short user input into Aleph 2 edit instructions:
+ * Rewrites short user input into targeted edit instructions:
  *   [Verb + change]. Keep [unchanged elements] exactly as in the source.
  *
  * Primary path: Claude Haiku. Fallback: lightweight template.
@@ -15,9 +15,9 @@ const TAG = 'promptCompiler';
 const MODEL      = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 200;
 
-const SYSTEM_PROMPT = `You are a Runway Aleph 2.0 video edit prompt writer.
+const SYSTEM_PROMPT = `You are a video edit prompt writer.
 
-Aleph 2.0 receives an existing video and applies a targeted edit. The clip already contains framing, lighting, camera motion, and subjects — do NOT redescribe the scene.
+The model receives an existing video and applies a targeted edit. The clip already contains framing, lighting, camera motion, and subjects — do NOT redescribe the scene.
 
 Write like a compositor giving an edit note, not like an image caption.
 
@@ -43,7 +43,7 @@ const TRANSFORM_VERBS =
 
 /**
  * Classifies a prompt as overlay (effect on top) or background (environment swap).
- * Used for downstream compositing hints — both use the same Aleph 2 prompt style.
+ * Used for downstream compositing hints — both use the same edit-instruction style.
  */
 export function classifyPromptEffect(prompt: string): 'overlay' | 'background' {
   const p = prompt.toLowerCase();
@@ -182,7 +182,7 @@ async function callClaude(userPrompt: string): Promise<string> {
     max_tokens: MAX_TOKENS,
     system:     SYSTEM_PROMPT,
     messages: [
-      { role: 'user', content: `Compile this Aleph 2 edit instruction: "${userPrompt}"` },
+      { role: 'user', content: `Compile this edit instruction: "${userPrompt}"` },
     ],
   });
 

@@ -61,8 +61,8 @@ export async function POST(
 
   const assetUrl = job.assetUrl as string | undefined;
   if (!assetUrl) {
-    await updateJob(userId, params.id, { status: 'failed', error: 'No asset URL — call /upload-url first' });
-    return NextResponse.json({ error: 'No asset — call /upload-url first' }, { status: 400 });
+    await updateJob(userId, params.id, { status: 'failed', error: 'No asset URL, call /upload-url first' });
+    return NextResponse.json({ error: 'No asset, call /upload-url first' }, { status: 400 });
   }
 
   let body: {
@@ -98,15 +98,15 @@ export async function POST(
   if (isBeebleMode) {
     const beebleUri = (job as any).beebleVideoUri as string | undefined;
     if (!beebleUri) {
-      await updateJob(userId, params.id, { status: 'failed', error: 'Asset not uploaded to Beeble — call /upload-url first' });
-      return NextResponse.json({ error: 'Asset not uploaded to Beeble — call /upload-url first' }, { status: 400 });
+      await updateJob(userId, params.id, { status: 'failed', error: 'Asset not uploaded to Beeble, call /upload-url first' });
+      return NextResponse.json({ error: 'Asset not uploaded to Beeble, call /upload-url first' }, { status: 400 });
     }
   } else if (isOmniMode && !assetUrl.startsWith('https://')) {
-    await updateJob(userId, params.id, { status: 'failed', error: 'Asset not uploaded for Omni — call /upload-url first' });
-    return NextResponse.json({ error: 'Asset not uploaded for Omni — call /upload-url first' }, { status: 400 });
+    await updateJob(userId, params.id, { status: 'failed', error: 'Asset not uploaded for Omni, call /upload-url first' });
+    return NextResponse.json({ error: 'Asset not uploaded for Omni, call /upload-url first' }, { status: 400 });
   } else if (isRunwayMode && !assetUrl.startsWith('runway://')) {
-    await updateJob(userId, params.id, { status: 'failed', error: 'Asset not uploaded to Runway — call /upload-url first' });
-    return NextResponse.json({ error: 'Asset not uploaded to Runway — call /upload-url first' }, { status: 400 });
+    await updateJob(userId, params.id, { status: 'failed', error: 'Clip not uploaded, try again' });
+    return NextResponse.json({ error: 'Clip not uploaded, try again' }, { status: 400 });
   }
 
   const clientW = typeof body.videoWidth  === 'number' ? body.videoWidth  : 0;
@@ -125,7 +125,7 @@ export async function POST(
   try {
 
     // ══════════════════════════════════════════════════════════════════════
-    // BEEBLE PATH — background + relight
+    // BEEBLE PATH, background + relight
     // ══════════════════════════════════════════════════════════════════════
     if (isBeebleMode) {
       const beebleVideoUri = job.beebleVideoUri ?? assetUrl;
@@ -141,7 +141,7 @@ export async function POST(
         }
       }
 
-      console.log(`[beeble] Starting SwitchX — source=${beebleVideoUri} refImage=${beebleRefImageUri ?? 'none'} prompt="${prompt.slice(0, 80)}"`);
+      console.log(`[beeble] Starting SwitchX, source=${beebleVideoUri} refImage=${beebleRefImageUri ?? 'none'} prompt="${prompt.slice(0, 80)}"`);
 
       const beebleJobId = await createSwitchXTask({
         sourceUri:         beebleVideoUri,
@@ -165,7 +165,7 @@ export async function POST(
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // KIE.AI PATH — omni mode (Pro/Exclusive only, Vercel Blob asset URL)
+    // KIE.AI PATH, omni mode (Pro/Exclusive only, Vercel Blob asset URL)
     // ══════════════════════════════════════════════════════════════════════
     if (isOmniMode) {
       const mediaInSec = typeof (job as any).mediaInSec === 'number'
@@ -173,7 +173,7 @@ export async function POST(
         : 0;
 
       // The uploaded asset is already the extracted/trimmed clip (starts at 0),
-      // so we always pass mediaInSec=0 — NOT the original source in-point.
+      // so we always pass mediaInSec=0, NOT the original source in-point.
       const cappedDur = Math.min(clipDuration, 10);
       console.log(`[kieai] assetUrl="${assetUrl}"`);
 
@@ -186,11 +186,11 @@ export async function POST(
         }
       } catch (headErr) {
         console.error(`[kieai] Video URL check failed:`, headErr);
-        await updateJob(userId, params.id, { status: 'failed', error: 'Video URL is not accessible — upload may have failed' }).catch(() => {});
+        await updateJob(userId, params.id, { status: 'failed', error: 'Video URL is not accessible, upload may have failed' }).catch(() => {});
         return NextResponse.json({ error: 'Video URL not accessible. Please retry.' }, { status: 400 });
       }
 
-      console.log(`[kieai] Starting Gemini Omni Video — prompt="${prompt.slice(0, 80)}" dur=${cappedDur}s dims=${clientW}x${clientH}`);
+      console.log(`[kieai] Starting Gemini Omni Video, prompt="${prompt.slice(0, 80)}" dur=${cappedDur}s dims=${clientW}x${clientH}`);
 
       const task = await createKieOmniVideoTask({
         videoUrl:    assetUrl,
@@ -217,10 +217,10 @@ export async function POST(
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // RUNWAY PATH — Aleph 2.0 (runway:// asset URL)
+    // RUNWAY PATH, Aleph 2.0 (runway:// asset URL)
     // ══════════════════════════════════════════════════════════════════════
     if (clipDuration < RUNWAY_MIN_SEC || clipDuration > RUNWAY_MAX_SEC) {
-      const msg = `Clip must be between ${RUNWAY_MIN_SEC} and ${RUNWAY_MAX_SEC} seconds for Aleph 2.0.`;
+      const msg = `Clip must be between ${RUNWAY_MIN_SEC} and ${RUNWAY_MAX_SEC} seconds.`;
       await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
       return NextResponse.json({ error: msg }, { status: 400 });
     }
@@ -243,7 +243,7 @@ export async function POST(
         keyframes = [{ uri: refUri, seconds: 0 }];
         log(TAG, `[aleph2] Keyframe anchor uploaded at t=0`);
       } catch (e) {
-        warn(TAG, '[aleph2] Keyframe upload failed — continuing prompt-only', { err: (e as Error).message });
+        warn(TAG, '[aleph2] Keyframe upload failed, continuing prompt-only', { err: (e as Error).message });
       } finally {
         try { fs.unlinkSync(refPath); } catch { /* ignore */ }
       }

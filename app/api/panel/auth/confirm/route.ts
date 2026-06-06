@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Code expired" }, { status: 410 });
   }
 
-  // Sync Clerk profile → Firestore (name, email) — fire-and-forget
+  // Sync Clerk profile → Firestore (name, email), fire-and-forget
   syncUserProfile(user.id, {
     email:     user.primaryEmailAddress?.emailAddress,
     firstName: user.firstName ?? undefined,
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   const plan      = userDoc?.plan ?? "starter";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
-  // One device seat per physical machine — Premiere + After Effects share the same slot
+  // One device seat per physical machine, Premiere + After Effects share the same slot
   const machineFingerprint = codeData.machineFingerprint;
   const deviceId = buildPanelDeviceId(user.id, machineFingerprint);
 
