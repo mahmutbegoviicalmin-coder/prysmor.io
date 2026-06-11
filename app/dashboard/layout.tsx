@@ -94,8 +94,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [planLabel, setPlanLabel]       = useState("Free");
+  const [showAffiliate, setShowAffiliate] = useState(false);
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     fetch("/api/me")
       .then((r) => r.json())
       .then((d) => {
@@ -108,13 +111,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {});
 
+    if (isSignedIn) {
+      fetch("/api/affiliate/stats")
+        .then((r) => setShowAffiliate(r.ok))
+        .catch(() => setShowAffiliate(false));
+    } else {
+      setShowAffiliate(false);
+    }
+
     // Only sync location once per session to avoid duplicate calls with ConditionalShell
     const syncKey = "prysmor_loc_synced";
     if (!sessionStorage.getItem(syncKey)) {
       sessionStorage.setItem(syncKey, "1");
       fetch("/api/sync-location", { method: "POST" }).catch(() => {});
     }
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
 
   // If Clerk loads but user is not signed in → wait briefly then redirect
@@ -159,7 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const userEmail      = user?.primaryEmailAddress?.emailAddress ?? "";
   const isAdmin        = userEmail === ADMIN_EMAIL;
-  const isAffiliate    = AFFILIATE_EMAILS.includes(userEmail);
+  const isAffiliate    = showAffiliate || AFFILIATE_EMAILS.includes(userEmail);
   const adminActive    = pathname.startsWith("/dashboard/admin");
   const affiliateActive = pathname.startsWith("/dashboard/affiliate");
 

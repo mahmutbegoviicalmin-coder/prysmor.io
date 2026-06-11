@@ -21,16 +21,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     manualPaidEarnings:    number;
     manualActiveMembers:   number;
     manualInactiveMembers: number;
+    manualChart?:          { title: string; points: { label: string; value: number }[] };
   }> = await req.json();
 
   const allowed = [
     'commissionPercent', 'status', 'code', 'note',
     'manualTotalEarnings', 'manualPendingEarnings', 'manualPaidEarnings',
-    'manualActiveMembers', 'manualInactiveMembers',
+    'manualActiveMembers', 'manualInactiveMembers', 'manualChart',
   ];
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowed) {
     if (key in body) update[key] = (body as Record<string, unknown>)[key];
+  }
+
+  if ('manualChart' in body && body.manualChart) {
+    update.manualChart = body.manualChart;
   }
 
   await db.collection('affiliates').doc(params.id).update(update);

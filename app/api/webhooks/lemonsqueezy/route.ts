@@ -4,6 +4,7 @@ import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
 import { topUpCredits, addCredits, PLAN_LABELS }  from '@/lib/firestore/users';
 import { recordReferral }            from '@/lib/affiliates';
+import { FB_PIXEL_ID }               from '@/lib/pixel';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +27,7 @@ async function sendMetaPurchaseEvent(order: {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
-    const res = await fetch(`https://graph.facebook.com/v19.0/4285435231716551/events`, {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${FB_PIXEL_ID}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

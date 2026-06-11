@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
     manualPaidEarnings:    0,
     manualActiveMembers:   0,
     manualInactiveMembers: 0,
+    manualChart:           DEFAULT_AFFILIATE_CHART,
     note:                  '',
     status:                'active',
     createdAt:             new Date(),

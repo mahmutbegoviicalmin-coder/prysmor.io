@@ -1,4 +1,4 @@
-export const FB_PIXEL_ID = '4285435231716551';
+export const FB_PIXEL_ID = '1468737715025683';
 
 export const initiateCheckout = (planName: string, value: number, currency = 'USD') => {
   if (typeof window === 'undefined') return;

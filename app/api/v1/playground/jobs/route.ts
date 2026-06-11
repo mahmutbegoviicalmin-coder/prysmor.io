@@ -8,11 +8,12 @@ export const runtime = "nodejs";
 
 const TRIAL_MAX_SECONDS = 2;
 
-// ── Upstash Redis (reuse existing KV creds) ──────────────────────────────────
-const redis = new Redis({
-  url:   process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+function getRedis() {
+  const url = process.env.KV_REST_API_URL?.trim();
+  const token = process.env.KV_REST_API_TOKEN?.trim();
+  if (!url || !token) throw new Error("KV not configured");
+  return new Redis({ url, token });
+}
 
 // ── Disposable email domain blocklist ────────────────────────────────────────
 const BLOCKED_DOMAINS = new Set([
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
     // ── 4. Email-based dedup in Redis (catches same email → new account) ──
     if (email) {
       const emailKey = `trial:email:${Buffer.from(email).toString("base64")}`;
-      const existing = await redis.get(emailKey).catch(() => null);
+      const existing = await getRedis().get(emailKey).catch(() => null);
       if (existing) {
         return NextResponse.json(
           { error: "trial_used", message: "A free trial has already been used with this email." },
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (ip !== "unknown") {
     const ipKey = `trial:ip:${ip}`;
     try {
-      const ipUsed = await redis.get(ipKey);
+      const ipUsed = await getRedis().get(ipKey);
       if (ipUsed) {
         return NextResponse.json(
           { error: "trial_used", message: "A free trial has already been used from this device." },
@@ -109,11 +110,11 @@ export async function POST(req: NextRequest) {
   try {
     const TTL = 60 * 60 * 24 * 30; // 30 days in seconds
     if (ip !== "unknown") {
-      await redis.set(`trial:ip:${ip}`, userId, { ex: TTL });
+      await getRedis().set(`trial:ip:${ip}`, userId, { ex: TTL });
     }
     if (email) {
       const emailKey = `trial:email:${Buffer.from(email).toString("base64")}`;
-      await redis.set(emailKey, userId, { ex: TTL });
+      await getRedis().set(emailKey, userId, { ex: TTL });
     }
   } catch { /* non-critical */ }
 

@@ -51,6 +51,50 @@ function fileNameFromPath(filePath) {
   return parts[parts.length - 1];
 }
 
+function isVideoTrackItem(item) {
+  if (!item) return false;
+  try {
+    var mt = item.mediaType;
+    if (mt === 'Video') return true;
+    if (mt === 'Audio') return false;
+  } catch (_) {}
+  return true;
+}
+
+// Premiere 2026+ exposes timeline selection via sequence.getSelection().
+// Per-clip isSelected() / .selected can stay false even when clips are selected.
+function findSelectedVideoClip(seq) {
+  if (!seq) return null;
+
+  try {
+    if (seq.getSelection) {
+      var sel = seq.getSelection();
+      if (sel && sel.length !== undefined && sel.length > 0) {
+        for (var i = 0; i < sel.length; i++) {
+          if (isVideoTrackItem(sel[i])) return sel[i];
+        }
+      }
+    }
+  } catch (_) {}
+
+  try {
+    var videoTracks = seq.videoTracks;
+    for (var t = 0; t < videoTracks.numTracks; t++) {
+      var track = videoTracks[t];
+      var clips = track.clips;
+      for (var c = 0; c < clips.numItems; c++) {
+        var clip = clips[c];
+        var selected = false;
+        try { selected = clip.isSelected(); } catch (_) {}
+        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
+        if (selected) return clip;
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
+
 // ─── importFile ───────────────────────────────────────────────────────────────
 
 function importFile(filePath) {
@@ -108,26 +152,7 @@ function getSelectionInfo() {
     }
 
     var MAX_SEC = 8;
-    var selectedClip = null;
-
-    // Search all video tracks for the first selected clip
-    var videoTracks = seq.videoTracks;
-    for (var t = 0; t < videoTracks.numTracks; t++) {
-      var track = videoTracks[t];
-      var clips = track.clips;
-      for (var c = 0; c < clips.numItems; c++) {
-        var clip = clips[c];
-        // Premiere Pro: TrackItem.isSelected() or .selected property
-        var selected = false;
-        try { selected = clip.isSelected(); } catch (_) {}
-        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected) {
-          selectedClip = clip;
-          break;
-        }
-      }
-      if (selectedClip) break;
-    }
+    var selectedClip = findSelectedVideoClip(seq);
 
     if (!selectedClip) {
       return JSON.stringify({ error: 'No clip selected — click a clip in the Premiere timeline first.' });
@@ -272,29 +297,7 @@ function replaceSelection(filePath) {
     var seq = app.project.activeSequence;
     if (!seq) return 'error: No active sequence.';
 
-    var selectedClip = null;
-    var selectedTrackIdx = -1;
-    var selectedClipIdx  = -1;
-
-    var videoTracks = seq.videoTracks;
-    for (var t = 0; t < videoTracks.numTracks; t++) {
-      var track = videoTracks[t];
-      var clips = track.clips;
-      for (var c = 0; c < clips.numItems; c++) {
-        var clip = clips[c];
-        var selected = false;
-        try { selected = clip.isSelected(); } catch (_) {}
-        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected) {
-          selectedClip = clip;
-          selectedTrackIdx = t;
-          selectedClipIdx  = c;
-          break;
-        }
-      }
-      if (selectedClip) break;
-    }
-
+    var selectedClip = findSelectedVideoClip(seq);
     if (!selectedClip) return 'error: No clip selected.';
 
     var startSec = selectedClip.start.seconds;

@@ -51,6 +51,50 @@ function fileNameFromPath(filePath) {
   return parts[parts.length - 1];
 }
 
+function isVideoTrackItem(item) {
+  if (!item) return false;
+  try {
+    var mt = item.mediaType;
+    if (mt === 'Video') return true;
+    if (mt === 'Audio') return false;
+  } catch (_) {}
+  return true;
+}
+
+// Premiere 2026+ exposes timeline selection via sequence.getSelection().
+// Per-clip isSelected() / .selected can stay false even when clips are selected.
+function findSelectedVideoClip(seq) {
+  if (!seq) return null;
+
+  try {
+    if (seq.getSelection) {
+      var sel = seq.getSelection();
+      if (sel && sel.length !== undefined && sel.length > 0) {
+        for (var i = 0; i < sel.length; i++) {
+          if (isVideoTrackItem(sel[i])) return sel[i];
+        }
+      }
+    }
+  } catch (_) {}
+
+  try {
+    var videoTracks = seq.videoTracks;
+    for (var t = 0; t < videoTracks.numTracks; t++) {
+      var track = videoTracks[t];
+      var clips = track.clips;
+      for (var c = 0; c < clips.numItems; c++) {
+        var clip = clips[c];
+        var selected = false;
+        try { selected = clip.isSelected(); } catch (_) {}
+        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
+        if (selected) return clip;
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
+
 // ─── importFile ───────────────────────────────────────────────────────────────
 
 function importFile(filePath) {
@@ -108,26 +152,7 @@ function getSelectionInfo() {
     }
 
     var MAX_SEC = 8;
-    var selectedClip = null;
-
-    // Search all video tracks for the first selected clip
-    var videoTracks = seq.videoTracks;
-    for (var t = 0; t < videoTracks.numTracks; t++) {
-      var track = videoTracks[t];
-      var clips = track.clips;
-      for (var c = 0; c < clips.numItems; c++) {
-        var clip = clips[c];
-        // Premiere Pro: TrackItem.isSelected() or .selected property
-        var selected = false;
-        try { selected = clip.isSelected(); } catch (_) {}
-        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected) {
-          selectedClip = clip;
-          break;
-        }
-      }
-      if (selectedClip) break;
-    }
+    var selectedClip = findSelectedVideoClip(seq);
 
     if (!selectedClip) {
       return JSON.stringify({ error: 'No clip selected — click a clip in the Premiere timeline first.' });
@@ -165,9 +190,18 @@ function getSelectionInfo() {
       }
     } catch (_) {}
 
-    // Sequence output dimensions — the video is rendered at sequence resolution,
-    // not source-file resolution. Use these for aspect ratio validation so that
-    // a 16:9 sequence with a wider source file is not incorrectly blocked.
+    // Clip source dimensions — actual media resolution, used for Runway ratio selection.
+    // Try clip.source.width/height (TrackItem source), then projectItem.source,
+    // then fall back to sequence dimensions if the clip API isn't available.
+    var clipW = 0, clipH = 0;
+    try { clipW = selectedClip.source.width  || 0; } catch (_) {}
+    try { clipH = selectedClip.source.height || 0; } catch (_) {}
+    if (!clipW || !clipH) {
+      try { clipW = selectedClip.projectItem.source.width  || 0; } catch (_) {}
+      try { clipH = selectedClip.projectItem.source.height || 0; } catch (_) {}
+    }
+
+    // Sequence dimensions — kept as fallback for the too-wide guard.
     var seqW = 0, seqH = 0;
     try { seqW = seq.frameSizeHorizontal || 0; } catch (_) {}
     try { seqH = seq.frameSizeVertical   || 0; } catch (_) {}
@@ -179,6 +213,8 @@ function getSelectionInfo() {
       debugTimes:   _debugTimes,
       sourcePath:   sourcePath,
       clipName:     selectedClip.name || fileNameFromPath(sourcePath),
+      clipWidth:    clipW,
+      clipHeight:   clipH,
       seqWidth:     seqW,
       seqHeight:    seqH,
     });
@@ -261,38 +297,12 @@ function replaceSelection(filePath) {
     var seq = app.project.activeSequence;
     if (!seq) return 'error: No active sequence.';
 
-    var selectedClip = null;
-    var selectedTrackIdx = -1;
-    var selectedClipIdx  = -1;
-
-    var videoTracks = seq.videoTracks;
-    for (var t = 0; t < videoTracks.numTracks; t++) {
-      var track = videoTracks[t];
-      var clips = track.clips;
-      for (var c = 0; c < clips.numItems; c++) {
-        var clip = clips[c];
-        var selected = false;
-        try { selected = clip.isSelected(); } catch (_) {}
-        if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected) {
-          selectedClip = clip;
-          selectedTrackIdx = t;
-          selectedClipIdx  = c;
-          break;
-        }
-      }
-      if (selectedClip) break;
-    }
-
+    var selectedClip = findSelectedVideoClip(seq);
     if (!selectedClip) return 'error: No clip selected.';
 
     var startSec = selectedClip.start.seconds;
-    var durSec   = selectedClip.duration.seconds;
 
-    // Remove the original clip
-    selectedClip.remove(false, false);
-
-    // Import and insert replacement
+    // Import the generated clip without removing the original
     app.project.importFiles([filePath], true, app.project.rootItem, false);
     var item = findProjectItemByPath(app.project.rootItem, filePath);
     if (!item) {
@@ -301,8 +311,16 @@ function replaceSelection(filePath) {
     }
     if (!item) return 'error: Replacement clip not found: ' + fileNameFromPath(filePath);
 
-    var track2 = seq.videoTracks[selectedTrackIdx];
-    track2.insertClip(item, startSec);
+    // Place generated clip on V2 above the original — original is preserved on V1
+    var v2 = seq.videoTracks[1];
+    if (!v2) return 'error: V2 track not found';
+    var time = new Time();
+    time.seconds = startSec;
+    if (v2.overwriteClip) {
+      v2.overwriteClip(item, time.seconds);
+    } else {
+      v2.insertClip(item, time.seconds);
+    }
 
     return 'success';
   } catch (e) {

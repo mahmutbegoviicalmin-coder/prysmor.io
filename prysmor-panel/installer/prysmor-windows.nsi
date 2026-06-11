@@ -13,7 +13,7 @@
 Unicode True
 
 !define PRODUCT_NAME      "Prysmor"
-!define PRODUCT_VERSION   "3.9.0"
+!define PRODUCT_VERSION   "5.4.6"
 !define PRODUCT_PUBLISHER "Prysmor"
 !define PRODUCT_URL       "https://prysmor.io"
 !define BUNDLE_ID         "com.prysmor.panel"
@@ -73,6 +73,7 @@ Section "Prysmor Panel" SecMain
   File "..\panel\main.js"
   File "..\panel\styles.css"
   File "..\panel\host.jsx"
+  File "..\panel\version.txt"
 
   ; ── Panel assets
   SetOutPath "$INSTDIR\panel\assets"

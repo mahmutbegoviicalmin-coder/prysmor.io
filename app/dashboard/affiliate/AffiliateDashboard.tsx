@@ -5,8 +5,11 @@ import { useUser } from "@clerk/nextjs";
 import {
   Copy, Check, Users, DollarSign, Clock,
   Plus, Trash2, Edit2, RefreshCw, Loader2, X,
-  CheckCircle, UserMinus,
+  CheckCircle, UserMinus, TrendingUp,
 } from "lucide-react";
+import { AffiliateEarningsChart } from "@/components/dashboard/AffiliateEarningsChart";
+import type { AffiliateChart } from "@/lib/affiliateChart";
+import { DEFAULT_AFFILIATE_CHART } from "@/lib/affiliateChart";
 
 const GREEN        = "#39FF6A";
 const ADMIN_EMAIL  = "mahmutbegoviic.almin@gmail.com";
@@ -30,6 +33,7 @@ interface AffiliateProfile {
   manualPaidEarnings: number;
   manualActiveMembers: number;
   manualInactiveMembers: number;
+  manualChart: AffiliateChart;
   note: string;
   status: "active" | "inactive";
   createdAt: string | null;
@@ -90,10 +94,375 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-// ─── Affiliate View (what brzotrcipuska7 sees) ────────────────────────────────
+// ─── Payout request ───────────────────────────────────────────────────────────
+
+type PayoutMethod = 'paypal' | 'bank';
+
+interface PayoutRequestRow {
+  id: string;
+  amount: number;
+  method: PayoutMethod;
+  status: 'pending' | 'paid' | 'rejected';
+  createdAt: string | null;
+}
+
+function PayoutRequestSection({ availableAmount }: { availableAmount: number }) {
+  const [method, setMethod] = useState<PayoutMethod>('paypal');
+  const [paypalMeLink, setPaypalMeLink] = useState('');
+  const [bank, setBank] = useState({
+    firstName: '',
+    lastName: '',
+    address: '',
+    city: '',
+    phone: '',
+    accountNumber: '',
+  });
+  const [requests, setRequests] = useState<PayoutRequestRow[]>([]);
+  const [openRequest, setOpenRequest] = useState<PayoutRequestRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    fetch('/api/affiliate/payout-requests')
+      .then((r) => r.json())
+      .then((d) => {
+        setRequests(d.requests ?? []);
+        setOpenRequest(d.openRequest ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const inputStyle: React.CSSProperties = {
+    padding: '10px 12px',
+    borderRadius: '8px',
+    background: '#111',
+    border: '1px solid #1e1e1e',
+    color: 'white',
+    fontSize: '13px',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+
+  const submit = async () => {
+    setError('');
+    setSuccess('');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/affiliate/payout-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          method === 'paypal'
+            ? { method: 'paypal', paypalMeLink }
+            : { method: 'bank', bank },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Request failed');
+        return;
+      }
+      setSuccess('Payout request submitted. You will be notified when it is processed.');
+      setPaypalMeLink('');
+      setBank({
+        firstName: '',
+        lastName: '',
+        address: '',
+        city: '',
+        phone: '',
+        accountNumber: '',
+      });
+      load();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const canRequest = availableAmount > 0 && !openRequest;
+
+  return (
+    <div style={{ ...CARD, marginBottom: '24px' }}>
+      <p style={{ fontSize: '11px', color: '#444', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '8px' }}>
+        Request Payout
+      </p>
+      <p style={{ fontSize: '13px', color: '#666', margin: '0 0 16px', lineHeight: 1.6 }}>
+        Available balance:{' '}
+        <span style={{ color: GREEN, fontWeight: 700 }}>${availableAmount.toFixed(2)}</span>
+      </p>
+
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
+          <Loader2 style={{ width: '18px', height: '18px', color: '#333', animation: 'spin 1s linear infinite' }} />
+        </div>
+      ) : openRequest ? (
+        <div style={{
+          padding: '14px 16px', borderRadius: '8px',
+          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)',
+          fontSize: '13px', color: '#aaa', lineHeight: 1.6,
+        }}>
+          You have a pending payout request for{' '}
+          <span style={{ color: '#F59E0B', fontWeight: 600 }}>${openRequest.amount.toFixed(2)}</span>.
+          Wait for admin approval before submitting another request.
+        </div>
+      ) : availableAmount <= 0 ? (
+        <p style={{ fontSize: '13px', color: '#444', margin: 0 }}>No balance available for payout yet.</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {(['paypal', 'bank'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: method === m ? `1px solid ${GREEN}` : '1px solid #1e1e1e',
+                  background: method === m ? 'rgba(57,255,106,0.08)' : '#111',
+                  color: method === m ? GREEN : '#666',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {m === 'paypal' ? 'PayPal' : 'Bank transfer'}
+              </button>
+            ))}
+          </div>
+
+          {method === 'paypal' ? (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '11px', color: '#555', marginBottom: '6px' }}>
+                PayPal.me link
+              </label>
+              <input
+                type="url"
+                value={paypalMeLink}
+                onChange={(e) => setPaypalMeLink(e.target.value)}
+                placeholder="https://paypal.me/yourname"
+                style={inputStyle}
+              />
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+              {[
+                ['firstName', 'First name'],
+                ['lastName', 'Last name'],
+                ['address', 'Address'],
+                ['city', 'City'],
+                ['phone', 'Phone number'],
+                ['accountNumber', 'Account number'],
+              ].map(([key, label]) => (
+                <div key={key} style={{ gridColumn: key === 'address' ? '1 / -1' : undefined }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#555', marginBottom: '6px' }}>
+                    {label}
+                  </label>
+                  <input
+                    value={bank[key as keyof typeof bank]}
+                    onChange={(e) => setBank((prev) => ({ ...prev, [key]: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && <p style={{ fontSize: '12px', color: '#F87171', marginBottom: '12px' }}>{error}</p>}
+          {success && <p style={{ fontSize: '12px', color: GREEN, marginBottom: '12px' }}>{success}</p>}
+
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canRequest || submitting}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '8px',
+              border: 'none',
+              background: submitting ? '#1a1a1a' : GREEN,
+              color: submitting ? '#555' : '#000',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: submitting || !canRequest ? 'default' : 'pointer',
+            }}
+          >
+            {submitting ? 'Submitting...' : `Request $${availableAmount.toFixed(2)}`}
+          </button>
+        </>
+      )}
+
+      {requests.length > 0 && (
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #161616' }}>
+          <p style={{ fontSize: '11px', color: '#444', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' }}>
+            Payout history
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {requests.slice(0, 5).map((req) => (
+              <div
+                key={req.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '12px',
+                  color: '#666',
+                }}
+              >
+                <span>${req.amount.toFixed(2)} · {req.method === 'paypal' ? 'PayPal' : 'Bank'}</span>
+                <span style={{
+                  textTransform: 'uppercase',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  color: req.status === 'paid' ? GREEN : req.status === 'rejected' ? '#F87171' : '#F59E0B',
+                }}>
+                  {req.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Partner earnings chart ───────────────────────────────────────────────────
+
+function ChartEditor({
+  title,
+  points,
+  onTitleChange,
+  onPointsChange,
+}: {
+  title: string;
+  points: { label: string; value: string }[];
+  onTitleChange: (value: string) => void;
+  onPointsChange: (points: { label: string; value: string }[]) => void;
+}) {
+  const previewChart: AffiliateChart = {
+    title: title.trim() || DEFAULT_AFFILIATE_CHART.title,
+    points: points.map((p) => ({
+      label: p.label.trim() || '—',
+      value: Math.max(0, Number(p.value) || 0),
+    })),
+  };
+
+  const inputStyle: React.CSSProperties = {
+    padding: '7px 10px',
+    borderRadius: '6px',
+    background: '#111',
+    border: '1px solid #1e1e1e',
+    color: 'white',
+    fontSize: '13px',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+
+  return (
+    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #161616' }}>
+      <p style={{ fontSize: '10px', color: '#333', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>
+        Dashboard chart
+      </p>
+      <label style={{ display: 'block', fontSize: '10px', color: '#444', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>
+        Chart title
+      </label>
+      <input
+        value={title}
+        onChange={(e) => onTitleChange(e.target.value)}
+        placeholder="Earnings overview"
+        style={{ ...inputStyle, marginBottom: '14px' }}
+      />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+        {points.map((point, index) => (
+          <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 36px', gap: '8px', alignItems: 'center' }}>
+            <input
+              value={point.label}
+              onChange={(e) => {
+                const next = [...points];
+                next[index] = { ...next[index], label: e.target.value };
+                onPointsChange(next);
+              }}
+              placeholder="Jan"
+              style={inputStyle}
+            />
+            <input
+              value={point.value}
+              onChange={(e) => {
+                const next = [...points];
+                next[index] = { ...next[index], value: e.target.value };
+                onPointsChange(next);
+              }}
+              placeholder="0"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => onPointsChange(points.filter((_, i) => i !== index))}
+              style={{
+                height: '34px',
+                borderRadius: '6px',
+                border: '1px solid rgba(239,68,68,0.2)',
+                background: 'transparent',
+                color: 'rgba(239,68,68,0.6)',
+                cursor: 'pointer',
+              }}
+            >
+              <X style={{ width: '14px', height: '14px', margin: '0 auto' }} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onPointsChange([...points, { label: '', value: '0' }])}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '7px 12px',
+          borderRadius: '6px',
+          border: '1px solid #1e1e1e',
+          background: 'transparent',
+          color: '#666',
+          fontSize: '12px',
+          cursor: 'pointer',
+          marginBottom: '16px',
+        }}
+      >
+        <Plus style={{ width: '12px', height: '12px' }} />
+        Add bar
+      </button>
+
+      <div style={{ ...CARD, padding: '18px', background: '#0a0a0a' }}>
+        <p style={{ fontSize: '11px', color: '#444', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '12px' }}>
+          Preview
+        </p>
+        <AffiliateEarningsChart chart={previewChart} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Affiliate View ───────────────────────────────────────────────────────────
 
 function AffiliateView() {
-  const [data, setData]       = useState<{ affiliate: AffiliateProfile; stats: Stats } | null>(null);
+  const [data, setData] = useState<{
+    affiliate: AffiliateProfile;
+    stats: Stats;
+    chart: AffiliateChart;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
 
@@ -121,54 +490,99 @@ function AffiliateView() {
 
   if (error || !data) return <div style={{ padding: "40px", color: "#F87171", fontSize: "13px" }}>{error || "No data"}</div>;
 
-  const { affiliate, stats } = data;
+  const { affiliate, stats, chart } = data;
   const refLink = `https://prysmor.io/?ref=${affiliate.code}`;
 
   return (
-    <div style={{ padding: "32px 28px", maxWidth: "860px" }}>
-      <div style={{ marginBottom: "28px" }}>
-        <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>// AFFILIATE</p>
-        <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>Your Referral Stats</h1>
+    <div style={{ padding: "32px 28px", maxWidth: "920px" }}>
+      <div style={{ marginBottom: "24px" }}>
+        <p style={{ fontSize: "10px", color: "#333", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "6px" }}>
+          Partner dashboard
+        </p>
+        <h1 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.8px", color: "white", margin: 0 }}>
+          Your earnings
+        </h1>
         <p style={{ fontSize: "14px", color: "#555", marginTop: "6px" }}>
-          You earn <span style={{ color: GREEN, fontWeight: 600 }}>{affiliate.commissionPercent}%</span> commission on each referred sale.
+          Balance and payout overview
         </p>
       </div>
 
-      {/* Referral link card */}
-      <div style={{ ...CARD, marginBottom: "24px" }}>
-        <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "12px" }}>Your Referral Link</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px", marginBottom: "16px" }}>
+        {[
+          { label: "Total earned", value: `$${stats.totalEarnings}`, accent: GREEN },
+          { label: "Available", value: `$${stats.pendingEarnings}`, accent: "#F59E0B" },
+          { label: "Paid out", value: `$${stats.paidEarnings}`, accent: "white" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              ...CARD,
+              padding: "18px 20px",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%)",
+            }}
+          >
+            <p style={{ fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px" }}>
+              {item.label}
+            </p>
+            <p style={{ fontSize: "28px", fontWeight: 800, color: item.accent, letterSpacing: "-1px", margin: 0 }}>
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...CARD, marginBottom: "16px", padding: "22px 22px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "8px" }}>
+          <div>
+            <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 4px" }}>
+              Performance
+            </p>
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: "white", margin: 0 }}>{chart.title}</h2>
+          </div>
+          <TrendingUp style={{ width: "18px", height: "18px", color: GREEN, opacity: 0.7 }} />
+        </div>
+        <AffiliateEarningsChart chart={chart} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", marginBottom: "16px" }}>
+        <div style={{ ...CARD, padding: "18px 20px" }}>
+          <p style={{ fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px" }}>Active members</p>
+          <p style={{ fontSize: "24px", fontWeight: 700, color: "white", margin: 0 }}>{stats.activeMembers}</p>
+        </div>
+        <div style={{ ...CARD, padding: "18px 20px" }}>
+          <p style={{ fontSize: "10px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", margin: "0 0 8px" }}>Inactive</p>
+          <p style={{ fontSize: "24px", fontWeight: 700, color: "white", margin: 0 }}>{stats.inactiveMembers}</p>
+        </div>
+      </div>
+
+      <PayoutRequestSection availableAmount={stats.pendingEarnings} />
+
+      <div style={{ ...CARD, marginBottom: "16px", padding: "18px 20px" }}>
+        <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "10px" }}>
+          Referral link
+        </p>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <code style={{
             flex: 1, minWidth: 0, padding: "10px 14px", borderRadius: "8px",
             background: "#111", border: "1px solid #1e1e1e",
-            fontSize: "13px", color: "#888", fontFamily: "monospace",
+            fontSize: "12px", color: "#777", fontFamily: "monospace",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>{refLink}</code>
           <CopyBtn text={refLink} />
         </div>
-        <p style={{ fontSize: "11px", color: "#333", marginTop: "10px" }}>
-          Code: <span style={{ color: GREEN, fontWeight: 600, fontFamily: "monospace" }}>{affiliate.code}</span>
+        <p style={{ fontSize: "11px", color: "#333", marginTop: "10px", marginBottom: 0 }}>
+          Code <span style={{ color: GREEN, fontWeight: 600, fontFamily: "monospace" }}>{affiliate.code}</span>
+          {" · "}
+          {affiliate.commissionPercent}% commission
         </p>
       </div>
 
-      {/* Stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px", marginBottom: "24px" }}>
-        <StatCard label="Total Earned"    value={`$${stats.totalEarnings}`}   icon={DollarSign} accent={GREEN} />
-        <StatCard label="Pending Payout"  value={`$${stats.pendingEarnings}`} sub="Awaiting payment" icon={Clock} />
-        <StatCard label="Paid Out"        value={`$${stats.paidEarnings}`}    icon={CheckCircle} />
-        <StatCard label="Active Members"  value={String(stats.activeMembers)} icon={Users} />
-        <StatCard label="Inactive"        value={String(stats.inactiveMembers)} icon={UserMinus} />
-      </div>
-
-      {/* Note from admin */}
       {affiliate.note && (
-        <div style={{ ...CARD, borderColor: "rgba(57,255,106,0.1)" }}>
-          <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "8px" }}>Note from Admin</p>
+        <div style={{ ...CARD, borderColor: "rgba(57,255,106,0.1)", padding: "18px 20px" }}>
+          <p style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "8px" }}>Note</p>
           <p style={{ fontSize: "13px", color: "#888", margin: 0, lineHeight: 1.6 }}>{affiliate.note}</p>
         </div>
       )}
-
-      
     </div>
   );
 }
@@ -183,6 +597,8 @@ type EditState = {
   manualPaidEarnings:    string;
   manualActiveMembers:   string;
   manualInactiveMembers: string;
+  chartTitle:            string;
+  chartPoints:           { label: string; value: string }[];
   note:                  string;
 };
 
@@ -234,6 +650,11 @@ function AdminAffiliateView() {
       manualPaidEarnings:    String(aff.manualPaidEarnings),
       manualActiveMembers:   String(aff.manualActiveMembers),
       manualInactiveMembers: String(aff.manualInactiveMembers),
+      chartTitle:            aff.manualChart?.title ?? DEFAULT_AFFILIATE_CHART.title,
+      chartPoints:           (aff.manualChart?.points ?? DEFAULT_AFFILIATE_CHART.points).map((p) => ({
+        label: p.label,
+        value: String(p.value),
+      })),
       note:                  aff.note,
     });
   };
@@ -252,6 +673,15 @@ function AdminAffiliateView() {
         manualPaidEarnings:    Number(editState.manualPaidEarnings),
         manualActiveMembers:   Number(editState.manualActiveMembers),
         manualInactiveMembers: Number(editState.manualInactiveMembers),
+        manualChart: {
+          title: editState.chartTitle.trim() || DEFAULT_AFFILIATE_CHART.title,
+          points: editState.chartPoints
+            .map((p) => ({
+              label: p.label.trim(),
+              value: Math.max(0, Number(p.value) || 0),
+            }))
+            .filter((p) => p.label),
+        },
         note:                  editState.note,
       }),
     });
@@ -471,7 +901,14 @@ function AdminAffiliateView() {
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "8px" }}>
+                  <ChartEditor
+                    title={editState.chartTitle}
+                    points={editState.chartPoints}
+                    onTitleChange={(value) => set("chartTitle", value)}
+                    onPointsChange={(points) => setEditState((prev) => prev ? { ...prev, chartPoints: points } : prev)}
+                  />
+
+                  <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
                     <button onClick={() => saveEdit(aff.id)} disabled={saving} style={{
                       padding: "8px 20px", borderRadius: "7px", border: "none",
                       background: saving ? "#1a1a1a" : GREEN, color: saving ? "#555" : "#000",

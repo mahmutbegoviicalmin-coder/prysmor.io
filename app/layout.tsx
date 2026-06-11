@@ -8,6 +8,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import ConditionalShell from "@/components/site/ConditionalShell";
 import PageTracker from "@/components/PageTracker";
+import { FB_PIXEL_ID } from "@/lib/pixel";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -15,8 +16,6 @@ const outfit = Outfit({
   display: "swap",
   variable: "--font-outfit",
 });
-
-const FB_PIXEL_ID = "4285435231716551";
 
 export const metadata: Metadata = {
   title: {
@@ -167,6 +166,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               `,
             }}
           />
+          <noscript>
+            <img
+              height="1"
+              width="1"
+              style={{ display: "none" }}
+              src={`https://www.facebook.com/tr?id=${FB_PIXEL_ID}&ev=PageView&noscript=1`}
+              alt=""
+            />
+          </noscript>
           <Analytics />
         </body>
       </html>

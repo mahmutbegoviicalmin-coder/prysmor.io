@@ -8,7 +8,7 @@ on:
       version:
         description: Premiere panel semver (matches version.txt)
         required: true
-        default: "5.4.5"
+        default: "5.4.6"
         type: string
   push:
     tags:
@@ -108,7 +108,7 @@ jobs:
           elif [[ "${{ github.ref_name }}" == v* ]]; then
             V="${GITHUB_REF_NAME#v}"
           else
-            V="5.4.5"
+            V="5.4.6"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=v${V}" >> "$GITHUB_OUTPUT"
@@ -134,8 +134,8 @@ jobs:
 
           NOTES="## Prysmor for Premiere Pro v${V}
 
-          - VFX mode migrated to **Runway Aleph 2.0** (\`aleph2\`)
-          - Updated Aleph 2 prompt system (edit verbs + keep clauses)
+          - Fix timeline clip selection on **Premiere Pro 2026** (uses \`sequence.getSelection()\`)
+          - OTA + fresh installs ship panel **${V}**
 
           | Platform | File |
           |----------|------|
