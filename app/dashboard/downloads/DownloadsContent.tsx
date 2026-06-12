@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Monitor } from "lucide-react";
 
 const PANEL_VERSION = "5.4.7";
-const PANEL_AE_VERSION = "2.0.1";
+const PANEL_AE_VERSION = "2.0.5";
 
 const DOWNLOADS = {
   premiere: {
@@ -20,10 +20,10 @@ const DOWNLOADS = {
     label: "After Effects",
     version: PANEL_AE_VERSION,
     accent: "#818CF8",
-    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.1/PrysmorAE-Setup.exe",
-    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.1/PrysmorAE-2.0.1.pkg",
+    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.5/PrysmorAE-Setup.exe",
+    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.5/PrysmorAE-2.0.5.pkg",
     winFile: "PrysmorAE-Setup.exe",
-    macFile: "PrysmorAE-2.0.1.pkg",
+    macFile: "PrysmorAE-2.0.5.pkg",
   },
 } as const;
 

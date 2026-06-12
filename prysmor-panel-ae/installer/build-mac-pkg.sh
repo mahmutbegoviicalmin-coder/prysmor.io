@@ -21,7 +21,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PANEL_SRC="$REPO_ROOT/prysmor-panel-ae"
 RES_DIR="$SCRIPT_DIR/mac-resources"
 
-VERSION="2.0.4"
+VERSION="2.0.5"
 BUNDLE_ID="com.prysmor.panel.ae"
 INSTALL_LOCATION="Library/Application Support/Adobe/CEP/extensions/com.prysmor.panel.ae"
 

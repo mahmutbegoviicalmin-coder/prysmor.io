@@ -67,14 +67,116 @@ function getActiveComp() {
   return null;
 }
 
+function getSelectedAVLayers(comp) {
+  var layers = [];
+  if (!comp || !comp.selectedLayers) return layers;
+  try {
+    var sel = comp.selectedLayers;
+    if (typeof sel.length === 'number' && sel.length > 0) {
+      for (var i = 0; i < sel.length; i++) {
+        if (sel[i] instanceof AVLayer) layers.push(sel[i]);
+      }
+      if (layers.length > 0) return layers;
+    }
+    for (var j = 0; sel[j] !== undefined && j < 256; j++) {
+      if (sel[j] instanceof AVLayer) layers.push(sel[j]);
+    }
+  } catch (_) {}
+  return layers;
+}
+
 function getPrimarySelectedLayer(comp) {
-  if (!comp || !comp.selectedLayers || comp.selectedLayers.length === 0) return null;
-  for (var i = 0; i < comp.selectedLayers.length; i++) {
-    if (comp.selectedLayers[i] instanceof AVLayer) {
-      return comp.selectedLayers[i];
+  var layers = getSelectedAVLayers(comp);
+  return layers.length > 0 ? layers[0] : null;
+}
+
+function isFootageAVLayer(layer) {
+  if (!layer || !(layer instanceof AVLayer)) return false;
+  try {
+    var src = layer.source;
+    if (src instanceof FootageItem && src.file) return true;
+    if (src && src.mainSource && src.mainSource.file) return true;
+  } catch (_) {}
+  return false;
+}
+
+function getLayerSourcePath(layer) {
+  try {
+    var src = layer.source;
+    if (src instanceof FootageItem && src.file) return src.file.fsName;
+    if (src && src.mainSource && src.mainSource.file) return src.mainSource.file.fsName;
+  } catch (_) {}
+  return '';
+}
+
+// Topmost footage layer visible at the current comp time (playhead).
+function findLayerAtCompTime(comp) {
+  if (!comp) return null;
+  var t = comp.time;
+  for (var i = 1; i <= comp.numLayers; i++) {
+    var layer = comp.layer(i);
+    if (!isFootageAVLayer(layer)) continue;
+    try { if (layer.enabled === false) continue; } catch (_) {}
+    try {
+      if (t >= layer.inPoint && t < layer.outPoint) return layer;
+    } catch (_) {}
+  }
+  return null;
+}
+
+// Returns { layer, method } where method is selection | time.
+function findActiveLayer(comp) {
+  if (!comp) return null;
+
+  var selected = getPrimarySelectedLayer(comp);
+  if (selected) return { layer: selected, method: 'selection' };
+
+  var atTime = findLayerAtCompTime(comp);
+  if (atTime) return { layer: atTime, method: 'time' };
+
+  return null;
+}
+
+function computeLayerTiming(layer, comp, method, maxSec) {
+  var startSec = 0;
+  var durSec = 0;
+  var mediaInSec = 0;
+  var _debugTimes = { selectionMethod: method };
+
+  if (method === 'time' && comp) {
+    var compTime = comp.time;
+    startSec = compTime;
+    var remain = layer.outPoint - compTime;
+    if (remain <= 0) remain = layer.outPoint - layer.inPoint;
+    durSec = remain > maxSec ? maxSec : remain;
+    try { mediaInSec = layer.sourceTime(compTime); _debugTimes['sourceTime'] = mediaInSec; } catch (_) {
+      try {
+        mediaInSec = compTime - layer.startTime;
+        _debugTimes['timeMinusStart'] = mediaInSec;
+      } catch (_) {}
+    }
+  } else {
+    var visibleDur = layer.outPoint - layer.inPoint;
+    if (visibleDur <= 0) return null;
+    durSec = visibleDur > maxSec ? maxSec : visibleDur;
+    startSec = layer.inPoint;
+    try {
+      mediaInSec = layer.sourceTime(layer.inPoint);
+      _debugTimes['sourceTime'] = mediaInSec;
+    } catch (_) {
+      try {
+        mediaInSec = layer.inPoint - layer.startTime;
+        _debugTimes['inMinusStart'] = mediaInSec;
+      } catch (_) {}
     }
   }
-  return comp.selectedLayers[0];
+
+  try { _debugTimes['inPoint'] = layer.inPoint; } catch (_) {}
+  try { _debugTimes['outPoint'] = layer.outPoint; } catch (_) {}
+  try { _debugTimes['startTime'] = layer.startTime; } catch (_) {}
+  if (comp) try { _debugTimes['compTime'] = comp.time; } catch (_) {}
+
+  return { startSec: startSec, durSec: durSec, mediaInSec: mediaInSec, debugTimes: _debugTimes };
 }
 
 function importFootageItem(filePath) {
@@ -159,47 +261,32 @@ function getSelectionInfo() {
       return JSON.stringify({ error: 'No active composition — open a comp in the Timeline.' });
     }
 
-    var layer = getPrimarySelectedLayer(comp);
-    if (!layer) {
-      return JSON.stringify({ error: 'No layer selected — select a footage layer in the comp first.' });
+    var found = findActiveLayer(comp);
+    if (!found) {
+      return JSON.stringify({
+        error: 'No footage layer found — place the playhead on a layer, or select a footage layer in the comp.'
+      });
+    }
+
+    var layer = found.layer;
+    var selectionMethod = found.method;
+
+    if (!isFootageAVLayer(layer)) {
+      return JSON.stringify({ error: 'Selected layer has no file path — use a footage layer, not a solid or text layer.' });
     }
 
     var MAX_SEC = 8;
-    var inPt = layer.inPoint;
-    var outPt = layer.outPoint;
-    var visibleDur = outPt - inPt;
-    if (visibleDur <= 0) {
+    var timing = computeLayerTiming(layer, comp, selectionMethod, MAX_SEC);
+    if (!timing) {
       return JSON.stringify({ error: 'Selected layer has zero duration.' });
     }
-    var durSec = visibleDur > MAX_SEC ? MAX_SEC : visibleDur;
-    // inPoint = where the layer is visible on the comp timeline (not startTime alone)
-    var startSec = layer.inPoint;
 
-    var mediaInSec = 0;
-    var _debugTimes = {};
-    try {
-      mediaInSec = layer.sourceTime(layer.inPoint);
-      _debugTimes['sourceTime'] = mediaInSec;
-    } catch (_) {
-      try {
-        mediaInSec = layer.inPoint - layer.startTime;
-        _debugTimes['inMinusStart'] = mediaInSec;
-      } catch (_) {}
-    }
-    try { _debugTimes['inPoint'] = layer.inPoint; } catch (_) {}
-    try { _debugTimes['outPoint'] = layer.outPoint; } catch (_) {}
-    try { _debugTimes['startTime'] = layer.startTime; } catch (_) {}
+    var startSec = timing.startSec;
+    var durSec = timing.durSec;
+    var mediaInSec = timing.mediaInSec;
+    var _debugTimes = timing.debugTimes;
 
-    var sourcePath = '';
-    try {
-      var src = layer.source;
-      if (src instanceof FootageItem && src.file) {
-        sourcePath = src.file.fsName;
-      } else if (src && src.mainSource && src.mainSource.file) {
-        sourcePath = src.mainSource.file.fsName;
-      }
-    } catch (_) {}
-
+    var sourcePath = getLayerSourcePath(layer);
     if (!sourcePath) {
       return JSON.stringify({ error: 'Selected layer has no file path — use a footage layer, not a solid or text layer.' });
     }
@@ -227,6 +314,7 @@ function getSelectionInfo() {
       clipHeight:   clipH,
       seqWidth:     compW,
       seqHeight:    compH,
+      selectionMethod: selectionMethod,
     });
   } catch (e) {
     return JSON.stringify({ error: e.message });
@@ -272,7 +360,9 @@ function insertClipOnV2(filePath, startTimeSec) {
     app.beginUndoGroup('Prysmor Add to Timeline');
 
     // Capture selection BEFORE add — AE auto-selects the new layer after add
-    var refLayer = getPrimarySelectedLayer(comp);
+    var refLayer = null;
+    var found = findActiveLayer(comp);
+    if (found) refLayer = found.layer;
     var refIndex = refLayer ? refLayer.index : -1;
     var placeSec = (typeof startTimeSec === 'number' && !isNaN(startTimeSec)) ? startTimeSec : 0;
     if (refLayer) {
@@ -329,8 +419,10 @@ function replaceSelection(filePath) {
     var comp = getActiveComp();
     if (!comp) return 'error: No active composition.';
 
-    var refLayer = getPrimarySelectedLayer(comp);
-    if (!refLayer) return 'error: No layer selected.';
+    var refLayer = null;
+    var found = findActiveLayer(comp);
+    if (found) refLayer = found.layer;
+    if (!refLayer) return 'error: No footage layer found — place the playhead on a layer or select one.';
 
     var startSec = refLayer.inPoint;
     return insertClipOnV2(filePath, startSec);
