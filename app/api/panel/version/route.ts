@@ -6,7 +6,7 @@ export const runtime = 'edge';
  * Current panel version, bump this string to push an OTA update to all installed panels.
  * Panels compare their local version.txt against this value on every Premiere launch.
  */
-const PANEL_VERSION = '5.4.8';
+const PANEL_VERSION = '5.4.9';
 
 const GITHUB_RAW =
   'https://raw.githubusercontent.com/mahmutbegoviicalmin-coder/prysmor.io/main/prysmor-panel/panel';

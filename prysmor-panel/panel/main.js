@@ -107,6 +107,9 @@ function startClipAutoSelect() {
   _autoSelectTimer = setInterval(function () {
     cs.evalScript('getSelectionInfo()', function (raw) {
       var parsed = null;
+      if (raw && String(raw).indexOf('EvalScript error') !== -1) {
+        console.warn('[Prysmor:autoSelect] ExtendScript error:', raw);
+      }
       try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
 
       var key = getClipKey(parsed);
@@ -601,7 +604,11 @@ function refreshClipAsync(silent) {
 function showClipEmpty() {
   el('clip-empty').classList.remove('hidden');
   el('clip-info').classList.add('hidden');
-  showClipThumbnail(null); // clear thumbnail
+  showClipThumbnail(null);
+  var verHint = el('clip-empty-version');
+  if (verHint) {
+    try { verHint.textContent = 'Panel v' + readLocalVersion() + ' — restart Premiere after updates'; } catch (_) {}
+  }
 }
 
 function creditsPerSecond(mode) {
@@ -2244,6 +2251,10 @@ function applyUpdate(data) {
       })
       .catch(function (e) {
         console.warn('[Prysmor:update] Download failed for', job.url, ':', e.message);
+        pending--;
+        if (pending === 0) {
+          showToast('Panel update incomplete — reinstall from prysmor.io/dashboard', 'error');
+        }
       });
   });
 }
