@@ -8,6 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 5000;
+const PANEL_VERSION_DEFAULT = '5.5.0'; // keep in sync with panel/version.txt
 const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -210,16 +211,20 @@ window.addEventListener('DOMContentLoaded', function () {
       .replace(/\/$/, '');   // strip trailing slash
   } catch (_) {}
   bindEvents();
-  // Display local panel version in login stats row
-  try {
-    var localVer = readLocalVersion();
-    var verEl = document.getElementById('lv-panel-version');
-    if (verEl && localVer) verEl.textContent = 'v' + localVer;
-  } catch (_) {}
+  refreshPanelVersionFromFile();
   // Set initial enhance chip label
   updateEnhanceLabel();
   // Check for OTA panel update in background — does not block login flow
   checkForUpdates();
+  // Local UI preview — open http://localhost:5500/?preview=1 in a browser
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /(?:^|[?&])preview=1(?:&|$)/.test(location.search)) {
+    state.auth.planLabel = 'EXCLUSIVE';
+    state.auth.plan = 'exclusive';
+    state.usage.credits = 1930;
+    state.usage.creditsTotal = 4000;
+    enterPanel();
+    return;
+  }
   // Try to restore saved session — validate against server before showing main view
   if (restoreSession()) {
     validateSessionThenEnter();
@@ -375,7 +380,7 @@ async function startLogin() {
     startAuthPolling(data.deviceCode);
   } catch (err) {
     btn.disabled = false;
-    btn.textContent = 'Sign In';
+    btn.textContent = 'Sign in';
     setLoginStatus('Error: ' + (err.message || 'Could not connect to server.'), true);
   }
 }
@@ -390,7 +395,7 @@ function startAuthPolling(deviceCode) {
       stopAuthPolling();
       var btn = el('btn-continue');
       btn.disabled = false;
-      btn.textContent = 'Sign In';
+      btn.textContent = 'Sign in';
       setLoginStatus('Authorization timed out. Please try again.', true);
       return;
     }
@@ -410,7 +415,7 @@ function startAuthPolling(deviceCode) {
         stopAuthPolling();
         var btn = el('btn-continue');
         btn.disabled = false;
-        btn.textContent = 'Sign In';
+        btn.textContent = 'Sign in';
         setLoginStatus('Code expired. Please try again.', true);
       }
       // status === 'pending' → keep polling
@@ -431,8 +436,8 @@ function setLoginStatus(msg, isError) {
   var el2 = el('login-status');
   if (!el2) return;
   el2.textContent = msg;
-  el2.style.display = msg ? '' : 'none';
-  el2.style.color = isError ? '#F87171' : '#A3FF12';
+  el2.classList.toggle('hidden', !msg);
+  el2.classList.toggle('is-error', !!isError);
 }
 
 function sendHeartbeat() {
@@ -535,7 +540,7 @@ function logout() {
     tempDir: '', generating: false,
   };
   var btn = el('btn-continue');
-  if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
   setLoginStatus('', false);
   resetUI();
   showView('login');
@@ -548,12 +553,10 @@ function logout() {
  * @param {boolean} silent  — if true, don't show toast when nothing is selected
  */
 function setRefreshBusy(busy) {
-  ['btn-refresh-clip', 'btn-sync-clip'].forEach(function (id) {
-    var btn = el(id);
-    if (!btn) return;
-    btn.disabled = busy;
-    btn.classList.toggle('spinning', busy);
-  });
+  var btn = el('btn-refresh-clip');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.classList.toggle('spinning', busy);
 }
 
 function applyClipInfo(parsed, silent) {
@@ -605,10 +608,8 @@ function showClipEmpty() {
   el('clip-empty').classList.remove('hidden');
   el('clip-info').classList.add('hidden');
   showClipThumbnail(null);
-  var verHint = el('clip-empty-version');
-  if (verHint) {
-    try { verHint.textContent = 'Panel v' + readLocalVersion() + ' — restart Premiere after updates'; } catch (_) {}
-  }
+  var hint = el('clip-bar-hint');
+  if (hint) hint.textContent = 'Place playhead on a video clip in the timeline';
 }
 
 function creditsPerSecond(mode) {
@@ -658,6 +659,12 @@ function updateCostPreview() {
 function showClipInfo(info) {
   el('clip-empty').classList.add('hidden');
   el('clip-info').classList.remove('hidden');
+
+  var hint = el('clip-bar-hint');
+  if (hint) {
+    var name = info.clipName || (info.sourcePath && info.sourcePath.split('/').pop()) || 'clip';
+    hint.textContent = 'Ready: ' + name;
+  }
 
   const dur        = info.durationSec || 0;
   const start      = info.startTimeSec || 0;
@@ -1132,7 +1139,7 @@ async function mfGenerate() {
     await refreshClipAsync(true);
   }
   if (!state.mf.selInfo) {
-    showToast('Place the playhead on a video clip, then tap Sync (top right) or Sync from timeline.', 'error');
+    showToast('Place playhead on a video clip, then tap Sync clip above.', 'error');
     return;
   }
 
@@ -2150,16 +2157,48 @@ function getUpdateRoot() {
 
 /**
  * Reads version.txt from the panel folder.
- * Falls back to '1.1.0' for panels installed before the auto-update feature.
+ * Falls back to PANEL_VERSION_DEFAULT when file cannot be read (e.g. old installs, browser preview).
  */
 function readLocalVersion() {
+  if (state._panelVersion) return state._panelVersion;
   try {
     var nodeFs   = require('fs');
     var nodePath = require('path');
-    var f = nodePath.join(getUpdateRoot(), 'panel', 'version.txt');
-    if (nodeFs.existsSync(f)) return nodeFs.readFileSync(f, 'utf8').trim();
+    var root = getUpdateRoot();
+    var candidates = [
+      nodePath.join(root, 'panel', 'version.txt'),
+      nodePath.join(root, 'version.txt'),
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      if (nodeFs.existsSync(candidates[i])) {
+        return nodeFs.readFileSync(candidates[i], 'utf8').trim();
+      }
+    }
   } catch (_) {}
-  return '1.1.0';
+  return PANEL_VERSION_DEFAULT;
+}
+
+function renderPanelVersion(ver) {
+  if (!ver) return;
+  var label = 'v' + ver;
+  var lv = el('lv-panel-version');
+  var hdr = el('hdr-panel-version');
+  if (lv) lv.textContent = label;
+  if (hdr) hdr.textContent = label;
+}
+
+/** Loads version.txt via HTTP (works in browser preview and CEP panel UI). */
+function refreshPanelVersionFromFile() {
+  renderPanelVersion(readLocalVersion());
+  fetch('version.txt?_=' + Date.now())
+    .then(function (res) { return res.ok ? res.text() : ''; })
+    .then(function (txt) {
+      txt = (txt || '').trim();
+      if (!txt) return;
+      state._panelVersion = txt;
+      renderPanelVersion(txt);
+    })
+    .catch(function () {});
 }
 
 /**
@@ -2866,13 +2905,6 @@ function bindEvents() {
     storedVideoInfo = null;
     refreshClip(false);
   });
-  var syncBtn = el('btn-sync-clip');
-  if (syncBtn) {
-    syncBtn.addEventListener('click', function () {
-      storedVideoInfo = null;
-      refreshClip(false);
-    });
-  }
 
   // Mark Omni tab based on plan
   (function () {

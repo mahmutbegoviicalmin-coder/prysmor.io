@@ -66,175 +66,90 @@ html,body{
 @keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* ═══════════════════════════════════
-   LOGIN VIEW  — v3 premium redesign
+   LOGIN VIEW  — minimal
 ═══════════════════════════════════ */
 .login-view{
   position:relative;overflow:hidden;
   display:flex;flex-direction:column;height:100%;
-  background:linear-gradient(160deg,#060a0c 0%,#07090b 55%,#050708 100%);
-  animation:fadeIn .35s cubic-bezier(0.16,1,0.3,1) both;
+  background:#080808;
+  animation:fadeIn .3s ease both;
 }
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-/* Grain canvas */
-#grain{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:.45;}
-
-/* Background glow layers */
 .lbg{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
 .lbg-glow-center{
-  position:absolute;top:8%;left:50%;transform:translateX(-50%);
-  width:360px;height:300px;
-  background:radial-gradient(ellipse,rgba(0,230,118,0.07) 0%,transparent 68%);
-  filter:blur(48px);
-  animation:glowBreath 7s ease-in-out infinite;
+  position:absolute;top:18%;left:50%;transform:translateX(-50%);
+  width:280px;height:240px;
+  background:radial-gradient(ellipse,rgba(0,230,118,0.06) 0%,transparent 70%);
+  filter:blur(40px);
 }
-.lbg-glow-br{
-  position:absolute;bottom:-60px;right:-40px;
-  width:200px;height:200px;
-  background:radial-gradient(circle,rgba(0,200,100,0.04) 0%,transparent 70%);
-  filter:blur(50px);
-}
-/* Subtle grid overlay */
-.lbg::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
-  background-size:32px 32px;
-  mask-image:radial-gradient(ellipse 80% 80% at 50% 0%,rgba(0,0,0,0.6) 0%,transparent 100%);
-  -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 0%,rgba(0,0,0,0.6) 0%,transparent 100%);
-}
-@keyframes glowBreath{0%,100%{opacity:.5;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.08)}}
 
-/* ── Topbar ───────────────────────────── */
-.lv-topbar{
-  position:relative;z-index:10;
-  display:flex;align-items:center;justify-content:space-between;
-  height:44px;padding:0 14px;
-  border-bottom:1px solid rgba(255,255,255,0.06);
-  background:linear-gradient(180deg,rgba(255,255,255,0.025) 0%,transparent 100%);
-  flex-shrink:0;
-}
-.lv-tb-brand{display:flex;align-items:center;gap:8px;}
-.lv-tb-logo{width:20px;height:20px;object-fit:contain;}
-.lv-tb-name{
-  font-size:13px;font-weight:700;letter-spacing:-.3px;
-  background:linear-gradient(135deg,#ffffff 40%,#6effc2 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.lv-tb-right{display:flex;align-items:center;}
-.lv-status-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.14);}
-.lv-status-dot.online{background:#00e676;box-shadow:0 0 8px rgba(0,230,118,0.6);}
-
-/* ── Content wrapper ─────────────────── */
-.lv-content{
+.lv-shell{
   position:relative;z-index:2;
-  display:flex;flex-direction:column;
-  padding:18px 14px 20px;gap:14px;flex:1;
-  overflow-y:auto;
+  display:flex;flex-direction:column;height:100%;
 }
 
-/* ── Brand row ───────────────────────── */
-.lv-brand{display:flex;align-items:flex-start;gap:13px;padding:12px 14px;position:relative;}
-.lv-brand-glow{
-  position:absolute;top:-10px;left:-10px;width:130px;height:130px;
-  background:radial-gradient(circle,rgba(0,230,118,0.08) 0%,transparent 70%);
-  filter:blur(22px);pointer-events:none;
-}
-.lv-brand-logo{width:42px;height:42px;object-fit:contain;flex-shrink:0;position:relative;z-index:1;}
-.lv-brand-text{display:flex;flex-direction:column;gap:2px;position:relative;z-index:1;padding-top:2px;}
-.lv-brand-title{
-  font-size:20px;font-weight:900;letter-spacing:-.6px;
-  background:linear-gradient(135deg,#ffffff 40%,#6effc2 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  line-height:1.1;
-}
-.lv-brand-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
-.lv-brand-pill{
-  font-size:10px;font-weight:600;letter-spacing:.02em;
-  color:rgba(0,230,118,0.8);
-  background:rgba(0,230,118,0.07);
-  border:1px solid rgba(0,230,118,0.20);
-  border-radius:99px;padding:2px 9px;
-}
-
-/* ── Auth card ───────────────────────── */
-.lv-workspace-card{
-  background:rgba(9,13,17,0.82);
-  backdrop-filter:blur(24px);
-  border:1px solid rgba(0,230,118,0.20);
-  border-radius:20px;padding:16px;
-  display:flex;flex-direction:column;gap:14px;
-  box-shadow:0 0 48px rgba(0,230,118,0.06),0 24px 64px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.04);
-}
-.lwc-header{display:flex;align-items:flex-start;gap:12px;}
-.lwc-icon{
-  width:38px;height:38px;border-radius:11px;flex-shrink:0;
-  background:rgba(0,230,118,0.09);
-  border:1px solid rgba(0,230,118,0.28);
-  color:#00e676;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 18px rgba(0,230,118,0.12);
-}
-.lwc-title{font-size:14px;font-weight:700;color:#f0f0f0;margin-bottom:4px;letter-spacing:-.3px;}
-.lwc-desc{font-size:11.5px;color:rgba(240,240,240,0.42);line-height:1.55;}
-
-/* ── CTA button ──────────────────────── */
-.lv-cta-btn{
-  position:relative;overflow:hidden;
-  width:100%;height:46px;
+.lv-hdr{
   display:flex;align-items:center;justify-content:space-between;
-  padding:0 18px;
-  border:none;cursor:pointer;border-radius:13px;
-  background:linear-gradient(135deg,#00e676 0%,#00c45c 100%);
-  color:#030f07;font-family:var(--font);
-  box-shadow:0 4px 24px rgba(0,230,118,0.35),inset 0 1px 0 rgba(255,255,255,0.18);
-  transition:transform .18s cubic-bezier(0.16,1,0.3,1),filter .18s,box-shadow .18s;
+  height:40px;padding:0 14px;flex-shrink:0;
+  border-bottom:1px solid rgba(255,255,255,0.07);
 }
-.lv-cta-btn::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(255,255,255,.18) 0%,transparent 55%);
-  border-radius:inherit;pointer-events:none;
+.lv-hdr-logo{
+  font-size:13px;font-weight:700;letter-spacing:-.4px;color:#f0f0f0;
 }
-.lv-cta-label{position:relative;z-index:1;font-size:13.5px;font-weight:800;letter-spacing:-.2px;}
-.lv-cta-arrow{position:relative;z-index:1;display:flex;align-items:center;opacity:.75;}
-.lv-cta-btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 6px 32px rgba(0,230,118,0.48),inset 0 1px 0 rgba(255,255,255,0.18);}
-.lv-cta-btn:active{transform:scale(.984);}
-.lv-cta-btn:disabled{opacity:.4;cursor:wait;pointer-events:none;}
-
-/* ── Trust row ───────────────────────── */
-.lv-trust-row{
-  display:flex;align-items:center;justify-content:center;
-  gap:18px;padding:2px 0;
+.lv-hdr-logo span{
+  background:linear-gradient(135deg,#fff 40%,#6effc2 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.lv-trust-item{
-  display:flex;align-items:center;gap:5px;
-  font-size:10.5px;font-weight:500;color:rgba(240,240,240,0.32);
-  letter-spacing:.01em;
-}
-.lv-trust-dot{
-  width:5px;height:5px;border-radius:50%;flex-shrink:0;
-  background:#00e676;
-  box-shadow:0 0 6px rgba(0,230,118,0.65);
+.lv-hdr-ver{
+  font-size:9px;color:rgba(255,255,255,0.22);
+  font-variant-numeric:tabular-nums;
 }
 
-/* ── Login status text ───────────────── */
-#login-status{
-  font-size:11px;text-align:center;padding:8px 10px;border-radius:9px;
-  background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.2);color:#00e676;
+.lv-main{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:28px 22px 20px;text-align:center;
+}
+.lv-title{
+  font-size:17px;font-weight:600;letter-spacing:-.35px;
+  color:#f0f0f0;margin:0 0 8px;
+}
+.lv-sub{
+  font-size:12px;line-height:1.55;color:rgba(240,240,240,0.38);
+  max-width:260px;margin:0 0 22px;
 }
 
-/* ── Stats row ───────────────────────── */
-.lv-stats{
-  display:flex;align-items:stretch;
-  background:rgba(9,13,17,0.65);
-  border:1px solid rgba(255,255,255,0.06);
-  border-radius:13px;overflow:hidden;
+.lv-signin-btn{
+  width:100%;max-width:100%;height:44px;
+  border:none;border-radius:10px;cursor:pointer;
+  background:#00e676;color:#041008;
+  font-family:var(--font);font-size:13px;font-weight:700;letter-spacing:-.15px;
+  transition:filter .15s,transform .15s,opacity .15s;
+  box-shadow:0 4px 20px rgba(0,230,118,0.22);
 }
-.lv-stat{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:11px 6px;}
-.lv-stat-label{font-size:9px;font-weight:600;color:rgba(240,240,240,0.25);text-transform:uppercase;letter-spacing:.08em;}
-.lv-stat-value{font-size:11px;font-weight:600;color:rgba(240,240,240,0.50);}
-.lv-stat-sep{width:1px;background:rgba(255,255,255,0.05);margin:8px 0;flex-shrink:0;}
-/* keep compat alias */
-.lv-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05) 30%,rgba(255,255,255,0.05) 70%,transparent);}
+.lv-signin-btn:hover{filter:brightness(1.06);}
+.lv-signin-btn:active{transform:scale(.985);}
+.lv-signin-btn:disabled{opacity:.45;cursor:wait;}
+
+.lv-status{
+  width:100%;margin-top:14px;
+  font-size:11px;line-height:1.5;
+  color:rgba(0,230,118,0.85);
+  word-break:break-word;
+}
+.lv-status.is-error{color:#f87171;}
+.lv-status.hidden{display:none;}
+
+.lv-foot{
+  flex-shrink:0;padding:12px 14px 14px;
+  border-top:1px solid rgba(255,255,255,0.05);
+  font-size:10px;color:rgba(240,240,240,0.22);
+  text-align:center;letter-spacing:.02em;
+}
+
+/* legacy login aliases (compat) */
+.lv-divider{height:1px;background:rgba(255,255,255,0.05);}
 
 /* ═══════════════════════════════════
    MAIN VIEW

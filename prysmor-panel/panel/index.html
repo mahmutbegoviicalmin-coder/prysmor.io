@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css?v=21"/>
+  <link rel="stylesheet" href="styles.css?v=22"/>
   <style>
     /* ─────────────────────────────────────────────
        DESIGN TOKENS
@@ -110,16 +110,17 @@
        HEADER
     ───────────────────────────────────────────── */
     .v2-hdr {
-      height: 44px; flex-shrink: 0;
+      height: 40px; flex-shrink: 0;
       display: flex; align-items: center;
-      padding: 0 14px;
+      padding: 0 12px;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
+      background: var(--bg);
+      gap: 10px;
     }
 
     /* Logo */
     .v2-hdr-logo {
-      font-size: 14px; font-weight: 700; letter-spacing: -0.5px;
+      font-size: 13px; font-weight: 700; letter-spacing: -0.4px;
       color: var(--text);
       flex-shrink: 0;
     }
@@ -133,52 +134,83 @@
     /* Credits badge (JS reveals via style.display='') */
     #topbar-credits {
       display: flex;
-      align-items: center; gap: 5px;
-      background: rgba(0,230,118,0.08);
-      border: 1px solid rgba(0,230,118,0.22);
-      border-radius: 20px;
-      padding: 3px 9px 3px 7px;
-      transition: border-color .2s, background .2s;
-    }
-    #topbar-credits:hover {
-      background: rgba(0,230,118,0.13);
-      border-color: rgba(0,230,118,0.38);
-    }
-    #topbar-credits svg { flex-shrink: 0; }
-    #topbar-credits-val {
-      font-size: 12px; font-weight: 700; letter-spacing: -0.3px;
-      color: var(--accent);
+      align-items: center; gap: 4px;
       font-variant-numeric: tabular-nums;
-      text-shadow: 0 0 12px rgba(0,230,118,0.5);
     }
-    #topbar-credits.low {
-      background: rgba(255,159,10,0.08);
-      border-color: rgba(255,159,10,0.25);
+    #topbar-credits:hover { opacity: 0.9; }
+    #topbar-credits svg { flex-shrink: 0; color: var(--accent); }
+    #topbar-credits-val {
+      font-size: 11px; font-weight: 600; letter-spacing: -0.2px;
+      color: var(--accent);
     }
-    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; text-shadow: none; }
+    #topbar-credits.low #topbar-credits-val { color: #ff9f0a; }
 
-    /* Right side of header */
-    .v2-hdr-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .v2-hdr-meta {
+      display: flex; align-items: center; gap: 8px;
+      margin-left: auto; min-width: 0;
+    }
+
+    .v2-hdr-actions {
+      display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+    }
 
     /* Plan badge (JS reveals via style.display='') */
     #topbar-plan {
       display: inline-block;
       font-size: 9px; font-weight: 600;
-      letter-spacing: 0.8px; text-transform: uppercase;
+      letter-spacing: 0.06em; text-transform: uppercase;
       color: var(--text-3);
-      border: 1px solid var(--border);
-      border-radius: 20px; padding: 2px 8px;
+      border: none; border-radius: 0; padding: 0; background: none;
     }
 
-    /* Gear button */
+    /* Icon buttons (history, settings) */
     .v2-gear-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 28px; height: 28px; border-radius: var(--r-sm);
+      width: 26px; height: 26px; border-radius: 6px;
       color: var(--text-3);
       transition: color .15s, background .15s;
     }
-    .v2-gear-btn:hover { color: var(--text-2); background: var(--surface3); }
-    .v2-gear-btn:active { transform: scale(0.9); }
+    .v2-gear-btn:hover { color: var(--text-2); background: rgba(255,255,255,0.05); }
+    .v2-gear-btn:active { transform: scale(0.92); }
+
+    /* Clip sync bar — primary action, always visible */
+    .v2-clip-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.012);
+      flex-shrink: 0;
+    }
+    .v2-clip-sync {
+      display: inline-flex; align-items: center; gap: 6px;
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,230,118,0.4);
+      background: rgba(0,230,118,0.08);
+      color: var(--accent);
+      font-size: 11px; font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, opacity .15s;
+    }
+    .v2-clip-sync:hover {
+      background: rgba(0,230,118,0.14);
+      border-color: rgba(0,230,118,0.55);
+    }
+    .v2-clip-sync:disabled { opacity: 0.55; cursor: wait; }
+    .v2-clip-sync.spinning svg { animation: spin .6s linear infinite; }
+    .v2-clip-bar-hint {
+      flex: 1; min-width: 0; margin: 0;
+      font-size: 10.5px; line-height: 1.35;
+      color: var(--text-3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .v2-clip-bar-ver {
+      flex-shrink: 0;
+      font-size: 9px; color: rgba(255,255,255,0.22);
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ─────────────────────────────────────────────
        VIDEO PREVIEW  (16:9)
@@ -226,26 +258,7 @@
       letter-spacing: -0.2px;
     }
     .pv-empty-sub {
-      font-size: 11px; color: var(--text-3); margin-bottom: 8px;
-    }
-    .v2-sync-btn {
-      margin-top: 4px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid rgba(0,230,118,0.35);
-      background: rgba(0,230,118,0.08);
-      color: var(--accent);
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .v2-sync-btn:hover { background: rgba(0,230,118,0.14); }
-    .v2-sync-btn:disabled { opacity: 0.5; cursor: wait; }
-    .v2-hdr-ver {
-      font-size: 9px;
-      color: rgba(255,255,255,0.28);
-      margin-right: 4px;
-      align-self: center;
+      font-size: 11px; color: var(--text-3); margin-bottom: 4px;
     }
     .v2-gear-btn.spinning svg { animation: spin .6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -769,68 +782,29 @@
   </div>
 
   <!-- ════════════════════════════════
-       LOGIN VIEW  (untouched)
+       LOGIN VIEW
   ════════════════════════════════ -->
   <div id="view-login" class="view login-view">
     <div class="lbg" aria-hidden="true">
       <div class="lbg-glow-center"></div>
-      <div class="lbg-glow-br"></div>
     </div>
-    <canvas id="grain" aria-hidden="true"></canvas>
 
-    <header class="lv-topbar">
-      <div class="lv-tb-brand">
-        <img src="assets/vecilogo.png" class="lv-tb-logo" alt=""/>
-        <span class="lv-tb-name">Prysmor</span>
-      </div>
-      <div class="lv-tb-right">
-        <span class="lv-status-dot" title="Not connected"></span>
-      </div>
-    </header>
+    <div class="lv-shell">
+      <header class="lv-hdr">
+        <div class="lv-hdr-logo">Pr<span>ysmor</span></div>
+        <span class="lv-hdr-ver" id="lv-panel-version">v5.5.0</span>
+      </header>
 
-    <div class="lv-content">
-      <div class="lv-brand">
-        <div class="lv-brand-glow" aria-hidden="true"></div>
-        <img src="assets/vecilogo.png" class="lv-brand-logo" alt="Prysmor"/>
-        <div class="lv-brand-text">
-          <h1 class="lv-brand-title">Prysmor</h1>
-          <div class="lv-brand-pills">
-            <span class="lv-brand-pill">Text to VFX</span>
-            <span class="lv-brand-pill">AI Generation</span>
-            <span class="lv-brand-pill">Timeline Ready</span>
-          </div>
-        </div>
+      <div class="lv-main">
+        <h1 class="lv-title">Sign in to start</h1>
+        <p class="lv-sub">Connect your account to sync credits and generate effects on your timeline.</p>
+
+        <button type="button" id="btn-continue" class="lv-signin-btn">Sign in</button>
+
+        <p id="login-status" class="lv-status hidden" role="status" aria-live="polite"></p>
       </div>
-      <div class="lv-workspace-card">
-        <div class="lwc-header">
-          <div class="lwc-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-          </div>
-          <div>
-            <p class="lwc-title">Access Workspace</p>
-            <p class="lwc-desc">Sign in to sync your subscription, credits and generation tools.</p>
-          </div>
-        </div>
-        <button id="btn-continue" class="lv-cta-btn">
-          <span class="lv-cta-label">Continue with Prysmor</span>
-          <span class="lv-cta-arrow" aria-hidden="true">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </span>
-        </button>
-        <div class="lv-trust-row">
-          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Secure login</span>
-          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Credits sync</span>
-          <span class="lv-trust-item"><span class="lv-trust-dot"></span>Premiere ready</span>
-        </div>
-        <p id="login-status" style="display:none"></p>
-      </div>
-      <div class="lv-stats">
-        <div class="lv-stat"><span class="lv-stat-label">Plan</span><span class="lv-stat-value">Not connected</span></div>
-        <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Credits</span><span class="lv-stat-value">—</span></div>
-        <div class="lv-stat-sep"></div>
-        <div class="lv-stat"><span class="lv-stat-label">Panel</span><span class="lv-stat-value" id="lv-panel-version">v5.4.3</span></div>
-      </div>
+
+      <footer class="lv-foot">Adobe Premiere Pro panel</footer>
     </div>
   </div>
 
@@ -842,39 +816,34 @@
     <!-- ─ HEADER ──────────────────── -->
     <header class="v2-hdr">
 
-      <!-- Logo — left -->
       <div class="v2-hdr-logo">Pr<span>ysmor</span></div>
 
-      <!-- Credits + plan + gear — right -->
-      <div class="v2-hdr-right">
-
-        <!-- Credits badge (JS reveals via style.display='') -->
+      <div class="v2-hdr-meta">
         <div id="topbar-credits" style="display:none">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span id="topbar-credits-val">—</span>
         </div>
-
-        <!-- Plan pill (JS reveals via style.display='') -->
         <span id="topbar-plan" style="display:none"></span>
+      </div>
 
-        <span id="hdr-panel-version" class="v2-hdr-ver"></span>
-
-        <!-- Sync clip from timeline -->
-        <button class="v2-gear-btn" id="btn-refresh-clip" title="Sync clip from timeline" aria-label="Sync clip">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </button>
-
-        <!-- History button -->
-        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
+      <div class="v2-hdr-actions">
+        <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </button>
-
-        <!-- Settings gear -->
         <button class="v2-gear-btn" id="btn-scroll-settings" title="Settings" aria-label="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         </button>
       </div>
     </header>
+
+    <div class="v2-clip-bar">
+      <button type="button" id="btn-refresh-clip" class="v2-clip-sync" title="Load the clip under the playhead from your timeline">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <span>Sync clip</span>
+      </button>
+      <p id="clip-bar-hint" class="v2-clip-bar-hint">Place playhead on a video clip in the timeline</p>
+      <span id="hdr-panel-version" class="v2-clip-bar-ver"></span>
+    </div>
 
     <!-- ─ VIDEO PREVIEW (16:9) ─────── -->
     <div class="v2-preview">
@@ -889,14 +858,12 @@
             <path d="M7 3v14M17 3v14M2 8h2M20 8h2M2 13h2M20 13h2"/>
           </svg>
         </div>
-        <span class="pv-empty-title">Place playhead on a clip</span>
-        <span class="pv-empty-sub">Or select a video clip on the timeline</span>
+        <span class="pv-empty-title">No clip loaded</span>
+        <span class="pv-empty-sub">Use Sync clip above when playhead is on your video</span>
         <div class="v2-watching-badge">
           <span class="v2-watching-dot"></span>
-          Watching timeline &amp; playhead
+          Auto-detect on
         </div>
-        <button type="button" id="btn-sync-clip" class="v2-sync-btn">Sync from timeline</button>
-        <span id="clip-empty-version" class="pv-empty-sub" style="margin-top:6px;font-size:10px;opacity:0.5"></span>
       </div>
 
       <!-- Filled: clip loaded -->
@@ -1260,7 +1227,7 @@
   </style>
 
   <script src="lib/CSInterface.js"></script>
-  <script src="main.js?v=47"></script>
+  <script src="main.js?v=48"></script>
   <script>
     /* ── Mode switching — global so onclick= attributes can call it ── */
     var _modePromptMap = {
