@@ -61,21 +61,95 @@ function isVideoTrackItem(item) {
   return true;
 }
 
-// Premiere 2026+ exposes timeline selection via sequence.getSelection().
-// Per-clip isSelected() / .selected can stay false even when clips are selected.
-function findSelectedVideoClip(seq) {
-  if (!seq) return null;
-
+// Normalise getSelection() across PP 2024–2026 (some builds omit .length).
+function getTimelineSelectionItems(seq) {
+  var items = [];
+  if (!seq || !seq.getSelection) return items;
   try {
-    if (seq.getSelection) {
-      var sel = seq.getSelection();
-      if (sel && sel.length !== undefined && sel.length > 0) {
-        for (var i = 0; i < sel.length; i++) {
-          if (isVideoTrackItem(sel[i])) return sel[i];
-        }
+    var sel = seq.getSelection();
+    if (!sel) return items;
+    var i, item;
+    if (typeof sel.length === 'number' && sel.length > 0) {
+      for (i = 0; i < sel.length; i++) {
+        item = sel[i];
+        if (item) items.push(item);
       }
+      if (items.length > 0) return items;
+    }
+    for (i = 0; i < 256; i++) {
+      item = sel[i];
+      if (!item) {
+        if (i === 0) break;
+        continue;
+      }
+      items.push(item);
     }
   } catch (_) {}
+  return items;
+}
+
+function clipEndSec(clip) {
+  try {
+    if (clip.end && typeof clip.end.seconds === 'number') return clip.end.seconds;
+  } catch (_) {}
+  try {
+    return clip.start.seconds + clip.duration.seconds;
+  } catch (_) {}
+  return -1;
+}
+
+// Reliable when timeline selection APIs return empty (common on PP 2026).
+function findVideoClipAtPlayhead(seq) {
+  if (!seq || !seq.getPlayerPosition) return null;
+  var posSec = 0;
+  try { posSec = seq.getPlayerPosition().seconds; } catch (_) { return null; }
+
+  var videoTracks = seq.videoTracks;
+  if (!videoTracks || !videoTracks.numTracks) return null;
+
+  for (var t = videoTracks.numTracks - 1; t >= 0; t--) {
+    var track = videoTracks[t];
+    var clips = track.clips;
+    for (var c = 0; c < clips.numItems; c++) {
+      var clip = clips[c];
+      if (!isVideoTrackItem(clip)) continue;
+      var startSec = 0;
+      try { startSec = clip.start.seconds; } catch (_) { continue; }
+      var endSec = clipEndSec(clip);
+      if (endSec <= startSec) continue;
+      if (posSec >= startSec && posSec < endSec) return clip;
+    }
+  }
+  return null;
+}
+
+function computeMediaInSec(clip, seq, method) {
+  var mediaInSec = 0;
+  try {
+    var ip = clip.inPoint;
+    if (ip && typeof ip.seconds === 'number') mediaInSec = ip.seconds;
+  } catch (_) {}
+
+  if (method === 'playhead' && seq && seq.getPlayerPosition) {
+    try {
+      var posSec = seq.getPlayerPosition().seconds;
+      var startSec = clip.start.seconds;
+      var offset = posSec - startSec;
+      if (offset > 0) mediaInSec += offset;
+    } catch (_) {}
+  }
+  return mediaInSec;
+}
+
+// Returns { clip, method } where method is selection | track | playhead.
+function findActiveVideoClip(seq) {
+  if (!seq) return null;
+
+  var items = getTimelineSelectionItems(seq);
+  var i;
+  for (i = 0; i < items.length; i++) {
+    if (isVideoTrackItem(items[i])) return { clip: items[i], method: 'selection' };
+  }
 
   try {
     var videoTracks = seq.videoTracks;
@@ -87,12 +161,20 @@ function findSelectedVideoClip(seq) {
         var selected = false;
         try { selected = clip.isSelected(); } catch (_) {}
         if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected) return clip;
+        if (selected && isVideoTrackItem(clip)) return { clip: clip, method: 'track' };
       }
     }
   } catch (_) {}
 
+  var playheadClip = findVideoClipAtPlayhead(seq);
+  if (playheadClip) return { clip: playheadClip, method: 'playhead' };
+
   return null;
+}
+
+function findSelectedVideoClip(seq) {
+  var found = findActiveVideoClip(seq);
+  return found ? found.clip : null;
 }
 
 // ─── importFile ───────────────────────────────────────────────────────────────
@@ -152,32 +234,26 @@ function getSelectionInfo() {
     }
 
     var MAX_SEC = 8;
-    var selectedClip = findSelectedVideoClip(seq);
+    var found = findActiveVideoClip(seq);
 
-    if (!selectedClip) {
-      return JSON.stringify({ error: 'No clip selected — click a clip in the Premiere timeline first.' });
+    if (!found) {
+      return JSON.stringify({
+        error: 'No clip found — place the playhead on a video clip, or select one on the timeline.'
+      });
     }
+
+    var selectedClip = found.clip;
+    var selectionMethod = found.method;
 
     var startSec   = selectedClip.start.seconds;
     var clipDurSec = selectedClip.duration.seconds;
     var durSec     = (clipDurSec > MAX_SEC) ? MAX_SEC : clipDurSec;
 
-    // mediaIn = offset (seconds) into the SOURCE FILE where this clip's content starts.
-    // clip.inPoint = source in-point; clip.start = sequence position.
-    // For a clip placed at timeline-0 and left-trimmed to second 33:
-    //   clip.start = 33, clip.inPoint = 33  → we must NOT skip equal values.
-    var mediaInSec = 0;
-    var _debugTimes = {};
-    try {
-      var ip = selectedClip.inPoint;
-      if (ip && typeof ip.seconds === 'number') {
-        mediaInSec = ip.seconds;
-        _debugTimes['inPoint'] = ip.seconds;
-      }
-    } catch (_) {}
+    var mediaInSec = computeMediaInSec(selectedClip, seq, selectionMethod);
+    var _debugTimes = { selectionMethod: selectionMethod };
+    try { _debugTimes['inPoint']  = selectedClip.inPoint.seconds;  } catch (_) {}
     try { _debugTimes['start']    = selectedClip.start.seconds;    } catch (_) {}
     try { _debugTimes['duration'] = selectedClip.duration.seconds; } catch (_) {}
-    try { _debugTimes['outPoint'] = selectedClip.outPoint.seconds; } catch (_) {}
 
     // Resolve source file path
     var sourcePath = '';
@@ -206,6 +282,8 @@ function getSelectionInfo() {
     try { seqW = seq.frameSizeHorizontal || 0; } catch (_) {}
     try { seqH = seq.frameSizeVertical   || 0; } catch (_) {}
 
+    try { _debugTimes['outPoint'] = selectedClip.outPoint.seconds; } catch (_) {}
+
     return JSON.stringify({
       startTimeSec: startSec,
       durationSec:  durSec,
@@ -217,6 +295,7 @@ function getSelectionInfo() {
       clipHeight:   clipH,
       seqWidth:     seqW,
       seqHeight:    seqH,
+      selectionMethod: selectionMethod,
     });
   } catch (e) {
     return JSON.stringify({ error: e.message });
