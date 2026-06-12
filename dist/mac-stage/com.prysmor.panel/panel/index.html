@@ -228,6 +228,27 @@
     .pv-empty-sub {
       font-size: 11px; color: var(--text-3); margin-bottom: 8px;
     }
+    .v2-sync-btn {
+      margin-top: 4px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,230,118,0.35);
+      background: rgba(0,230,118,0.08);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .v2-sync-btn:hover { background: rgba(0,230,118,0.14); }
+    .v2-sync-btn:disabled { opacity: 0.5; cursor: wait; }
+    .v2-hdr-ver {
+      font-size: 9px;
+      color: rgba(255,255,255,0.28);
+      margin-right: 4px;
+      align-self: center;
+    }
+    .v2-gear-btn.spinning svg { animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .v2-watching-badge {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 10px; font-weight: 600; letter-spacing: 0.2px;
@@ -836,6 +857,13 @@
         <!-- Plan pill (JS reveals via style.display='') -->
         <span id="topbar-plan" style="display:none"></span>
 
+        <span id="hdr-panel-version" class="v2-hdr-ver"></span>
+
+        <!-- Sync clip from timeline -->
+        <button class="v2-gear-btn" id="btn-refresh-clip" title="Sync clip from timeline" aria-label="Sync clip">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+
         <!-- History button -->
         <button class="v2-gear-btn" id="btn-history" title="Generation History" aria-label="History" style="margin-right:2px" onclick="var o=document.getElementById('section-history');if(o){o.classList.add('history-visible');if(typeof loadHistory==='function')loadHistory();}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -867,6 +895,7 @@
           <span class="v2-watching-dot"></span>
           Watching timeline &amp; playhead
         </div>
+        <button type="button" id="btn-sync-clip" class="v2-sync-btn">Sync from timeline</button>
       </div>
 
       <!-- Filled: clip loaded -->
@@ -1022,7 +1051,6 @@
     <div style="display:none" aria-hidden="true">
       <div id="credits-card"><b id="usage-used">—</b>/<span id="usage-limit">1000</span><span id="usage-seconds"></span></div>
       <div id="progress-fill" style="width:0%"></div>
-      <button id="btn-refresh-clip"></button>
       <span id="clip-thumb-placeholder"></span>
       <span id="clip-trim-badge"></span>
       <span id="clip-start-badge"></span>

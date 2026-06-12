@@ -51,14 +51,47 @@ function fileNameFromPath(filePath) {
   return parts[parts.length - 1];
 }
 
-function isVideoTrackItem(item) {
+function isVideoTrackItem(item, seq) {
   if (!item) return false;
   try {
     var mt = item.mediaType;
     if (mt === 'Video') return true;
     if (mt === 'Audio') return false;
   } catch (_) {}
+  if (seq) {
+    try {
+      var idx = item.parentTrackIndex;
+      if (typeof idx === 'number' && seq.videoTracks && idx >= 0 && idx < seq.videoTracks.numTracks) {
+        return true;
+      }
+    } catch (_) {}
+  }
   return true;
+}
+
+function getActiveSequence() {
+  if (typeof app === 'undefined' || !app.project) return null;
+  try {
+    if (app.project.activeSequence) return app.project.activeSequence;
+  } catch (_) {}
+  try {
+    if (app.project.sequences && app.project.sequences.numSequences > 0) {
+      for (var i = 0; i < app.project.sequences.numSequences; i++) {
+        var s = app.project.sequences[i];
+        if (s) return s;
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+function clipContainsTime(clip, posSec) {
+  var startSec = 0;
+  try { startSec = clip.start.seconds; } catch (_) { return false; }
+  var endSec = clipEndSec(clip);
+  if (endSec <= startSec) return false;
+  var eps = 0.05;
+  return posSec >= (startSec - eps) && posSec <= (endSec + eps);
 }
 
 // Normalise getSelection() across PP 2024–2026 (some builds omit .length).
@@ -112,12 +145,8 @@ function findVideoClipAtPlayhead(seq) {
     var clips = track.clips;
     for (var c = 0; c < clips.numItems; c++) {
       var clip = clips[c];
-      if (!isVideoTrackItem(clip)) continue;
-      var startSec = 0;
-      try { startSec = clip.start.seconds; } catch (_) { continue; }
-      var endSec = clipEndSec(clip);
-      if (endSec <= startSec) continue;
-      if (posSec >= startSec && posSec < endSec) return clip;
+      if (!isVideoTrackItem(clip, seq)) continue;
+      if (clipContainsTime(clip, posSec)) return clip;
     }
   }
   return null;
@@ -148,7 +177,7 @@ function findActiveVideoClip(seq) {
   var items = getTimelineSelectionItems(seq);
   var i;
   for (i = 0; i < items.length; i++) {
-    if (isVideoTrackItem(items[i])) return { clip: items[i], method: 'selection' };
+    if (isVideoTrackItem(items[i], seq)) return { clip: items[i], method: 'selection' };
   }
 
   try {
@@ -161,7 +190,7 @@ function findActiveVideoClip(seq) {
         var selected = false;
         try { selected = clip.isSelected(); } catch (_) {}
         if (!selected) { try { selected = !!clip.selected; } catch (_) {} }
-        if (selected && isVideoTrackItem(clip)) return { clip: clip, method: 'track' };
+        if (selected && isVideoTrackItem(clip, seq)) return { clip: clip, method: 'track' };
       }
     }
   } catch (_) {}
@@ -196,7 +225,7 @@ function insertToTimeline(filePath) {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
     if (!app.project) return 'error: No project open.';
-    var seq = app.project.activeSequence;
+    var seq = getActiveSequence();
     if (!seq) return 'error: No active sequence.';
     if (seq.videoTracks.numTracks === 0) return 'error: No video tracks in sequence.';
 
@@ -228,7 +257,7 @@ function getSelectionInfo() {
     if (!app.project) {
       return JSON.stringify({ error: 'No project open — create or open a Premiere project first.' });
     }
-    var seq = app.project.activeSequence;
+    var seq = getActiveSequence();
     if (!seq) {
       return JSON.stringify({ error: 'No active sequence — open a sequence in the Timeline.' });
     }
@@ -325,7 +354,7 @@ function insertClipOnV2(filePath, startTimeSec) {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
     if (!app.project) return 'error: No project open.';
-    var seq = app.project.activeSequence;
+    var seq = getActiveSequence();
     if (!seq) return 'error: No active sequence.';
 
     app.project.importFiles([filePath], true, app.project.rootItem, false);
@@ -373,7 +402,7 @@ function replaceSelection(filePath) {
   try {
     if (typeof app === 'undefined') return 'error: Adobe scripting engine not available.';
     if (!app.project) return 'error: No project open.';
-    var seq = app.project.activeSequence;
+    var seq = getActiveSequence();
     if (!seq) return 'error: No active sequence.';
 
     var selectedClip = findSelectedVideoClip(seq);
@@ -416,10 +445,10 @@ function getAppInfo() {
       appName:     app.name    || 'Adobe Premiere Pro',
       appVersion:  app.version || 'unknown',
       hasProject:  !!(app.project),
-      hasSequence: !!(app.project && app.project.activeSequence),
+      hasSequence: !!(app.project && getActiveSequence()),
       sequenceName: ''
     };
-    if (info.hasSequence) info.sequenceName = app.project.activeSequence.name;
+    if (info.hasSequence) info.sequenceName = getActiveSequence().name;
     return JSON.stringify(info);
   } catch (e) {
     return JSON.stringify({ error: e.message });

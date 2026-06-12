@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <ExtensionManifest Version="7.0"
   ExtensionBundleId="com.prysmor.panel"
-  ExtensionBundleVersion="5.4.7"
+  ExtensionBundleVersion="5.4.8"
   ExtensionBundleName="Prysmor">
 
   <ExtensionList>
-    <Extension Id="com.prysmor.panel" Version="5.4.7"/>
+    <Extension Id="com.prysmor.panel" Version="5.4.8"/>
   </ExtensionList>
 
   <ExecutionEnvironment>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Monitor } from "lucide-react";
 
-const PANEL_VERSION = "5.4.7";
+const PANEL_VERSION = "5.4.8";
 const PANEL_AE_VERSION = "2.0.5";
 
 const DOWNLOADS = {
@@ -11,10 +11,10 @@ const DOWNLOADS = {
     label: "Premiere Pro",
     version: PANEL_VERSION,
     accent: "#39FF6A",
-    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.7/PrysmrSetup.exe",
-    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.7/Prysmor-5.4.7.pkg",
+    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.8/PrysmrSetup.exe",
+    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.4.8/Prysmor-5.4.8.pkg",
     winFile: "PrysmrSetup.exe",
-    macFile: "Prysmor-5.4.7.pkg",
+    macFile: "Prysmor-5.4.8.pkg",
   },
   ae: {
     label: "After Effects",

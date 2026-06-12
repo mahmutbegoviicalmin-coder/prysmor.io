@@ -473,6 +473,11 @@ function enterPanel() {
 
   showView('main');
 
+  var hdrVer = el('hdr-panel-version');
+  if (hdrVer) {
+    try { hdrVer.textContent = 'v' + readLocalVersion(); } catch (_) {}
+  }
+
   // Render credits immediately if pre-loaded by validateSessionThenEnter()
   if (state.usage.credits > 0 || state.usage.creditsTotal !== 1000) {
     renderUsage();
@@ -539,40 +544,57 @@ function logout() {
  * Calls ExtendScript getSelectionInfo(), updates the clip card.
  * @param {boolean} silent  — if true, don't show toast when nothing is selected
  */
-function refreshClip(silent) {
-  // Clear immediately so Generate is blocked while the async refresh is in progress.
-  storedVideoInfo = null;
+function setRefreshBusy(busy) {
+  ['btn-refresh-clip', 'btn-sync-clip'].forEach(function (id) {
+    var btn = el(id);
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.classList.toggle('spinning', busy);
+  });
+}
 
-  el('btn-refresh-clip').disabled = true;
-  el('btn-refresh-clip').classList.add('spinning');
-
-  cs.evalScript('getSelectionInfo()', function (raw) {
-    el('btn-refresh-clip').disabled = false;
-    el('btn-refresh-clip').classList.remove('spinning');
-
-    let parsed = null;
-    try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
-
-    if (!parsed || parsed.error) {
-      state.mf.selInfo      = null;
-      storedVideoInfo = null;
-      showClipEmpty();
-      if (!silent) {
-        showToast(parsed ? parsed.error : 'Could not read Premiere selection', 'error');
-      }
-      return;
-    }
-
-    state.mf.selInfo = parsed;
-    parsed.sourcePath = normalisePath(parsed.sourcePath);
-    showClipInfo(parsed);
-    updateCostPreview();
-    // Silently capture a reference frame in background so Enhance has it ready.
-    captureClipReferenceFrame(parsed.sourcePath);
+function applyClipInfo(parsed, silent) {
+  if (!parsed || parsed.error) {
+    state.mf.selInfo = null;
+    storedVideoInfo = null;
+    showClipEmpty();
     if (!silent) {
-      var dbg = parsed.debugTimes ? JSON.stringify(parsed.debugTimes) : 'n/a';
-      showToast('Clip: ' + (parsed.clipName || 'clip') + ' | mediaIn=' + (parsed.mediaInSec || 0).toFixed(2) + 's | times=' + dbg, 'success');
+      showToast(parsed ? parsed.error : 'Could not read clip from timeline', 'error');
     }
+    return false;
+  }
+  state.mf.selInfo = parsed;
+  parsed.sourcePath = normalisePath(parsed.sourcePath);
+  showClipInfo(parsed);
+  updateCostPreview();
+  captureClipReferenceFrame(parsed.sourcePath);
+  if (!silent) {
+    showToast('Clip ready: ' + (parsed.clipName || 'clip'), 'success');
+  }
+  return true;
+}
+
+function refreshClip(silent) {
+  storedVideoInfo = null;
+  setRefreshBusy(true);
+  cs.evalScript('getSelectionInfo()', function (raw) {
+    setRefreshBusy(false);
+    var parsed = null;
+    try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
+    applyClipInfo(parsed, silent);
+  });
+}
+
+function refreshClipAsync(silent) {
+  return new Promise(function (resolve) {
+    storedVideoInfo = null;
+    setRefreshBusy(true);
+    cs.evalScript('getSelectionInfo()', function (raw) {
+      setRefreshBusy(false);
+      var parsed = null;
+      try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
+      resolve(applyClipInfo(parsed, silent));
+    });
   });
 }
 
@@ -1099,9 +1121,11 @@ async function mfGenerate() {
   const prompt      = el('mf-prompt').value.trim();
   const replaceMode = el('mf-replace-toggle').checked;
 
-  // Guard: must have clip
   if (!state.mf.selInfo) {
-    showToast('No clip selected — click a clip in the timeline and press Refresh', 'error');
+    await refreshClipAsync(true);
+  }
+  if (!state.mf.selInfo) {
+    showToast('Place the playhead on a video clip, then tap Sync (top right) or Sync from timeline.', 'error');
     return;
   }
 
@@ -2104,7 +2128,7 @@ function fileExistsSync(p) {
 
 // ─── Auto-Update ──────────────────────────────────────────────────────────────
 
-var VERSION_API = 'https://prysmor-io.vercel.app/api/panel/version';
+var VERSION_API = 'https://prysmor.io/api/panel/version';
 
 /**
  * Returns the extension root directory (absolute path, no trailing slash).
@@ -2826,13 +2850,18 @@ function showToast(msg, type) {
 function bindEvents() {
   el('btn-continue').addEventListener('click', startLogin);
 
-  // Clip
+  // Clip sync
   el('btn-refresh-clip').addEventListener('click', function () {
-    // Clear stale state immediately so Generate stays blocked until the
-    // full refresh + frame capture cycle completes.
     storedVideoInfo = null;
     refreshClip(false);
   });
+  var syncBtn = el('btn-sync-clip');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', function () {
+      storedVideoInfo = null;
+      refreshClip(false);
+    });
+  }
 
   // Mark Omni tab based on plan
   (function () {

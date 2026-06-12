@@ -8,7 +8,7 @@ on:
       version:
         description: Premiere panel semver (matches version.txt)
         required: true
-        default: "5.4.7"
+        default: "5.4.8"
         type: string
   push:
     tags:
@@ -108,7 +108,7 @@ jobs:
           elif [[ "${{ github.ref_name }}" == v* ]]; then
             V="${GITHUB_REF_NAME#v}"
           else
-            V="5.4.7"
+            V="5.4.8"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=v${V}" >> "$GITHUB_OUTPUT"
