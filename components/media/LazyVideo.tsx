@@ -30,22 +30,25 @@ export default function LazyVideo({
   });
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
-  const posterSrc = poster ?? videoPoster(src);
+  const posterSrc = poster ?? videoPoster(src.split("?")[0]);
   const shouldLoad = eager || inView;
 
   useEffect(() => {
+    setReady(false);
+  }, [src]);
+
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video || !shouldLoad) return;
+    if (!video || !shouldLoad || !autoPlay) return;
 
-    if (video.dataset.src !== src) {
-      video.dataset.src = src;
-      video.src = src;
-      setReady(false);
-      video.load();
-    }
+    const play = () => {
+      video.play().catch(() => {});
+    };
 
-    if (!autoPlay) return;
-    video.play().catch(() => {});
+    if (video.readyState >= 3) play();
+    else video.addEventListener("canplaythrough", play, { once: true });
+
+    return () => video.removeEventListener("canplaythrough", play);
   }, [shouldLoad, src, autoPlay]);
 
   return (
@@ -60,20 +63,24 @@ export default function LazyVideo({
         alt=""
         aria-hidden
         decoding="async"
+        fetchPriority={eager ? "high" : "auto"}
         className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
           ready ? "opacity-0" : "opacity-100"
         }`}
       />
       {shouldLoad && (
         <video
+          key={src}
           ref={videoRef}
+          src={src}
           muted
           loop
           playsInline
-          preload="none"
+          autoPlay={autoPlay}
+          preload={eager ? "auto" : "metadata"}
           poster={posterSrc}
           aria-label={label}
-          onCanPlay={() => setReady(true)}
+          onLoadedData={() => setReady(true)}
           className={`${videoClassName} transition-opacity duration-300 ${
             ready ? "opacity-100" : "opacity-0"
           }`}

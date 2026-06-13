@@ -6,6 +6,9 @@ import { ArrowRight } from "lucide-react";
 import { track } from "@vercel/analytics";
 import LazyVideo from "@/components/media/LazyVideo";
 
+const HERO_VIDEO_SRC = "/EXAMPLES.mp4?v=4";
+const HERO_VIDEO_POSTER = "/EXAMPLES-poster.jpg?v=4";
+
 const CAPABILITIES = ["Relight", "Background", "VFX"];
 
 const WORKFLOW_STEPS = ["Select Clip", "Describe Effect", "Apply To Timeline"];
@@ -137,9 +140,9 @@ export default function HeroSection() {
               aria-hidden
             />
             <LazyVideo
-              src="/vfx.mp4"
-              poster="/vfx-poster.jpg"
-              label="Prysmor VFX output example"
+              src={HERO_VIDEO_SRC}
+              poster={HERO_VIDEO_POSTER}
+              label="Prysmor panel workflow demo"
               eager
               className="aspect-video w-full"
               videoClassName="absolute inset-0 h-full w-full object-cover"
