@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import LazyVideo from "@/components/media/LazyVideo";
-import { videoPoster } from "@/hooks/useInView";
+import { videoPoster, withAssetVersion } from "@/hooks/useInView";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -31,7 +31,7 @@ export const CAPABILITY_MODES: CapabilityMode[] = [
       "Subject stays consistent shot to shot",
       "Ready to drop back on your timeline",
     ],
-    videos: ["/primjeri/re1.mp4", "/primjeri/re2.mp4"],
+    videos: [withAssetVersion("/primjeri/slider1.mp4"), withAssetVersion("/primjeri/slider2.mp4")],
     layout: "split-content-left",
   },
   {
@@ -46,7 +46,7 @@ export const CAPABILITY_MODES: CapabilityMode[] = [
       "Optional reference image for precise looks",
       "Clean edges without manual masking",
     ],
-    videos: ["/primjeri/bg1.mp4", "/primjeri/bg2.mp4"],
+    videos: [withAssetVersion("/primjeri/slide1.mp4"), withAssetVersion("/primjeri/slide2.mp4")],
     layout: "split-content-right",
   },
   {
@@ -61,7 +61,7 @@ export const CAPABILITY_MODES: CapabilityMode[] = [
       "4K output sized for real timelines",
       "Overlay above your edit, original preserved",
     ],
-    videos: ["/primjeri/vfx1.mp4", "/primjeri/vfx2.mp4"],
+    videos: [withAssetVersion("/primjeri/vfx1.mp4"), withAssetVersion("/primjeri/vfx2.mp4")],
     layout: "split-content-left",
   },
 ];

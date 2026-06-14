@@ -11,7 +11,7 @@ export { DEFAULT_AFFILIATE_CHART };
 export interface AffiliateProfile {
   id: string;
   email: string;
-  userId: string;
+  userId: string | null;
   code: string;
   commissionPercent: number;    // e.g. 15 = 15%
   // Manual fields set by admin, what the affiliate sees
@@ -20,6 +20,9 @@ export interface AffiliateProfile {
   manualPaidEarnings: number;
   manualActiveMembers: number;
   manualInactiveMembers: number;
+  manualStarterCount: number;
+  manualProCount: number;
+  manualExclusiveCount: number;
   manualChart: AffiliateChart;
   note: string;
   status: 'active' | 'inactive';
@@ -46,11 +49,59 @@ export function generateCode(email: string): string {
   return `${base}${suffix}`;
 }
 
+export function normalizeAffiliateEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 /** Get affiliate profile by Clerk userId */
 export async function getAffiliateByUserId(userId: string): Promise<AffiliateProfile | null> {
   const snap = await db.collection('affiliates').where('userId', '==', userId).limit(1).get();
   if (snap.empty) return null;
   return docToAffiliate(snap.docs[0]);
+}
+
+/** Get affiliate profile by email (case-insensitive) */
+export async function getAffiliateByEmail(email: string): Promise<AffiliateProfile | null> {
+  const normalized = normalizeAffiliateEmail(email);
+  const snap = await db.collection('affiliates').where('email', '==', normalized).limit(1).get();
+  if (!snap.empty) return docToAffiliate(snap.docs[0]);
+
+  // Legacy docs may store mixed-case email
+  const all = await db.collection('affiliates').get();
+  const match = all.docs.find(
+    (doc: FirebaseFirestore.QueryDocumentSnapshot) =>
+      normalizeAffiliateEmail(doc.data().email ?? '') === normalized,
+  );
+  return match ? docToAffiliate(match) : null;
+}
+
+/**
+ * Resolve affiliate for signed-in user.
+ * Links email-only profiles to Clerk userId on first access.
+ */
+export async function resolveAffiliateForUser(
+  userId: string,
+  email: string,
+): Promise<AffiliateProfile | null> {
+  const byUser = await getAffiliateByUserId(userId);
+  if (byUser) return byUser;
+
+  const byEmail = await getAffiliateByEmail(email);
+  if (!byEmail) return null;
+
+  if (byEmail.userId && byEmail.userId !== userId) {
+    return null;
+  }
+
+  if (!byEmail.userId) {
+    await db.collection('affiliates').doc(byEmail.id).update({
+      userId,
+      updatedAt: new Date(),
+    });
+    return { ...byEmail, userId };
+  }
+
+  return byEmail;
 }
 
 /** Get affiliate profile by referral code */
@@ -163,7 +214,7 @@ function docToAffiliate(doc: FirebaseFirestore.QueryDocumentSnapshot): Affiliate
   return {
     id:                    doc.id,
     email:                 d.email ?? '',
-    userId:                d.userId ?? '',
+    userId:                d.userId ? String(d.userId) : null,
     code:                  d.code ?? '',
     commissionPercent:     d.commissionPercent ?? d.commissionPerSale ?? 15,
     manualTotalEarnings:   d.manualTotalEarnings ?? 0,
@@ -171,6 +222,9 @@ function docToAffiliate(doc: FirebaseFirestore.QueryDocumentSnapshot): Affiliate
     manualPaidEarnings:    d.manualPaidEarnings ?? 0,
     manualActiveMembers:   d.manualActiveMembers ?? 0,
     manualInactiveMembers: d.manualInactiveMembers ?? 0,
+    manualStarterCount:    d.manualStarterCount ?? 0,
+    manualProCount:        d.manualProCount ?? 0,
+    manualExclusiveCount:  d.manualExclusiveCount ?? 0,
     manualChart:           normalizeChart(d.manualChart),
     note:                  d.note ?? '',
     status:                d.status ?? 'active',

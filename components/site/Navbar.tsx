@@ -38,6 +38,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const isHome = pathname === "/";
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
 
@@ -63,13 +64,13 @@ export default function Navbar() {
       <header className="pointer-events-none fixed inset-x-0 top-0 z-[100] px-4 pt-2.5 sm:px-6 sm:pt-3">
         <div
           className={cn(
-            "pointer-events-auto relative mx-auto flex h-14 max-w-[1120px] items-center justify-between overflow-hidden rounded-xl px-5 transition-all duration-300 lg:px-6",
-            scrolled
-              ? "border border-white/[0.08] bg-[#080808]/72 shadow-[0_4px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+            "pointer-events-auto relative mx-auto flex h-14 max-w-[1400px] items-center justify-between overflow-hidden rounded-xl px-5 transition-all duration-300 lg:px-6",
+            scrolled || isHome
+              ? "border border-white/[0.08] bg-[#080808]/90 shadow-[0_4px_24px_rgba(0,0,0,0.35)] backdrop-blur-xl"
               : "border border-transparent bg-transparent shadow-none",
           )}
         >
-          {scrolled && (
+          {(scrolled || isHome) && (
             <>
               <div
                 className="pointer-events-none absolute inset-0 opacity-70"

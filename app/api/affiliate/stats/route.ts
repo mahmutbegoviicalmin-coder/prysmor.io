@@ -1,15 +1,16 @@
-import { currentUser }      from '@clerk/nextjs/server';
-import { NextResponse }      from 'next/server';
-import { getAffiliateByUserId } from '@/lib/affiliates';
+import { currentUser } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { resolveAffiliateForUser } from '@/lib/affiliates';
 
-/** GET /api/affiliate/stats, returns stats for the current user's affiliate profile */
+/** GET /api/affiliate/stats */
 export async function GET() {
   const user = await currentUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const affiliate = await getAffiliateByUserId(user.id);
+  const email = user.emailAddresses[0]?.emailAddress ?? '';
+  const affiliate = await resolveAffiliateForUser(user.id, email);
   if (!affiliate) {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });
   }
@@ -18,15 +19,20 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    affiliate,
-    // All values shown to affiliate are manually set by admin
-    stats: {
-      totalEarnings:    affiliate.manualTotalEarnings,
-      pendingEarnings:  affiliate.manualPendingEarnings,
-      paidEarnings:     affiliate.manualPaidEarnings,
-      activeMembers:    affiliate.manualActiveMembers,
-      inactiveMembers:  affiliate.manualInactiveMembers,
+    affiliate: {
+      commissionPercent: affiliate.commissionPercent,
+      note: affiliate.note,
     },
-    chart: affiliate.manualChart,
+    refLink: `https://prysmor.io/?ref=${affiliate.code}`,
+    stats: {
+      totalEarnings: affiliate.manualTotalEarnings,
+      pendingEarnings: affiliate.manualPendingEarnings,
+      paidEarnings: affiliate.manualPaidEarnings,
+      activeMembers: affiliate.manualActiveMembers,
+      inactiveMembers: affiliate.manualInactiveMembers,
+      starterCount: affiliate.manualStarterCount,
+      proCount: affiliate.manualProCount,
+      exclusiveCount: affiliate.manualExclusiveCount,
+    },
   });
 }

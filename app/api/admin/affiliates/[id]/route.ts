@@ -1,37 +1,46 @@
-import { currentUser }            from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db }                        from '@/lib/firebaseAdmin';
-import { getReferralsByCode }        from '@/lib/affiliates';
+import { db } from '@/lib/firebaseAdmin';
+import { getReferralsByCode } from '@/lib/affiliates';
+import { requireAdmin } from '@/lib/admin/auth';
 
-const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
-
-/** PATCH /api/admin/affiliates/[id], update affiliate */
+/** PATCH /api/admin/affiliates/[id] */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const user   = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
 
   const body: Partial<{
-    commissionPercent:     number;
-    status:                'active' | 'inactive';
-    code:                  string;
-    note:                  string;
-    manualTotalEarnings:   number;
+    commissionPercent: number;
+    status: 'active' | 'inactive';
+    code: string;
+    note: string;
+    userId: string | null;
+    manualTotalEarnings: number;
     manualPendingEarnings: number;
-    manualPaidEarnings:    number;
-    manualActiveMembers:   number;
+    manualPaidEarnings: number;
+    manualActiveMembers: number;
     manualInactiveMembers: number;
-    manualChart?:          { title: string; points: { label: string; value: number }[] };
+    manualStarterCount: number;
+    manualProCount: number;
+    manualExclusiveCount: number;
+    manualChart?: { title: string; points: { label: string; value: number }[] };
   }> = await req.json();
 
   const allowed = [
-    'commissionPercent', 'status', 'code', 'note',
+    'commissionPercent', 'status', 'code', 'note', 'userId',
     'manualTotalEarnings', 'manualPendingEarnings', 'manualPaidEarnings',
-    'manualActiveMembers', 'manualInactiveMembers', 'manualChart',
+    'manualActiveMembers', 'manualInactiveMembers',
+    'manualStarterCount', 'manualProCount', 'manualExclusiveCount',
+    'manualChart',
   ];
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const key of allowed) {
-    if (key in body) update[key] = (body as Record<string, unknown>)[key];
+    if (key in body) {
+      if (key === 'userId') {
+        update[key] = body.userId?.trim() || null;
+      } else {
+        update[key] = (body as Record<string, unknown>)[key];
+      }
+    }
   }
 
   if ('manualChart' in body && body.manualChart) {
@@ -42,21 +51,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-/** DELETE /api/admin/affiliates/[id], delete affiliate */
+/** DELETE /api/admin/affiliates/[id] */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const user   = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
 
   await db.collection('affiliates').doc(params.id).delete();
   return NextResponse.json({ ok: true });
 }
 
-/** POST /api/admin/affiliates/[id]/mark-paid, mark referrals as paid */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const user   = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+/** POST /api/admin/affiliates/[id] — legacy mark referrals paid */
+export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
 
   const affDoc = await db.collection('affiliates').doc(params.id).get();
   if (!affDoc.exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });

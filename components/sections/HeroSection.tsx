@@ -1,98 +1,99 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { track } from "@vercel/analytics";
+import { motion } from "framer-motion";
 import LazyVideo from "@/components/media/LazyVideo";
+import { HERO_VIDEO_POSTER, HERO_VIDEO_SRC } from "@/lib/heroMedia";
 
-const HERO_VIDEO_SRC = "/EXAMPLES.mp4?v=4";
-const HERO_VIDEO_POSTER = "/EXAMPLES-poster.jpg?v=4";
+const ease = [0.22, 1, 0.36, 1] as const;
 
-const CAPABILITIES = ["Relight", "Background", "VFX"];
-
-const WORKFLOW_STEPS = ["Select Clip", "Describe Effect", "Apply To Timeline"];
+const fadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  show: (delay: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.65, delay, ease },
+  }),
+};
 
 export default function HeroSection() {
   return (
-    <section
-      className="relative border-b border-white/[0.06] bg-[#080808]"
-      style={{ paddingTop: "88px" }}
-    >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[480px] opacity-30"
-        style={{
-          background:
-            "radial-gradient(ellipse 50% 40% at 70% 0%, rgba(57,255,106,0.05) 0%, transparent 70%)",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative mx-auto grid max-w-[1200px] gap-10 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)] lg:items-center lg:gap-12 lg:pb-20 lg:pt-12 xl:px-8">
-        <div className="max-w-xl lg:py-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/30">
-            AI VFX for Premiere Pro & After Effects
-          </p>
-
-          <h1 className="mt-3.5 text-[clamp(2rem,4.5vw,3.25rem)] font-semibold leading-[1.06] tracking-[-0.035em] text-white">
-            Generate VFX directly on your{" "}
-            <span className="text-[#39FF6A]">timeline.</span>
-          </h1>
-
-          <p className="mt-3.5 max-w-md text-[15px] leading-7 text-white/45">
-            Select a clip, describe the effect, and get a 4K result back on your
-            timeline. Prysmor runs inside Premiere Pro and After Effects, not in
-            a browser.
-          </p>
-
-          <div className="mt-7 flex flex-wrap gap-2">
-            {CAPABILITIES.map((item) => (
-              <span
-                key={item}
-                className="inline-flex items-center rounded-md border border-white/[0.08] bg-white/[0.025] px-3 py-1.5 text-[12px] font-medium tracking-[-0.01em] text-white/58 transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-white/78"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2">
-              <Image
-                src="/pr.png"
-                alt=""
-                width={18}
-                height={18}
-                className="h-[18px] w-[18px] object-contain opacity-60"
-                aria-hidden
-              />
-              <Image
-                src="/ae.png"
-                alt=""
-                width={18}
-                height={18}
-                className="h-[18px] w-[18px] object-contain opacity-60"
-                aria-hidden
+    <section className="bg-black px-3 pb-4 pt-[calc(var(--bar-h,0px)+4.25rem)] sm:px-4 sm:pb-5 sm:pt-[calc(var(--bar-h,0px)+4.75rem)] md:px-5">
+      <div className="relative mx-auto grid min-h-[min(780px,calc(100svh-5.5rem))] max-w-[1400px] overflow-hidden rounded-[20px] border border-white/[0.07] sm:min-h-[min(820px,calc(100svh-6rem))] sm:rounded-[28px]">
+        {/* Video */}
+        <div className="relative col-start-1 row-start-1 min-h-[inherit]">
+          <div className="absolute inset-0">
+            <div className="hero-ken-burns absolute inset-[-3%]">
+              <LazyVideo
+                src={HERO_VIDEO_SRC}
+                poster={HERO_VIDEO_POSTER}
+                label="Prysmor VFX generation demo"
+                eager
+                className="h-full w-full min-h-full"
+                videoClassName="absolute inset-0 h-full w-full object-cover"
               />
             </div>
-            <span className="text-[12px] tracking-[-0.01em] text-white/38">
-              Premiere Pro & After Effects
-            </span>
+
+            <div className="pointer-events-none absolute inset-0 bg-black/15" aria-hidden />
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 32%, rgba(0,0,0,0.08) 58%, transparent 100%)",
+              }}
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to right, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 42%, transparent 72%)",
+              }}
+              aria-hidden
+            />
+            <div className="hero-grain pointer-events-none absolute inset-0 opacity-[0.035]" aria-hidden />
           </div>
+        </div>
 
-          <div className="mt-10 border-t border-white/[0.05] pt-8">
-            <p className="text-[11px] tracking-[-0.01em] text-white/28">
-              Create an account and try Prysmor in Playground.
-            </p>
+        {/* Copy — bottom-left, video stays visible above */}
+        <div className="relative z-10 col-start-1 row-start-1 flex min-h-[inherit] items-end px-5 pb-10 pt-24 sm:px-8 sm:pb-12 md:px-12 md:pb-14 lg:pb-16">
+          <div className="flex w-full max-w-[640px] flex-col items-start text-left lg:max-w-[680px]">
+            <motion.h1
+              custom={0}
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="text-balance text-[clamp(1.875rem,4.2vw,3.25rem)] font-medium leading-[1.08] tracking-[-0.035em] text-white"
+            >
+              VFX from a prompt on your timeline.
+            </motion.h1>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2.5">
+            <motion.p
+              custom={0.1}
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="mt-4 max-w-[540px] text-pretty text-[15px] font-normal leading-[1.65] text-white/62 sm:mt-5 sm:text-[16px] sm:leading-[1.7] lg:max-w-[580px]"
+            >
+              Select a clip in Premiere Pro or After Effects, describe relight,
+              background, or VFX, and get a 4K result placed back on your edit.
+              No browser tab, no export round-trip.
+            </motion.p>
+
+            <motion.div
+              custom={0.2}
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="mt-7 flex w-full flex-col gap-2.5 sm:mt-8 sm:w-auto sm:flex-row sm:items-center sm:gap-3"
+            >
               <Link
                 href="/sign-up"
                 onClick={() => track("get_started", { location: "hero" })}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#39FF6A] px-5 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-black transition-opacity hover:opacity-90"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#39FF6A] px-7 text-[14px] font-semibold tracking-[-0.01em] text-black transition-opacity hover:opacity-90 sm:w-auto sm:px-8"
               >
                 Get Started Free
-                <ArrowRight size={15} strokeWidth={2.5} />
               </Link>
               <button
                 type="button"
@@ -100,68 +101,21 @@ export default function HeroSection() {
                   track("see_pricing", { location: "hero" });
                   document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="inline-flex items-center rounded-lg border border-white/[0.09] px-5 py-2.5 text-[14px] font-medium tracking-[-0.01em] text-white/50 transition-colors hover:border-white/[0.16] hover:text-white/75"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/30 bg-transparent px-7 text-[14px] font-medium tracking-[-0.01em] text-white/88 transition-colors hover:border-white/50 hover:bg-white/[0.06] sm:w-auto sm:px-8"
               >
                 See Pricing
               </button>
-            </div>
+            </motion.div>
 
-            <p className="mt-3 text-[10px] leading-relaxed tracking-[0.02em] text-white/24">
-              <span>Free account</span>
-              <span className="mx-1.5 text-white/15" aria-hidden>
-                ·
-              </span>
-              <span>1 free generation included</span>
-              <span className="mx-1.5 text-white/15" aria-hidden>
-                ·
-              </span>
-              <span>No credit card required</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="relative w-full lg:order-none">
-          <div
-            className="pointer-events-none absolute -inset-14 rounded-[2rem] opacity-60 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(ellipse at center, rgba(57,255,106,0.14) 0%, transparent 62%)",
-            }}
-            aria-hidden
-          />
-
-          <div className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[#0a0a0a]/80 shadow-[0_28px_90px_rgba(0,0,0,0.62),0_0_0_1px_rgba(255,255,255,0.04)_inset] ring-1 ring-[#39FF6A]/15 backdrop-blur-sm">
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-white/[0.09] via-white/[0.02] to-transparent"
-              aria-hidden
-            />
-            <div
-              className="pointer-events-none absolute inset-0 z-10 rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.10),inset_0_-1px_0_rgba(0,0,0,0.35)]"
-              aria-hidden
-            />
-            <LazyVideo
-              src={HERO_VIDEO_SRC}
-              poster={HERO_VIDEO_POSTER}
-              label="Prysmor panel workflow demo"
-              eager
-              className="aspect-video w-full"
-              videoClassName="absolute inset-0 h-full w-full object-cover"
-            />
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-1 lg:justify-start">
-            {WORKFLOW_STEPS.map((step, index) => (
-              <span key={step} className="flex items-center gap-1">
-                <span className="rounded border border-white/[0.07] bg-white/[0.02] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-white/35">
-                  {step}
-                </span>
-                {index < WORKFLOW_STEPS.length - 1 && (
-                  <span className="text-[10px] text-white/15" aria-hidden>
-                    →
-                  </span>
-                )}
-              </span>
-            ))}
+            <motion.p
+              custom={0.28}
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="mt-5 text-[11px] leading-relaxed tracking-[0.01em] text-white/30 sm:mt-6"
+            >
+              Free account, 1 generation included, no credit card
+            </motion.p>
           </div>
         </div>
       </div>

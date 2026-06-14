@@ -1,9 +1,8 @@
 import { currentUser } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { resolveAffiliateForUser } from '@/lib/affiliates';
-import { getOpenPayoutRequestForUser, getPayoutRequestsForUser } from '@/lib/payouts';
+import { getReferralsByCode, resolveAffiliateForUser } from '@/lib/affiliates';
 
-/** GET /api/affiliate/payout-requests */
+/** GET /api/affiliate/referrals */
 export async function GET() {
   const user = await currentUser();
   if (!user) {
@@ -16,14 +15,6 @@ export async function GET() {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });
   }
 
-  const [requests, openRequest] = await Promise.all([
-    getPayoutRequestsForUser(user.id),
-    getOpenPayoutRequestForUser(user.id),
-  ]);
-
-  return NextResponse.json({
-    requests,
-    openRequest,
-    availableAmount: affiliate.manualPendingEarnings,
-  });
+  const referrals = await getReferralsByCode(affiliate.code);
+  return NextResponse.json({ referrals });
 }

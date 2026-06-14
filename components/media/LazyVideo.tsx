@@ -41,14 +41,37 @@ export default function LazyVideo({
     const video = videoRef.current;
     if (!video || !shouldLoad || !autoPlay) return;
 
+    let cancelled = false;
+
     const play = () => {
+      if (cancelled) return;
       video.play().catch(() => {});
     };
 
-    if (video.readyState >= 3) play();
-    else video.addEventListener("canplaythrough", play, { once: true });
+    const markReadyAndPlay = () => {
+      if (cancelled) return;
+      setReady(true);
+      play();
+    };
 
-    return () => video.removeEventListener("canplaythrough", play);
+    // canplay = first frame ready (faststart mp4). Avoid canplaythrough — waits for full buffer.
+    if (video.readyState >= 3) {
+      markReadyAndPlay();
+    } else {
+      video.addEventListener("canplay", markReadyAndPlay, { once: true });
+      video.addEventListener("loadeddata", () => setReady(true), { once: true });
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") play();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener("canplay", markReadyAndPlay);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [shouldLoad, src, autoPlay]);
 
   return (
@@ -64,7 +87,7 @@ export default function LazyVideo({
         aria-hidden
         decoding="async"
         fetchPriority={eager ? "high" : "auto"}
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
           ready ? "opacity-0" : "opacity-100"
         }`}
       />
@@ -80,8 +103,9 @@ export default function LazyVideo({
           preload={eager ? "auto" : "metadata"}
           poster={posterSrc}
           aria-label={label}
-          onLoadedData={() => setReady(true)}
-          className={`${videoClassName} transition-opacity duration-300 ${
+          // @ts-expect-error fetchPriority on video is valid in modern browsers
+          fetchPriority={eager ? "high" : "auto"}
+          className={`${videoClassName} transition-opacity duration-200 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
         />

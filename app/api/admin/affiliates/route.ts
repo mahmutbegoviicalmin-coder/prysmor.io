@@ -1,68 +1,89 @@
-import { currentUser }            from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { db }                        from '@/lib/firebaseAdmin';
-import { getAllAffiliates, getReferralsByCode, generateCode } from '@/lib/affiliates';
+import { db } from '@/lib/firebaseAdmin';
+import {
+  DEFAULT_AFFILIATE_CHART,
+  generateCode,
+  getAllAffiliates,
+  getReferralsByCode,
+  normalizeAffiliateEmail,
+} from '@/lib/affiliates';
+import { requireAdmin } from '@/lib/admin/auth';
 
-const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
-
-function isAdminUser(user: Awaited<ReturnType<typeof currentUser>>) {
-  return user?.emailAddresses?.some(e => ADMIN_EMAILS.includes(e.emailAddress)) ?? false;
-}
-
-/** GET /api/admin/affiliates, list all affiliates with referral counts */
+/** GET /api/admin/affiliates — list all affiliates with referral counts */
 export async function GET() {
-  const user = await currentUser();
-  if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
 
   const affiliates = await getAllAffiliates();
 
-  // Fetch referral counts for each affiliate in parallel
   const withStats = await Promise.all(
     affiliates.map(async (aff) => {
       const referrals = await getReferralsByCode(aff.code);
-      const active   = referrals.filter(r => r.status === 'pending').length;
-      const paid     = referrals.filter(r => r.status === 'paid').length;
+      const active = referrals.filter((r) => r.status === 'pending').length;
+      const paid = referrals.filter((r) => r.status === 'paid').length;
       return { ...aff, referralCount: referrals.length, activeCount: active, paidCount: paid, referrals };
-    })
+    }),
   );
 
   return NextResponse.json({ affiliates: withStats });
 }
 
-/** POST /api/admin/affiliates, create a new affiliate */
+/** POST /api/admin/affiliates — create affiliate (email only; Clerk ID optional) */
 export async function POST(req: NextRequest) {
-  const user = await currentUser();
-  if (!isAdminUser(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
 
-  const body: { email: string; userId: string; code?: string; commissionPercent?: number } = await req.json();
-  if (!body.email || !body.userId) {
-    return NextResponse.json({ error: 'email and userId are required' }, { status: 400 });
+  const body: {
+    email: string;
+    userId?: string;
+    code?: string;
+    commissionPercent?: number;
+  } = await req.json();
+
+  const email = normalizeAffiliateEmail(body.email ?? '');
+  if (!email) {
+    return NextResponse.json({ error: 'email is required' }, { status: 400 });
   }
 
-  // Check for duplicate
-  const existing = await db.collection('affiliates').where('email', '==', body.email).limit(1).get();
+  const existing = await db.collection('affiliates').where('email', '==', email).limit(1).get();
   if (!existing.empty) {
     return NextResponse.json({ error: 'Affiliate with this email already exists' }, { status: 409 });
   }
 
-  const code = body.code?.toUpperCase() || generateCode(body.email);
-  const ref  = db.collection('affiliates').doc();
+  const userId = body.userId?.trim() || null;
+  if (userId) {
+    const linked = await db.collection('affiliates').where('userId', '==', userId).limit(1).get();
+    if (!linked.empty) {
+      return NextResponse.json({ error: 'This Clerk user is already linked to another affiliate' }, { status: 409 });
+    }
+  }
+
+  const code = body.code?.trim().toUpperCase() || generateCode(email);
+  const codeTaken = await db.collection('affiliates').where('code', '==', code).limit(1).get();
+  if (!codeTaken.empty) {
+    return NextResponse.json({ error: 'Referral code already in use' }, { status: 409 });
+  }
+
+  const ref = db.collection('affiliates').doc();
   await ref.set({
-    email:                 body.email,
-    userId:                body.userId,
+    email,
+    userId,
     code,
-    commissionPercent:     body.commissionPercent ?? 15,
-    manualTotalEarnings:   0,
+    commissionPercent: body.commissionPercent ?? 15,
+    manualTotalEarnings: 0,
     manualPendingEarnings: 0,
-    manualPaidEarnings:    0,
-    manualActiveMembers:   0,
+    manualPaidEarnings: 0,
+    manualActiveMembers: 0,
     manualInactiveMembers: 0,
-    manualChart:           DEFAULT_AFFILIATE_CHART,
-    note:                  '',
-    status:                'active',
-    createdAt:             new Date(),
-    updatedAt:             new Date(),
+    manualStarterCount: 0,
+    manualProCount: 0,
+    manualExclusiveCount: 0,
+    manualChart: DEFAULT_AFFILIATE_CHART,
+    note: '',
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date(),
   });
 
-  return NextResponse.json({ id: ref.id, code }, { status: 201 });
+  return NextResponse.json({ id: ref.id, code, linked: Boolean(userId) }, { status: 201 });
 }

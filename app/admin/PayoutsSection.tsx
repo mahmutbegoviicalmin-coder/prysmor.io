@@ -60,7 +60,7 @@ export function PayoutsSection() {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        alert(d.error ?? 'Failed to update payout');
+        alert((d as { error?: string }).error ?? `Failed to update payout (${res.status})`);
         return;
       }
       load();

@@ -10,8 +10,7 @@ import {
   Settings, Download, ShieldCheck, TrendingUp, LifeBuoy, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-const ADMIN_EMAIL      = "mahmutbegoviic.almin@gmail.com";
-const AFFILIATE_EMAILS = ["mahmutbegoviic.almin@gmail.com", "brzotrcipuska7@gmail.com"];
+const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
 
 const GREEN = "#39FF6A";
 
@@ -170,7 +169,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const userEmail      = user?.primaryEmailAddress?.emailAddress ?? "";
   const isAdmin        = userEmail === ADMIN_EMAIL;
-  const isAffiliate    = showAffiliate || AFFILIATE_EMAILS.includes(userEmail);
+  const isAffiliate    = showAffiliate;
   const adminActive    = pathname.startsWith("/dashboard/admin");
   const affiliateActive = pathname.startsWith("/dashboard/affiliate");
 
