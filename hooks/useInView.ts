@@ -39,7 +39,7 @@ export function useInView<T extends Element>({
   return { ref, inView };
 }
 
-const PRIMJERI_ASSET_VERSION = "?v=2";
+const PRIMJERI_ASSET_VERSION = "?v=3";
 
 export function videoPoster(src: string) {
   const base = src.split("?")[0].replace(/\.mp4$/i, "-poster.jpg");

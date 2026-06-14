@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import LazyVideo from "@/components/media/LazyVideo";
+import CapabilityVideoPlayer from "@/components/media/CapabilityVideoPlayer";
 import { videoPoster, withAssetVersion } from "@/hooks/useInView";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -105,10 +105,12 @@ function ThumbnailRow({
   mode,
   activeIndex,
   onSelect,
+  onHover,
 }: {
   mode: CapabilityMode;
   activeIndex: number;
   onSelect: (index: number) => void;
+  onHover?: (index: number) => void;
 }) {
   if (mode.videos.length < 2) return null;
 
@@ -127,6 +129,8 @@ function ThumbnailRow({
         aria-selected={active}
         aria-label={`Show ${mode.title} example ${index + 1}`}
         onClick={() => onSelect(index)}
+        onMouseEnter={() => onHover?.(index)}
+        onFocus={() => onHover?.(index)}
         className={`${thumbClass(active)} ${className}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -175,40 +179,11 @@ function ModeMedia({
   onSelect: (index: number) => void;
   eager?: boolean;
 }) {
-  const [fading, setFading] = useState(false);
-  const [heroSrc, setHeroSrc] = useState(mode.videos[0]);
-  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const selectVideo = useCallback(
-    (index: number) => {
-      if (index === activeIndex) return;
-      onSelect(index);
-      const next = mode.videos[index];
-      if (!next || next === heroSrc) return;
-
-      setFading(true);
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      fadeTimer.current = setTimeout(() => {
-        setHeroSrc(next);
-        setFading(false);
-      }, 180);
-    },
-    [activeIndex, heroSrc, mode.videos, onSelect],
-  );
-
-  useEffect(() => () => {
-    if (fadeTimer.current) clearTimeout(fadeTimer.current);
-  }, []);
-
-  useEffect(() => {
-    setHeroSrc(mode.videos[activeIndex] ?? mode.videos[0]);
-  }, [mode.videos, activeIndex]);
+  const [warmIndex, setWarmIndex] = useState<number | null>(null);
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      <div
-        className={`relative transition-opacity duration-200 ${fading ? "opacity-0" : "opacity-100"}`}
-      >
+      <div className="relative">
         <div
           className="pointer-events-none absolute -inset-6 rounded-[1.75rem] opacity-60 blur-2xl"
           style={{
@@ -217,15 +192,21 @@ function ModeMedia({
           }}
           aria-hidden
         />
-        <LazyVideo
-          key={heroSrc}
-          src={heroSrc}
+        <CapabilityVideoPlayer
+          videos={mode.videos}
+          activeIndex={activeIndex}
+          warmIndex={warmIndex}
           label={`${mode.title} demo`}
           eager={eager}
-          className="relative aspect-video rounded-2xl border border-white/10 ring-1 ring-[#39FF6A]/10"
+          className="relative rounded-2xl border border-white/10 ring-1 ring-[#39FF6A]/10"
         />
       </div>
-      <ThumbnailRow mode={mode} activeIndex={activeIndex} onSelect={selectVideo} />
+      <ThumbnailRow
+        mode={mode}
+        activeIndex={activeIndex}
+        onSelect={onSelect}
+        onHover={setWarmIndex}
+      />
     </div>
   );
 }
