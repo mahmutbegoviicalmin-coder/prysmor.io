@@ -21,12 +21,15 @@ export default function CapabilityVideoPlayer({
   className = "",
 }: CapabilityVideoPlayerProps) {
   const { ref, inView } = useInView<HTMLDivElement>({
-    rootMargin: "480px",
+    rootMargin: "600px",
     once: true,
   });
   const shouldLoad = eager || inView;
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const activeIndexRef = useRef(activeIndex);
   const [ready, setReady] = useState<boolean[]>(() => videos.map(() => false));
+
+  activeIndexRef.current = activeIndex;
 
   const markReady = useCallback((index: number) => {
     setReady((prev) => {
@@ -37,25 +40,62 @@ export default function CapabilityVideoPlayer({
     });
   }, []);
 
+  const playVideo = useCallback((video: HTMLVideoElement | null, index: number) => {
+    if (!video) return;
+
+    const start = () => {
+      markReady(index);
+      video.play().catch(() => {});
+    };
+
+    if (video.readyState >= 2) {
+      start();
+      return;
+    }
+
+    const onCanPlay = () => {
+      video.removeEventListener("canplay", onCanPlay);
+      if (index === activeIndexRef.current) start();
+    };
+
+    video.addEventListener("canplay", onCanPlay);
+    if (video.readyState === 0) video.load();
+  }, [markReady]);
+
+  const syncPlayback = useCallback(() => {
+    if (!shouldLoad) return;
+
+    videoRefs.current.forEach((video, index) => {
+      if (!video) return;
+      if (index === activeIndexRef.current) {
+        playVideo(video, index);
+      } else {
+        video.pause();
+      }
+    });
+  }, [shouldLoad, playVideo]);
+
   useEffect(() => {
     setReady(videos.map(() => false));
     videoRefs.current = [];
   }, [videos]);
 
   useEffect(() => {
+    syncPlayback();
+    const id = requestAnimationFrame(syncPlayback);
+    return () => cancelAnimationFrame(id);
+  }, [activeIndex, shouldLoad, syncPlayback]);
+
+  useEffect(() => {
     if (!shouldLoad) return;
 
-    videoRefs.current.forEach((video, index) => {
-      if (!video) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") syncPlayback();
+    };
 
-      if (index === activeIndex) {
-        if (video.readyState >= 2) markReady(index);
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-      }
-    });
-  }, [activeIndex, shouldLoad, markReady]);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [shouldLoad, syncPlayback]);
 
   useEffect(() => {
     if (warmIndex == null || !shouldLoad) return;
@@ -93,7 +133,7 @@ export default function CapabilityVideoPlayer({
             <div
               key={src}
               className={`absolute inset-0 transition-opacity duration-150 ${
-                isActive ? "z-10 opacity-100" : "z-0 opacity-0"
+                isActive ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0"
               }`}
               aria-hidden={!isActive}
             >
@@ -110,17 +150,27 @@ export default function CapabilityVideoPlayer({
               <video
                 ref={(el) => {
                   videoRefs.current[index] = el;
+                  if (el && shouldLoad && index === activeIndexRef.current) {
+                    playVideo(el, index);
+                  }
                 }}
                 src={src}
                 muted
                 loop
                 playsInline
-                preload={shouldLoad ? "auto" : "none"}
+                autoPlay={isActive}
+                preload="auto"
                 poster={poster}
                 aria-label={isActive ? label : undefined}
                 tabIndex={isActive ? 0 : -1}
-                onCanPlay={() => markReady(index)}
                 onLoadedData={() => markReady(index)}
+                onCanPlay={() => {
+                  markReady(index);
+                  if (index === activeIndexRef.current) {
+                    videoRefs.current[index]?.play().catch(() => {});
+                  }
+                }}
+                onPlaying={() => markReady(index)}
                 className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-150 ${
                   isReady ? "opacity-100" : "opacity-0"
                 }`}
