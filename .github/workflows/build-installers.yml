@@ -8,7 +8,7 @@ on:
       version:
         description: Premiere panel semver (matches version.txt)
         required: true
-        default: "5.5.1"
+        default: "5.5.2"
         type: string
   push:
     tags:
@@ -134,8 +134,8 @@ jobs:
 
           NOTES="## Prysmor for Premiere Pro v${V}
 
-          - Fix Mac timeline clip sync (QE sequence fallback, playhead-at-cut detection)
-          - Clearer errors when Premiere scripting fails — restart required after OTA
+          - Fix Mac Premiere 26 ExtendScript crash with multiple sequences open
+          - Safer active sequence detection (QE fallback, no playhead scan on inactive seqs)
           - OTA + fresh installs ship panel **${V}**
 
           | Platform | File |
