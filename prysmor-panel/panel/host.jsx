@@ -69,42 +69,40 @@ function isVideoTrackItem(item, seq) {
   return true;
 }
 
+function getActiveSequenceViaQE() {
+  try {
+    if (!app.enableQE) return null;
+    app.enableQE();
+    if (typeof qe === 'undefined' || !qe.project || !qe.project.getActiveSequence) return null;
+    var qeSeq = qe.project.getActiveSequence();
+    if (!qeSeq || !qeSeq.name || !app.project.sequences) return null;
+    for (var q = 0; q < app.project.sequences.numSequences; q++) {
+      var cand = app.project.sequences[q];
+      if (cand && cand.name === qeSeq.name) return cand;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function getActiveSequence() {
   if (typeof app === 'undefined' || !app.project) return null;
   try {
     if (app.project.activeSequence) return app.project.activeSequence;
   } catch (_) {}
 
-  // QE DOM exposes the sequence tab the editor is actually viewing (Mac PP 2025+).
-  try {
-    if (app.enableQE) {
-      app.enableQE();
-      if (typeof qe !== 'undefined' && qe.project && qe.project.getActiveSequence) {
-        var qeSeq = qe.project.getActiveSequence();
-        if (qeSeq && qeSeq.name && app.project.sequences) {
-          for (var q = 0; q < app.project.sequences.numSequences; q++) {
-            var cand = app.project.sequences[q];
-            if (cand && cand.name === qeSeq.name) return cand;
-          }
-        }
-      }
-    }
-  } catch (_) {}
+  var viaQe = getActiveSequenceViaQE();
+  if (viaQe) return viaQe;
 
-  // Mac PP 2024–2026: activeSequence can be null while a sequence tab is open.
-  // Prefer the sequence that actually has a clip at (or near) the playhead.
+  // Safe fallback only. Never call getPlayerPosition() on inactive sequences —
+  // that hard-crashes ExtendScript on Mac Premiere 25/26 with multiple sequences open.
   try {
     var sequences = app.project.sequences;
     if (sequences && sequences.numSequences > 0) {
-      var i, s;
-      for (i = 0; i < sequences.numSequences; i++) {
-        s = sequences[i];
-        if (sequenceHasClipNearPlayhead(s)) return s;
-      }
-      for (i = 0; i < sequences.numSequences; i++) {
-        s = sequences[i];
+      for (var i = 0; i < sequences.numSequences; i++) {
+        var s = sequences[i];
         if (s && s.videoTracks && s.videoTracks.numTracks > 0) return s;
       }
+      return sequences[0];
     }
   } catch (_) {}
   return null;
@@ -227,13 +225,6 @@ function findNearestVideoClipAtPlayhead(seq, maxGapSec) {
     }
   }
   return best;
-}
-
-function sequenceHasClipNearPlayhead(seq) {
-  if (!seq) return false;
-  if (findVideoClipAtPlayhead(seq)) return true;
-  if (findNearestVideoClipAtPlayhead(seq, 0.25)) return true;
-  return false;
 }
 
 function computeMediaInSec(clip, seq, method) {
@@ -545,5 +536,20 @@ function getAppInfo() {
     return JSON.stringify(info);
   } catch (e) {
     return JSON.stringify({ error: e.message });
+  }
+}
+
+// Lightweight health check — safe to call even when timeline APIs are unavailable.
+function pingHost() {
+  try {
+    return JSON.stringify({
+      ok: true,
+      hostVersion: '5.5.2',
+      hasGetSelectionInfo: (typeof getSelectionInfo === 'function'),
+      hasProject: !!(app && app.project),
+      appVersion: (app && app.version) ? app.version : 'unknown',
+    });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e.message });
   }
 }

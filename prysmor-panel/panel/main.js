@@ -8,7 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 5000;
-const PANEL_VERSION_DEFAULT = '5.5.1'; // keep in sync with panel/version.txt
+const PANEL_VERSION_DEFAULT = '5.5.2'; // keep in sync with panel/version.txt
 const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -98,7 +98,7 @@ function parseExtendScriptJson(raw) {
   if (s.indexOf('EvalScript error') !== -1) {
     return {
       parsed: null,
-      error: 'Premiere scripting failed — quit and reopen Premiere Pro, then tap Sync clip again.',
+      error: 'Premiere scripting failed. Quit Premiere fully (Cmd+Q), reopen it, then tap Sync clip. If this persists, reinstall from prysmor.io/dashboard.',
       evalFailed: true,
     };
   }
@@ -532,10 +532,11 @@ function enterPanel() {
   fetchCredits();
 
   // Verify ExtendScript host loaded (common failure after partial OTA on Mac).
-  cs.evalScript('typeof getSelectionInfo === "function" ? "ok" : "missing"', function (res) {
-    if (res !== 'ok') {
-      console.error('[Prysmor:host] getSelectionInfo unavailable:', res);
-      showToast('Panel host script not loaded — quit and reopen Premiere Pro.', 'error');
+  cs.evalScript('pingHost()', function (res) {
+    var ping = clipInfoFromEval(res);
+    if (!ping.ok) {
+      console.error('[Prysmor:host] pingHost failed:', res);
+      showToast('Panel host script not loaded. Quit and reopen Premiere Pro.', 'error');
     }
   });
 
