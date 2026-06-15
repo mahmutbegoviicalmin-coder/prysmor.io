@@ -8,7 +8,7 @@ on:
       version:
         description: Premiere panel semver (matches version.txt)
         required: true
-        default: "5.5.0"
+        default: "5.5.1"
         type: string
   push:
     tags:
@@ -134,8 +134,8 @@ jobs:
 
           NOTES="## Prysmor for Premiere Pro v${V}
 
-          - Minimal login + clearer **Sync clip** bar for timeline loading
-          - Fix timeline clip detection (playhead fallback for PP 2024–2026)
+          - Fix Mac timeline clip sync (QE sequence fallback, playhead-at-cut detection)
+          - Clearer errors when Premiere scripting fails — restart required after OTA
           - OTA + fresh installs ship panel **${V}**
 
           | Platform | File |

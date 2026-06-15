@@ -8,7 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 5000;
-const PANEL_VERSION_DEFAULT = '5.5.0'; // keep in sync with panel/version.txt
+const PANEL_VERSION_DEFAULT = '5.5.1'; // keep in sync with panel/version.txt
 const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -85,6 +85,40 @@ var _elapsedTimer    = null;   // setInterval ID for the elapsed clock
 var _displayPct      = 0;      // last rendered % — never decrements
 var _progressHistory = [];     // [{t, pct}] ring-buffer for ETA estimation
 
+// ─── ExtendScript JSON parsing ────────────────────────────────────────────────
+/**
+ * Parses JSON returned by host.jsx evalScript calls.
+ * ExtendScript failures often arrive as plain text ("EvalScript error.") instead of JSON.
+ */
+function parseExtendScriptJson(raw) {
+  if (raw == null || raw === '') {
+    return { parsed: null, error: 'Could not read clip from timeline — is Premiere Pro responding?' };
+  }
+  var s = String(raw).replace(/^\uFEFF/, '').trim();
+  if (s.indexOf('EvalScript error') !== -1) {
+    return {
+      parsed: null,
+      error: 'Premiere scripting failed — quit and reopen Premiere Pro, then tap Sync clip again.',
+      evalFailed: true,
+    };
+  }
+  if (s.indexOf('error:') === 0) {
+    return { parsed: null, error: s.slice(6).trim() || 'ExtendScript error' };
+  }
+  try {
+    return { parsed: JSON.parse(s) };
+  } catch (_) {
+    console.warn('[Prysmor:evalScript] Non-JSON response:', s.slice(0, 200));
+    return { parsed: null, error: 'Could not read clip from timeline — restart Premiere Pro and try Sync clip again.' };
+  }
+}
+
+function clipInfoFromEval(raw) {
+  var result = parseExtendScriptJson(raw);
+  if (result.parsed) return result.parsed;
+  return { error: result.error || 'Could not read clip from timeline' };
+}
+
 // ─── Auto-Select State ────────────────────────────────────────────────────────
 // Polls Premiere every 500 ms and reloads the clip when the selection changes.
 
@@ -107,11 +141,10 @@ function startClipAutoSelect() {
   stopClipAutoSelect();
   _autoSelectTimer = setInterval(function () {
     cs.evalScript('getSelectionInfo()', function (raw) {
-      var parsed = null;
-      if (raw && String(raw).indexOf('EvalScript error') !== -1) {
+      var parsed = clipInfoFromEval(raw);
+      if (parsed.error && parsed.evalFailed) {
         console.warn('[Prysmor:autoSelect] ExtendScript error:', raw);
       }
-      try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
 
       var key = getClipKey(parsed);
 
@@ -498,6 +531,14 @@ function enterPanel() {
   // Fetch credit balance to keep it fresh
   fetchCredits();
 
+  // Verify ExtendScript host loaded (common failure after partial OTA on Mac).
+  cs.evalScript('typeof getSelectionInfo === "function" ? "ok" : "missing"', function (res) {
+    if (res !== 'ok') {
+      console.error('[Prysmor:host] getSelectionInfo unavailable:', res);
+      showToast('Panel host script not loaded — quit and reopen Premiere Pro.', 'error');
+    }
+  });
+
   // Resolve system temp dir
   cs.evalScript('getTempDir()', function (res) {
     if (res && res.indexOf('error') !== 0) {
@@ -585,9 +626,7 @@ function refreshClip(silent) {
   setRefreshBusy(true);
   cs.evalScript('getSelectionInfo()', function (raw) {
     setRefreshBusy(false);
-    var parsed = null;
-    try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
-    applyClipInfo(parsed, silent);
+    applyClipInfo(clipInfoFromEval(raw), silent);
   });
 }
 
@@ -597,9 +636,7 @@ function refreshClipAsync(silent) {
     setRefreshBusy(true);
     cs.evalScript('getSelectionInfo()', function (raw) {
       setRefreshBusy(false);
-      var parsed = null;
-      try { parsed = JSON.parse(raw || '{}'); } catch (_) {}
-      resolve(applyClipInfo(parsed, silent));
+      resolve(applyClipInfo(clipInfoFromEval(raw), silent));
     });
   });
 }
@@ -609,7 +646,7 @@ function showClipEmpty() {
   el('clip-info').classList.add('hidden');
   showClipThumbnail(null);
   var hint = el('clip-bar-hint');
-  if (hint) hint.textContent = 'Place playhead on a video clip in the timeline';
+  if (hint) hint.textContent = 'Place playhead inside a clip (not on a cut), then Sync clip';
 }
 
 function creditsPerSecond(mode) {
@@ -1095,8 +1132,7 @@ async function captureClipReferenceFrame(sourcePath) {
   var seqW = 0, seqH = 0;
   try {
     var freshRaw  = await evalScriptAsync('getSelectionInfo()');
-    var freshInfo = null;
-    try { freshInfo = JSON.parse(freshRaw || '{}'); } catch (_) {}
+    var freshInfo = clipInfoFromEval(freshRaw);
     if (freshInfo && !freshInfo.error) {
       // Prefer clip source dimensions (actual media res); fall back to sequence dims
       seqW = Number(freshInfo.clipWidth  || freshInfo.seqWidth)  || 0;
@@ -2285,6 +2321,19 @@ function applyUpdate(data) {
             nodeFs.writeFileSync(vf, data.version, 'utf8');
             console.log('[Prysmor:update] version.txt updated to', data.version);
           } catch (_) {}
+          // OTA updates don't preserve +x on macOS ffmpeg — restore it after panel file writes.
+          try {
+            var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+            if (!isWin) {
+              var ff = nodePath.join(root, 'panel', 'ffmpeg', 'mac', 'ffmpeg');
+              if (nodeFs.existsSync(ff)) {
+                nodeFs.chmodSync(ff, 0o755);
+                console.log('[Prysmor:update] ffmpeg chmod +x:', ff);
+              }
+            }
+          } catch (e) {
+            console.warn('[Prysmor:update] ffmpeg chmod failed:', e.message);
+          }
           showUpdateBanner(data.version);
         }
       })

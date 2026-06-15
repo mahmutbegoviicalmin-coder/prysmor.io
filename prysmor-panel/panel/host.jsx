@@ -74,23 +74,64 @@ function getActiveSequence() {
   try {
     if (app.project.activeSequence) return app.project.activeSequence;
   } catch (_) {}
+
+  // QE DOM exposes the sequence tab the editor is actually viewing (Mac PP 2025+).
   try {
-    if (app.project.sequences && app.project.sequences.numSequences > 0) {
-      for (var i = 0; i < app.project.sequences.numSequences; i++) {
-        var s = app.project.sequences[i];
-        if (s) return s;
+    if (app.enableQE) {
+      app.enableQE();
+      if (typeof qe !== 'undefined' && qe.project && qe.project.getActiveSequence) {
+        var qeSeq = qe.project.getActiveSequence();
+        if (qeSeq && qeSeq.name && app.project.sequences) {
+          for (var q = 0; q < app.project.sequences.numSequences; q++) {
+            var cand = app.project.sequences[q];
+            if (cand && cand.name === qeSeq.name) return cand;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
+  // Mac PP 2024–2026: activeSequence can be null while a sequence tab is open.
+  // Prefer the sequence that actually has a clip at (or near) the playhead.
+  try {
+    var sequences = app.project.sequences;
+    if (sequences && sequences.numSequences > 0) {
+      var i, s;
+      for (i = 0; i < sequences.numSequences; i++) {
+        s = sequences[i];
+        if (sequenceHasClipNearPlayhead(s)) return s;
+      }
+      for (i = 0; i < sequences.numSequences; i++) {
+        s = sequences[i];
+        if (s && s.videoTracks && s.videoTracks.numTracks > 0) return s;
       }
     }
   } catch (_) {}
   return null;
 }
 
-function clipContainsTime(clip, posSec) {
+function clipContainsTime(clip, posSec, seq) {
+  // Tick comparison is more reliable than seconds on Mac (edit-point rounding).
+  if (seq && seq.getPlayerPosition) {
+    try {
+      var posTicks = seq.getPlayerPosition().ticks;
+      var startTicks = clip.start.ticks;
+      var endTicks = 0;
+      try { endTicks = clip.end.ticks; } catch (_) {
+        endTicks = startTicks + clip.duration.ticks;
+      }
+      if (endTicks > startTicks) {
+        return posTicks >= startTicks && posTicks <= endTicks;
+      }
+    } catch (_) {}
+  }
+
   var startSec = 0;
   try { startSec = clip.start.seconds; } catch (_) { return false; }
   var endSec = clipEndSec(clip);
   if (endSec <= startSec) return false;
-  var eps = 0.05;
+  // ~6 frames at 24fps — covers 1-frame gaps at cut points on Mac.
+  var eps = 0.25;
   return posSec >= (startSec - eps) && posSec <= (endSec + eps);
 }
 
@@ -131,7 +172,6 @@ function clipEndSec(clip) {
   return -1;
 }
 
-// Reliable when timeline selection APIs return empty (common on PP 2026).
 function findVideoClipAtPlayhead(seq) {
   if (!seq || !seq.getPlayerPosition) return null;
   var posSec = 0;
@@ -146,10 +186,54 @@ function findVideoClipAtPlayhead(seq) {
     for (var c = 0; c < clips.numItems; c++) {
       var clip = clips[c];
       if (!isVideoTrackItem(clip, seq)) continue;
-      if (clipContainsTime(clip, posSec)) return clip;
+      if (clipContainsTime(clip, posSec, seq)) return clip;
     }
   }
   return null;
+}
+
+// When the playhead sits in a 1-frame gap at a cut, pick the nearest clip.
+function findNearestVideoClipAtPlayhead(seq, maxGapSec) {
+  if (!seq || !seq.getPlayerPosition) return null;
+  var posSec = 0;
+  try { posSec = seq.getPlayerPosition().seconds; } catch (_) { return null; }
+  maxGapSec = maxGapSec || 0.25;
+
+  var best = null;
+  var bestDist = maxGapSec + 1;
+  var videoTracks = seq.videoTracks;
+  if (!videoTracks || !videoTracks.numTracks) return null;
+
+  for (var t = videoTracks.numTracks - 1; t >= 0; t--) {
+    var track = videoTracks[t];
+    var clips = track.clips;
+    for (var c = 0; c < clips.numItems; c++) {
+      var clip = clips[c];
+      if (!isVideoTrackItem(clip, seq)) continue;
+      var startSec = 0;
+      try { startSec = clip.start.seconds; } catch (_) { continue; }
+      var endSec = clipEndSec(clip);
+      if (endSec <= startSec) continue;
+
+      var dist = 0;
+      if (posSec < startSec) dist = startSec - posSec;
+      else if (posSec > endSec) dist = posSec - endSec;
+      else return clip;
+
+      if (dist <= maxGapSec && dist < bestDist) {
+        bestDist = dist;
+        best = clip;
+      }
+    }
+  }
+  return best;
+}
+
+function sequenceHasClipNearPlayhead(seq) {
+  if (!seq) return false;
+  if (findVideoClipAtPlayhead(seq)) return true;
+  if (findNearestVideoClipAtPlayhead(seq, 0.25)) return true;
+  return false;
 }
 
 function computeMediaInSec(clip, seq, method) {
@@ -196,6 +280,7 @@ function findActiveVideoClip(seq) {
   } catch (_) {}
 
   var playheadClip = findVideoClipAtPlayhead(seq);
+  if (!playheadClip) playheadClip = findNearestVideoClipAtPlayhead(seq, 0.25);
   if (playheadClip) return { clip: playheadClip, method: 'playhead' };
 
   return null;
@@ -274,9 +359,15 @@ function getSelectionInfo() {
     var selectedClip = found.clip;
     var selectionMethod = found.method;
 
-    var startSec   = selectedClip.start.seconds;
-    var clipDurSec = selectedClip.duration.seconds;
-    var durSec     = (clipDurSec > MAX_SEC) ? MAX_SEC : clipDurSec;
+    var startSec = 0;
+    var clipDurSec = 0;
+    try { startSec = selectedClip.start.seconds; } catch (e) {
+      return JSON.stringify({ error: 'Could not read clip timing — click the clip on the timeline, then Sync clip.' });
+    }
+    try { clipDurSec = selectedClip.duration.seconds; } catch (e) {
+      return JSON.stringify({ error: 'Could not read clip duration — try a different clip on the timeline.' });
+    }
+    var durSec = (clipDurSec > MAX_SEC) ? MAX_SEC : clipDurSec;
 
     var mediaInSec = computeMediaInSec(selectedClip, seq, selectionMethod);
     var _debugTimes = { selectionMethod: selectionMethod };
@@ -284,14 +375,16 @@ function getSelectionInfo() {
     try { _debugTimes['start']    = selectedClip.start.seconds;    } catch (_) {}
     try { _debugTimes['duration'] = selectedClip.duration.seconds; } catch (_) {}
 
-    // Resolve source file path
+    // Resolve source file path (nested sequences / proxies may need treePath fallback).
     var sourcePath = '';
     try {
       var pi = selectedClip.projectItem;
-      if (pi && pi.getMediaPath) {
-        sourcePath = pi.getMediaPath();
-      } else if (pi && pi.treePath) {
-        sourcePath = pi.treePath;
+      if (pi) {
+        if (pi.getMediaPath) sourcePath = pi.getMediaPath();
+        if (!sourcePath && pi.treePath) sourcePath = pi.treePath;
+        if (!sourcePath && pi.getProxyPath) {
+          try { sourcePath = pi.getProxyPath(); } catch (_) {}
+        }
       }
     } catch (_) {}
 
