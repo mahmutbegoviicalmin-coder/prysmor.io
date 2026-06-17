@@ -69,32 +69,17 @@ function isVideoTrackItem(item, seq) {
   return true;
 }
 
-function getActiveSequenceViaQE() {
-  try {
-    if (!app.enableQE) return null;
-    app.enableQE();
-    if (typeof qe === 'undefined' || !qe.project || !qe.project.getActiveSequence) return null;
-    var qeSeq = qe.project.getActiveSequence();
-    if (!qeSeq || !qeSeq.name || !app.project.sequences) return null;
-    for (var q = 0; q < app.project.sequences.numSequences; q++) {
-      var cand = app.project.sequences[q];
-      if (cand && cand.name === qeSeq.name) return cand;
-    }
-  } catch (_) {}
-  return null;
-}
-
 function getActiveSequence() {
   if (typeof app === 'undefined' || !app.project) return null;
   try {
     if (app.project.activeSequence) return app.project.activeSequence;
   } catch (_) {}
 
-  var viaQe = getActiveSequenceViaQE();
-  if (viaQe) return viaQe;
-
-  // Safe fallback only. Never call getPlayerPosition() on inactive sequences —
-  // that hard-crashes ExtendScript on Mac Premiere 25/26 with multiple sequences open.
+  // NOTE: We deliberately do NOT use app.enableQE() / the QE DOM here.
+  // QE is undocumented/unsupported and crashes the scripting engine on the
+  // latest Premiere builds (25.x/26.x) — that surfaced as "EvalScript error"
+  // for users on the newest Premiere. Use documented APIs only.
+  // Safe fallback: first sequence that has video tracks, else first sequence.
   try {
     var sequences = app.project.sequences;
     if (sequences && sequences.numSequences > 0) {
@@ -544,7 +529,7 @@ function pingHost() {
   try {
     return JSON.stringify({
       ok: true,
-      hostVersion: '5.5.2',
+      hostVersion: '5.5.3',
       hasGetSelectionInfo: (typeof getSelectionInfo === 'function'),
       hasProject: !!(app && app.project),
       appVersion: (app && app.version) ? app.version : 'unknown',

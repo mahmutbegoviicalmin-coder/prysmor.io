@@ -8,7 +8,7 @@ on:
       version:
         description: Premiere panel semver (matches version.txt)
         required: true
-        default: "5.5.2"
+        default: "5.5.3"
         type: string
   push:
     tags:
@@ -134,8 +134,8 @@ jobs:
 
           NOTES="## Prysmor for Premiere Pro v${V}
 
-          - Fix Mac Premiere 26 ExtendScript crash with multiple sequences open
-          - Safer active sequence detection (QE fallback, no playhead scan on inactive seqs)
+          - Fix "EvalScript error" on latest Premiere / clean installs (self-heal host via \$.evalFile)
+          - Remove unsupported QE DOM call that crashed scripting on Premiere 25/26
           - OTA + fresh installs ship panel **${V}**
 
           | Platform | File |

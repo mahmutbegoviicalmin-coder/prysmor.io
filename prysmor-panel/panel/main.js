@@ -8,7 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 5000;
-const PANEL_VERSION_DEFAULT = '5.5.2'; // keep in sync with panel/version.txt
+const PANEL_VERSION_DEFAULT = '5.5.3'; // keep in sync with panel/version.txt
 const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -504,6 +504,45 @@ function stopHeartbeat() {
   }
 }
 
+// ─── ExtendScript host loader ──────────────────────────────────────────────
+// On the latest Premiere (especially CLEAN installs of 25.6+/26.x) the host
+// script declared via the manifest <ScriptPath> sometimes fails to auto-load,
+// so every evalScript() call returns "EvalScript error". Adobe confirmed the
+// clean-install scripting-bridge regression; upgraded installs are unaffected
+// (which is why it works on our dev machines but not on customers' fresh ones).
+// We self-heal by explicitly loading host.jsx via $.evalFile at startup.
+function hostScriptPath() {
+  var root = (state._extRoot || '').replace(/\\/g, '/').replace(/\/$/, '');
+  var isWin = (navigator.platform || '').toLowerCase().indexOf('win') !== -1;
+  if (!isWin && root && root.charAt(0) !== '/') root = '/' + root;
+  return root + '/panel/host.jsx';
+}
+
+function hostIsLoadedAsync() {
+  return evalScriptAsync('typeof getSelectionInfo === "function" ? "1" : "0"')
+    .then(function (res) { return String(res).indexOf('1') !== -1; });
+}
+
+// Returns 'loaded' | 'evalfile' | 'dead'. 'dead' means the ExtendScript bridge
+// itself is unresponsive (the Premiere clean-install bug) — user must update PP.
+function ensureHostLoaded() {
+  return hostIsLoadedAsync().then(function (ok) {
+    if (ok) return 'loaded';
+    var p = hostScriptPath().replace(/"/g, '\\"');
+    console.warn('[Prysmor:host] host not auto-loaded — $.evalFile:', p);
+    return evalScriptAsync('$.evalFile("' + p + '")').then(function () {
+      return hostIsLoadedAsync().then(function (ok2) {
+        if (ok2) {
+          console.log('[Prysmor:host] host loaded via $.evalFile');
+          return 'evalfile';
+        }
+        console.error('[Prysmor:host] $.evalFile did not define host functions — scripting bridge unresponsive');
+        return 'dead';
+      });
+    });
+  }).catch(function () { return 'dead'; });
+}
+
 function enterPanel() {
   // Update plan label in topbar if element exists
   var planEl = el('topbar-plan');
@@ -531,26 +570,28 @@ function enterPanel() {
   // Fetch credit balance to keep it fresh
   fetchCredits();
 
-  // Verify ExtendScript host loaded (common failure after partial OTA on Mac).
-  cs.evalScript('pingHost()', function (res) {
-    var ping = clipInfoFromEval(res);
-    if (!ping.ok) {
-      console.error('[Prysmor:host] pingHost failed:', res);
-      showToast('Panel host script not loaded. Quit and reopen Premiere Pro.', 'error');
+  // Ensure the ExtendScript host is loaded before touching the timeline.
+  // Self-heals the "EvalScript error" seen on the latest Premiere / clean installs.
+  ensureHostLoaded().then(function (hostState) {
+    if (hostState === 'dead') {
+      showToast('Premiere scripting is not responding. Update Premiere Pro to the latest version, then fully quit (Cmd+Q) and reopen.', 'error');
+      // Still start polling — if the user updates/reloads, auto-detect recovers.
+      startClipAutoSelect();
+      return;
     }
-  });
 
-  // Resolve system temp dir
-  cs.evalScript('getTempDir()', function (res) {
-    if (res && res.indexOf('error') !== 0) {
-      state.mf.tempDir = res.replace(/\\/g, '/').replace(/\/$/, '');
-    }
-  });
-  // Try to auto-load whatever is selected in Premiere right now
-  refreshClip(true);
+    // Resolve system temp dir
+    cs.evalScript('getTempDir()', function (res) {
+      if (res && res.indexOf('error') !== 0) {
+        state.mf.tempDir = res.replace(/\\/g, '/').replace(/\/$/, '');
+      }
+    });
+    // Try to auto-load whatever is selected in Premiere right now
+    refreshClip(true);
 
-  // Start 500 ms auto-detect polling — no Refresh button needed
-  startClipAutoSelect();
+    // Start 500 ms auto-detect polling — no Refresh button needed
+    startClipAutoSelect();
+  });
 }
 
 
