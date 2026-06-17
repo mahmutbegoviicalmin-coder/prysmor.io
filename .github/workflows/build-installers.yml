@@ -134,7 +134,7 @@ jobs:
 
           NOTES="## Prysmor for Premiere Pro v${V}
 
-          - Fix "EvalScript error" on latest Premiere / clean installs (self-heal host via \$.evalFile)
+          - Fix scripting errors on the latest Premiere and clean installs (self-heal host load)
           - Remove unsupported QE DOM call that crashed scripting on Premiere 25/26
           - OTA + fresh installs ship panel **${V}**
 
