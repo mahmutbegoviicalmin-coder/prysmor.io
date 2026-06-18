@@ -31,6 +31,27 @@ async function refundWithRetry(userId: string, credits: number, jobId: string): 
   }
 }
 
+/**
+ * Turns raw provider failure strings into clear, actionable user-facing text.
+ * Distinguishes media-level moderation (the footage was flagged) from
+ * prompt-level moderation (the wording was flagged), since the fix differs.
+ */
+function friendlyFailureMessage(raw: string | undefined | null): string {
+  const r = (raw || '').toLowerCase();
+  if (r.includes('moderation') || r.includes('content policy') || r.includes('safety')) {
+    const mediaFlagged  = r.includes('media') || r.includes('image') || r.includes('video') || r.includes('input');
+    const promptFlagged = r.includes('text') || r.includes('prompt');
+    if (mediaFlagged && !promptFlagged) {
+      return 'The AI provider blocked your footage (content safety filter). Try a different clip or move the playhead to another frame — close-ups of faces and footage it reads as sensitive are often rejected.';
+    }
+    if (promptFlagged && !mediaFlagged) {
+      return 'Your prompt was blocked by the content safety filter. Rephrase with neutral wording — no violence, weapons, nudity, real names, or brands.';
+    }
+    return 'This request was blocked by the AI provider\'s content safety filter. Try a different clip and a neutral prompt (no violence, weapons, nudity, real names, or brands).';
+  }
+  return raw || 'Generation failed.';
+}
+
 // ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function GET(
@@ -156,8 +177,9 @@ export async function GET(
       }
 
       if (result.state === 'fail') {
-        const reason = result.failMsg || 'KIE.AI Gemini Omni Video failed';
-        logError(TAG, `[kieai] Task ${kieTaskId} failed: ${reason}`);
+        const rawReason = result.failMsg || 'KIE.AI Gemini Omni Video failed';
+        const reason    = friendlyFailureMessage(rawReason);
+        logError(TAG, `[kieai] Task ${kieTaskId} failed: ${rawReason}`);
         await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {
           refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});
@@ -236,8 +258,9 @@ export async function GET(
 
       // ── Runway failed / cancelled ────────────────────────────────────────
       if (taskStatus === 'FAILED' || taskStatus === 'CANCELLED') {
-        const reason = task.failure || task.failureCode || `Task ${taskStatus}`;
-        logError(TAG, `Runway task ${job.runwayTaskId} ${taskStatus}`, reason);
+        const rawReason = task.failure || task.failureCode || `Task ${taskStatus}`;
+        const reason    = friendlyFailureMessage(rawReason);
+        logError(TAG, `Runway task ${job.runwayTaskId} ${taskStatus}`, rawReason);
         await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {
           refundWithRetry(job.userId, job.creditCost, params.id).catch(() => {});

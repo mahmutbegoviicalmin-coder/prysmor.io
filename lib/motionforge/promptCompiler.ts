@@ -29,6 +29,14 @@ Rules:
 - Never write full scene descriptions or camera directions
 - Never use quality words: cinematic, photorealistic, film-quality, professional
 
+CONTENT SAFETY (critical — output goes to an AI video model with strict moderation that rejects the whole job on any flagged word):
+- No violence, weapons, gore, blood, injury, death, fighting, or threats
+- No nudity, sexual, or suggestive content
+- No real people, celebrities, politicians, or brand/logo names
+- No references to minors, age, or children
+- No hate, slurs, drugs, or illegal activity
+- If the user's request implies anything unsafe, silently reinterpret it into the closest safe, family-friendly equivalent. Never refuse.
+
 Examples:
 - "money rain" → "Add green dollar bills drifting and falling slowly through the air. Keep the subject, framing, lighting, and background exactly as in the source."
 - "fire effect" → "Add bright orange flames flickering upward from the ground with ember particles rising. Keep all subjects, camera motion, and surroundings exactly as in the source."
@@ -125,10 +133,28 @@ const TRADEMARK_REPLACEMENTS: Array<[RegExp, string]> = [
 const BANNED_WORD_PATTERN =
   /\b(scanlines?|horizontal\s+lines?|banding|crt|interlac(ing|ed)?|glitch(ed|ing)?|vhs|corrupted?|static|distorted?|artifacts?|compression\s+artifacts?|shutter\s+artifact|signal\s+interference|data[\s-]?moshing|noise\s+pattern|digital\s+defects?|video\s+distortion|tape\s+artifacts?|scan\s+effects?)\b/gi;
 
+// Common content-moderation triggers → safe equivalents. These words almost
+// always cause Runway/Gemini to reject the job, so we soften them before send.
+const MODERATION_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bblood(y|ied)?\b/gi,                              'red liquid'],
+  [/\bgore\b/gi,                                       'red liquid'],
+  [/\b(gun|guns|gunfire|gunshot|rifle|pistol|firearm|weapon)s?\b/gi, 'prop'],
+  [/\b(knife|knives|blade|sword|machete)s?\b/gi,       'prop'],
+  [/\b(kill|killing|killed|murder|murdered|slaughter)\w*\b/gi, 'remove'],
+  [/\b(dead\s+bod(y|ies)|corpse|corpses)\b/gi,         'figure'],
+  [/\b(nude|nudity|naked|topless)\b/gi,                'clothed'],
+  [/\b(nsfw|porn\w*|explicit\s+sexual)\b/gi,           ''],
+  [/\b(decapitat\w*|dismember\w*|mutilat\w*)\b/gi,     ''],
+];
+
 export function sanitizeForRunway(text: string): string {
   let result = text;
 
   for (const [pattern, replacement] of TRADEMARK_REPLACEMENTS) {
+    result = result.replace(pattern, replacement);
+  }
+
+  for (const [pattern, replacement] of MODERATION_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
   }
 

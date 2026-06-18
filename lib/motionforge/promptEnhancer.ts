@@ -91,6 +91,21 @@ Rules:
 // Fallback for unknown modes
 const DEFAULT_MODE = 'background';
 
+/**
+ * Appended to every mode system prompt. The enhanced text is sent to AI video
+ * models (Runway / Beeble / Gemini) that run strict content moderation. If the
+ * prompt contains flagged language the whole job is rejected, so we force the
+ * model to always emit safe, neutral descriptions.
+ */
+const MODERATION_GUIDANCE = `CONTENT SAFETY (critical — output goes to an AI video model with strict moderation that will reject the whole job on any flagged word):
+- No violence, weapons, gore, blood, injury, death, fighting, or threats.
+- No nudity, sexual, or suggestive content.
+- No real people, celebrities, politicians, or brand/logo names.
+- No references to minors, age, or children.
+- No hate, slurs, drugs, or illegal activity.
+- Describe only a neutral, safe environment, lighting, atmosphere, or visual effect.
+If the user's request implies anything unsafe, silently reinterpret it into the closest safe, family-friendly cinematic equivalent. Never refuse — always return a usable, safe description.`;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface EnhancementResult {
@@ -160,7 +175,8 @@ async function callClaude(
   userPrompt: string,
   mode: string = DEFAULT_MODE,
 ): Promise<string> {
-  const systemPrompt = MODE_PROMPTS[mode] ?? MODE_PROMPTS[DEFAULT_MODE];
+  const basePrompt   = MODE_PROMPTS[mode] ?? MODE_PROMPTS[DEFAULT_MODE];
+  const systemPrompt = basePrompt + '\n\n' + MODERATION_GUIDANCE;
 
   console.log('[claude] callClaude — model:', MODEL_TEXT, '— mode:', mode);
 
