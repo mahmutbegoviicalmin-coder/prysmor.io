@@ -42,11 +42,14 @@ interface ReferralRow {
 }
 
 interface InactiveMember {
+  id: string;
   email: string;
+  displayName: string;
+  plan: string;
+  planLabel: string;
   country: string;
   countryCode: string;
-  plan: string;
-  joinedAt: string | null;
+  createdAt: string | null;
 }
 
 type PayoutMethod = "paypal" | "bank";
@@ -363,7 +366,7 @@ function InactiveMembersSection({
 }) {
   return (
     <div className="rounded-xl border border-white/[0.07] bg-[#0c0c0c] p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <UserX className="h-4 w-4 text-[#F87171]" />
           <h2 className="text-[15px] font-semibold text-white">Inactive members</h2>
@@ -374,6 +377,9 @@ function InactiveMembersSection({
           </span>
         )}
       </div>
+      <p className="mb-4 text-[12px] text-[#666]">
+        All users without an active subscription.
+      </p>
 
       {loading ? (
         <div className="flex justify-center py-8">
@@ -383,20 +389,28 @@ function InactiveMembersSection({
         <p className="text-[13px] text-[#555]">No inactive members right now.</p>
       ) : (
         <div className="space-y-2">
-          {members.map((m, i) => (
+          {members.map((m) => (
             <div
-              key={`${m.email}-${i}`}
+              key={m.id}
               className="flex flex-col gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex min-w-0 items-center gap-2">
-                <Mail className="h-3.5 w-3.5 shrink-0 text-[#666]" />
-                <span className="truncate text-[13px] text-white/90">{m.email}</span>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 shrink-0 text-[#666]" />
+                  <span className="truncate text-[13px] text-white/90">{m.email}</span>
+                </div>
+                {m.displayName && m.displayName !== m.email.split("@")[0] && (
+                  <span className="pl-5 text-[11px] text-[#666]">{m.displayName}</span>
+                )}
               </div>
               <div className="flex items-center gap-3 sm:shrink-0">
                 <span className="inline-flex items-center gap-1.5 text-[12px] text-[#888]">
                   <MapPin className="h-3.5 w-3.5 text-[#666]" />
                   {m.country}
                   {m.countryCode ? ` (${m.countryCode})` : ""}
+                </span>
+                <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-[#999]">
+                  {m.planLabel}
                 </span>
                 <span className="rounded-md border border-[#F87171]/20 bg-[#F87171]/[0.07] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#F87171]">
                   Inactive

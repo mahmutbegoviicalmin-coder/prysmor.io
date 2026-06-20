@@ -1,24 +1,31 @@
-import { currentUser } from '@clerk/nextjs/server';
+import { currentUser, createClerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseAdmin';
-import { getReferralsByCode, resolveAffiliateForUser } from '@/lib/affiliates';
+import { PLAN_LABELS } from '@/lib/firestore/users';
+import { resolveAffiliateForUser } from '@/lib/affiliates';
 
 export const runtime = 'nodejs';
 
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+
 interface InactiveMember {
+  id: string;
   email: string;
+  displayName: string;
+  plan: string;
+  planLabel: string;
   country: string;
   countryCode: string;
-  plan: string;
-  joinedAt: string | null;
+  createdAt: string | null;
 }
 
 /**
  * GET /api/affiliate/inactive-members
  *
- * Returns the staff member's referred users whose subscription is NOT active
- * (churned / inactive), with their email address and location. Active users are
- * filtered out server-side and never returned.
+ * Returns ALL users (global, not tied to this staff member's referrals) whose
+ * subscription is NOT active — i.e. only inactive members, with their email
+ * address and location. Active and trialing users are filtered out server-side
+ * and never returned. Accessible to any active staff member.
  */
 export async function GET() {
   const user = await currentUser();
@@ -32,48 +39,73 @@ export async function GET() {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });
   }
 
-  const referrals = await getReferralsByCode(affiliate.code);
+  // Firestore docs + Clerk users (for accurate emails / names), same as admin.
+  const [snap, clerkRes] = await Promise.all([
+    db.collection('users').limit(500).get(),
+    clerk.users.getUserList({ limit: 500 }).catch((err) => {
+      console.error('[inactive-members] getUserList error:', err);
+      return { data: [] };
+    }),
+  ]);
 
-  // Unique referred users (a user may have multiple referral rows)
-  const byUser = new Map<string, { email: string; createdAt: string | null }>();
-  for (const r of referrals) {
-    if (!r.referredUserId) continue;
-    if (!byUser.has(r.referredUserId)) {
-      byUser.set(r.referredUserId, { email: r.referredEmail, createdAt: r.createdAt });
-    }
+  type ClerkUserShape = {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    emailAddresses: { emailAddress: string }[];
+    createdAt: number;
+  };
+
+  const rawList = Array.isArray(clerkRes)
+    ? clerkRes
+    : ((clerkRes as { data: unknown[] }).data ?? []);
+  const clerkUserList = rawList as ClerkUserShape[];
+
+  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
+  for (const doc of snap.docs) {
+    fsMap.set(doc.id, doc.data());
   }
-
-  const userIds = Array.from(byUser.keys());
-  if (userIds.length === 0) {
-    return NextResponse.json({ members: [] });
-  }
-
-  // Batch-read user docs
-  const refs = userIds.map((id) => db.collection('users').doc(id));
-  const docs = await db.getAll(...refs);
 
   const members: InactiveMember[] = [];
-  for (const doc of docs) {
-    const fallback = byUser.get(doc.id);
-    const data = doc.exists ? doc.data() ?? {} : {};
-    const status = (data.licenseStatus as string) ?? 'inactive';
+  for (const cu of clerkUserList) {
+    const d = fsMap.get(cu.id) ?? {};
+    const status = (d.licenseStatus as string) ?? 'inactive';
 
     // Only inactive — never active or trialing.
     if (status === 'active' || status === 'trialing') continue;
 
+    const plan = (d.plan as string) ?? 'unpaid';
+    const firstName = cu.firstName ?? d.firstName ?? '';
+    const lastName = cu.lastName ?? d.lastName ?? '';
+    const clerkEmail = cu.emailAddresses?.[0]?.emailAddress ?? '';
+    const resolvedEmail = clerkEmail || d.userEmail || d.email || '';
+
+    const displayName =
+      firstName || lastName
+        ? [firstName, lastName].filter(Boolean).join(' ')
+        : (d.displayName ?? resolvedEmail.split('@')[0] ?? '');
+
+    let createdAt: string | null = null;
+    if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().toISOString();
+    else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
+    else if (cu.createdAt) createdAt = new Date(cu.createdAt).toISOString();
+
     members.push({
-      email: (data.email as string) || fallback?.email || '—',
-      country: (data.country as string) || 'Unknown',
-      countryCode: (data.countryCode as string) || '',
-      plan: (data.plan as string) || 'unpaid',
-      joinedAt: fallback?.createdAt ?? null,
+      id: cu.id,
+      email: resolvedEmail || '—',
+      displayName,
+      plan,
+      planLabel: PLAN_LABELS[plan] ?? plan,
+      country: (d.country as string) || 'Unknown',
+      countryCode: (d.countryCode as string) || '',
+      createdAt,
     });
   }
 
   members.sort((a, b) => {
-    if (!a.joinedAt) return 1;
-    if (!b.joinedAt) return -1;
-    return b.joinedAt.localeCompare(a.joinedAt);
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return b.createdAt.localeCompare(a.createdAt);
   });
 
   return NextResponse.json({ members });
