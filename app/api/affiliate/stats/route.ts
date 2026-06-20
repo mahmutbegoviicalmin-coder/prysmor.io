@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });
   }
   if (affiliate.status !== 'active') {
-    return NextResponse.json({ error: 'Affiliate profile inactive' }, { status: 403 });
+    return NextResponse.json({ error: 'Staff profile inactive' }, { status: 403 });
   }
 
   return NextResponse.json({

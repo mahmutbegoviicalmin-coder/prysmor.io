@@ -78,7 +78,7 @@ export function PayoutsSection() {
           <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#4B5563]">Payout requests</p>
           <h2 className="text-[20px] font-bold tracking-tight text-white">Partner payouts</h2>
           <p className="mt-1 text-[12px] text-[#4B5563]">
-            PayPal and bank transfer details submitted by affiliates.
+            PayPal and bank transfer details submitted by staff.
           </p>
         </div>
         <button
@@ -126,7 +126,7 @@ export function PayoutsSection() {
                   </p>
                 </div>
                 <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.02] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4B5563]">Affiliate ID</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#4B5563]">Staff ID</p>
                   <p className="mt-1 break-all font-mono text-[12px] text-white/60">{req.affiliateId}</p>
                 </div>
               </div>

@@ -393,7 +393,7 @@ export default function AffiliateDashboard() {
         setData(statsRes);
         setReferrals(refsRes.referrals ?? []);
       })
-      .catch(() => setError("Failed to load affiliate data"))
+      .catch(() => setError("Failed to load staff data"))
       .finally(() => setLoading(false));
 
     loadPayouts();
@@ -413,7 +413,7 @@ export default function AffiliateDashboard() {
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03]">
           <Users className="h-5 w-5 text-[#555]" />
         </div>
-        <h1 className="text-[18px] font-semibold text-white">Affiliate access not set up</h1>
+        <h1 className="text-[18px] font-semibold text-white">Staff access not set up</h1>
         <p className="mt-2 text-[14px] leading-relaxed text-[#666]">
           Contact admin to get access with the same email you use to sign in.
         </p>
@@ -438,10 +438,10 @@ export default function AffiliateDashboard() {
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#39FF6A]/70">
-              Partner program
+              Staff program
             </p>
             <h1 className="mt-2 text-[26px] font-bold tracking-tight text-white sm:text-[30px]">
-              Affiliate dashboard
+              Staff dashboard
             </h1>
             <p className="mt-1 text-[14px] text-[#666]">
               Share your link, track referrals, and request payouts.

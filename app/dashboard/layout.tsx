@@ -162,7 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const currentLabel = pathname.startsWith("/dashboard/admin")
     ? "Admin"
     : pathname.startsWith("/dashboard/affiliate")
-    ? "Affiliate"
+    ? "Staff"
     : navItems.find((n) =>
         n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
       )?.label ?? "Dashboard";
@@ -272,7 +272,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       color: affiliateActive ? GREEN : "#444",
                     }}
                   />
-                  Affiliate
+                  Staff
                 </Link>
               )}
               {isAdmin && (
@@ -425,7 +425,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }}
             >
               <TrendingUp style={{ width: "14px", height: "14px", color: affiliateActive ? GREEN : "#444" }} />
-              Affiliate
+              Staff
             </Link>
           )}
           {isAdmin && (

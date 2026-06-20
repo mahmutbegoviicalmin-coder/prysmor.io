@@ -84,7 +84,7 @@ export function AffiliatesSection() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? 'Failed to create affiliate');
+        setError(data.error ?? 'Failed to create staff member');
         return;
       }
       setShowAdd(false);
@@ -140,7 +140,7 @@ export function AffiliatesSection() {
   };
 
   const deleteAffiliate = async (id: string) => {
-    if (!confirm('Delete this affiliate profile?')) return;
+    if (!confirm('Delete this staff profile?')) return;
     setDeletingId(id);
     await fetch(`/api/admin/affiliates/${id}`, { method: 'DELETE' });
     setDeletingId(null);
@@ -154,7 +154,7 @@ export function AffiliatesSection() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-[18px] font-semibold text-white">Affiliate partners</h2>
+          <h2 className="text-[18px] font-semibold text-white">Staff</h2>
           <p className="mt-1 text-[13px] text-[#6B7280]">
             Add partners by email only. They auto-link when they sign in with the same email.
           </p>
@@ -175,7 +175,7 @@ export function AffiliatesSection() {
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#39FF6A] px-3 py-2 text-[12px] font-semibold text-black"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add affiliate
+            Add staff
           </button>
         </div>
       </div>
@@ -186,7 +186,7 @@ export function AffiliatesSection() {
         </div>
       ) : affiliates.length === 0 ? (
         <div className="rounded-xl border border-white/[0.07] bg-[#0c0c0c] px-6 py-16 text-center text-[13px] text-[#555]">
-          No affiliates yet.
+          No staff yet.
         </div>
       ) : (
         <div className="space-y-3">
@@ -386,7 +386,7 @@ export function AffiliatesSection() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#0c0c0c] p-6">
             <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-[16px] font-semibold text-white">Add affiliate</h3>
+              <h3 className="text-[16px] font-semibold text-white">Add staff</h3>
               <button type="button" onClick={() => setShowAdd(false)} className="text-[#555]">
                 <X className="h-4 w-4" />
               </button>
@@ -446,7 +446,7 @@ export function AffiliatesSection() {
               disabled={saving || !newEmail.trim()}
               className="mt-5 w-full rounded-lg bg-[#39FF6A] py-2.5 text-[13px] font-semibold text-black disabled:opacity-50"
             >
-              {saving ? 'Creating…' : 'Create affiliate'}
+              {saving ? 'Creating…' : 'Create staff'}
             </button>
           </div>
         </div>

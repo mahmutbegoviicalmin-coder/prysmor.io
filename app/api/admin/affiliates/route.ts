@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const existing = await db.collection('affiliates').where('email', '==', email).limit(1).get();
   if (!existing.empty) {
-    return NextResponse.json({ error: 'Affiliate with this email already exists' }, { status: 409 });
+    return NextResponse.json({ error: 'Staff member with this email already exists' }, { status: 409 });
   }
 
   const userId = body.userId?.trim() || null;

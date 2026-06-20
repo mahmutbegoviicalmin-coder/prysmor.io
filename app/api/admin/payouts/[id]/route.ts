@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const affRef = db.collection('affiliates').doc(payout.affiliateId);
     const affDoc = await affRef.get();
     if (!affDoc.exists) {
-      return NextResponse.json({ error: 'Affiliate not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Staff member not found' }, { status: 404 });
     }
 
     const aff = affDoc.data()!;
