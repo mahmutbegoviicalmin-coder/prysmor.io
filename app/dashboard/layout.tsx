@@ -161,7 +161,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const currentLabel = pathname.startsWith("/dashboard/admin")
     ? "Admin"
-    : pathname.startsWith("/dashboard/affiliate")
+    : pathname.startsWith("/dashboard/staff")
     ? "Staff"
     : navItems.find((n) =>
         n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
@@ -171,7 +171,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdmin        = userEmail === ADMIN_EMAIL;
   const isAffiliate    = showAffiliate;
   const adminActive    = pathname.startsWith("/dashboard/admin");
-  const affiliateActive = pathname.startsWith("/dashboard/affiliate");
+  const affiliateActive = pathname.startsWith("/dashboard/staff");
 
   return (
     <div
@@ -247,7 +247,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div style={{ paddingTop: "12px", marginTop: "8px", borderTop: "1px solid #161616", display: "flex", flexDirection: "column", gap: "2px" }}>
               {isAffiliate && (
                 <Link
-                  href="/dashboard/affiliate"
+                  href="/dashboard/staff"
                   style={{
                     position: "relative",
                     display: "flex",
@@ -417,7 +417,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {isAffiliate && (
             <Link
-              href="/dashboard/affiliate"
+              href="/dashboard/staff"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap flex-shrink-0"
               style={{
                 color: affiliateActive ? "white" : "#555",

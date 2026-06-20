@@ -1,7 +1,5 @@
-import AffiliateDashboard from "./AffiliateDashboard";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Staff" };
-
-export default function AffiliatePage() {
-  return <AffiliateDashboard />;
+export default function AffiliateRedirect() {
+  redirect("/dashboard/staff");
 }
