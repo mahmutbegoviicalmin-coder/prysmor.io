@@ -80,11 +80,11 @@ export async function resolveAffiliateForUser(
   const byEmail = await getAffiliateByEmail(email);
   if (!byEmail) return null;
 
-  if (byEmail.userId && byEmail.userId !== userId) {
-    return null;
-  }
-
-  if (!byEmail.userId) {
+  // The email is Clerk-verified, so the signed-in user owns this address and
+  // is the rightful owner of this profile. If the stored userId is missing or
+  // stale (e.g. admin pasted a different/incorrect Clerk ID), re-link it to the
+  // current user instead of blocking access.
+  if (byEmail.userId !== userId) {
     await db.collection('affiliates').doc(byEmail.id).update({
       userId,
       updatedAt: new Date(),
