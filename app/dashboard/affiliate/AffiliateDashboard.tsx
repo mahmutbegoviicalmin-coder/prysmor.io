@@ -108,14 +108,28 @@ function PlanCard({
   accent: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-[#0c0c0c] p-4">
+    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-[#0e0e0e] to-[#0a0a0a] p-5 transition-colors hover:border-white/[0.13]">
+      <div
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.10] blur-2xl transition-opacity duration-300 group-hover:opacity-25"
+        style={{ background: accent }}
+      />
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#555]">
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-lg"
+          style={{ backgroundColor: `${accent}1A`, border: `1px solid ${accent}33` }}
+        >
+          <Icon className="h-4 w-4" style={{ color: accent }} />
+        </span>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#666]">
           {label}
         </p>
-        <Icon className="h-3.5 w-3.5" style={{ color: accent }} />
       </div>
-      <p className="mt-2 text-[24px] font-bold text-white">{value}</p>
+      <div className="mt-4 flex items-end gap-2">
+        <p className="text-[30px] font-bold leading-none tracking-tight text-white">
+          {value}
+        </p>
+        <p className="mb-0.5 text-[11px] text-[#555]">members</p>
+      </div>
     </div>
   );
 }
@@ -454,20 +468,29 @@ export default function AffiliateDashboard() {
           />
         </div>
 
-        <div className="mb-6 grid gap-3 sm:grid-cols-3">
-          <PlanCard
-            label="Starter"
-            value={stats.starterCount}
-            icon={Sparkles}
-            accent="#9CA3AF"
-          />
-          <PlanCard label="Pro" value={stats.proCount} icon={Zap} accent="#60A5FA" />
-          <PlanCard
-            label="Exclusive"
-            value={stats.exclusiveCount}
-            icon={Crown}
-            accent="#F59E0B"
-          />
+        <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[13px] font-semibold text-white/90">Members by plan</h2>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-[#888]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#39FF6A]" />
+              Today
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <PlanCard
+              label="Starter"
+              value={stats.starterCount}
+              icon={Sparkles}
+              accent="#9CA3AF"
+            />
+            <PlanCard label="Pro" value={stats.proCount} icon={Zap} accent="#60A5FA" />
+            <PlanCard
+              label="Exclusive"
+              value={stats.exclusiveCount}
+              icon={Crown}
+              accent="#F59E0B"
+            />
+          </div>
         </div>
 
         <div className="mb-6">
