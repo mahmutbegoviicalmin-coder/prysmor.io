@@ -4,9 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Plus, RefreshCw, Loader2, X, Edit2, Trash2, Link2, UserCheck, UserX,
 } from 'lucide-react';
-import type { AffiliateChart } from '@/lib/affiliateChart';
-import { DEFAULT_AFFILIATE_CHART } from '@/lib/affiliateChart';
-
 interface AffiliateRow {
   id: string;
   email: string;
@@ -21,7 +18,6 @@ interface AffiliateRow {
   manualStarterCount: number;
   manualProCount: number;
   manualExclusiveCount: number;
-  manualChart: AffiliateChart;
   note: string;
   status: 'active' | 'inactive';
   referralCount?: number;
@@ -131,7 +127,6 @@ export function AffiliatesSection() {
         manualExclusiveCount: Number(editState.manualExclusiveCount),
         note: editState.note,
         userId: editState.userId.trim() || null,
-        manualChart: DEFAULT_AFFILIATE_CHART,
       }),
     });
     setSaving(false);

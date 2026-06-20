@@ -23,7 +23,6 @@ export async function GET() {
       commissionPercent: affiliate.commissionPercent,
       note: affiliate.note,
     },
-    refLink: `https://prysmor.io/?ref=${affiliate.code}`,
     stats: {
       totalEarnings: affiliate.manualTotalEarnings,
       pendingEarnings: affiliate.manualPendingEarnings,

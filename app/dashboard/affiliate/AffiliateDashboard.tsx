@@ -13,9 +13,6 @@ import {
   Zap,
   Crown,
   Sparkles,
-  Copy,
-  Check,
-  Link2,
 } from "lucide-react";
 
 interface Stats {
@@ -120,28 +117,6 @@ function PlanCard({
       </div>
       <p className="mt-2 text-[24px] font-bold text-white">{value}</p>
     </div>
-  );
-}
-
-function CopyLink({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1600);
-      }}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[12px] text-[#888] transition-colors hover:text-white"
-    >
-      {copied ? (
-        <Check className="h-3.5 w-3.5 text-[#39FF6A]" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
-      {copied ? "Copied" : "Copy"}
-    </button>
   );
 }
 
@@ -358,7 +333,6 @@ export default function AffiliateDashboard() {
   const [data, setData] = useState<{
     affiliate: AffiliateProfile;
     stats: Stats;
-    refLink: string;
   } | null>(null);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [requests, setRequests] = useState<PayoutRequestRow[]>([]);
@@ -429,7 +403,7 @@ export default function AffiliateDashboard() {
     );
   }
 
-  const { affiliate, stats, refLink } = data;
+  const { affiliate, stats } = data;
   const canRequestPayout = stats.pendingEarnings > 0 && !openRequest;
 
   return (
@@ -444,7 +418,7 @@ export default function AffiliateDashboard() {
               Staff dashboard
             </h1>
             <p className="mt-1 text-[14px] text-[#666]">
-              Share your link, track referrals, and request payouts.
+              Track your members and request payouts.
             </p>
           </div>
 
@@ -494,22 +468,6 @@ export default function AffiliateDashboard() {
             icon={Crown}
             accent="#F59E0B"
           />
-        </div>
-
-        <div className="mb-6 rounded-xl border border-white/[0.07] bg-[#0c0c0c] p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Link2 className="h-4 w-4 text-[#39FF6A]" />
-            <h2 className="text-[14px] font-semibold text-white">Referral link</h2>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-lg border border-white/[0.08] bg-[#0a0a0a] px-3 py-2.5 font-mono text-[11px] text-[#888]">
-              {refLink}
-            </code>
-            <CopyLink text={refLink} />
-          </div>
-          <p className="mt-3 text-[11px] text-[#555]">
-            {affiliate.commissionPercent}% commission on referred subscriptions
-          </p>
         </div>
 
         <div className="mb-6">

@@ -1,12 +1,4 @@
 import { db } from '@/lib/firebaseAdmin';
-import {
-  DEFAULT_AFFILIATE_CHART,
-  type AffiliateChart,
-  type AffiliateChartPoint,
-} from '@/lib/affiliateChart';
-
-export type { AffiliateChart, AffiliateChartPoint };
-export { DEFAULT_AFFILIATE_CHART };
 
 export interface AffiliateProfile {
   id: string;
@@ -23,7 +15,6 @@ export interface AffiliateProfile {
   manualStarterCount: number;
   manualProCount: number;
   manualExclusiveCount: number;
-  manualChart: AffiliateChart;
   note: string;
   status: 'active' | 'inactive';
   createdAt: string | null;
@@ -181,31 +172,6 @@ export async function recordReferral(params: {
   console.log(`[affiliate] Referral recorded: code=${params.affiliateCode} order=${params.orderId} commission=$${params.commission}`);
 }
 
-function normalizeChart(raw: unknown): AffiliateChart {
-  if (!raw || typeof raw !== 'object') return DEFAULT_AFFILIATE_CHART;
-  const data = raw as { title?: unknown; points?: unknown };
-  const title =
-    typeof data.title === 'string' && data.title.trim()
-      ? data.title.trim()
-      : DEFAULT_AFFILIATE_CHART.title;
-  const points = Array.isArray(data.points)
-    ? data.points
-        .map((point) => {
-          if (!point || typeof point !== 'object') return null;
-          const p = point as { label?: unknown; value?: unknown };
-          const label = typeof p.label === 'string' ? p.label.trim() : '';
-          const value = Number(p.value);
-          if (!label || Number.isNaN(value)) return null;
-          return { label, value: Math.max(0, value) };
-        })
-        .filter((p): p is AffiliateChartPoint => p !== null)
-    : [];
-  return {
-    title,
-    points: points.length > 0 ? points : DEFAULT_AFFILIATE_CHART.points,
-  };
-}
-
 function docToAffiliate(doc: FirebaseFirestore.QueryDocumentSnapshot): AffiliateProfile {
   const d = doc.data();
   let createdAt: string | null = null;
@@ -225,7 +191,6 @@ function docToAffiliate(doc: FirebaseFirestore.QueryDocumentSnapshot): Affiliate
     manualStarterCount:    d.manualStarterCount ?? 0,
     manualProCount:        d.manualProCount ?? 0,
     manualExclusiveCount:  d.manualExclusiveCount ?? 0,
-    manualChart:           normalizeChart(d.manualChart),
     note:                  d.note ?? '',
     status:                d.status ?? 'active',
     createdAt,

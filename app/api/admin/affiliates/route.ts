@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseAdmin';
 import {
-  DEFAULT_AFFILIATE_CHART,
   generateCode,
   getAllAffiliates,
   getReferralsByCode,
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
     manualStarterCount: 0,
     manualProCount: 0,
     manualExclusiveCount: 0,
-    manualChart: DEFAULT_AFFILIATE_CHART,
     note: '',
     status: 'active',
     createdAt: new Date(),
