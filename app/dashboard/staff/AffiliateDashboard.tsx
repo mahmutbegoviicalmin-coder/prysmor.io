@@ -13,6 +13,9 @@ import {
   Zap,
   Crown,
   Sparkles,
+  UserX,
+  MapPin,
+  Mail,
 } from "lucide-react";
 
 interface Stats {
@@ -36,6 +39,14 @@ interface ReferralRow {
   commission: number;
   status: "pending" | "paid";
   createdAt: string | null;
+}
+
+interface InactiveMember {
+  email: string;
+  country: string;
+  countryCode: string;
+  plan: string;
+  joinedAt: string | null;
 }
 
 type PayoutMethod = "paypal" | "bank";
@@ -343,6 +354,62 @@ function MyRequestsSection({
   );
 }
 
+function InactiveMembersSection({
+  members,
+  loading,
+}: {
+  members: InactiveMember[];
+  loading: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-[#0c0c0c] p-5 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <UserX className="h-4 w-4 text-[#F87171]" />
+          <h2 className="text-[15px] font-semibold text-white">Inactive members</h2>
+        </div>
+        {!loading && members.length > 0 && (
+          <span className="rounded-full border border-[#F87171]/25 bg-[#F87171]/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#F87171]">
+            {members.length} inactive
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-[#333]" />
+        </div>
+      ) : members.length === 0 ? (
+        <p className="text-[13px] text-[#555]">No inactive members right now.</p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m, i) => (
+            <div
+              key={`${m.email}-${i}`}
+              className="flex flex-col gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <Mail className="h-3.5 w-3.5 shrink-0 text-[#666]" />
+                <span className="truncate text-[13px] text-white/90">{m.email}</span>
+              </div>
+              <div className="flex items-center gap-3 sm:shrink-0">
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-[#888]">
+                  <MapPin className="h-3.5 w-3.5 text-[#666]" />
+                  {m.country}
+                  {m.countryCode ? ` (${m.countryCode})` : ""}
+                </span>
+                <span className="rounded-md border border-[#F87171]/20 bg-[#F87171]/[0.07] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#F87171]">
+                  Inactive
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AffiliateDashboard() {
   const [data, setData] = useState<{
     affiliate: AffiliateProfile;
@@ -355,6 +422,8 @@ export default function AffiliateDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [inactiveMembers, setInactiveMembers] = useState<InactiveMember[]>([]);
+  const [inactiveLoading, setInactiveLoading] = useState(true);
 
   const loadPayouts = useCallback(() => {
     setPayoutsLoading(true);
@@ -383,6 +452,12 @@ export default function AffiliateDashboard() {
       })
       .catch(() => setError("Failed to load staff data"))
       .finally(() => setLoading(false));
+
+    fetch("/api/affiliate/inactive-members")
+      .then((r) => (r.ok ? r.json() : { members: [] }))
+      .then((d) => setInactiveMembers(d.members ?? []))
+      .catch(() => setInactiveMembers([]))
+      .finally(() => setInactiveLoading(false));
 
     loadPayouts();
   }, [loadPayouts]);
@@ -499,6 +574,10 @@ export default function AffiliateDashboard() {
             loading={payoutsLoading}
             openRequest={openRequest}
           />
+        </div>
+
+        <div className="mb-6">
+          <InactiveMembersSection members={inactiveMembers} loading={inactiveLoading} />
         </div>
 
         <div className="mb-6 rounded-xl border border-white/[0.07] bg-[#0c0c0c] p-5 sm:p-6">
