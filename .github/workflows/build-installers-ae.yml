@@ -8,7 +8,7 @@ on:
       version:
         description: AE panel semver (matches version.txt)
         required: true
-        default: "2.0.5"
+        default: "2.0.6"
         type: string
   push:
     tags:

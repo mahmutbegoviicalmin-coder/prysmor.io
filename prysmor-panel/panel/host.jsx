@@ -316,11 +316,11 @@ function getSelectionInfo() {
       return JSON.stringify({ error: 'Adobe scripting engine not available.' });
     }
     if (!app.project) {
-      return JSON.stringify({ error: 'No project open — create or open a Premiere project first.' });
+      return JSON.stringify({ error: 'No project open. Create or open a Premiere project first.' });
     }
     var seq = getActiveSequence();
     if (!seq) {
-      return JSON.stringify({ error: 'No active sequence — open a sequence in the Timeline.' });
+      return JSON.stringify({ error: 'No active sequence. Open a sequence in the Timeline.' });
     }
 
     var MAX_SEC = 8;
@@ -328,7 +328,7 @@ function getSelectionInfo() {
 
     if (!found) {
       return JSON.stringify({
-        error: 'No clip found — place the playhead on a video clip, or select one on the timeline.'
+        error: 'No clip found. Place the playhead on a video clip, or select one on the timeline.'
       });
     }
 
@@ -338,10 +338,10 @@ function getSelectionInfo() {
     var startSec = 0;
     var clipDurSec = 0;
     try { startSec = selectedClip.start.seconds; } catch (e) {
-      return JSON.stringify({ error: 'Could not read clip timing — click the clip on the timeline, then Sync clip.' });
+      return JSON.stringify({ error: 'Could not read clip timing. Click the clip on the timeline, then Sync clip.' });
     }
     try { clipDurSec = selectedClip.duration.seconds; } catch (e) {
-      return JSON.stringify({ error: 'Could not read clip duration — try a different clip on the timeline.' });
+      return JSON.stringify({ error: 'Could not read clip duration. Try a different clip on the timeline.' });
     }
     var durSec = (clipDurSec > MAX_SEC) ? MAX_SEC : clipDurSec;
 

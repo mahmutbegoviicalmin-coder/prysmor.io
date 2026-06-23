@@ -3,27 +3,27 @@
 import Link from "next/link";
 import { Monitor } from "lucide-react";
 
-const PANEL_VERSION = "5.5.3";
-const PANEL_AE_VERSION = "2.0.5";
+const PANEL_VERSION = "5.5.5";
+const PANEL_AE_VERSION = "2.0.6";
 
 const DOWNLOADS = {
   premiere: {
     label: "Premiere Pro",
     version: PANEL_VERSION,
     accent: "#39FF6A",
-    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.5.3/PrysmrSetup.exe",
-    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.5.3/Prysmor-5.5.3.pkg",
+    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.5.5/PrysmrSetup.exe",
+    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/v5.5.5/Prysmor-5.5.5.pkg",
     winFile: "PrysmrSetup.exe",
-    macFile: "Prysmor-5.5.3.pkg",
+    macFile: "Prysmor-5.5.5.pkg",
   },
   ae: {
     label: "After Effects",
     version: PANEL_AE_VERSION,
     accent: "#818CF8",
-    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.5/PrysmorAE-Setup.exe",
-    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.5/PrysmorAE-2.0.5.pkg",
+    win: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.6/PrysmorAE-Setup.exe",
+    mac: "https://github.com/mahmutbegoviicalmin-coder/prysmor.io/releases/download/panel-ae-v2.0.6/PrysmorAE-2.0.6.pkg",
     winFile: "PrysmorAE-Setup.exe",
-    macFile: "PrysmorAE-2.0.5.pkg",
+    macFile: "PrysmorAE-2.0.6.pkg",
   },
 } as const;
 

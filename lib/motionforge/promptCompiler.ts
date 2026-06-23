@@ -29,7 +29,7 @@ Rules:
 - Never write full scene descriptions or camera directions
 - Never use quality words: cinematic, photorealistic, film-quality, professional
 
-CONTENT SAFETY (critical — output goes to an AI video model with strict moderation that rejects the whole job on any flagged word):
+CONTENT SAFETY (critical. Output goes to a video model with strict moderation that rejects the whole job on any flagged word):
 - No violence, weapons, gore, blood, injury, death, fighting, or threats
 - No nudity, sexual, or suggestive content
 - No real people, celebrities, politicians, or brand/logo names
@@ -134,7 +134,7 @@ const BANNED_WORD_PATTERN =
   /\b(scanlines?|horizontal\s+lines?|banding|crt|interlac(ing|ed)?|glitch(ed|ing)?|vhs|corrupted?|static|distorted?|artifacts?|compression\s+artifacts?|shutter\s+artifact|signal\s+interference|data[\s-]?moshing|noise\s+pattern|digital\s+defects?|video\s+distortion|tape\s+artifacts?|scan\s+effects?)\b/gi;
 
 // Common content-moderation triggers → safe equivalents. These words almost
-// always cause Runway/Gemini to reject the job, so we soften them before send.
+// always cause the video model to reject the job, so we soften them before send.
 const MODERATION_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bblood(y|ied)?\b/gi,                              'red liquid'],
   [/\bgore\b/gi,                                       'red liquid'],
@@ -145,6 +145,8 @@ const MODERATION_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\b(nude|nudity|naked|topless)\b/gi,                'clothed'],
   [/\b(nsfw|porn\w*|explicit\s+sexual)\b/gi,           ''],
   [/\b(decapitat\w*|dismember\w*|mutilat\w*)\b/gi,     ''],
+  [/\b(celebrity|celebrities|famous\s+person|public\s+figure)\w*\b/gi, 'person'],
+  [/\b(close[\s-]?up\s+of\s+(a\s+)?face|face\s+close[\s-]?up)\b/gi, 'subject'],
 ];
 
 export function sanitizeForRunway(text: string): string {

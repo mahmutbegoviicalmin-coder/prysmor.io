@@ -242,7 +242,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <NavLink key={item.href} item={item} pathname={pathname} isActive={isSubscribed} />
           ))}
 
-          {/* Affiliate + Admin links */}
+          {/* Staff / Admin links */}
           {(isAffiliate || isAdmin) && (
             <div style={{ paddingTop: "12px", marginTop: "8px", borderTop: "1px solid #161616", display: "flex", flexDirection: "column", gap: "2px" }}>
               {isAffiliate && (

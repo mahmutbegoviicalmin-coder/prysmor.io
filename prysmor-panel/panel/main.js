@@ -8,7 +8,7 @@ const SITE_URL  = 'https://prysmor.io';
 // Change this single line before shipping a new panel build.
 const API_BASE  = 'https://prysmor-io.vercel.app';
 const POLL_MS         = 5000;
-const PANEL_VERSION_DEFAULT = '5.5.3'; // keep in sync with panel/version.txt
+const PANEL_VERSION_DEFAULT = '5.5.5'; // keep in sync with panel/version.txt
 const POLL_MS_SLOW    = 15000;              // slower after 10 min
 const MAX_POLL_MS     = 40 * 60 * 1000;    // 40 min hard timeout
 const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
@@ -23,7 +23,7 @@ const GEN_STATUS_LABELS = [
   { after:  10, text: 'Preparing your clip…'                  },
   { after:  30, text: 'Queued for processing…'                },
   { after:  90, text: 'Effect generation in progress…'        },
-  { after: 180, text: 'Still working — complex effects take time…' },
+  { after: 180, text: 'Still working. Complex effects take time…' },
   { after: 300, text: 'Almost there, processing your effect…'      },
 ];
 
@@ -92,7 +92,7 @@ var _progressHistory = [];     // [{t, pct}] ring-buffer for ETA estimation
  */
 function parseExtendScriptJson(raw) {
   if (raw == null || raw === '') {
-    return { parsed: null, error: 'Could not read clip from timeline — is Premiere Pro responding?' };
+    return { parsed: null, error: 'Could not read clip from timeline. Is Premiere Pro responding?' };
   }
   var s = String(raw).replace(/^\uFEFF/, '').trim();
   if (s.indexOf('EvalScript error') !== -1) {
@@ -109,7 +109,7 @@ function parseExtendScriptJson(raw) {
     return { parsed: JSON.parse(s) };
   } catch (_) {
     console.warn('[Prysmor:evalScript] Non-JSON response:', s.slice(0, 200));
-    return { parsed: null, error: 'Could not read clip from timeline — restart Premiere Pro and try Sync clip again.' };
+    return { parsed: null, error: 'Could not read clip from timeline. Restart Premiere Pro and try Sync clip again.' };
   }
 }
 
@@ -299,7 +299,7 @@ async function validateSessionThenEnter() {
     if (res.status === 401) {
       clearSession();
       showView('login');
-      setLoginStatus('Your session expired — please sign in again.', true);
+      setLoginStatus('Your session expired. Please sign in again.', true);
       return;
     }
     var data = res.ok ? await res.json().catch(function () { return {}; }) : {};
@@ -761,7 +761,7 @@ function showClipInfo(info) {
   var warnEl = el('clip-trim-warning');
   if (warnEl) {
     if (willTrim) {
-      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's — only the first ' + effectiveDur.toFixed(0) + 's will be processed. Trim your selection to max 8s for best results.';
+      warnEl.textContent = '⚠ Clip is ' + dur.toFixed(1) + 's. Only the first ' + effectiveDur.toFixed(0) + 's will be processed. Trim your selection to max 8s for best results.';
       warnEl.style.display = '';
     } else {
       warnEl.style.display = 'none';
@@ -787,7 +787,7 @@ async function apiFetch(path, options) {
   if (res.status === 401 || res.status === 403) {
     clearSession();
     logout();
-    throw new Error('Session expired — please sign in again.');
+    throw new Error('Session expired. Please sign in again.');
   }
   var json = await res.json().catch(function () { return { error: 'HTTP ' + res.status }; });
   if (!res.ok) throw new Error(json.error || 'HTTP ' + res.status);
@@ -845,7 +845,7 @@ async function compilePrompt() {
 
       if (res.status === 401) {
         logout();
-        showToast('Session expired — please sign in again', 'error');
+        showToast('Session expired. Please sign in again', 'error');
         return;
       }
       if (!res.ok || !json.prompt) {
@@ -891,7 +891,7 @@ async function compilePrompt() {
 
     if (res2.status === 401) {
       logout();
-      showToast('Session expired — please sign in again', 'error');
+      showToast('Session expired. Please sign in again', 'error');
       return;
     }
     if (!res2.ok || (!json2.enhancedPrompt && !json2.enhanced)) {
@@ -1677,9 +1677,9 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
 
   if (!hasCepFs) {
     // cep.fs unavailable — show preview only, can't insert without disk access
-    setStatus('Done — preview ready', 100);
+    setStatus('Done. Preview ready', 100);
     showResult(blobUrl || outputUrl);
-    showToast('Preview ready. cep.fs not available — insert manually via Insert on V2 button.', 'info');
+    showToast('Preview ready. cep.fs not available. Insert manually via Insert on V2 button.', 'info');
     return;
   }
 
@@ -1717,7 +1717,7 @@ async function downloadAndInsert(outputUrl, startTimeSec, replaceMode, clipDurSe
 
   if (wr.err !== 0) {
     showResult(blobUrl || outputUrl);
-    throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown — use Insert button to retry.');
+    throw new Error('Could not save to disk (cep.fs err=' + wr.err + ', path=' + outPath + '). Preview shown. Use Insert button to retry.');
   }
 
   // ── ffmpeg post-process: ensure output is 1920×1080 ──────────────────────────
@@ -1997,6 +1997,34 @@ function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
   }
 }
 
+function sanitizePanelError(msg) {
+  if (!msg) return 'Generation failed. Please try again.';
+  var s = String(msg);
+  s = s.replace(/^Generation failed to start:\s*/i, '');
+  s = s.replace(/^Failed to create job:\s*/i, '');
+  s = s.replace(/^Upload (init|confirm )?failed:\s*/i, '');
+  s = s.replace(/\{[\s\S]*\}/g, ' ').replace(/https?:\/\/\S+/gi, ' ').trim();
+  s = s.replace(/VFX generation failed\s*\(\d+\)\s*:?/gi, ' ').trim();
+  s = s.replace(/\brunway(ml)?\b/gi, ' ').trim();
+  s = s.replace(/\bAI provider\b/gi, 'safety filter');
+  s = s.replace(/\s*[\u2014—]\s*/g, '. ');
+
+  var r = s.toLowerCase();
+  if (r.includes('not enough credits') && !r.includes('upgrade')) {
+    return 'Effect engine is temporarily unavailable. Please try again later.';
+  }
+  if (r.includes('moderation') || r.includes('safety') || r.includes('content policy') || r.includes('blocked your footage')) {
+    if (r.includes('footage') || r.includes('clip') || r.includes('media') || r.includes('frame')) {
+      return 'Your clip was blocked by the safety filter. Try a different frame, avoid tight face close-ups, or use a wider shot.';
+    }
+    if (r.includes('prompt')) {
+      return 'Your prompt was blocked by the safety filter. Use neutral wording without violence, weapons, nudity, names, or brands.';
+    }
+    return 'This request was blocked by the safety filter. Try a different clip and a neutral prompt.';
+  }
+  return s || 'Generation failed. Please try again.';
+}
+
 function fail(msg) {
   stopMfPolling();
   stopElapsedTimer();
@@ -2016,7 +2044,7 @@ function fail(msg) {
   var failEl  = el('mf-gen-failed');
   var failMsg = el('gen-fail-msg');
   if (failEl)  failEl.classList.remove('hidden');
-  if (failMsg) failMsg.textContent = msg || 'Generation failed.';
+  if (failMsg) failMsg.textContent = sanitizePanelError(msg);
 
   showToast(msg, 'error');
 }
@@ -2184,7 +2212,7 @@ async function addToTimeline() {
 function readFileBase64(absPath) {
   return new Promise(function (resolve, reject) {
     if (!window.cep || !window.cep.fs) {
-      return reject(new Error('cep.fs not available — run inside Premiere'));
+      return reject(new Error('cep.fs not available. Run inside Premiere'));
     }
     // Normalise path before passing to cep.fs (handles macOS file:// and %20)
     absPath = normalisePath(absPath);
@@ -2383,7 +2411,7 @@ function applyUpdate(data) {
         console.warn('[Prysmor:update] Download failed for', job.url, ':', e.message);
         pending--;
         if (pending === 0) {
-          showToast('Panel update incomplete — reinstall from prysmor.io/dashboard', 'error');
+          showToast('Panel update incomplete. Reinstall from prysmor.io/dashboard', 'error');
         }
       });
   });
@@ -2414,7 +2442,7 @@ function showUpdateBanner(version) {
 
     var msg = document.createElement('span');
     msg.style.cssText = 'flex:1;font-size:11.5px;color:rgba(0,230,118,0.9);font-weight:500;letter-spacing:-0.01em;';
-    msg.textContent = 'Panel updated to v' + version + ' — restart Premiere to apply.';
+    msg.textContent = 'Panel updated to v' + version + '. Restart Premiere to apply.';
 
     var close = document.createElement('button');
     close.textContent = '✕';
@@ -2484,11 +2512,11 @@ function manualCheckForUpdates() {
         return;
       }
       if (!data || !data.version) {
-        showToast('Update check failed — invalid response.', 'error');
+        showToast('Update check failed. Invalid response.', 'error');
         return;
       }
       if (isNewerVersion(data.version, localVersion)) {
-        showToast('Update available — downloading v' + data.version + '…', 'info');
+        showToast('Update available. Downloading v' + data.version + '…', 'info');
         applyUpdate(data);
       } else {
         showToast('Panel is up to date (v' + localVersion + ')', 'success');
@@ -2810,7 +2838,7 @@ function populateDiagnostics() {
     bkEl.textContent = r.ok || r.status === 201 ? '✓ Online' : '✕ HTTP ' + r.status;
     bkEl.className   = 'diag-status ' + (r.status === 201 ? 'ok' : 'err');
   }).catch(function () {
-    bkEl.textContent = '✕ Offline — run npm dev';
+    bkEl.textContent = '✕ Offline. Run npm dev';
     bkEl.className   = 'diag-status err';
   });
 }
@@ -3052,7 +3080,7 @@ function bindEvents() {
       btnReplace.classList.toggle('seg-active', replace);
       hint.textContent = replace
         ? 'Result overwrites your original clip in the timeline'
-        : 'Result added on a new V2 track — your original clip is untouched';
+        : 'Result added on a new V2 track. Your original clip is untouched';
     }
 
     btnV2.addEventListener('click',      function () { setMode(false); });

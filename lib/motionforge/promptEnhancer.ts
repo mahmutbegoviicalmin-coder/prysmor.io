@@ -10,6 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { log, warn } from './logger';
+import { sanitizeForRunway } from './promptCompiler';
 
 const TAG = 'promptEnhancer';
 
@@ -93,7 +94,7 @@ const DEFAULT_MODE = 'background';
 
 /**
  * Appended to every mode system prompt. The enhanced text is sent to AI video
- * models (Runway / Beeble / Gemini) that run strict content moderation. If the
+ * models (Beeble / Gemini / VFX engine) that run strict content moderation. If the
  * prompt contains flagged language the whole job is rejected, so we force the
  * model to always emit safe, neutral descriptions.
  */
@@ -216,7 +217,7 @@ export async function enhanceMotionForgePrompt(
   log(TAG, `Enhancing prompt (mode=${mode})`, { promptLen: prompt.length });
 
   try {
-    const enhanced = await callClaude(prompt, mode);
+    const enhanced = sanitizeForRunway(await callClaude(prompt, mode));
 
     const wordCount = enhanced.split(/\s+/).length;
     if (wordCount < 3) {
@@ -231,7 +232,7 @@ export async function enhanceMotionForgePrompt(
   } catch (err) {
     warn(TAG, 'Claude enhancement failed — using fallback', { err: (err as Error).message });
 
-    const enhanced = fallbackEnhance(prompt, mode);
+    const enhanced = sanitizeForRunway(fallbackEnhance(prompt, mode));
     log(TAG, 'Fallback enhancement used', { wordCount: enhanced.split(/\s+/).length });
 
     return { enhancedPrompt: enhanced, method: 'fallback', sceneAnalysed: false };

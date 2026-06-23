@@ -19,7 +19,7 @@
   </choices-outline>
 
   <pkg-ref id="com.prysmor.panel.ae"
-           version="2.0.5"
+           version="2.0.6"
            onConclusion="none">PrysmorAEPanel.pkg</pkg-ref>
 
 </installer-gui-script>

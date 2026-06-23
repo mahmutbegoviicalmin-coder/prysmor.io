@@ -6,6 +6,7 @@ import { pollSwitchXJob }      from '@/lib/motionforge/beeble';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { refundCredits }              from '@/lib/firestore/users';
+import { friendlyFailureMessage } from '@/lib/motionforge/userErrors';
 
 export const runtime     = 'nodejs';
 export const maxDuration = 60;
@@ -33,23 +34,9 @@ async function refundWithRetry(userId: string, credits: number, jobId: string): 
 
 /**
  * Turns raw provider failure strings into clear, actionable user-facing text.
- * Distinguishes media-level moderation (the footage was flagged) from
- * prompt-level moderation (the wording was flagged), since the fix differs.
  */
-function friendlyFailureMessage(raw: string | undefined | null): string {
-  const r = (raw || '').toLowerCase();
-  if (r.includes('moderation') || r.includes('content policy') || r.includes('safety')) {
-    const mediaFlagged  = r.includes('media') || r.includes('image') || r.includes('video') || r.includes('input');
-    const promptFlagged = r.includes('text') || r.includes('prompt');
-    if (mediaFlagged && !promptFlagged) {
-      return 'The AI provider blocked your footage (content safety filter). Try a different clip or move the playhead to another frame — close-ups of faces and footage it reads as sensitive are often rejected.';
-    }
-    if (promptFlagged && !mediaFlagged) {
-      return 'Your prompt was blocked by the content safety filter. Rephrase with neutral wording — no violence, weapons, nudity, real names, or brands.';
-    }
-    return 'This request was blocked by the AI provider\'s content safety filter. Try a different clip and a neutral prompt (no violence, weapons, nudity, real names, or brands).';
-  }
-  return raw || 'Generation failed.';
+function mapFailureMessage(raw: string | undefined | null): string {
+  return friendlyFailureMessage(raw);
 }
 
 // ─── Route handler ────────────────────────────────────────────────────────────
@@ -178,7 +165,7 @@ export async function GET(
 
       if (result.state === 'fail') {
         const rawReason = result.failMsg || 'KIE.AI Gemini Omni Video failed';
-        const reason    = friendlyFailureMessage(rawReason);
+        const reason    = mapFailureMessage(rawReason);
         logError(TAG, `[kieai] Task ${kieTaskId} failed: ${rawReason}`);
         await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {
@@ -259,7 +246,7 @@ export async function GET(
       // ── Runway failed / cancelled ────────────────────────────────────────
       if (taskStatus === 'FAILED' || taskStatus === 'CANCELLED') {
         const rawReason = task.failure || task.failureCode || `Task ${taskStatus}`;
-        const reason    = friendlyFailureMessage(rawReason);
+        const reason    = mapFailureMessage(rawReason);
         logError(TAG, `Runway task ${job.runwayTaskId} ${taskStatus}`, rawReason);
         await updateJob(userId, params.id, { status: 'failed', error: reason });
         if (job.userId && job.creditCost) {

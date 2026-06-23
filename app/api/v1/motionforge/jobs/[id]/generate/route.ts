@@ -18,7 +18,8 @@ import {
 }                                      from '@/lib/motionforge/beeble';
 import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
-import { sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
+import { compileVfxPrompt, sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
+import { sanitizeUserFacingError } from '@/lib/motionforge/userErrors';
 import * as fs   from 'fs';
 import * as os   from 'os';
 import * as path from 'path';
@@ -116,11 +117,18 @@ export async function POST(
     ? body.clipDuration
     : 8;
 
-  const prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
-
-  log(TAG, `Mode: ${mode} → ${isBeebleMode ? 'Beeble' : isOmniMode ? 'KIE.AI/Omni' : 'Runway'} | asset: ${assetUrl.slice(0, 60)}`);
-
   const referenceImageB64 = (body.referenceImage ?? '').trim() || null;
+
+  let prompt: string;
+  if (isRunwayMode) {
+    const compiled = await compileVfxPrompt(rawPrompt);
+    prompt = compiled.compiledPrompt;
+    log(TAG, `VFX prompt compiled via ${compiled.method}`, { effectType: compiled.effectType });
+  } else {
+    prompt = sanitizeForRunway(rawPrompt).slice(0, 1000);
+  }
+
+  log(TAG, `Mode: ${mode} → ${isBeebleMode ? 'Beeble' : isOmniMode ? 'KIE.AI/Omni' : 'VFX'} | asset: ${assetUrl.slice(0, 60)}`);
 
   try {
 
@@ -264,11 +272,10 @@ export async function POST(
 
   } catch (err: unknown) {
     const raw     = err instanceof Error ? err.message : 'Generation failed';
-    const cleaned = raw.includes('API_KEY') || raw.includes('api_key')
-      ? 'Generation service temporarily unavailable. Please try again.'
-      : raw;
-    const userMsg = ASPECT_RATIO_RE.test(cleaned) ? ASPECT_RATIO_MSG : cleaned;
-    const status  = ASPECT_RATIO_RE.test(cleaned) ? 400 : 502;
+    const userMsg = ASPECT_RATIO_RE.test(raw)
+      ? ASPECT_RATIO_MSG
+      : sanitizeUserFacingError(raw);
+    const status  = ASPECT_RATIO_RE.test(raw) ? 400 : 502;
     logError(TAG, `Generation failed for job ${params.id}`, err);
     await updateJob(userId, params.id, { status: 'failed', error: userMsg }).catch(() => {});
     return NextResponse.json({ error: userMsg }, { status });

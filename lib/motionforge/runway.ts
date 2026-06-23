@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { parseProviderHttpError } from './userErrors';
 
 const RUNWAY_API_BASE =
   process.env.RUNWAY_API_BASE || 'https://api.dev.runwayml.com';
@@ -187,7 +188,7 @@ export async function createVideoToVideoTask(
   if (!res.ok) {
     const errBody = await res.text();
     console.error(`[runway] ❌ video_to_video FAILED ${res.status} — FULL ERROR BODY:`, errBody);
-    throw new Error(`VFX generation failed (${res.status}): ${errBody}`);
+    throw new Error(parseProviderHttpError(res.status, errBody));
   }
 
   return res.json() as Promise<RunwayTaskCreated>;
@@ -221,7 +222,7 @@ export async function createImageToVideoTask(
   if (!res.ok) {
     const text = await res.text();
     console.error(`[runway] image_to_video ${res.status}:`, text);
-    throw new Error(`Runway image_to_video error ${res.status}: ${text}`);
+    throw new Error(parseProviderHttpError(res.status, text));
   }
 
   return res.json() as Promise<RunwayTaskCreated>;

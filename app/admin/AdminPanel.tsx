@@ -1303,7 +1303,7 @@ export function AdminPanel() {
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#A3FF12]">Admin</span>
           </div>
           <h1 className="text-[24px] sm:text-[28px] font-bold text-white tracking-tight leading-none mb-1.5">Control Panel</h1>
-          <p className="text-[12px] text-[#4B5563]">Users · Revenue · Staff · Payouts · Email · Campaigns</p>
+          <p className="text-[12px] text-[#4B5563]">Korisnici · Prihod · Staff · Isplate · Email · Kampanje</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={load} disabled={loading}
