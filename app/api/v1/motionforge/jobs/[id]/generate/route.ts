@@ -20,14 +20,18 @@ import { validatePanelKey, validatePanelToken } from '@/lib/motionforge/auth';
 import { log, warn, error as logError } from '@/lib/motionforge/logger';
 import { compileVfxPrompt, sanitizeForRunway } from '@/lib/motionforge/promptCompiler';
 import { sanitizeUserFacingError } from '@/lib/motionforge/userErrors';
+import {
+  isRunwayClipDurationValid,
+  resolveClipDuration,
+  RUNWAY_MAX_SEC,
+  runwayClipDurationError,
+} from '@/lib/motionforge/clipDuration';
 import * as fs   from 'fs';
 import * as os   from 'os';
 import * as path from 'path';
 
 const TAG              = 'generate';
 const RUNWAY_MAX_RATIO = 2.358;
-const RUNWAY_MIN_SEC   = 2;
-const RUNWAY_MAX_SEC   = 30;
 const ASPECT_RATIO_RE  = /aspect\s*ratio/i;
 const ASPECT_RATIO_MSG =
   'Video is too wide for AI processing. Please crop your clip to 16:9 or narrower before generating.';
@@ -113,9 +117,10 @@ export async function POST(
   const clientW = typeof body.videoWidth  === 'number' ? body.videoWidth  : 0;
   const clientH = typeof body.videoHeight === 'number' ? body.videoHeight : 0;
 
-  const clipDuration = typeof body.clipDuration === 'number' && body.clipDuration > 0
-    ? body.clipDuration
-    : 8;
+  const clipDuration = resolveClipDuration(
+    body.clipDuration,
+    (job as { clipDurSec?: number }).clipDurSec,
+  );
 
   const referenceImageB64 = (body.referenceImage ?? '').trim() || null;
 
@@ -227,8 +232,9 @@ export async function POST(
     // ══════════════════════════════════════════════════════════════════════
     // RUNWAY PATH, Aleph 2.0 (runway:// asset URL)
     // ══════════════════════════════════════════════════════════════════════
-    if (clipDuration < RUNWAY_MIN_SEC || clipDuration > RUNWAY_MAX_SEC) {
-      const msg = `Clip must be between ${RUNWAY_MIN_SEC} and ${RUNWAY_MAX_SEC} seconds.`;
+    if (!isRunwayClipDurationValid(clipDuration)) {
+      const msg = runwayClipDurationError(clipDuration)
+        ?? `Clip must be between 2 and ${RUNWAY_MAX_SEC} seconds.`;
       await updateJob(userId, params.id, { status: 'failed', error: msg }).catch(() => {});
       return NextResponse.json({ error: msg }, { status: 400 });
     }

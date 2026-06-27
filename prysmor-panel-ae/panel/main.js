@@ -1205,10 +1205,16 @@ async function mfGenerate() {
     var preparedVideoHeight = 0;
     var fileBase64;
     try {
-      var extractResult = await extractAndPrepareClip(sourcePath, mediaInSec, clipDurSec);
+      var extractDurSec = selectedMode === 'vfx' ? runwayExtractDurationSec(clipDurSec) : clipDurSec;
+      var extractResult = await extractAndPrepareClip(sourcePath, mediaInSec, extractDurSec);
       preparedTmpPath     = extractResult.path;
       preparedVideoWidth  = extractResult.width  || 0;
       preparedVideoHeight = extractResult.height || 0;
+      if (extractResult.durationSec > 0) {
+        clipDurSec = extractResult.durationSec;
+      } else if (extractDurSec > clipDurSec) {
+        clipDurSec = extractDurSec;
+      }
       console.log('[Prysmor] Extracted segment: mediaIn=' + mediaInSec + 's dur=' + clipDurSec + 's → ' + preparedTmpPath +
         '  dims=' + preparedVideoWidth + 'x' + preparedVideoHeight);
       setStatus('Reading clip…', 20);
@@ -2382,9 +2388,22 @@ function getFFmpegBin() {
   return 'ffmpeg';
 }
 
+function runwayExtractDurationSec(durationSec) {
+  var d = parseFloat(durationSec) || 0;
+  if (d <= 0) return d;
+  if (d >= 1.75 && d < 2.1) return 2.1;
+  return d;
+}
+
+function parseFfmpegDuration(stderr) {
+  var m = (stderr || '').match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (!m) return 0;
+  return parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseFloat(m[3]);
+}
+
 /**
- * Reads width×height from ffmpeg stderr (`ffmpeg -i file` — exits non-zero but prints stream info).
- * @returns {Promise<{width:number,height:number}>}
+ * Reads width×height and duration from ffmpeg stderr (`ffmpeg -i file`).
+ * @returns {Promise<{width:number,height:number,durationSec:number}>}
  */
 function probeVideoDimensionsFfmpeg(videoPath) {
   return new Promise(function (resolve) {
@@ -2395,19 +2414,23 @@ function probeVideoDimensionsFfmpeg(videoPath) {
       var stderr = '';
       if (proc.stderr) proc.stderr.on('data', function (d) { stderr += d.toString(); });
       proc.on('close', function () {
+        var width = 0;
+        var height = 0;
         var m = stderr.match(/Stream\s+#\d+:\d+(?:\([^)]*\))?:\s*Video:[^\n]*?(\d{2,})x(\d+)/);
         if (!m) m = stderr.match(/Video:[^\n]*?,\s*(\d{2,})x(\d+)/);
         if (m) {
-          return resolve({
-            width:  parseInt(m[1], 10),
-            height: parseInt(m[2], 10),
-          });
+          width = parseInt(m[1], 10);
+          height = parseInt(m[2], 10);
         }
-        resolve({ width: 0, height: 0 });
+        resolve({
+          width: width,
+          height: height,
+          durationSec: parseFfmpegDuration(stderr),
+        });
       });
-      proc.on('error', function () { resolve({ width: 0, height: 0 }); });
+      proc.on('error', function () { resolve({ width: 0, height: 0, durationSec: 0 }); });
     } catch (_) {
-      resolve({ width: 0, height: 0 });
+      resolve({ width: 0, height: 0, durationSec: 0 });
     }
   });
 }
@@ -2541,8 +2564,13 @@ function extractAndPrepareClip(sourcePath, mediaInSec, durationSec) {
       if (code === 0 && ok) {
         console.log('[Prysmor:extract] done →', outPath);
         probeVideoDimensionsFfmpeg(outPath).then(function (dims) {
-          console.log('[Prysmor:extract] probed output:', dims.width + 'x' + dims.height);
-          resolve({ path: outPath, width: dims.width, height: dims.height });
+          console.log('[Prysmor:extract] probed output:', dims.width + 'x' + dims.height, 'dur=' + (dims.durationSec || 0).toFixed(3) + 's');
+          resolve({
+            path: outPath,
+            width: dims.width,
+            height: dims.height,
+            durationSec: dims.durationSec || durationSec,
+          });
         });
       } else {
         console.error('[Prysmor:extract] ffmpeg exited', code, stderr.slice(-600));
