@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { MARKETING_FROM, appBaseUrl } from './constants';
 import { PLAN_LABELS } from '@/lib/firestore/users';
+import { magicLinkUrl } from '@/lib/auth/magic';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -29,34 +30,33 @@ function planLabel(plan: string): string {
   return PLAN_LABELS[plan] ?? plan;
 }
 
-export async function sendPurchaseActivationEmail(opts: {
+export async function sendPurchaseMagicEmail(opts: {
   to: string;
-  claimId: string;
   plan: string;
-  activateUrl?: string;
+  redirect?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: 'RESEND_API_KEY not configured' };
 
-  const activateUrl = opts.activateUrl
-    ?? `${appBaseUrl()}/activate?purchase=${encodeURIComponent(opts.claimId)}`;
+  const link = magicLinkUrl(opts.to, {
+    redirect: opts.redirect ?? '/dashboard',
+    purpose: 'purchase',
+  });
   const label = planLabel(opts.plan);
   const innerHtml = `
     <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:#ffffff;font-weight:700;">
       Thanks for your order
     </h1>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#9ca3af;">
-      Your <strong style="color:#ffffff;">${label}</strong> subscription is ready.
-      One quick step left: activate your Prysmor account.
+      Your <strong style="color:#ffffff;">${label}</strong> plan is ready.
+      Open your dashboard to install the Premiere Pro and After Effects panels.
     </p>
-    <ol style="margin:0 0 22px;padding-left:18px;color:#9ca3af;font-size:14px;line-height:1.7;">
-      <li>Click <strong style="color:#ffffff;">Activate account</strong> below</li>
-      <li>Create a password once</li>
-      <li>Install the Premiere Pro and After Effects panels</li>
-    </ol>
-    <a href="${activateUrl}"
+    <a href="${link}"
        style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
-      Activate account
+      Open dashboard
     </a>
+    <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">
+      This link signs you in securely — no password needed. It expires in 30 minutes.
+    </p>
   `;
 
   try {
@@ -64,6 +64,46 @@ export async function sendPurchaseActivationEmail(opts: {
       from: MARKETING_FROM,
       to: opts.to,
       subject: 'Thanks for your Prysmor order',
+      html: wrapTransactionalHtml(innerHtml),
+    });
+    if (error) return { ok: false, error: error.message ?? String(error) };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Send failed' };
+  }
+}
+
+export async function sendMagicLoginEmail(opts: {
+  to: string;
+  redirect?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!resend) return { ok: false, error: 'RESEND_API_KEY not configured' };
+
+  const link = magicLinkUrl(opts.to, {
+    redirect: opts.redirect ?? '/dashboard',
+    purpose: 'login',
+  });
+  const innerHtml = `
+    <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:#ffffff;font-weight:700;">
+      Sign in to Prysmor
+    </h1>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#9ca3af;">
+      Click below to open your dashboard. No password needed.
+    </p>
+    <a href="${link}"
+       style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
+      Open dashboard
+    </a>
+    <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">
+      This link expires in 30 minutes. If you did not request it, you can ignore this email.
+    </p>
+  `;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: MARKETING_FROM,
+      to: opts.to,
+      subject: 'Your Prysmor sign-in link',
       html: wrapTransactionalHtml(innerHtml),
     });
     if (error) return { ok: false, error: error.message ?? String(error) };
@@ -107,3 +147,6 @@ export async function sendOrderConfirmedEmail(opts: {
     return { ok: false, error: e instanceof Error ? e.message : 'Send failed' };
   }
 }
+
+/** @deprecated Use sendPurchaseMagicEmail */
+export const sendPurchaseActivationEmail = sendPurchaseMagicEmail;

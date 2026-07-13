@@ -1,8 +1,7 @@
-import { currentUser } from '@clerk/nextjs/server';
+import { requireAdmin } from '@/lib/admin/auth';
 import { NextResponse }  from 'next/server';
 import { LS_STORE_ID, VARIANT_TO_PLAN } from '@/lib/lemonsqueezy';
 
-const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
 const LS_API       = 'https://api.lemonsqueezy.com/v1';
 
 // Variant IDs that belong to plans (not credit packs)
@@ -78,11 +77,8 @@ export interface RevenueData {
 }
 
 export async function GET() {
-  const user   = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
 
   const apiKey = process.env.LEMONSQUEEZY_API_KEY;
   if (!apiKey) {

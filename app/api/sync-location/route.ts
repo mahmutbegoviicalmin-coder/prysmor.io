@@ -1,4 +1,4 @@
-import { auth }           from '@clerk/nextjs/server';
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { updateUserCountry } from '@/lib/firestore/users';
 
@@ -38,10 +38,9 @@ function getCountryName(code: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   /* ── 1. Try Vercel built-in geo headers (fast, no external call) ── */
   const vercelCountryCode = req.headers.get('x-vercel-ip-country');

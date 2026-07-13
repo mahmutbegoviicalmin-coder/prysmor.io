@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { getSessionUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { BookOpen, PanelLeft, Zap, Sparkles, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -28,10 +28,10 @@ const sections = [
 ];
 
 export default async function DashboardDocsPage() {
-  const user = await currentUser();
-  if (!user) redirect("/");
+  const session = await getSessionUser();
+  if (!session) redirect("/sign-in");
 
-  const userDoc = await getUser(user.id).catch(() => null);
+  const userDoc = await getUser(session.userId).catch(() => null);
   if (userDoc?.licenseStatus !== "active") redirect("/dashboard/billing");
 
   return (

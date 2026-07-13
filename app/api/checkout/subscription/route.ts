@@ -1,4 +1,4 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createCheckout, PLAN_VARIANTS } from '@/lib/lemonsqueezy';
@@ -14,9 +14,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid plan or billing period' }, { status: 400 });
   }
 
-  const { userId } = await auth();
-  const user = userId ? await currentUser() : null;
-  const email = user?.primaryEmailAddress?.emailAddress ?? null;
+  const session = await getSessionUser();
+  const userId = session?.userId ?? null;
+  const email = session?.email ?? null;
   const rawRefCode = cookies().get('prysmor_ref')?.value ?? null;
   const refCode = rawRefCode && /^[A-Z0-9_-]{1,20}$/i.test(rawRefCode)
     ? rawRefCode.toUpperCase()

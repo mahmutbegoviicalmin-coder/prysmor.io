@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Menu, X, LayoutDashboard } from "lucide-react";
-import { useAuth, useClerk, UserButton } from "@clerk/nextjs";
 import { track } from "@vercel/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -37,15 +36,25 @@ function NavLink({ href, label }: { href: string; label: string }) {
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const { isSignedIn } = useAuth();
-  const { openSignIn } = useClerk();
 
-  const handleSignIn = () => openSignIn({ fallbackRedirectUrl: "/auth-redirect" });
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => {
+        if (!cancelled) setIsSignedIn(r.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setIsSignedIn(false);
+      });
+    return () => { cancelled = true; };
+  }, [pathname]);
+
   const handleSignUp = () => {
     track("get_started", { location: "navbar" });
-    window.location.href = "/sign-up";
+    window.location.href = "/sign-in";
   };
 
   useEffect(() => {
@@ -112,33 +121,21 @@ export default function Navbar() {
 
           <div className="relative hidden items-center gap-4 lg:flex">
             {isSignedIn ? (
-              <>
-                <Link
-                  href="https://prysmor.io/dashboard"
-                  className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/45 transition-colors duration-200 hover:text-white/85"
-                >
-                  <LayoutDashboard className="h-3.5 w-3.5 text-white/35" />
-                  Dashboard
-                </Link>
-                <UserButton
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      avatarBox:
-                        "w-7 h-7 rounded-[8px] ring-1 ring-white/[0.08] hover:ring-white/[0.16] transition-all",
-                    },
-                  }}
-                />
-              </>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/45 transition-colors duration-200 hover:text-white/85"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5 text-white/35" />
+                Dashboard
+              </Link>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={handleSignIn}
+                <Link
+                  href="/sign-in"
                   className="cursor-pointer px-1 text-[13px] font-medium tracking-[-0.015em] text-white/40 transition-colors duration-200 hover:text-white/80"
                 >
                   Sign In
-                </button>
+                </Link>
                 <button
                   type="button"
                   onClick={handleSignUp}
@@ -223,7 +220,7 @@ export default function Navbar() {
                 <div className="mt-3 flex flex-col gap-2 border-t border-white/[0.06] pt-3">
                   {isSignedIn ? (
                     <Link
-                      href="https://prysmor.io/dashboard"
+                      href="/dashboard"
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
                     >
                       <LayoutDashboard className="h-4 w-4 text-white/35" />
@@ -231,16 +228,13 @@ export default function Navbar() {
                     </Link>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMobileOpen(false);
-                          handleSignIn();
-                        }}
-                        className="w-full rounded-lg py-2.5 text-[14px] font-medium text-white/42 transition-colors hover:text-white/80"
+                      <Link
+                        href="/sign-in"
+                        onClick={() => setMobileOpen(false)}
+                        className="w-full rounded-lg py-2.5 text-center text-[14px] font-medium text-white/42 transition-colors hover:text-white/80"
                       >
                         Sign In
-                      </button>
+                      </Link>
                       <button
                         type="button"
                         onClick={() => {

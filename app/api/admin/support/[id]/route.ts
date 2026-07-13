@@ -1,19 +1,11 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { requireAdmin } from "@/lib/admin/auth";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 
-const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
-
-async function checkAdmin(): Promise<boolean> {
-  const user = await currentUser();
-  if (!user) return false;
-  return user.emailAddresses.some((e) => e.emailAddress === ADMIN_EMAIL);
-}
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  if (!(await checkAdmin())) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
 
   const ticketRef = db.collection("support_tickets").doc(params.id);
   const ticketSnap = await ticketRef.get();

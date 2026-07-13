@@ -1,12 +1,13 @@
-import { auth } from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 
 // Accepts { imageBase64: string } JSON body
 // Stores compressed image in Firestore and returns a served URL
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   let imageBase64: string;
   try {

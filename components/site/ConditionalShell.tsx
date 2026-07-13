@@ -1,8 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Suspense, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { Suspense, useEffect, useState } from "react";
 import Navbar from "@/components/site/Navbar";
 import Footer from "@/components/site/Footer";
 import RefTracker from "@/components/site/RefTracker";
@@ -14,34 +13,43 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
     || pathname === "/activate"
     || pathname.startsWith("/purchase/")
     || pathname.startsWith("/sign-in")
-    || pathname.startsWith("/sign-up");
-  const { isSignedIn, isLoaded, user } = useUser();
+    || pathname.startsWith("/sign-up")
+    || pathname === "/sign-out"
+    || pathname.startsWith("/panel-auth");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  /* Bug 1 fix, keep prysmor_user_id in localStorage in sync with Clerk auth state */
   useEffect(() => {
-    if (!isLoaded) return;
-    try {
-      if (user?.id) {
-        localStorage.setItem("prysmor_user_id", user.id);
-      } else {
-        localStorage.removeItem("prysmor_user_id");
-      }
-    } catch {
-      // localStorage blocked (private mode / storage full)
-    }
-  }, [isLoaded, user?.id]);
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        const id = d?.userId ? String(d.userId) : null;
+        setUserId(id);
+        try {
+          if (id) localStorage.setItem("prysmor_user_id", id);
+          else localStorage.removeItem("prysmor_user_id");
+        } catch { /* storage blocked */ }
+      })
+      .catch(() => {
+        if (!cancelled) setUserId(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, [pathname]);
 
-  /* Sync country once per session for any logged-in user */
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!loaded || !userId) return;
     try {
       const key = "prysmor_loc_synced";
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
     } catch { /* storage blocked */ }
     fetch("/api/sync-location", { method: "POST" }).catch(() => {});
-  }, [isLoaded, isSignedIn]);
-
+  }, [loaded, userId]);
 
   return (
     <>

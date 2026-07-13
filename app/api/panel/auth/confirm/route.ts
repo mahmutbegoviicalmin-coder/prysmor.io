@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse }  from "next/server";
-import { currentUser }               from "@clerk/nextjs/server";
+import { requireUser }               from "@/lib/auth/session";
 import { db }                        from "@/lib/firebaseAdmin";
 import { getUser, PLAN_LABELS, syncUserProfile } from "@/lib/firestore/users";
 import {
@@ -16,10 +16,11 @@ function generateToken(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await currentUser();
-  if (!user) {
+  const authResult = await requireUser();
+  if (!authResult.ok) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+  const { userId, email } = authResult.user;
 
   const { code } = await req.json().catch(() => ({ code: "" }));
   if (!code) {
@@ -43,15 +44,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Code expired" }, { status: 410 });
   }
 
-  // Sync Clerk profile → Firestore (name, email), fire-and-forget
-  syncUserProfile(user.id, {
-    email:     user.primaryEmailAddress?.emailAddress,
-    firstName: user.firstName ?? undefined,
-    lastName:  user.lastName  ?? undefined,
-  }).catch(() => {});
+  syncUserProfile(userId, { email }).catch(() => {});
 
-  // Verify active subscription in Firestore
-  const userDoc       = await getUser(user.id);
+  const userDoc       = await getUser(userId);
   const licenseStatus = userDoc?.licenseStatus ?? "inactive";
 
   if (licenseStatus !== "active") {
@@ -67,13 +62,12 @@ export async function POST(req: NextRequest) {
   const plan      = userDoc?.plan ?? "starter";
   const planLabel = PLAN_LABELS[plan] ?? plan;
 
-  // One device seat per physical machine, Premiere + After Effects share the same slot
   const machineFingerprint = codeData.machineFingerprint;
-  const deviceId = buildPanelDeviceId(user.id, machineFingerprint);
+  const deviceId = buildPanelDeviceId(userId, machineFingerprint);
 
   let resolvedDeviceId = deviceId;
   try {
-    resolvedDeviceId = await registerDevice(user.id, deviceId, codeData.platform ?? "Unknown", codeData.deviceName, {
+    resolvedDeviceId = await registerDevice(userId, deviceId, codeData.platform ?? "Unknown", codeData.deviceName, {
       hostApp:            codeData.hostApp,
       hostAppVersion:     codeData.hostAppVersion,
       cepVersion:         codeData.cepVersion,
@@ -89,13 +83,12 @@ export async function POST(req: NextRequest) {
     console.warn("[panel/auth/confirm] registerDevice failed:", err);
   }
 
-  // Create session in Firestore
   const token     = generateToken();
   const now       = Date.now();
   const expiresAt = now + PANEL_SESSION_TTL_MS;
 
   await db.collection("panel_sessions").doc(token).set({
-    userId:           user.id,
+    userId,
     plan,
     planLabel,
     deviceCode:       code.toUpperCase(),
@@ -106,11 +99,10 @@ export async function POST(req: NextRequest) {
     ...(machineFingerprint && { machineFingerprint }),
   });
 
-  // Mark code as authorized so poll returns the token
   await codeRef.update({
     status:   "authorized",
     token,
-    userId:   user.id,
+    userId,
     plan,
     planLabel,
     expiresAt,

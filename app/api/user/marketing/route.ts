@@ -1,10 +1,11 @@
-import { auth } from '@clerk/nextjs/server';
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseAdmin';
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   const snap = await db.collection('users').doc(userId).get();
   const d = snap.data() ?? {};
@@ -16,8 +17,9 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   let body: { marketingOptIn?: boolean };
   try {

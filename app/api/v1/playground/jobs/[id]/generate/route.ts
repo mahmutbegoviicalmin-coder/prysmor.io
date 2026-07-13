@@ -1,7 +1,7 @@
 export const runtime    = "nodejs";
 export const maxDuration = 120;
 
-import { auth } from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from "next/server";
 import { getJob, updateJob } from "@/lib/motionforge/jobs";
 import { uploadToBeeble, createSwitchXTask } from "@/lib/motionforge/beeble";
@@ -13,8 +13,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   // Re-check trial guard on generate (double-check, job creation is the primary guard)
   const userDoc = await getUser(userId).catch(() => null);

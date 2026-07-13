@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { getSessionUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import { Monitor, Laptop, CheckCircle2, Circle, WifiOff, ShieldAlert } from "lucide-react";
 import { getDashboardData } from "@/lib/firestore/dashboard";
@@ -7,15 +7,15 @@ import { getUser } from "@/lib/firestore/users";
 export const metadata = { title: "Devices | Dashboard" };
 
 export default async function DevicesPage() {
-  const user = await currentUser();
-  if (!user) redirect("/");
+  const session = await getSessionUser();
+  if (!session) redirect("/sign-in");
 
   let data;
   let licenseStatus: string | undefined;
   try {
     const [userDoc, dashboardData] = await Promise.all([
-      getUser(user.id).catch(() => null),
-      getDashboardData(user.id, user),
+      getUser(session.userId).catch(() => null),
+      getDashboardData(session.userId, { email: session.email }),
     ]);
     licenseStatus = userDoc?.licenseStatus;
     data = dashboardData;

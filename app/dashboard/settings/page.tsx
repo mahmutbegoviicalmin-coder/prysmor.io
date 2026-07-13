@@ -1,8 +1,9 @@
-import { currentUser } from "@clerk/nextjs/server";
-import { redirect }     from "next/navigation";
-import { ShieldAlert, Mail, Chrome } from "lucide-react";
+import { getSessionUser } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
+import { ShieldAlert, Mail } from "lucide-react";
 import { DeleteAccountButton } from "./DeleteAccountButton";
 import { MarketingPreferences } from "@/components/settings/MarketingPreferences";
+import { getUser } from "@/lib/firestore/users";
 
 export const metadata = { title: "Settings | Dashboard" };
 
@@ -29,43 +30,28 @@ function Badge({ children, color = "gray" }: { children: React.ReactNode; color?
   );
 }
 
-function formatDate(ts: number | Date | null | undefined): string {
+function formatDate(ts: Date | { toDate?: () => Date } | null | undefined): string {
   if (!ts) return "-";
   try {
-    return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "-";
-  }
-}
-
-function formatDateTime(ts: number | Date | null | undefined): string {
-  if (!ts) return "-";
-  try {
-    return new Date(ts).toLocaleString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
+    const d = typeof (ts as { toDate?: () => Date }).toDate === "function"
+      ? (ts as { toDate: () => Date }).toDate()
+      : new Date(ts as Date);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return "-";
   }
 }
 
 export default async function SettingsPage() {
-  const user = await currentUser();
-  if (!user) redirect("/");
+  const session = await getSessionUser();
+  if (!session) redirect("/sign-in");
 
-  const primaryEmail = user.emailAddresses?.find(e => e.id === user.primaryEmailAddressId)
-    ?? user.emailAddresses?.[0];
-
-  const googleAccount = user.externalAccounts?.find(a =>
-    a.provider === "google" || a.provider === "oauth_google"
-  );
-
-  const mfaEnabled = user.twoFactorEnabled ?? false;
-
-  const verifiedEmails = user.emailAddresses?.filter(e =>
-    e.verification?.status === "verified"
-  ) ?? [];
+  const userDoc = await getUser(session.userId).catch(() => null);
+  const displayName = (userDoc as { displayName?: string; firstName?: string } | null)?.displayName
+    || (userDoc as { firstName?: string } | null)?.firstName
+    || session.email.split("@")[0]
+    || "Account";
+  const initial = (displayName[0] || session.email[0] || "?").toUpperCase();
 
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[800px]">
@@ -74,119 +60,71 @@ export default async function SettingsPage() {
         <p className="text-[14px] text-[#6B7280]">Account profile, security, and preferences.</p>
       </div>
 
-      {/* ── Profile ─────────────────────────────────────────────────────────── */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Profile</p>
       <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-6">
         <div className="flex items-center gap-4 mb-5 pb-4 border-b border-white/[0.04]">
-          {/* Avatar */}
           <div className="w-12 h-12 rounded-full bg-[#1a2e12] border border-[#A3FF12]/20 flex items-center justify-center text-[16px] font-bold text-[#A3FF12] flex-shrink-0">
-            {((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || primaryEmail?.emailAddress?.[0]?.toUpperCase() || "?"}
+            {initial}
           </div>
           <div>
-            <p className="text-[15px] font-semibold text-white">
-              {[user.firstName, user.lastName].filter(Boolean).join(" ") || "No name set"}
-            </p>
-            <p className="text-[12px] text-[#4B5563]">{primaryEmail?.emailAddress ?? "-"}</p>
+            <p className="text-[15px] font-semibold text-white">{displayName}</p>
+            <p className="text-[12px] text-[#4B5563]">{session.email}</p>
           </div>
         </div>
         <div className="space-y-0">
-          <DataRow
-            label="First name"
-            value={user.firstName || <span className="text-[#374151] italic">Not set</span>}
-          />
-          <DataRow
-            label="Last name"
-            value={user.lastName || <span className="text-[#374151] italic">Not set</span>}
-          />
-          <DataRow
-            label="Email address"
-            value={
-              <span className="flex items-center gap-2">
-                {primaryEmail?.emailAddress ?? "-"}
-                {primaryEmail?.verification?.status === "verified" && (
-                  <Badge color="green">Verified</Badge>
-                )}
-              </span>
-            }
-          />
+          <DataRow label="Email address" value={
+            <span className="flex items-center gap-2">
+              {session.email}
+              <Badge color="green">Signed in</Badge>
+            </span>
+          } />
           <DataRow
             label="Account created"
-            value={formatDate(user.createdAt)}
+            value={formatDate(userDoc?.createdAt)}
           />
           <DataRow
             label="User ID"
-            value={<span className="font-mono text-[11px] text-[#374151]">{user.id.slice(0, 20)}…</span>}
+            value={<span className="font-mono text-[11px] text-[#374151]">{session.userId.slice(0, 20)}…</span>}
           />
         </div>
       </div>
 
-      {/* ── Connected accounts ──────────────────────────────────────────────── */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Connected accounts</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Sign-in method</p>
       <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-6">
-        {googleAccount ? (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
-              <Chrome className="w-4 h-4 text-[#60A5FA]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-white">Google</p>
-              <p className="text-[11px] text-[#4B5563] truncate">{googleAccount.emailAddress}</p>
-            </div>
-            <Badge color="green">Connected</Badge>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
+            <Mail className="w-4 h-4 text-[#6B7280]" />
           </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
-              <Mail className="w-4 h-4 text-[#6B7280]" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[13px] font-medium text-white">Email / password</p>
-              <p className="text-[11px] text-[#4B5563]">
-                {verifiedEmails.length} verified email{verifiedEmails.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <Badge color="gray">No OAuth</Badge>
+          <div className="flex-1">
+            <p className="text-[13px] font-medium text-white">Magic link</p>
+            <p className="text-[11px] text-[#4B5563]">Passwordless email sign-in</p>
           </div>
-        )}
+          <Badge color="green">Active</Badge>
+        </div>
       </div>
 
-      {/* ── Email preferences ─────────────────────────────────────────────────── */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Email preferences</p>
       <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-6">
         <MarketingPreferences />
       </div>
 
-      {/* ── Security ────────────────────────────────────────────────────────── */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Security</p>
       <div className="rounded-[12px] border border-white/[0.07] bg-[#111113] p-5 mb-6">
         <div className="space-y-0">
           <DataRow
-            label="Two-factor authentication"
-            value={
-              mfaEnabled
-                ? <Badge color="green">Enabled</Badge>
-                : <Badge color="yellow">Not enabled</Badge>
-            }
+            label="Authentication"
+            value={<Badge color="gray">Magic link session</Badge>}
           />
           <DataRow
-            label="Last sign in"
-            value={formatDateTime(user.lastSignInAt)}
-          />
-          <DataRow
-            label="Password"
-            value={
-              googleAccount
-                ? <span className="text-[#374151] italic">Managed by Google</span>
-                : <Badge color="gray">Email login</Badge>
-            }
+            label="Session"
+            value={<Badge color="green">Active</Badge>}
           />
         </div>
         <p className="mt-4 text-[11px] text-[#374151]">
-          Contact support to manage two-factor authentication or active sessions.
+          Use Sign out from the dashboard to end this session on this device.
         </p>
       </div>
 
-      {/* ── Danger zone ─────────────────────────────────────────────────────── */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#374151] mb-3">Danger zone</p>
       <div className="rounded-[12px] border border-red-500/[0.12] bg-red-500/[0.03] p-5">
         <div className="flex items-start gap-3">

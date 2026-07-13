@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/firestore/users";
 import { createJob } from "@/lib/motionforge/jobs";
@@ -43,8 +43,9 @@ function getClientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId, email: sessionEmail } = authResult.user;
 
   // ── 1. Firestore trial flag ───────────────────────────────────────────────
   const userDoc = await getUser(userId).catch(() => null);
@@ -55,14 +56,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 2. Fetch Clerk user for email checks ─────────────────────────────────
-  let email: string | undefined;
-  let displayName: string | undefined;
+  // ── 2. Session email checks ───────────────────────────────────────────────
+  let email: string | undefined = sessionEmail?.toLowerCase().trim() || undefined;
+  let displayName: string | undefined = email?.split("@")[0] || undefined;
   try {
-    const clerkUser = await currentUser();
-    email       = clerkUser?.primaryEmailAddress?.emailAddress?.toLowerCase().trim() ?? undefined;
-    displayName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(" ")
-                  || email?.split("@")[0] || undefined;
 
     // ── 3. Disposable email check ────────────────────────────────────────
     if (email) {

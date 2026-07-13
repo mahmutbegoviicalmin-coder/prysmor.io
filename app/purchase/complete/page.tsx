@@ -1,21 +1,17 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
-type PurchaseState = "processing" | "awaiting_account" | "fulfilled" | "error";
+type PurchaseState = "processing" | "awaiting_email" | "fulfilled" | "error";
 
-export default function PurchaseCompletePage() {
+function PurchaseCompleteInner() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const claim = searchParams.get("claim") ?? "";
-  const { isLoaded, isSignedIn } = useAuth();
   const [state, setState] = useState<PurchaseState>("processing");
-  const [isCurrentUser, setIsCurrentUser] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
-  const [activationUrl, setActivationUrl] = useState<string | null>(null);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
     if (!/^[a-f0-9]{64}$/.test(claim)) {
@@ -28,7 +24,13 @@ export default function PurchaseCompletePage() {
 
     const check = async () => {
       try {
-        if (isSignedIn) {
+        const me = await fetch("/api/me", { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (stopped) return;
+        if (me?.userId) setHasSession(true);
+
+        if (me?.userId) {
           await fetch("/api/purchase/claim", { method: "POST" }).catch(() => null);
         }
 
@@ -39,28 +41,19 @@ export default function PurchaseCompletePage() {
         if (stopped) return;
 
         if (data.plan) setPlan(String(data.plan));
-        if (typeof data.activationUrl === "string") setActivationUrl(data.activationUrl);
 
-        if (data.status === "awaiting_account") {
-          // Guests who land here after checkout should go activate, not sit on "check email"
-          if (!isSignedIn) {
-            const dest = typeof data.activationUrl === "string" && data.activationUrl.includes("__clerk_ticket=")
-              ? data.activationUrl
-              : `/activate?purchase=${encodeURIComponent(claim)}`;
-            router.replace(dest);
-            return;
-          }
-          setState("awaiting_account");
-        } else if (data.status === "fulfilled") {
+        if (data.status === "fulfilled") {
           setState("fulfilled");
-          setIsCurrentUser(data.fulfilledForCurrentUser === true);
+        } else if (data.status === "awaiting_account") {
+          // Legacy claims — treat as email step
+          setState("awaiting_email");
         } else if (data.status === "checkout_failed" || data.status === "invalid") {
           setState("error");
         } else if (attempts < 30) {
           attempts += 1;
           window.setTimeout(check, 2000);
         } else {
-          setState(isSignedIn ? "processing" : "awaiting_account");
+          setState(me?.userId ? "fulfilled" : "awaiting_email");
         }
       } catch {
         if (!stopped && attempts < 30) {
@@ -70,16 +63,15 @@ export default function PurchaseCompletePage() {
       }
     };
 
-    if (!isLoaded) return;
     check();
     return () => {
       stopped = true;
     };
-  }, [claim, isLoaded, isSignedIn, router]);
+  }, [claim]);
 
   const title =
-    state === "awaiting_account"
-      ? "Activate your account"
+    state === "awaiting_email"
+      ? "Check your email"
       : state === "fulfilled"
         ? "You're ready"
         : state === "error"
@@ -87,12 +79,12 @@ export default function PurchaseCompletePage() {
           : "Confirming your purchase";
 
   const description =
-    state === "awaiting_account"
-      ? "Create a password once to unlock your plan and install the panels."
+    state === "awaiting_email"
+      ? "We sent a secure Open dashboard link to your checkout email. No password needed."
       : state === "fulfilled"
         ? plan
-          ? `Your ${plan} plan and credits are active. Install the panels and start generating in Premiere Pro or After Effects.`
-          : "Your subscription and credits are active. Install the panels and start generating in Premiere Pro or After Effects."
+          ? `Your ${plan} plan and credits are active. Install the panels and start generating.`
+          : "Your subscription and credits are active. Install the panels and start generating."
         : state === "error"
           ? "Please use the link in your order email or contact support."
           : "Payment was received. This usually takes only a few seconds.";
@@ -109,38 +101,29 @@ export default function PurchaseCompletePage() {
         {state === "fulfilled" && (
           <div className="mt-6 flex flex-col gap-3">
             <Link
-              href={isCurrentUser || isSignedIn ? "/dashboard/downloads" : "/sign-in?redirect_url=/dashboard/downloads"}
+              href={hasSession ? "/dashboard/downloads" : "/sign-in"}
               className="inline-flex items-center justify-center rounded-lg bg-[#39FF6A] px-5 py-3 text-sm font-semibold text-black"
             >
-              Install panels
+              {hasSession ? "Install panels" : "Open dashboard link"}
             </Link>
-            <Link
-              href={isCurrentUser || isSignedIn ? "/dashboard" : "/sign-in?redirect_url=/dashboard"}
-              className="inline-flex items-center justify-center rounded-lg border border-white/15 px-5 py-3 text-sm font-medium text-white/80 hover:bg-white/[0.04]"
-            >
-              Open dashboard
-            </Link>
+            {hasSession && (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-lg border border-white/15 px-5 py-3 text-sm font-medium text-white/80 hover:bg-white/[0.04]"
+              >
+                Open dashboard
+              </Link>
+            )}
           </div>
         )}
 
-        {state === "awaiting_account" && /^[a-f0-9]{64}$/.test(claim) && (
-          <div className="mt-6 flex flex-col gap-3">
-            <Link
-              href={activationUrl ?? `/activate?purchase=${encodeURIComponent(claim)}`}
-              className="inline-flex items-center justify-center rounded-lg bg-[#39FF6A] px-5 py-3 text-sm font-semibold text-black"
-            >
-              Activate account
+        {state === "awaiting_email" && (
+          <p className="mt-6 text-xs text-white/35">
+            Already have a link?{" "}
+            <Link href="/sign-in" className="text-[#39FF6A]">
+              Request another
             </Link>
-            <p className="text-xs text-white/35">
-              Already activated?{" "}
-              <Link
-                href={`/sign-in?redirect_url=${encodeURIComponent(`/purchase/complete?claim=${claim}`)}`}
-                className="text-[#39FF6A]"
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
+          </p>
         )}
 
         {state === "error" && (
@@ -150,5 +133,17 @@ export default function PurchaseCompletePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function PurchaseCompletePage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-[#080808] text-white/40 text-sm">
+        Confirming your purchase…
+      </main>
+    }>
+      <PurchaseCompleteInner />
+    </Suspense>
   );
 }

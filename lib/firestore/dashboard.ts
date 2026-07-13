@@ -1,12 +1,15 @@
 /**
  * Aggregates all real data needed for the dashboard overview page.
- * Called server-side; combines Firestore + Clerk session data.
+ * Called server-side from Firestore + session identity.
  */
 
 import { db } from "@/lib/firebaseAdmin";
 import { getUser, PLAN_LABELS, PLAN_CREDITS } from "./users";
 import { getDevices } from "./devices";
-import type { User } from "@clerk/nextjs/server";
+
+export interface DashboardSessionUser {
+  email?: string | null;
+}
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +141,7 @@ export interface DashboardData {
 
 export async function getDashboardData(
   userId: string,
-  clerkUser: User
+  sessionUser: DashboardSessionUser = {},
 ): Promise<DashboardData> {
   const [userDoc, devices, jobsSnap] = await Promise.all([
     getUser(userId),
@@ -239,15 +242,9 @@ export async function getDashboardData(
   };
 
   // ── Security ───────────────────────────────────────────────────────────────
-  const mfaEnabled = clerkUser.twoFactorEnabled ?? false;
-  const lastSignIn = clerkUser.lastSignInAt
-    ? new Date(clerkUser.lastSignInAt)
-    : null;
-
-  // Clerk doesn't expose session list server-side easily; default to 1
   const security: DashboardSecurity = {
-    mfaEnabled,
-    lastLoginAt: lastSignIn ? formatDateTime(lastSignIn) : "-",
+    mfaEnabled: false,
+    lastLoginAt: "-",
     activeSessions: 1,
   };
 
@@ -267,12 +264,11 @@ export async function getDashboardData(
     });
   }
 
-  // Last sign-in from Clerk
-  if (lastSignIn) {
+  if (sessionUser.email) {
     activity.push({
-      title: "Sign in",
-      detail: clerkUser.primaryEmailAddress?.emailAddress ?? "Authenticated",
-      timestamp: formatRelative(lastSignIn),
+      title: "Signed in",
+      detail: sessionUser.email,
+      timestamp: "This session",
     });
   }
 

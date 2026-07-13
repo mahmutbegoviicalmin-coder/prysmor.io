@@ -1,21 +1,13 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { requireAdmin } from "@/lib/admin/auth";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { Resend } from "resend";
 
-const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-async function checkAdmin(): Promise<boolean> {
-  const user = await currentUser();
-  if (!user) return false;
-  return user.emailAddresses.some((e) => e.emailAddress === ADMIN_EMAIL);
-}
-
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  if (!(await checkAdmin())) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
 
   const { body, status } = await req.json();
   if (!body?.trim()) return NextResponse.json({ error: "Empty message" }, { status: 400 });
@@ -84,9 +76,8 @@ ${body.trim()}
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  if (!(await checkAdmin())) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
 
   const { status } = await req.json();
   await db.collection("support_tickets").doc(params.id).update({

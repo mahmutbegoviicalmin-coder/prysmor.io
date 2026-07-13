@@ -1,18 +1,15 @@
-import { auth, createClerkClient } from "@clerk/nextjs/server";
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  SESSION_COOKIE,
+  destroySession,
+  clearSessionCookieJar,
+} from "@/lib/auth/session";
 
 export default async function SignOutPage() {
-  const { sessionId } = await auth();
-
-  if (sessionId) {
-    try {
-      await clerk.sessions.revokeSession(sessionId);
-    } catch {
-      // Session already invalid, proceed to sign-in anyway
-    }
-  }
-
+  const jar = await cookies();
+  const sessionId = jar.get(SESSION_COOKIE)?.value;
+  await destroySession(sessionId);
+  await clearSessionCookieJar();
   redirect("/sign-in");
 }

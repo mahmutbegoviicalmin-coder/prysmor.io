@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { db } from '@/lib/firebaseAdmin';
 import { PLAN_LABELS } from '@/lib/firestore/users';
 
@@ -15,21 +15,16 @@ export async function GET(req: NextRequest) {
   }
 
   const data = snap.data()!;
-  const { userId } = await auth();
+  const session = await getSessionUser();
   const fulfilledForCurrentUser =
-    data.status === 'fulfilled' && !!userId && data.userId === userId;
+    data.status === 'fulfilled' && !!session && data.userId === session.userId;
   const planKey = typeof data.plan === 'string' ? data.plan : null;
-  const activationUrl =
-    data.status === 'awaiting_account' && typeof data.activationUrl === 'string'
-      ? data.activationUrl
-      : null;
 
   return NextResponse.json(
     {
       status: data.status,
       fulfilledForCurrentUser,
       plan: planKey ? (PLAN_LABELS[planKey] ?? planKey) : null,
-      activationUrl,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -151,7 +150,18 @@ function TicketList() {
 
 /* ─────────────────────────── new ticket form ─────────────────────── */
 function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
-  const { user } = useUser();
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.userId) return;
+        setUser({ id: d.userId, email: d.email || "" });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -164,7 +174,7 @@ function NewTicketForm({ onSuccess }: { onSuccess: () => void }) {
   const [status, setStatus] = useState<"idle"|"loading"|"error">("idle");
 
   if (user && !form.email) {
-    setForm(f => ({ ...f, email: user.primaryEmailAddress?.emailAddress ?? "" }));
+    setForm(f => ({ ...f, email: user?.email ?? "" }));
   }
 
   const set = (field: keyof typeof form) =>

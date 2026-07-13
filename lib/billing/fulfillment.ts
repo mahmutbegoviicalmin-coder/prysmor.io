@@ -1,9 +1,12 @@
 import crypto from 'node:crypto';
-import { createClerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/firebaseAdmin';
 import { PLAN_CREDITS } from '@/lib/firestore/users';
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+import {
+  ensureEmailUserIndex,
+  ensureUserForEmail,
+  normalizeEmail,
+  resolveUserIdByEmail,
+} from '@/lib/auth/identity';
 
 export interface LemonEventInput {
   eventFingerprint: string;
@@ -25,14 +28,15 @@ export interface FulfillmentResult {
   userId?: string;
   buyerEmail: string;
   claimId?: string;
-  needsInvitation: boolean;
+  /** True when we should send a magic-link dashboard email (new/guest purchase). */
+  needsMagicLink: boolean;
 }
 
 export function normalizeBillingEmail(email?: string): string {
-  return (email ?? '').trim().toLowerCase();
+  return normalizeEmail(email);
 }
 
-function emailKey(email: string): string {
+function emailHash(email: string): string {
   return crypto.createHash('sha256').update(email).digest('hex');
 }
 
@@ -54,14 +58,9 @@ function formatLsDate(iso?: string): string | null {
   });
 }
 
+/** @deprecated use resolveUserIdByEmail */
 export async function findClerkUserIdByEmail(email: string): Promise<string | undefined> {
-  if (!email) return undefined;
-  const result = await clerk.users.getUserList({ emailAddress: [email], limit: 2 });
-  return result.data.find((user) =>
-    user.emailAddresses.some((item) =>
-      normalizeBillingEmail(item.emailAddress) === email,
-    ),
-  )?.id;
+  return resolveUserIdByEmail(email);
 }
 
 function userMutation(input: LemonEventInput): Record<string, unknown> {
@@ -126,13 +125,25 @@ export async function processSubscriptionEvent(
   let userId = input.suppliedUserId
     ?? (claimData?.userId as string | undefined)
     ?? (subscriptionData?.userId as string | undefined);
-  if (!userId && buyerEmail) userId = await findClerkUserIdByEmail(buyerEmail);
+
+  if (!userId && buyerEmail) {
+    userId = await resolveUserIdByEmail(buyerEmail);
+  }
+
+  // Always create/attach a user for paid subscription events when we have email
+  const isGranting = [
+    'subscription_created',
+    'subscription_payment_success',
+    'subscription_updated',
+    'subscription_resumed',
+  ].includes(input.eventName);
+
+  if (!userId && buyerEmail && isGranting) {
+    const ensured = await ensureUserForEmail(buyerEmail);
+    userId = ensured.userId;
+  }
 
   const idempotencyRef = db.collection('ls_webhook_events').doc(eventKey(input));
-  const pendingRef = resolvedClaimId && buyerEmail
-    ? db.collection('pending_entitlements').doc(emailKey(buyerEmail))
-      .collection('claims').doc(resolvedClaimId)
-    : null;
 
   const fresh = await db.runTransaction(async (tx: any) => {
     const processed = await tx.get(idempotencyRef);
@@ -144,26 +155,8 @@ export async function processSubscriptionEvent(
     if (userId && userRef) {
       tx.set(userRef, {
         ...userMutation(input),
-        ...(buyerEmail && { email: buyerEmail }),
+        ...(buyerEmail && { email: buyerEmail, emailKey: emailHash(buyerEmail) }),
         ...(!userSnap?.exists && { deviceLimit: 1, createdAt: now }),
-      }, { merge: true });
-    } else if (input.eventName === 'subscription_created' && pendingRef) {
-      tx.set(pendingRef, {
-        claimId: resolvedClaimId,
-        buyerEmail,
-        plan: input.plan,
-        variantId: input.variantId,
-        subscriptionId: input.subscriptionId,
-        customerId: input.customerId ?? null,
-        renewsAt: input.renewsAt ?? null,
-        refCode: input.refCode ?? null,
-        createdAt: now,
-      });
-    } else if (pendingRef && ['subscription_expired', 'subscription_paused'].includes(input.eventName)) {
-      tx.set(pendingRef, {
-        inactive: true,
-        statusEvent: input.eventName,
-        updatedAt: now,
       }, { merge: true });
     }
 
@@ -202,118 +195,67 @@ export async function processSubscriptionEvent(
     return true;
   });
 
+  if (userId && buyerEmail) {
+    await ensureEmailUserIndex(userId, buyerEmail).catch(() => {});
+  }
+
   return {
     fresh,
     userId,
     buyerEmail,
     claimId: resolvedClaimId,
-    needsInvitation: input.eventName === 'subscription_created' && !userId && !!buyerEmail,
+    needsMagicLink: fresh && input.eventName === 'subscription_created' && !!buyerEmail && !!userId,
   };
 }
 
-function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io').replace(/\/$/, '');
-}
-
-/** Build an on-site activate URL that embeds the Clerk invitation ticket. */
-export function buildActivateUrl(claimId: string, invitationUrl?: string | null): string {
-  const base = `${appOrigin()}/activate?purchase=${encodeURIComponent(claimId)}`;
-  if (!invitationUrl) return base;
-  try {
-    const ticket = new URL(invitationUrl).searchParams.get('ticket');
-    if (!ticket) return base;
-    return `${base}&__clerk_ticket=${encodeURIComponent(ticket)}&__clerk_status=sign_up`;
-  } catch {
-    return base;
-  }
-}
-
-async function createSilentInvitationUrl(
+export async function ensurePurchaseMagicLink(
+  claimId: string | undefined,
   buyerEmail: string,
-  claimId: string,
-): Promise<string | null> {
-  const redirectUrl = `${appOrigin()}/activate?purchase=${encodeURIComponent(claimId)}`;
+  plan: string,
+  opts?: { forceResend?: boolean },
+): Promise<void> {
+  if (!buyerEmail) return;
 
-  try {
-    const invitation = await clerk.invitations.createInvitation({
-      emailAddress: buyerEmail,
-      redirectUrl,
-      notify: false,
+  if (claimId) {
+    const claimRef = db.collection('purchase_claims').doc(claimId);
+    const claim = await claimRef.get();
+    if (claim.exists && claim.data()?.magicSentAt && !opts?.forceResend) return;
+
+    const { sendPurchaseMagicEmail } = await import('@/lib/email/transactional');
+    const redirect = claimId
+      ? `/purchase/complete?claim=${encodeURIComponent(claimId)}`
+      : '/dashboard';
+    const emailResult = await sendPurchaseMagicEmail({
+      to: buyerEmail,
+      plan,
+      redirect,
     });
-    return invitation.url ?? null;
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : '';
-    const clerkCodes = Array.isArray((error as { errors?: { code?: string }[] })?.errors)
-      ? (error as { errors: { code?: string }[] }).errors.map((e) => (e.code ?? '').toLowerCase()).join(' ')
-      : '';
-    const isDuplicate = message.includes('already')
-      || message.includes('exist')
-      || message.includes('duplicate')
-      || clerkCodes.includes('duplicate');
-    if (!isDuplicate) throw error;
-
-    try {
-      const invitation = await clerk.invitations.createInvitation({
-        emailAddress: buyerEmail,
-        redirectUrl,
-        notify: false,
-        ignoreExisting: true,
-      });
-      return invitation.url ?? null;
-    } catch (retryError) {
-      const list = await clerk.invitations.getInvitationList({ status: 'pending', limit: 100 });
-      const existing = list.data.find(
-        (item) => normalizeBillingEmail(item.emailAddress) === buyerEmail,
-      );
-      if (existing?.url) return existing.url;
-      // Last resort: revoke pending invites for this email, then recreate
-      for (const item of list.data) {
-        if (normalizeBillingEmail(item.emailAddress) !== buyerEmail) continue;
-        await clerk.invitations.revokeInvitation(item.id).catch(() => {});
-      }
-      const invitation = await clerk.invitations.createInvitation({
-        emailAddress: buyerEmail,
-        redirectUrl,
-        notify: false,
-        ignoreExisting: true,
-      });
-      return invitation.url ?? null;
+    if (!emailResult.ok) {
+      console.warn('[fulfillment] magic email failed:', emailResult.error);
+      return;
     }
+    if (claim.exists) {
+      await claimRef.set({
+        magicSentAt: new Date(),
+        status: 'fulfilled',
+        updatedAt: new Date(),
+      }, { merge: true });
+    }
+    return;
   }
+
+  const { sendPurchaseMagicEmail } = await import('@/lib/email/transactional');
+  await sendPurchaseMagicEmail({ to: buyerEmail, plan, redirect: '/dashboard' });
 }
 
+/** @deprecated use ensurePurchaseMagicLink */
 export async function ensurePurchaseInvitation(
   claimId: string,
   buyerEmail: string,
   plan?: string,
   opts?: { forceResend?: boolean },
 ): Promise<void> {
-  const claimRef = db.collection('purchase_claims').doc(claimId);
-  const claim = await claimRef.get();
-  if (!claim.exists) return;
-  if (claim.data()?.invitationSentAt && !opts?.forceResend) return;
-
-  const resolvedPlan = plan ?? String(claim.data()?.plan ?? 'starter');
-  const invitationUrl = await createSilentInvitationUrl(buyerEmail, claimId);
-  const activateUrl = buildActivateUrl(claimId, invitationUrl);
-
-  const { sendPurchaseActivationEmail } = await import('@/lib/email/transactional');
-  const emailResult = await sendPurchaseActivationEmail({
-    to: buyerEmail,
-    claimId,
-    plan: resolvedPlan,
-    activateUrl,
-  });
-  if (!emailResult.ok) {
-    console.warn('[fulfillment] activation email failed:', emailResult.error);
-    return;
-  }
-
-  await claimRef.set({
-    invitationSentAt: new Date(),
-    activationUrl: activateUrl,
-    updatedAt: new Date(),
-  }, { merge: true });
+  await ensurePurchaseMagicLink(claimId, buyerEmail, plan ?? 'starter', opts);
 }
 
 export async function ensureOrderConfirmedEmail(
@@ -349,6 +291,7 @@ export async function ensureOrderConfirmedEmail(
   });
 }
 
+/** Legacy pending_entitlements support for any in-flight guest purchases. */
 export async function claimPendingEntitlements(
   buyerEmail: string,
   userId: string,
@@ -356,7 +299,7 @@ export async function claimPendingEntitlements(
   const normalizedEmail = normalizeBillingEmail(buyerEmail);
   if (!normalizedEmail) return [];
   const pending = await db.collection('pending_entitlements')
-    .doc(emailKey(normalizedEmail))
+    .doc(emailHash(normalizedEmail))
     .collection('claims')
     .get();
   const claimed: Array<{ subscriptionId: string; plan: string; active: boolean; refCode?: string }> = [];
@@ -390,12 +333,14 @@ export async function claimPendingEntitlements(
         buyerEmail: normalizedEmail,
         updatedAt: now,
       }, { merge: true });
-      tx.set(db.collection('purchase_claims').doc(String(data.claimId)), {
-        status: 'fulfilled',
-        userId,
-        fulfilledAt: now,
-        updatedAt: now,
-      }, { merge: true });
+      if (data.claimId) {
+        tx.set(db.collection('purchase_claims').doc(String(data.claimId)), {
+          status: 'fulfilled',
+          userId,
+          fulfilledAt: now,
+          updatedAt: now,
+        }, { merge: true });
+      }
       tx.update(doc.ref, { userId, claimedAt: now });
       return true;
     });
@@ -408,5 +353,6 @@ export async function claimPendingEntitlements(
       });
     }
   }
+  await ensureEmailUserIndex(userId, normalizedEmail).catch(() => {});
   return claimed;
 }

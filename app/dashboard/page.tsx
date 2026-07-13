@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { getSessionUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -109,15 +109,15 @@ const FALLBACK_DATA = {
 };
 
 export default async function DashboardOverviewPage() {
-  const user = await currentUser();
+  const session = await getSessionUser();
 
-  if (!user) {
+  if (!session) {
     redirect("/sign-in");
   }
 
   let data;
   try {
-    data = await getDashboardData(user.id, user);
+    data = await getDashboardData(session.userId, { email: session.email });
   } catch (err) {
     console.error("[dashboard] getDashboardData failed:", err);
     data = FALLBACK_DATA;

@@ -1,8 +1,6 @@
-import { createClerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/firebaseAdmin';
 import type { FunnelId } from './constants';
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 import { getMergedFunnel } from './campaigns';
 import { renderStepHtml } from './funnels';
 import { getEmailSettings, incrementDailyMarketingSent, getDailyMarketingSentCount } from './settings';
@@ -33,16 +31,10 @@ export async function loadUserEmailProfile(
   userId: string,
   fallbackEmail?: string,
 ): Promise<UserEmailProfile | null> {
-  const [snap, clerkUser] = await Promise.all([
-    db.collection('users').doc(userId).get(),
-    clerk.users.getUser(userId).catch(() => null),
-  ]);
-
+  const snap = await db.collection('users').doc(userId).get();
   const d = snap.exists ? snap.data()! : {};
-  const clerkEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? '';
   const email = (
-    clerkEmail
-    || (d.email as string | undefined)
+    (d.email as string | undefined)
     || (d.userEmail as string | undefined)
     || fallbackEmail
   )?.trim();
@@ -51,8 +43,7 @@ export async function loadUserEmailProfile(
   return {
     userId,
     email,
-    firstName: (clerkUser?.firstName as string | undefined)?.trim()
-      || (d.firstName as string | undefined)?.trim()
+    firstName: (d.firstName as string | undefined)?.trim()
       || (d.displayName as string | undefined)?.split(' ')[0]
       || 'there',
     plan:             (d.plan as string) ?? 'unpaid',
@@ -152,39 +143,22 @@ interface UnpaidCandidate {
   createdAt: number;
 }
 
-/** Same source as Admin Users tab: Clerk list + Firestore profile. */
+/** Same source as Admin Users tab: Firestore users collection. */
 async function listUnpaidCandidates(funnelId: FunnelId): Promise<UnpaidCandidate[]> {
-  const [snap, clerkRes] = await Promise.all([
-    db.collection('users').limit(1000).get(),
-    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string; emailAddresses?: { emailAddress: string }[]; firstName?: string | null; createdAt?: number }[] })),
-  ]);
-
-  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
-  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
-
+  const snap = await db.collection('users').limit(1000).get();
   const candidates: UnpaidCandidate[] = [];
 
-  for (const cu of clerkRes.data) {
-    const d = fsMap.get(cu.id) ?? {};
+  for (const doc of snap.docs) {
+    const d = doc.data();
     if (!isUnpaidUser(d.licenseStatus as string | undefined)) continue;
-
-    const clerkEmail = cu.emailAddresses?.[0]?.emailAddress ?? '';
-    const merged = {
-      ...d,
-      email: clerkEmail || d.email,
-      userEmail: d.userEmail,
-      firstName: cu.firstName ?? d.firstName,
-    };
-
-    const profile = profileFromUserDoc(cu.id, merged);
+    const profile = profileFromUserDoc(doc.id, d);
     if (!profile || !isEligibleForFunnel(profile, funnelId)) continue;
 
     let createdAt = 0;
     if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().getTime();
     else if (d.createdAt instanceof Date) createdAt = d.createdAt.getTime();
-    else if (cu.createdAt) createdAt = new Date(cu.createdAt).getTime();
 
-    candidates.push({ userId: cu.id, email: profile.email, createdAt });
+    candidates.push({ userId: doc.id, email: profile.email, createdAt });
   }
 
   candidates.sort((a, b) => a.createdAt - b.createdAt);
@@ -469,27 +443,16 @@ export async function enrollAllStarterPro(): Promise<EnrollAllUnpaidResult> {
   const funnel = await getMergedFunnel(funnelId);
   const step0Delay = funnel.steps[0]?.delayDays ?? 0;
 
-  const [snap, clerkRes] = await Promise.all([
-    db.collection('users').limit(1000).get(),
-    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string; emailAddresses?: { emailAddress: string }[]; firstName?: string | null; createdAt?: number }[] })),
-  ]);
-  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
-  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
+  const snap = await db.collection('users').limit(1000).get();
 
   const candidates: UnpaidCandidate[] = [];
-  for (const cu of clerkRes.data) {
-    const d = fsMap.get(cu.id) ?? {};
-    const merged = {
-      ...d,
-      email: cu.emailAddresses?.[0]?.emailAddress || d.email,
-      firstName: cu.firstName ?? d.firstName,
-    };
-    const profile = profileFromUserDoc(cu.id, merged);
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    const profile = profileFromUserDoc(doc.id, d);
     if (!profile || !isEligibleForFunnel(profile, funnelId)) continue;
     let createdAt = 0;
     if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().getTime();
-    else if (cu.createdAt) createdAt = new Date(cu.createdAt).getTime();
-    candidates.push({ userId: cu.id, email: profile.email, createdAt });
+    candidates.push({ userId: doc.id, email: profile.email, createdAt });
   }
   candidates.sort((a, b) => a.createdAt - b.createdAt);
 
@@ -519,16 +482,11 @@ export async function enrollAllStarterPro(): Promise<EnrollAllUnpaidResult> {
 }
 
 async function computeUnpaidBreakdown() {
-  const [snap, clerkRes] = await Promise.all([
-    db.collection('users').limit(1000).get(),
-    clerk.users.getUserList({ limit: 500 }).catch(() => ({ data: [] as { id: string }[] })),
-  ]);
-  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
-  for (const doc of snap.docs) fsMap.set(doc.id, doc.data());
+  const snap = await db.collection('users').limit(1000).get();
 
   let unpaidTotal = 0;
-  for (const cu of clerkRes.data) {
-    const d = fsMap.get(cu.id) ?? {};
+  for (const doc of snap.docs) {
+    const d = doc.data();
     if (isUnpaidUser(d.licenseStatus as string | undefined)) unpaidTotal++;
   }
 

@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Users, Zap, AlertCircle, Search, ChevronDown,
   RefreshCw, X, Check, Loader2, Edit2, CreditCard, ShieldOff,
@@ -1076,8 +1075,13 @@ function RevenueSection() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AdminPanel() {
-  const { user: clerkUser } = useUser();
-  const currentUserId = clerkUser?.id ?? '';
+  const [currentUserId, setCurrentUserId] = useState('');
+  useEffect(() => {
+    fetch('/api/me', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.userId) setCurrentUserId(d.userId); })
+      .catch(() => {});
+  }, []);
 
   const [users,         setUsers]         = useState<AdminUser[]>([]);
   const [loadError,     setLoadError]     = useState<string | null>(null);

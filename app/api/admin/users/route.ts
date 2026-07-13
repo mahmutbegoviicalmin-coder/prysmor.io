@@ -1,11 +1,7 @@
-import { currentUser, createClerkClient } from '@clerk/nextjs/server';
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-import { NextResponse }              from 'next/server';
-import { db }                        from '@/lib/firebaseAdmin';
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/firebaseAdmin';
 import { PLAN_LABELS, PLAN_CREDITS } from '@/lib/firestore/users';
-
-const ADMIN_EMAILS = ['mahmutbegoviic.almin@gmail.com'];
+import { requireAdmin } from '@/lib/admin/auth';
 
 export interface AdminUser {
   id:               string;
@@ -29,188 +25,76 @@ export interface AdminUser {
   trialUsedAt:      string | null;
 }
 
-// country name → ISO-2 code
-const NAME_TO_CODE: Record<string, string> = {
-  "afghanistan":"AF","albania":"AL","algeria":"DZ","argentina":"AR","armenia":"AM",
-  "australia":"AU","austria":"AT","azerbaijan":"AZ","bahrain":"BH","bangladesh":"BD",
-  "belarus":"BY","belgium":"BE","belize":"BZ","bolivia":"BO","bosnia and herzegovina":"BA",
-  "botswana":"BW","brazil":"BR","bulgaria":"BG","cambodia":"KH","cameroon":"CM",
-  "canada":"CA","chile":"CL","china":"CN","colombia":"CO","congo (drc)":"CD",
-  "costa rica":"CR","croatia":"HR","cuba":"CU","cyprus":"CY","czech republic":"CZ",
-  "czechia":"CZ","denmark":"DK","dominican republic":"DO","ecuador":"EC","egypt":"EG",
-  "el salvador":"SV","estonia":"EE","ethiopia":"ET","finland":"FI","france":"FR",
-  "georgia":"GE","germany":"DE","ghana":"GH","greece":"GR","guatemala":"GT",
-  "honduras":"HN","hong kong":"HK","hungary":"HU","india":"IN","indonesia":"ID",
-  "iran":"IR","iraq":"IQ","ireland":"IE","israel":"IL","italy":"IT","jamaica":"JM",
-  "japan":"JP","jordan":"JO","kazakhstan":"KZ","kenya":"KE","kuwait":"KW",
-  "latvia":"LV","lebanon":"LB","lithuania":"LT","luxembourg":"LU","malaysia":"MY",
-  "mexico":"MX","moldova":"MD","morocco":"MA","mozambique":"MZ","myanmar":"MM",
-  "nepal":"NP","netherlands":"NL","new zealand":"NZ","nicaragua":"NI","nigeria":"NG",
-  "north korea":"KP","north macedonia":"MK","norway":"NO","oman":"OM","pakistan":"PK",
-  "palestine":"PS","panama":"PA","paraguay":"PY","peru":"PE","philippines":"PH",
-  "poland":"PL","portugal":"PT","qatar":"QA","romania":"RO","russia":"RU",
-  "saudi arabia":"SA","senegal":"SN","serbia":"RS","singapore":"SG","slovakia":"SK",
-  "slovenia":"SI","south africa":"ZA","south korea":"KR","spain":"ES","sri lanka":"LK",
-  "sudan":"SD","sweden":"SE","switzerland":"CH","syria":"SY","taiwan":"TW",
-  "tanzania":"TZ","thailand":"TH","tunisia":"TN","turkey":"TR","uganda":"UG",
-  "ukraine":"UA","united arab emirates":"AE","united kingdom":"GB","united states":"US",
-  "uruguay":"UY","uzbekistan":"UZ","venezuela":"VE","vietnam":"VN","yemen":"YE",
-  "zambia":"ZM","zimbabwe":"ZW",
-};
-
-function countryNameToCode(name: string): string | null {
-  return NAME_TO_CODE[name.toLowerCase().trim()] ?? null;
-}
-
 export async function GET() {
   try {
-  const user  = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+    const admin = await requireAdmin();
+    if (!admin.ok) return admin.response;
 
-  // Fetch Firestore docs + Clerk users in parallel
-  const [snap, clerkRes] = await Promise.all([
-    db.collection('users').limit(500).get(),
-    clerk.users.getUserList({ limit: 500 }).catch((err) => {
-      console.error('[admin GET] getUserList error:', err);
-      return { data: [] };
-    }),
-  ]);
+    const snap = await db.collection('users').limit(500).get();
 
-  type ClerkUserShape = {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    emailAddresses: { emailAddress: string }[];
-    lastSignInAt: number | null;
-    createdAt: number;
-  };
+    const users: AdminUser[] = snap.docs.map((doc) => {
+      const d = doc.data();
+      const plan         = d.plan ?? 'unpaid';
+      const planCap      = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
+      const credits      = typeof d.credits === 'number' ? d.credits : 0;
+      const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
 
-  const rawList = Array.isArray(clerkRes) ? clerkRes : ((clerkRes as { data: unknown[] }).data ?? []);
-  const clerkUserList = rawList as ClerkUserShape[];
+      let createdAt: string | null = null;
+      if (d.createdAt?.toDate)              createdAt = d.createdAt.toDate().toISOString();
+      else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
 
-  // Build Firestore lookup map
-  const fsMap = new Map<string, FirebaseFirestore.DocumentData>();
-  for (const doc of snap.docs) {
-    fsMap.set(doc.id, doc.data());
-  }
+      const firstName     = d.firstName ?? '';
+      const lastName      = d.lastName  ?? '';
+      const resolvedEmail = d.userEmail || d.email || '';
 
-  // Build user list, country comes from Firestore cache only.
-  // Per-user country refresh is available via the "Refresh location" action in the admin panel.
-  // Bulk Clerk session fetching was removed because it caused route timeouts with large user lists.
-  const users: AdminUser[] = clerkUserList.map((cu) => {
-    const d = fsMap.get(cu.id) ?? {};
+      const displayName = (firstName || lastName)
+        ? [firstName, lastName].filter(Boolean).join(' ')
+        : (d.displayName ?? String(resolvedEmail).split('@')[0] ?? '');
 
-    const plan         = d.plan ?? 'unpaid';
-    const planCap      = PLAN_CREDITS[plan] ?? PLAN_CREDITS.starter;
-    const credits      = typeof d.credits      === 'number' ? d.credits      : 0;
-    const creditsTotal = typeof d.creditsTotal === 'number' ? d.creditsTotal : planCap;
+      return {
+        id:               doc.id,
+        email:            resolvedEmail,
+        displayName,
+        firstName,
+        lastName,
+        plan,
+        planLabel:        PLAN_LABELS[plan] ?? plan,
+        licenseStatus:    d.licenseStatus  ?? 'inactive',
+        credits,
+        creditsTotal,
+        renewalDate:      d.renewalDate    ?? null,
+        deviceLimit:      d.deviceLimit    ?? 1,
+        createdAt,
+        lastSignInAt:     null,
+        country:          d.country     ?? null,
+        countryCode:      d.countryCode ?? null,
+        lsSubscriptionId: d.lsSubscriptionId,
+        trialUsed:        d.trialUsed   === true,
+        trialUsedAt:      d.trialUsedAt?.toDate?.()?.toISOString?.()
+                          ?? (d.trialUsedAt instanceof Date ? d.trialUsedAt.toISOString() : null),
+      };
+    });
 
-    let createdAt: string | null = null;
-    if (d.createdAt?.toDate)              createdAt = d.createdAt.toDate().toISOString();
-    else if (d.createdAt instanceof Date) createdAt = d.createdAt.toISOString();
-    else if (cu.createdAt)               createdAt = new Date(cu.createdAt).toISOString();
+    users.sort((a, b) => {
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
 
-    const firstName     = cu.firstName ?? d.firstName ?? '';
-    const lastName      = cu.lastName  ?? d.lastName  ?? '';
-    const clerkEmail    = cu.emailAddresses?.[0]?.emailAddress ?? '';
-    const resolvedEmail = clerkEmail || d.userEmail || d.email || '';
-
-    const displayName = (firstName || lastName)
-      ? [firstName, lastName].filter(Boolean).join(' ')
-      : (d.displayName ?? resolvedEmail.split('@')[0] ?? '');
-
-    const lastSignInAt = cu.lastSignInAt ? new Date(cu.lastSignInAt).toISOString() : null;
-
-    return {
-      id:               cu.id,
-      email:            resolvedEmail,
-      displayName,
-      firstName,
-      lastName,
-      plan,
-      planLabel:        PLAN_LABELS[plan] ?? plan,
-      licenseStatus:    d.licenseStatus  ?? 'inactive',
-      credits,
-      creditsTotal,
-      renewalDate:      d.renewalDate    ?? null,
-      deviceLimit:      d.deviceLimit    ?? 1,
-      createdAt,
-      lastSignInAt,
-      country:          d.country     ?? null,
-      countryCode:      d.countryCode ?? null,
-      lsSubscriptionId: d.lsSubscriptionId,
-      trialUsed:        d.trialUsed   === true,
-      trialUsedAt:      d.trialUsedAt?.toDate?.()?.toISOString?.()
-                        ?? (d.trialUsedAt instanceof Date ? d.trialUsedAt.toISOString() : null),
-    };
-  });
-
-  users.sort((a, b) => {
-    if (!a.createdAt) return 1;
-    if (!b.createdAt) return -1;
-    return b.createdAt.localeCompare(a.createdAt);
-  });
-
-  return NextResponse.json({ users });
+    return NextResponse.json({ users });
   } catch (err) {
     console.error('[admin GET /api/admin/users]', err);
     return NextResponse.json({ error: 'Internal server error', detail: String(err) }, { status: 500 });
   }
 }
 
-/** DELETE /api/admin/users, purge all Firestore users with no Clerk account */
+/** DELETE /api/admin/users — disabled without Clerk; refuse destructive bulk purge */
 export async function DELETE() {
-  const user  = await currentUser();
-  const emails = user?.emailAddresses?.map(e => e.emailAddress) ?? [];
-  if (!emails.some(e => ADMIN_EMAILS.includes(e))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
 
-  let clerkUsersRes;
-  try {
-    clerkUsersRes = await clerk.users.getUserList({ limit: 500 });
-  } catch (err) {
-    console.error('[admin purge] getUserList failed:', err);
-    return NextResponse.json({ error: 'Cannot purge: Clerk API unavailable. Refusing to delete to avoid data loss.' }, { status: 503 });
-  }
-
-  const clerkUsers = Array.isArray(clerkUsersRes) ? clerkUsersRes : ((clerkUsersRes as { data: { id: string }[] }).data ?? []);
-  const clerkIds = new Set(clerkUsers.map((cu: { id: string }) => cu.id));
-
-  // Safety guard: if Clerk returned 0 users, refuse to purge, it means the API call
-  // failed silently and purging would delete ALL Firestore users incorrectly.
-  if (clerkIds.size === 0) {
-    return NextResponse.json({
-      error: 'Safety check failed: Clerk returned 0 users. Refusing to purge to prevent data loss.',
-      deleted: 0,
-    }, { status: 503 });
-  }
-
-  const snap = await db.collection('users').get();
-  const orphans = snap.docs.filter(doc => !clerkIds.has(doc.id));
-
-  if (orphans.length === 0) {
-    return NextResponse.json({ deleted: 0, message: 'No orphaned users found.' });
-  }
-
-  // Safety guard: never delete more than 50% of Firestore users at once
-  const threshold = Math.ceil(snap.docs.length * 0.5);
-  if (orphans.length > threshold) {
-    return NextResponse.json({
-      error: `Safety check failed: ${orphans.length} of ${snap.docs.length} users would be deleted (>${threshold}). This looks wrong. Use Firestore console if you really need this.`,
-      deleted: 0,
-    }, { status: 400 });
-  }
-
-  const batch = db.batch();
-  for (const doc of orphans) {
-    batch.delete(doc.ref);
-  }
-  await batch.commit();
-
-  console.log(`[admin] Purged ${orphans.length} orphaned Firestore users`);
-  return NextResponse.json({ deleted: orphans.length, message: `Deleted ${orphans.length} orphaned user(s).` });
+  return NextResponse.json({
+    error: 'Orphan purge is disabled after Clerk removal. Delete users individually.',
+    deleted: 0,
+  }, { status: 400 });
 }

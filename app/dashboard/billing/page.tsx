@@ -1,4 +1,4 @@
-import { auth }        from '@clerk/nextjs/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { CreditCard, CheckCircle2, AlertTriangle, XCircle }  from 'lucide-react';
 import Link            from 'next/link';
 import { db }          from '@/lib/firebaseAdmin';
@@ -70,7 +70,8 @@ interface PageProps {
 }
 
 export default async function BillingPage({ searchParams }: PageProps) {
-  const { userId } = await auth();
+  const session = await getSessionUser();
+  const userId = session?.userId ?? null;
   const userDoc = userId ? await getUserDoc(userId).catch(() => null) : null;
 
   const plan          = userDoc?.plan          ?? 'starter';

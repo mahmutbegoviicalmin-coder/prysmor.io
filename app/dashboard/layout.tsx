@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
@@ -88,37 +87,48 @@ function NavLink({
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname                    = usePathname();
-  const { user, isLoaded, isSignedIn } = useUser();
-  const firstName                   = user?.firstName ?? "";
+  const [me, setMe] = useState<{ userId: string; email: string } | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const isSignedIn = !!me;
+  const firstName = me?.email?.split("@")[0] ?? "";
 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [planLabel, setPlanLabel]       = useState("Free");
   const [showAffiliate, setShowAffiliate] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
-
-    fetch("/api/me")
-      .then((r) => r.json())
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        setIsSubscribed(d.licenseStatus === "active");
-        setPlanLabel(
-          d.licenseStatus === "active"
-            ? (d.plan === "pro" ? "Pro" : d.plan === "exclusive" ? "Exclusive" : "Starter")
-            : "No Plan"
-        );
+        if (cancelled) return;
+        if (d?.userId) {
+          setMe({ userId: d.userId, email: d.email || "" });
+          setIsSubscribed(d.licenseStatus === "active");
+          setPlanLabel(
+            d.licenseStatus === "active"
+              ? (d.plan === "pro" ? "Pro" : d.plan === "exclusive" ? "Exclusive" : "Starter")
+              : "No Plan"
+          );
+        } else {
+          setMe(null);
+        }
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setMe(null); })
+      .finally(() => { if (!cancelled) setIsLoaded(true); });
 
-    if (isSignedIn) {
-      fetch("/api/affiliate/stats")
-        .then((r) => setShowAffiliate(r.ok))
-        .catch(() => setShowAffiliate(false));
-    } else {
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
       setShowAffiliate(false);
+      return;
     }
+    fetch("/api/affiliate/stats")
+      .then((r) => setShowAffiliate(r.ok))
+      .catch(() => setShowAffiliate(false));
 
-    // Only sync location once per session to avoid duplicate calls with ConditionalShell
     const syncKey = "prysmor_loc_synced";
     if (!sessionStorage.getItem(syncKey)) {
       sessionStorage.setItem(syncKey, "1");
@@ -127,17 +137,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [isLoaded, isSignedIn]);
 
 
-  // If Clerk loads but user is not signed in → wait briefly then redirect
-  // (OAuth sessions can take a moment to establish after redirect)
   useEffect(() => {
     if (!isLoaded || isSignedIn) return;
     const timer = setTimeout(() => {
       window.location.replace("/sign-in");
-    }, 1000);
+    }, 500);
     return () => clearTimeout(timer);
   }, [isLoaded, isSignedIn]);
 
-  // Show spinner while Clerk is loading OR session is settling after OAuth
+  // Show spinner while session is loading
   if (!isLoaded || !isSignedIn) {
     return (
       <div style={{
@@ -167,7 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         n.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(n.href)
       )?.label ?? "Dashboard";
 
-  const userEmail      = user?.primaryEmailAddress?.emailAddress ?? "";
+  const userEmail      = me?.email ?? "";
   const isAdmin        = userEmail === ADMIN_EMAIL;
   const isAffiliate    = showAffiliate;
   const adminActive    = pathname.startsWith("/dashboard/admin");
@@ -334,7 +342,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               borderRadius: "8px",
             }}
           >
-            <UserButton afterSignOutUrl="/" />
+            <Link href="/sign-out" style={{ fontSize: "12px", color: "#666", textDecoration: "none" }}>Sign out</Link>
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: "12px", fontWeight: 500, color: "#aaa", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {firstName}
@@ -378,7 +386,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {firstName}
               </span>
             )}
-            <UserButton afterSignOutUrl="/" />
+            <Link href="/sign-out" style={{ fontSize: "12px", color: "#666", textDecoration: "none" }}>Sign out</Link>
           </div>
         </header>
 

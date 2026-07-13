@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
 import {
   Upload, Play, RotateCcw, ArrowRight, CheckCircle,
   Loader2, AlertCircle, ImageIcon, X, Layers, Sun,
@@ -48,7 +47,18 @@ function getVideoDuration(file: File): Promise<number> {
 }
 
 export default function PlaygroundPage() {
-  const { user } = useUser();
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.userId) return;
+        setUser({ id: d.userId, email: d.email || "" });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const [mode,        setMode]        = useState<Mode>("background");
   const [videoFile,   setVideoFile]   = useState<File | null>(null);

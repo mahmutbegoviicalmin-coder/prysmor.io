@@ -1,16 +1,14 @@
-import { currentUser } from '@clerk/nextjs/server';
+import { requireUser } from '@/lib/auth/session';
 import { NextResponse } from 'next/server';
 import { resolveAffiliateForUser } from '@/lib/affiliates';
 import { getOpenPayoutRequestForUser, getPayoutRequestsForUser } from '@/lib/payouts';
 
 /** GET /api/affiliate/payout-requests */
 export async function GET() {
-  const user = await currentUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const email = user.emailAddresses[0]?.emailAddress ?? '';
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId, email } = authResult.user;
+  const user = { id: userId };
   const affiliate = await resolveAffiliateForUser(user.id, email);
   if (!affiliate || affiliate.status !== 'active') {
     return NextResponse.json({ error: 'No affiliate profile found' }, { status: 404 });

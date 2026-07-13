@@ -3000,6 +3000,23 @@ function bindEvents() {
     cs.openURLInDefaultBrowser(SITE_URL + '/dashboard');
   });
 
+  var manageSubBtn = el('btn-manage-sub');
+  if (manageSubBtn) {
+    manageSubBtn.addEventListener('click', function () {
+      apiFetch('/api/panel/portal')
+        .then(function (data) {
+          if (data && data.url) {
+            cs.openURLInDefaultBrowser(data.url);
+            return;
+          }
+          cs.openURLInDefaultBrowser(SITE_URL + '/dashboard/billing');
+        })
+        .catch(function () {
+          cs.openURLInDefaultBrowser(SITE_URL + '/dashboard/billing');
+        });
+    });
+  }
+
   // No-credits upgrade link
   var upgradeLink = el('no-credits-upgrade-link');
   if (upgradeLink) {

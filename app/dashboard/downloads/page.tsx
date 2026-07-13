@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { getSessionUser } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Lock, Zap, ArrowRight } from "lucide-react";
@@ -88,10 +88,10 @@ function PaywallGate({ planName }: { planName: string }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function DownloadsPage() {
-  const user = await currentUser();
-  if (!user) redirect("/");
+  const session = await getSessionUser();
+  if (!session) redirect("/sign-in");
 
-  const userDoc       = await getUser(user.id).catch(() => null);
+  const userDoc       = await getUser(session.userId).catch(() => null);
   const licenseStatus = userDoc?.licenseStatus ?? "inactive";
   const plan          = userDoc?.plan ?? "starter";
   const planName      = PLAN_LABELS[plan] ?? "Starter";

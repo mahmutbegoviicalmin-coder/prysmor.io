@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
 import { Loader2, ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 
@@ -36,7 +35,20 @@ function formatTime(iso: string) {
 }
 
 export default function AdminSupportPage() {
-  const { user, isLoaded } = useUser();
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.userId) setUser({ id: d.userId, email: d.email || "" });
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setIsLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -48,7 +60,7 @@ export default function AdminSupportPage() {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = isLoaded && user?.primaryEmailAddress?.emailAddress === ADMIN_EMAIL;
+  const isAdmin = isLoaded && user?.email === ADMIN_EMAIL;
 
   async function loadTickets() {
     const res = await fetch("/api/admin/support");

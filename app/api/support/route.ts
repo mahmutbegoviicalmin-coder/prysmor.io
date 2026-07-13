@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { Resend } from "resend";
@@ -6,8 +6,9 @@ import { Resend } from "resend";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   const body = await req.json();
   const { issueType, adobeVersion, osVersion, pluginVersion, description, email, screenshotUrl } = body;

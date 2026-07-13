@@ -1,7 +1,7 @@
 export const runtime    = "nodejs";
 export const maxDuration = 30;
 
-import { auth }         from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from "next/server";
 import { getJob, updateJob } from "@/lib/motionforge/jobs";
 import { createBeebleUploadSlot } from "@/lib/motionforge/beeble";
@@ -20,8 +20,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   const job = await getJob(userId, params.id).catch(() => null);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });

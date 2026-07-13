@@ -1,12 +1,13 @@
 export const runtime = 'nodejs';
 
-import { auth } from "@clerk/nextjs/server";
+import { requireUser } from '@/lib/auth/session';
 import { NextRequest, NextResponse } from 'next/server';
 import { enhanceMotionForgePrompt, validatePrompt } from '@/lib/motionforge/promptEnhancer';
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireUser();
+  if (!authResult.ok) return authResult.response;
+  const { userId } = authResult.user;
 
   let body: { prompt?: string; mode?: string };
   try { body = await req.json(); }
