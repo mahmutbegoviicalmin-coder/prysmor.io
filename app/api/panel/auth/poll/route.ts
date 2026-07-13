@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
       userId:    data.userId,
       plan:      data.plan,
       planLabel: data.planLabel,
+      expiresAt: data.expiresAt,
     });
   }
 

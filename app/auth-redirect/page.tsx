@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const MAX_RETRIES = 6;   // 6 × 400ms = ~2.4s max wait
 const RETRY_MS   = 400;
@@ -10,12 +10,18 @@ const RETRY_MS   = 400;
 export default function AuthRedirectPage() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const purchase = searchParams.get("purchase");
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (!isLoaded) return;
 
     if (user) {
+      if (purchase && /^[a-f0-9]{64}$/.test(purchase)) {
+        router.replace(`/purchase/complete?claim=${encodeURIComponent(purchase)}`);
+        return;
+      }
       const createdAt = user.createdAt ? new Date(user.createdAt) : null;
       const isNew = createdAt !== null && Date.now() - createdAt.getTime() < 5 * 60_000;
       router.replace(isNew ? "/dashboard/playground" : "/dashboard");
@@ -28,7 +34,7 @@ export default function AuthRedirectPage() {
     }
 
     router.replace("/sign-in");
-  }, [user, isLoaded, router, tick]);
+  }, [user, isLoaded, router, tick, purchase]);
 
   return (
     <div

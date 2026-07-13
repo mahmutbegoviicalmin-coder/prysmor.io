@@ -1152,8 +1152,43 @@
     </div>
   </div>
 
+  <div id="mf-generation-lock" class="mf-generation-lock" aria-hidden="true" role="status" aria-live="polite" tabindex="-1">
+    <div class="mf-generation-lock-card">
+      <div class="mf-generation-lock-spinner"></div>
+      <strong>Generation in progress</strong>
+      <span id="mf-generation-lock-status">Preparing your clip…</span>
+      <div class="mf-generation-lock-track"><span id="mf-generation-lock-fill"></span></div>
+      <small id="mf-generation-lock-percent">0%</small>
+    </div>
+  </div>
+
   <!-- ── History overlay styles ─────────────────────── -->
   <style>
+    .mf-generation-lock {
+      position: fixed; inset: 0; z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      padding: 22px; background: rgba(8,8,8,0.78);
+      backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .mf-generation-lock.active { opacity: 1; pointer-events: auto; }
+    .mf-generation-lock-card {
+      width: min(280px, 100%); padding: 22px 18px;
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+      background: #111113; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 9px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .mf-generation-lock-card strong { color: var(--text-1); font-size: 14px; }
+    .mf-generation-lock-card span, .mf-generation-lock-card small { color: var(--text-2); font-size: 11px; }
+    .mf-generation-lock-spinner {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent);
+      animation: spin 0.75s linear infinite;
+    }
+    .mf-generation-lock-track { width: 100%; height: 3px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,0.08); }
+    #mf-generation-lock-fill { display: block; width: 0%; height: 100%; background: var(--accent); transition: width 0.25s ease; }
     #section-history {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
       background: rgba(0,0,0,0.55);

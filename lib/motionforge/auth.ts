@@ -5,6 +5,7 @@ import { getUser }    from '@/lib/firestore/users';
 // ─── Panel session token ───────────────────────────────────────────────────────
 
 export interface PanelSession {
+  token:              string;
   userId:             string;
   plan:               string;
   planLabel:          string;
@@ -12,6 +13,8 @@ export interface PanelSession {
   deviceId?:          string;
   machineFingerprint?: string;
 }
+
+export const PANEL_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
  * Validates the static panel secret (legacy dev convenience).
@@ -29,7 +32,8 @@ export function validatePanelKey(req: NextRequest): boolean {
  * Returns null if the token is missing, invalid, or expired.
  */
 export async function validatePanelToken(
-  req: NextRequest
+  req: NextRequest,
+  options: { skipMachineCheck?: boolean } = {},
 ): Promise<PanelSession | null> {
   const auth  = req.headers.get('authorization') ?? '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
@@ -41,12 +45,17 @@ export async function validatePanelToken(
 
     const data = snap.data()!;
     if (Date.now() > data.expiresAt) return null;
+    if (!options.skipMachineCheck && data.machineFingerprint) {
+      const incomingMachineId = req.headers.get('x-machine-id') ?? '';
+      if (incomingMachineId !== data.machineFingerprint) return null;
+    }
 
     // Verify license is still active
     const userDoc = await getUser(data.userId).catch(() => null);
     if (userDoc && userDoc.licenseStatus !== 'active') return null;
 
     return {
+      token,
       userId:             data.userId,
       plan:               data.plan,
       planLabel:          data.planLabel,

@@ -2,6 +2,7 @@
 
 import { SignUp } from "@clerk/nextjs";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 
 const appearance = {
   variables: {
@@ -90,6 +91,11 @@ const STEPS = [
 ];
 
 export default function SignUpPage() {
+  const searchParams = useSearchParams();
+  const purchase = searchParams.get("purchase");
+  const afterSignUp = purchase && /^[a-f0-9]{64}$/.test(purchase)
+    ? `/auth-redirect?purchase=${encodeURIComponent(purchase)}`
+    : "/auth-redirect";
   return (
     <>
       <style>{`
@@ -228,7 +234,7 @@ export default function SignUpPage() {
           <div className="au-form-wrap">
             <h2 className="au-form-title">Create account</h2>
             <p className="au-form-sub">Join thousands of editors already using Prysmor.</p>
-            <SignUp forceRedirectUrl="/auth-redirect" appearance={appearance} />
+            <SignUp forceRedirectUrl={afterSignUp} appearance={appearance} />
           </div>
         </div>
       </div>

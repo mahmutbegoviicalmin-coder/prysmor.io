@@ -16,6 +16,7 @@ const SOFT_TIMEOUT_MS = 10 * 60 * 1000;    // at 10 min switch to slow polling
 // Auth polling
 const AUTH_POLL_MS  = 6000;  // how often to check if browser auth completed
 const AUTH_MAX_MS   = 5 * 60 * 1000; // 5 min before code expires
+const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 // Generation status labels by elapsed time (no vendor names)
 const GEN_STATUS_LABELS = [
@@ -313,8 +314,8 @@ async function validateSessionThenEnter() {
   enterPanel();
 }
 
-function saveSession(token, userId, plan, planLabel) {
-  const exp = Date.now() + 5 * 24 * 60 * 60 * 1000; // 5 days
+function saveSession(token, userId, plan, planLabel, serverExpiresAt) {
+  const exp = Number(serverExpiresAt) || (Date.now() + SESSION_TTL_MS);
   try {
     localStorage.setItem(LS_TOKEN,      token);
     localStorage.setItem(LS_USER_ID,    userId);
@@ -441,7 +442,7 @@ function startAuthPolling(deviceCode) {
 
       if (data.status === 'authorized') {
         stopAuthPolling();
-        saveSession(data.token, data.userId, data.plan, data.planLabel);
+        saveSession(data.token, data.userId, data.plan, data.planLabel, data.expiresAt);
         setLoginStatus('', false);
         enterPanel();
       } else if (data.status === 'expired') {
@@ -484,6 +485,14 @@ function sendHeartbeat() {
         if (data && data.code === 'machine_mismatch') {
           logout();
           showToast('Session invalid on this device. Please sign in again.', 'error');
+        }
+      }).catch(function () {});
+      return;
+    }
+    if (res.ok) {
+      res.json().then(function (data) {
+        if (data && Number(data.expiresAt)) {
+          localStorage.setItem(LS_TOKEN_EXP, String(data.expiresAt));
         }
       }).catch(function () {});
     }
@@ -1903,6 +1912,21 @@ function setGenerating(active) {
   var btn   = el('mf-btn-generate');
   var lbl   = el('gen-btn-label');
   var pline = el('v2-gen-pline');
+  var lock  = el('mf-generation-lock');
+  var mainView = el('view-main');
+
+  if (lock) {
+    lock.classList.toggle('active', active);
+    lock.setAttribute('aria-hidden', active ? 'false' : 'true');
+    if (active) lock.focus();
+  }
+  if (mainView) mainView.setAttribute('aria-busy', active ? 'true' : 'false');
+  if (active) {
+    var settings = el('section-settings');
+    var history = el('section-history');
+    if (settings) settings.classList.remove('settings-visible');
+    if (history) history.classList.remove('history-visible');
+  }
 
   if (btn) {
     btn.disabled = active; // disabled while generating so double-clicks are blocked
@@ -1962,6 +1986,14 @@ function setStage(stage) {
 }
 
 function setStatus(text, pct /*, elapsed — ignored, timer handles it */) {
+  var lockStatus = el('mf-generation-lock-status');
+  var lockFill = el('mf-generation-lock-fill');
+  var lockPercent = el('mf-generation-lock-percent');
+  var lockPct = pct != null ? Math.round(Math.min(Math.max(pct, 0), 100)) : null;
+  if (lockStatus) lockStatus.textContent = text;
+  if (lockFill && lockPct != null) lockFill.style.width = lockPct + '%';
+  if (lockPercent) lockPercent.textContent = lockPct != null ? lockPct + '%' : '';
+
   // ── Update the generate button inline during generation ──────────────────
   if (state.mf.generating) {
     var genLbl  = el('gen-btn-label');
@@ -2033,18 +2065,7 @@ function sanitizePanelError(msg) {
 
 function fail(msg) {
   stopMfPolling();
-  stopElapsedTimer();
-  _genStartTime = null;
-  state.mf.generating = false;
-
-  // Reset button to normal (not generating) state — do NOT hide it
-  var btn   = el('mf-btn-generate');
-  var lbl   = el('gen-btn-label');
-  var pline = el('v2-gen-pline');
-  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
-  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
-  if (pline) pline.style.width = '0%';
-  updateCostPreview();
+  setGenerating(false);
 
   // Show inline error card
   var failEl  = el('mf-gen-failed');
@@ -2085,16 +2106,7 @@ function showResult(videoUrl) {
 
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // Unlock Generate button
-  var btn   = el('mf-btn-generate');
-  var lbl   = el('gen-btn-label');
-  var pline = el('v2-gen-pline');
-  if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
-  if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
-  if (pline) pline.style.width = '0%';
-  state.mf.generating = false;
-  stopElapsedTimer();
-  updateCostPreview();
+  setGenerating(false);
 }
 
 function resetUI() {
@@ -3192,16 +3204,7 @@ function bindEvents() {
     var promptEl = el('mf-prompt');
     if (promptEl) { promptEl.value = ''; promptEl.dispatchEvent(new Event('input')); }
     var cc = el('mf-char-count'); if (cc) cc.textContent = '0';
-    // Restore Generate button
-    var btn   = el('mf-btn-generate');
-    var lbl   = el('gen-btn-label');
-    var pline = el('v2-gen-pline');
-    if (btn)   { btn.disabled = false; btn.classList.remove('v2-generating'); }
-    if (lbl)   lbl.textContent = '\u25b6 Generate Effect';
-    if (pline) pline.style.width = '0%';
-    state.mf.generating = false;
-    stopElapsedTimer();
-    updateCostPreview();
+    setGenerating(false);
     if (promptEl) setTimeout(function () { promptEl.focus(); }, 150);
   });
 

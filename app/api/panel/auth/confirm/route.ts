@@ -7,8 +7,7 @@ import {
   DeviceLimitError,
   buildPanelDeviceId,
 } from "@/lib/firestore/devices";
-
-const SESSION_TTL_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+import { PANEL_SESSION_TTL_MS } from "@/lib/motionforge/auth";
 
 function generateToken(): string {
   const arr = new Uint8Array(32);
@@ -93,7 +92,7 @@ export async function POST(req: NextRequest) {
   // Create session in Firestore
   const token     = generateToken();
   const now       = Date.now();
-  const expiresAt = now + SESSION_TTL_MS;
+  const expiresAt = now + PANEL_SESSION_TTL_MS;
 
   await db.collection("panel_sessions").doc(token).set({
     userId:           user.id,
@@ -114,6 +113,7 @@ export async function POST(req: NextRequest) {
     userId:   user.id,
     plan,
     planLabel,
+    expiresAt,
   });
 
   return NextResponse.json({ ok: true });

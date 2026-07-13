@@ -279,7 +279,7 @@ const pricingTiers: PriceTier[] = [
       "4K output quality",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=starter&billing=monthly",
   },
   {
     id: "pro",
@@ -298,7 +298,7 @@ const pricingTiers: PriceTier[] = [
       "4K output quality",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=pro&billing=monthly",
   },
   {
     id: "exclusive",
@@ -316,7 +316,7 @@ const pricingTiers: PriceTier[] = [
       "Priority support included",
     ],
     cta: "Get Started",
-    ctaHref: "/sign-up",
+    ctaHref: "/checkout?plan=exclusive&billing=monthly",
   },
 ];
 
@@ -469,7 +469,7 @@ export default function VFXPilotPage() {
                 className="flex flex-wrap gap-3"
               >
                 <Button size="lg" asChild>
-                  <Link href="/sign-up">
+                  <Link href="/checkout?plan=starter&billing=monthly">
                     Get Started <ArrowRight className="w-4 h-4" />
                   </Link>
                 </Button>

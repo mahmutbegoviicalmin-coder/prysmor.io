@@ -3,15 +3,14 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import { Check, ShieldCheck, Lock, Monitor } from "lucide-react";
 import { initiateCheckout } from "@/lib/pixel";
 import { track } from "@/lib/track";
-import { getRefCodeFromCookie } from "@/components/site/RefTracker";
 
 declare global {
   interface Window {
+    fbq?: (...args: unknown[]) => void;
     LemonSqueezy?: {
       Setup: () => void;
       Url: { Open: (url: string) => void; Close: () => void };
@@ -230,11 +229,8 @@ export default function PricingSection({
   onCtaClick,
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
-  const { user } = useUser();
-
-  const openLSCheckout = useCallback(
-    (baseUrl: string, tierName?: string, tierPrice?: number) => {
-      if (!user) return;
+  const openCheckout = useCallback(
+    (plan: string, billing: "monthly" | "yearly", tierName?: string, tierPrice?: number) => {
       try {
         if (typeof window !== "undefined" && window.fbq && tierName && tierPrice !== undefined) {
           initiateCheckout(tierName, tierPrice);
@@ -242,23 +238,13 @@ export default function PricingSection({
       } catch {
         /* pixel optional */
       }
-      const refCode = getRefCodeFromCookie();
-      let url = `${baseUrl}?embed=1&dark=1&checkout[custom][user_id]=${user.id}`;
-      if (refCode) url += `&checkout[custom][ref_code]=${encodeURIComponent(refCode)}`;
-      if (window.LemonSqueezy?.Url?.Open) {
-        window.LemonSqueezy.Url.Open(url);
-      } else if (window.createLemonSqueezy) {
-        window.createLemonSqueezy();
-        window.LemonSqueezy?.Url?.Open(url);
-      } else {
-        window.location.href = url;
-      }
+      window.location.href = `/checkout?plan=${encodeURIComponent(plan)}&billing=${billing}`;
     },
-    [user],
+    [],
   );
 
   const openLSOverlay = useCallback(
-    (baseUrl: string, e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
+    (plan: string, billing: "monthly" | "yearly", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
       e.preventDefault();
       if (tierName && tierPrice !== undefined) {
         track(`pricing_click_${tierName.toLowerCase()}`, {
@@ -266,14 +252,9 @@ export default function PricingSection({
           price: tierPrice,
         });
       }
-      if (!user) {
-        window.location.href =
-          "/sign-in?redirect_url=" + encodeURIComponent("/#pricing");
-        return;
-      }
-      openLSCheckout(baseUrl, tierName, tierPrice);
+      openCheckout(plan, billing, tierName, tierPrice);
     },
-    [user, openLSCheckout],
+    [openCheckout],
   );
 
   return (
@@ -332,7 +313,9 @@ export default function PricingSection({
             const featured = tier.featured;
 
             const handleCta = (e: React.MouseEvent) => {
-              if (lsBaseUrl) openLSOverlay(lsBaseUrl, e, tier.name, price);
+              if (lsBaseUrl) {
+                openLSOverlay(tier.id, isYearly ? "yearly" : "monthly", e, tier.name, price);
+              }
               else if (tier.onCtaClick ?? onCtaClick) {
                 e.preventDefault();
                 (tier.onCtaClick ?? onCtaClick)?.();

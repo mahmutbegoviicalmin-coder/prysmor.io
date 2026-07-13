@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook }                   from 'svix';
 import { db }                        from '@/lib/firebaseAdmin';
 import { createUser, syncUserProfile } from '@/lib/firestore/users';
+import { claimPendingEntitlements } from '@/lib/billing/fulfillment';
+import { recordReferral } from '@/lib/affiliates';
 
 export const runtime = 'nodejs';
 
@@ -65,10 +67,31 @@ export async function POST(req: NextRequest) {
         firstName: data.first_name  ?? undefined,
         lastName:  data.last_name   ?? undefined,
       });
-      const { enrollInFunnel } = await import('@/lib/email/enrollments');
-      await enrollInFunnel(userId, 'unpaid-starter').catch((e) => {
-        console.warn('[clerk-webhook] email enroll failed:', e);
-      });
+      const email = extractEmail(data);
+      const claimed = email
+        ? await claimPendingEntitlements(email, userId)
+        : [];
+      const activeClaims = claimed.filter((purchase) => purchase.active);
+      if (activeClaims.length === 0) {
+        const { enrollInFunnel } = await import('@/lib/email/enrollments');
+        await enrollInFunnel(userId, 'unpaid-starter').catch((e) => {
+          console.warn('[clerk-webhook] email enroll failed:', e);
+        });
+      } else {
+        const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+        await onUserBecamePaid(userId, activeClaims[activeClaims.length - 1].plan).catch(() => {});
+        for (const purchase of activeClaims) {
+          if (!purchase.refCode) continue;
+          await recordReferral({
+            affiliateCode: purchase.refCode,
+            referredUserId: userId,
+            referredEmail: email!,
+            orderId: purchase.subscriptionId,
+            plan: purchase.plan,
+            commission: 15,
+          });
+        }
+      }
       console.log(`[clerk-webhook] user.created synced: ${userId}`);
 
     } else if (type === 'user.updated') {

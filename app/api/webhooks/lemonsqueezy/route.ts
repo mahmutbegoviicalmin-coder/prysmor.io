@@ -2,9 +2,12 @@ import crypto                        from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
-import { topUpCredits, addCredits, PLAN_LABELS }  from '@/lib/firestore/users';
 import { recordReferral }            from '@/lib/affiliates';
 import { FB_PIXEL_ID }               from '@/lib/pixel';
+import {
+  ensurePurchaseInvitation,
+  processSubscriptionEvent,
+} from '@/lib/billing/fulfillment';
 
 export const runtime = 'nodejs';
 
@@ -70,56 +73,6 @@ function verifySignature(rawBody: string, signature: string, secret: string): bo
   }
 }
 
-/** Format an ISO date string from LS into "Month Day, Year" for display.
- *  LemonSqueezy sends .NET-style 7-digit fractional seconds (e.g. .0000000Z).
- *  We normalize to 3-digit millis before parsing. */
-function formatLsDate(iso: string | undefined): string | undefined {
-  if (!iso) return undefined;
-  try {
-    // Normalize .NET 7-digit fractional seconds → 3-digit millis
-    const normalized = iso.replace(/\.(\d{7})Z$/, (_, frac) => `.${frac.slice(0, 3)}Z`);
-    const d = new Date(normalized);
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString('en-US', {
-      month: 'long', day: 'numeric', year: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
-}
-
-async function setUserPlan(
-  userId: string,
-  plan: string,
-  status: 'active' | 'inactive',
-  subscriptionId?: string,
-  renewalDate?: string,
-  extra?: Record<string, unknown>,
-) {
-  const ref = db.collection('users').doc(userId);
-  const doc = await ref.get();
-
-  const data: Record<string, unknown> = {
-    plan,
-    licenseStatus:  status,
-    updatedAt:      new Date(),
-    ...extra,
-  };
-  if (subscriptionId) data.lsSubscriptionId = subscriptionId;
-  // Store as human-readable string, not raw ISO
-  if (renewalDate) data.renewalDate = formatLsDate(renewalDate) ?? renewalDate;
-
-  if (doc.exists) {
-    // Do NOT touch deviceLimit on existing docs, admin may have set a custom value.
-    await ref.update(data);
-  } else {
-    // New user doc, seed deviceLimit to 1.
-    await ref.set({ ...data, deviceLimit: 1, createdAt: new Date() });
-  }
-
-  console.log(`[ls-webhook] userId=${userId} → plan=${plan} status=${status}`);
-}
-
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -147,16 +100,12 @@ export async function POST(req: NextRequest) {
   const eventName  = (payload.meta as Record<string, unknown>)?.event_name as string;
   const customData = (payload.meta as Record<string, unknown>)?.custom_data as Record<string, string> | undefined;
   const userId     = customData?.user_id;
+  const claimId    = customData?.claim_id;
   const refCode    = customData?.ref_code;
   const data       = payload.data as Record<string, unknown>;
   const attrs      = data?.attributes as Record<string, unknown>;
 
   console.log(`[ls-webhook] event=${eventName} userId=${userId}`);
-
-  if (!userId) {
-    console.warn('[ls-webhook] No user_id in custom_data, skipping');
-    return NextResponse.json({ received: true });
-  }
 
   // Subscription events: variant_id lives directly on attrs (first_subscription_item has price_id, not variant_id)
   // Order events: variant_id is on first_order_item or order_items[0]
@@ -169,7 +118,7 @@ export async function POST(req: NextRequest) {
     ?? orderItem?.variant_id  // order events
     ?? ''
   );
-  const subscriptionId = String(data?.id ?? '');
+  const subscriptionId = String(attrs?.subscription_id ?? data?.id ?? '');
   const isMapped       = variantId in VARIANT_TO_PLAN;
   const renewsAt       = attrs?.renews_at as string | undefined;
 
@@ -183,106 +132,83 @@ export async function POST(req: NextRequest) {
   if (isMapped) {
     plan = VARIANT_TO_PLAN[variantId];
   } else {
-    const existingDoc = await db.collection('users').doc(userId).get();
-    plan = (existingDoc.exists ? (existingDoc.data()?.plan as string) : undefined) ?? 'starter';
-    console.log(`[ls-webhook] variantId unknown, using existing plan="${plan}" for userId=${userId}`);
+    const existingDoc = userId ? await db.collection('users').doc(userId).get() : null;
+    plan = (existingDoc?.exists ? (existingDoc.data()?.plan as string) : undefined) ?? 'starter';
+    console.log(`[ls-webhook] variantId unknown, using existing plan="${plan}"`);
   }
 
   console.log(`[ls-webhook] resolved plan="${plan}" for event=${eventName}`);
 
   try {
-    switch (eventName) {
-      case 'subscription_created': {
-        // New subscription, set plan + top-up credits to plan cap
-        await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
-        await topUpCredits(userId, plan);
-        const { onUserBecamePaid } = await import('@/lib/email/enrollments');
-        await onUserBecamePaid(userId, plan).catch((e) => {
-          console.warn('[ls-webhook] email funnel update failed:', e);
-        });
-        console.log(`[ls-webhook] Credits topped up for new subscription: userId=${userId} plan=${plan}`);
-        // Meta CAPI Purchase event
-        await sendMetaPurchaseEvent({
-          id:       subscriptionId,
-          total:    (attrs?.total as number) ?? 0,
-          currency: (attrs?.currency as string) ?? 'USD',
-          email:    (attrs?.user_email as string) ?? '',
-        });
-        // Affiliate referral tracking
-        if (refCode) {
-          await recordReferral({
-            affiliateCode:   refCode,
-            referredUserId:  userId,
-            referredEmail:   (attrs?.user_email as string) ?? '',
-            orderId:         subscriptionId,
-            plan,
-            commission:      15,
-          });
-        }
-        break;
+    const subscriptionEvents = new Set([
+      'subscription_created',
+      'subscription_payment_success',
+      'subscription_updated',
+      'subscription_resumed',
+      'subscription_cancelled',
+      'subscription_expired',
+      'subscription_paused',
+    ]);
+
+    if (subscriptionEvents.has(eventName)) {
+      if (!isMapped && eventName === 'subscription_created') {
+        throw new Error(`Unknown subscription variant "${variantId}"`);
+      }
+      const result = await processSubscriptionEvent({
+        eventFingerprint: crypto.createHash('sha256').update(rawBody).digest('hex'),
+        eventName,
+        objectId: String(data?.id ?? ''),
+        subscriptionId,
+        claimId,
+        suppliedUserId: userId,
+        buyerEmail: attrs?.user_email as string | undefined,
+        customerId: attrs?.customer_id ? String(attrs.customer_id) : undefined,
+        variantId,
+        plan,
+        renewsAt,
+        refCode,
+      });
+
+      if (result.needsInvitation && claimId) {
+        await ensurePurchaseInvitation(claimId, result.buyerEmail);
       }
 
-      case 'subscription_payment_success':
-        // Monthly renewal, set plan + reset credits to plan cap
-        await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
-        await topUpCredits(userId, plan);
-        console.log(`[ls-webhook] Credits reset on renewal: userId=${userId} plan=${plan}`);
-        break;
-
-      case 'subscription_updated':
-        // Plan change (upgrade/downgrade), update plan + top-up to new plan cap
-        await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
-        await topUpCredits(userId, plan);
-        {
-          const { onUserBecamePaid } = await import('@/lib/email/enrollments');
-          await onUserBecamePaid(userId, plan).catch(() => {});
-        }
-        console.log(`[ls-webhook] Credits updated on plan change: userId=${userId} plan=${plan}`);
-        break;
-
-      case 'subscription_resumed':
-        await setUserPlan(userId, plan, 'active', subscriptionId, renewsAt);
-        await topUpCredits(userId, plan);
-        {
-          const { onUserBecamePaid } = await import('@/lib/email/enrollments');
-          await onUserBecamePaid(userId, plan).catch(() => {});
-        }
-        break;
-
-      case 'subscription_cancelled':
-        // User cancelled but keeps access until end of billing period.
-        // Do NOT revoke here, subscription_expired fires when access truly ends.
-        // Use set+merge so this is safe even if the user doc doesn't exist yet.
-        await db.collection('users').doc(userId).set({
-          lsCancelledAt:    new Date(),
-          lsCancellationAt: renewsAt ?? null,
-          updatedAt:        new Date(),
-        }, { merge: true });
-        console.log(`[ls-webhook] subscription cancelled, access valid until: ${renewsAt}`);
-        break;
-
-      case 'subscription_expired':
-        // Billing period ended, revoke access, downgrade to free.
-        await setUserPlan(userId, 'starter', 'inactive', subscriptionId, undefined, {
-          renewalDate: null,
+      if (result.fresh && ['subscription_created', 'subscription_updated', 'subscription_resumed'].includes(eventName) && result.userId) {
+        const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+        await onUserBecamePaid(result.userId, plan).catch((e) => {
+          console.warn('[ls-webhook] email funnel update failed:', e);
         });
-        {
-          const { cancelAllFunnelsForUser, enrollInFunnel } = await import('@/lib/email/enrollments');
-          await cancelAllFunnelsForUser(userId, 'subscription_expired').catch(() => {});
-          await enrollInFunnel(userId, 'unpaid-starter').catch(() => {});
+      }
+
+      if (result.fresh && eventName === 'subscription_expired' && result.userId) {
+        const { cancelAllFunnelsForUser, enrollInFunnel } = await import('@/lib/email/enrollments');
+        await cancelAllFunnelsForUser(result.userId, 'subscription_expired').catch(() => {});
+        await enrollInFunnel(result.userId, 'unpaid-starter').catch(() => {});
+      }
+
+      if (result.fresh && eventName === 'subscription_created') {
+        await sendMetaPurchaseEvent({
+          id: subscriptionId,
+          total: (attrs?.total as number) ?? 0,
+          currency: (attrs?.currency as string) ?? 'USD',
+          email: (attrs?.user_email as string) ?? '',
+        });
+        if (refCode && result.userId) {
+          await recordReferral({
+            affiliateCode: refCode,
+            referredUserId: result.userId,
+            referredEmail: result.buyerEmail,
+            orderId: subscriptionId,
+            plan,
+            commission: 15,
+          });
         }
-        console.log(`[ls-webhook] subscription expired, access revoked: userId=${userId}`);
-        break;
+      }
 
-      case 'subscription_paused':
-        await db.collection('users').doc(userId).set({
-          licenseStatus: 'inactive',
-          lsPausedAt:    new Date(),
-          updatedAt:     new Date(),
-        }, { merge: true });
-        console.log(`[ls-webhook] subscription paused: userId=${userId}`);
-        break;
+      return NextResponse.json({ received: true });
+    }
 
+    switch (eventName) {
       case 'order_created': {
         // One-time credit top-up purchase
         const orderStatus = attrs?.status as string | undefined;
@@ -297,7 +223,30 @@ export async function POST(req: NextRequest) {
           console.warn(`[ls-webhook] order_created, unknown pack_id "${packId}", no credits added`);
           break;
         }
-        await addCredits(userId, creditsToAdd);
+        if (!userId) {
+          console.warn('[ls-webhook] Credit top-up has no user_id, skipping');
+          break;
+        }
+        const orderId = String(data?.id ?? '');
+        const orderEventRef = db.collection('ls_webhook_events').doc(
+          crypto.createHash('sha256').update(`order_created:${orderId}`).digest('hex'),
+        );
+        const userRef = db.collection('users').doc(userId);
+        const shouldAdd = await db.runTransaction(async (tx: any) => {
+          const [processed, userSnap] = await Promise.all([
+            tx.get(orderEventRef),
+            tx.get(userRef),
+          ]);
+          if (processed.exists) return false;
+          if (!userSnap.exists) throw new Error(`User ${userId} not found`);
+          const current = typeof userSnap.data()?.credits === 'number'
+            ? userSnap.data()!.credits
+            : 0;
+          tx.update(userRef, { credits: current + creditsToAdd, updatedAt: new Date() });
+          tx.set(orderEventRef, { eventName, orderId, userId, processedAt: new Date() });
+          return true;
+        });
+        if (!shouldAdd) break;
         console.log(`[ls-webhook] +${creditsToAdd} credits added: userId=${userId} pack=${packId}`);
         // Meta CAPI Purchase event for one-time top-up
         await sendMetaPurchaseEvent({

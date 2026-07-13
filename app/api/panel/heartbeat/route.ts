@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validatePanelToken }        from '@/lib/motionforge/auth';
+import { PANEL_SESSION_TTL_MS, validatePanelToken } from '@/lib/motionforge/auth';
 import { db }                        from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
@@ -21,7 +21,7 @@ export async function OPTIONS() {
  * Updates the device's lastActive timestamp in Firestore.
  */
 export async function POST(req: NextRequest) {
-  const session = await validatePanelToken(req);
+  const session = await validatePanelToken(req, { skipMachineCheck: true });
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -49,5 +49,12 @@ export async function POST(req: NextRequest) {
       .catch(() => {});
   }
 
-  return NextResponse.json({ ok: true, ts: Date.now() });
+  const now = Date.now();
+  const expiresAt = now + PANEL_SESSION_TTL_MS;
+  await db.collection('panel_sessions').doc(session.token).update({
+    expiresAt,
+    lastActiveAt: now,
+  });
+
+  return NextResponse.json({ ok: true, ts: now, expiresAt });
 }

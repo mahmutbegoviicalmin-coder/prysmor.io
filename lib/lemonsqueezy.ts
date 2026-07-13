@@ -1,3 +1,6 @@
+import crypto from 'node:crypto';
+import { db } from '@/lib/firebaseAdmin';
+
 const LS_API_BASE = 'https://api.lemonsqueezy.com';
 
 export const LS_STORE_ID = '216284';
@@ -85,9 +88,34 @@ function lsHeaders() {
  * Creates a Lemon Squeezy hosted checkout and returns the checkout URL.
  * Embeds userId in custom_data so the webhook can map the payment to a user.
  */
-export async function createCheckout(variantId: string, userId: string, overrideRedirect?: string): Promise<string> {
+export async function createCheckout(
+  variantId: string,
+  options: {
+    userId?: string | null;
+    email?: string | null;
+    refCode?: string | null;
+    overrideRedirect?: string;
+  } = {},
+): Promise<string> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
-  const redirectUrl = overrideRedirect ?? `${appUrl}/dashboard/billing?upgraded=true`;
+  const claimId = crypto.randomBytes(32).toString('hex');
+  const redirectUrl = options.overrideRedirect
+    ?? `${appUrl}/purchase/complete?claim=${encodeURIComponent(claimId)}`;
+  const plan = VARIANT_TO_PLAN[variantId];
+  if (!plan) throw new Error(`Unknown Lemon Squeezy variant: ${variantId}`);
+
+  await db.collection('purchase_claims').doc(claimId).set({
+    status: 'pending',
+    plan,
+    variantId,
+    userId: options.userId ?? null,
+    createdAt: new Date(),
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+  });
+
+  const custom: Record<string, string> = { claim_id: claimId };
+  if (options.userId) custom.user_id = options.userId;
+  if (options.refCode) custom.ref_code = options.refCode;
 
   const res = await fetch(`${LS_API_BASE}/v1/checkouts`, {
     method:  'POST',
@@ -97,7 +125,8 @@ export async function createCheckout(variantId: string, userId: string, override
         type: 'checkouts',
         attributes: {
           checkout_data: {
-            custom: { user_id: userId },
+            custom,
+            ...(options.email && { email: options.email }),
           },
           checkout_options: {
             dark:         true,
@@ -105,8 +134,8 @@ export async function createCheckout(variantId: string, userId: string, override
           },
           product_options: {
             redirect_url:         redirectUrl,
-            receipt_button_text:  'Go to Dashboard',
-            receipt_link_url:     `${appUrl}/dashboard/billing`,
+            receipt_button_text:  'Activate Prysmor',
+            receipt_link_url:     redirectUrl,
           },
         },
         relationships: {
@@ -119,6 +148,11 @@ export async function createCheckout(variantId: string, userId: string, override
 
   if (!res.ok) {
     const body = await res.text();
+    await db.collection('purchase_claims').doc(claimId).set({
+      status: 'checkout_failed',
+      error: `Lemon Squeezy checkout error ${res.status}`,
+      updatedAt: new Date(),
+    }, { merge: true }).catch(() => {});
     throw new Error(`LemonSqueezy checkout error ${res.status}: ${body}`);
   }
 
