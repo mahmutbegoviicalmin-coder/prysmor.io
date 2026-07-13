@@ -2,7 +2,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { CreditCard, CheckCircle2, AlertTriangle, XCircle }  from 'lucide-react';
 import Link            from 'next/link';
 import { db }          from '@/lib/firebaseAdmin';
-import { PLAN_LABELS, PLAN_CREDITS } from '@/lib/firestore/users';
+import { PLAN_LABELS } from '@/lib/firestore/users';
 import { getCustomerPortalUrl } from '@/lib/lemonsqueezy';
 import { TopUpButton } from './TopUpButton';
 
@@ -74,32 +74,42 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const userId = session?.userId ?? null;
   const userDoc = userId ? await getUserDoc(userId).catch(() => null) : null;
 
-  const plan          = userDoc?.plan          ?? 'starter';
-  const planCap       = PLAN_CREDITS[plan]     ?? 1000;
+  const plan          = userDoc?.plan          ?? 'unpaid';
   const licenseStatus = userDoc?.licenseStatus ?? 'inactive';
   const renewalDate   = formatDateDisplay(userDoc?.renewalDate);
   const isActive      = licenseStatus === 'active';
-  // Show "No Plan" until user actually purchases, stored plan is "starter" by default
-  const planName      = isActive ? (PLAN_LABELS[plan] ?? 'Starter') : 'No Plan';
+  const isLifetime    = plan === 'lifetime';
+  const isLegacySub   = Boolean(userDoc?.lsSubscriptionId);
+  // Show "No Plan" until user actually purchases
+  const planName      = isActive
+    ? (isLifetime ? 'Lifetime' : (PLAN_LABELS[plan] ?? plan))
+    : 'No Plan';
 
-  // Default to 0, never show phantom credits to unsubscribed users
+  // Default to 0, never show phantom credits to unlicensed users
   const credits      = typeof userDoc?.credits      === 'number' ? userDoc.credits      : 0;
   const creditsTotal = typeof userDoc?.creditsTotal === 'number' ? userDoc.creditsTotal : 0;
 
-  // Resolve Lemon Squeezy customer portal URL
-  const portalUrl = userDoc?.lsSubscriptionId
-    ? await getCustomerPortalUrl(userDoc.lsSubscriptionId).catch(() => null)
+  // Lemon Squeezy customer portal — legacy subscribers only
+  const portalUrl = isLegacySub
+    ? await getCustomerPortalUrl(userDoc!.lsSubscriptionId!).catch(() => null)
     : null;
 
   const showUpgraded = searchParams.upgraded === 'true';
   const showTopUp    = searchParams.topup    === 'true';
   const showError    = searchParams.error;
 
+  const planSubtitle = (() => {
+    if (!isActive) return 'No active license';
+    if (isLifetime) return 'Lifetime license · Premiere + After Effects';
+    if (renewalDate) return `Renews ${renewalDate}`;
+    return 'Active subscription';
+  })();
+
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10 max-w-[800px]">
       <div className="mb-8">
         <h1 className="text-[28px] font-semibold text-white tracking-tight mb-1.5">Billing</h1>
-        <p className="text-[14px] text-[#6B7280]">Plan details, credits, and usage.</p>
+        <p className="text-[14px] text-[#6B7280]">License, credits, and usage.</p>
       </div>
 
       {/* ── Success banner (plan upgrade) ── */}
@@ -109,7 +119,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <div>
             <p className="text-[13px] font-semibold text-[#39FF6A]">Payment received. Thank you!</p>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
-              Your plan is being activated. If it doesn&apos;t appear as active within 30 seconds,{' '}
+              Your license is being activated. If it doesn&apos;t appear as active within 30 seconds,{' '}
               <a href="/dashboard/billing" className="underline underline-offset-2 hover:text-white transition-colors">
                 refresh this page
               </a>.
@@ -144,23 +154,23 @@ export default async function BillingPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* ── Inactive subscription warning ── */}
+      {/* ── Inactive warning ── */}
       {!isActive && (
         <div className="mb-6 flex items-start gap-3 rounded-[10px] border border-[#F59E0B]/20 bg-[#F59E0B]/[0.06] px-4 py-3">
           <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
           <div>
-            {userDoc?.lsSubscriptionId ? (
+            {isLegacySub ? (
               <>
                 <p className="text-[13px] font-semibold text-[#F59E0B]">Subscription inactive</p>
                 <p className="text-[12px] text-[#6B7280] mt-0.5">
-                  VFX generation is disabled. Reactivate your plan to restore access.
+                  VFX generation is disabled. Reactivate via Lemon Squeezy, or buy a lifetime license.
                 </p>
               </>
             ) : (
               <>
-                <p className="text-[13px] font-semibold text-[#F59E0B]">No active plan</p>
+                <p className="text-[13px] font-semibold text-[#F59E0B]">No active license</p>
                 <p className="text-[12px] text-[#6B7280] mt-0.5">
-                  Choose a plan below to unlock VFX generation and the Premiere panel.
+                  Buy Prysmor to unlock VFX generation and the Premiere + After Effects panels.
                 </p>
               </>
             )}
@@ -174,13 +184,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-[20px] font-semibold text-white">{planName}</p>
-            {renewalDate ? (
-              <p className="text-[13px] text-[#6B7280] mt-0.5">Renews {renewalDate}</p>
-            ) : (
-              <p className="text-[13px] text-[#6B7280] mt-0.5">
-                {isActive ? 'Active subscription' : 'No active subscription'}
-              </p>
-            )}
+            <p className="text-[13px] text-[#6B7280] mt-0.5">{planSubtitle}</p>
           </div>
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${
             isActive
@@ -201,20 +205,23 @@ export default async function BillingPage({ searchParams }: PageProps) {
             >
               Manage subscription ↗
             </a>
-          ) : !isActive ? (
+          ) : null}
+          {!isActive ? (
             <Link
-              href="/#pricing"
+              href="/checkout"
               className="px-3.5 py-2 rounded-[8px] text-[12px] font-semibold bg-[#39FF6A] text-[#050505] hover:bg-[#4fff7e] transition-colors"
             >
-              Subscribe now →
+              Buy Prysmor →
             </Link>
           ) : null}
-          <Link
-            href="/#pricing"
-            className="px-3.5 py-2 rounded-[8px] text-[12px] font-medium border border-white/[0.08] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
-          >
-            View all plans →
-          </Link>
+          {isActive && (
+            <Link
+              href="/#pricing"
+              className="px-3.5 py-2 rounded-[8px] text-[12px] font-medium border border-white/[0.08] text-[#6B7280] hover:text-white hover:border-white/[0.14] transition-colors"
+            >
+              View pricing →
+            </Link>
+          )}
         </div>
       </div>
 
@@ -226,83 +233,35 @@ export default async function BillingPage({ searchParams }: PageProps) {
       <div className="rounded-[12px] border border-[#161616] bg-[#0c0c0c] p-5 mb-4">
         <CreditsBar credits={credits} total={creditsTotal} />
         <div className="mt-4 pt-4 border-t border-[#111] text-[12px] text-[#4B5563]">
-          1 second of AI VFX = 4 credits · Credits reset on each billing date
+          1 second of AI VFX = 4 credits
+          {isLifetime
+            ? ' · Lifetime includes 200 seconds — buy more credits anytime'
+            : isLegacySub
+              ? ' · Credits reset on each billing date'
+              : ''}
         </div>
       </div>
 
-      {/* Upgrade CTAs, only for active subscribers not yet on Exclusive */}
-      {isActive && plan !== 'exclusive' && (
+      {/* License CTA for inactive users */}
+      {!isActive && (
         <>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Upgrade for more credits</p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {plan === 'starter' && (
-              <Link
-                href="/checkout?plan=pro&billing=monthly"
-                className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
-              >
-                <span className="text-[14px] font-semibold text-white">Pro · $49/mo</span>
-                <span className="text-[12px] text-[#6B7280]">2 000 credits · 500s of AI VFX</span>
-                <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
-              </Link>
-            )}
-            <Link
-              href="/checkout?plan=exclusive&billing=monthly"
-              className="flex flex-col gap-1 p-4 rounded-[12px] border border-white/[0.08] bg-[#0c0c0c] hover:border-[#39FF6A]/30 hover:bg-[#39FF6A]/[0.03] transition-all group"
-            >
-              <span className="text-[14px] font-semibold text-white">Exclusive · $149/mo</span>
-              <span className="text-[12px] text-[#6B7280]">4 000 credits · 1 000s of AI VFX</span>
-              <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Upgrade →</span>
-            </Link>
-          </div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Get Prysmor</p>
+          <Link
+            href="/checkout"
+            className="flex flex-col gap-1 p-5 rounded-[12px] border border-[#39FF6A]/25 bg-[#39FF6A]/[0.04] hover:border-[#39FF6A]/40 transition-all group"
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="text-[14px] text-[#6B7280] line-through">$199</span>
+              <span className="text-[18px] font-semibold text-white">$99</span>
+              <span className="text-[12px] text-[#6B7280]">one-time</span>
+            </div>
+            <span className="text-[12px] text-[#6B7280]">
+              Lifetime license · 200 seconds of AI VFX · Premiere + After Effects
+            </span>
+            <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Buy Prysmor →</span>
+          </Link>
         </>
       )}
-
-      {/* Plan comparison */}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Plan comparison</p>
-      <div className="rounded-[12px] border border-[#161616] bg-[#0c0c0c] overflow-hidden">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="border-b border-[#111]">
-              {['Plan', 'Credits/mo', 'AI VFX time', 'Price/mo', ''].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-[#333] uppercase tracking-[0.07em]">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/[0.04]">
-            {[
-              { name: 'Starter',   credits: 1000, seconds: '250s',  price: '$29',  planKey: 'starter'   },
-              { name: 'Pro',       credits: 2000, seconds: '500s',  price: '$49',  planKey: 'pro'       },
-              { name: 'Exclusive', credits: 4000, seconds: '1000s', price: '$149', planKey: 'exclusive' },
-            ].map((row) => (
-              <tr key={row.name} className={`hover:bg-white/[0.02] transition-colors ${plan === row.planKey ? 'bg-[#39FF6A]/[0.03]' : ''}`}>
-                <td className="px-4 py-3 font-medium text-[#D1D5DB]">
-                  {row.name}
-                  {plan === row.planKey && (
-                    <span className="ml-2 text-[10px] text-[#39FF6A] bg-[#39FF6A]/10 px-1.5 py-0.5 rounded-full">Current</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-[#9CA3AF]">{row.credits.toLocaleString()}</td>
-                <td className="px-4 py-3 text-[#9CA3AF]">{row.seconds}</td>
-                <td className="px-4 py-3 text-[#D1D5DB]">{row.price}</td>
-                <td className="px-4 py-3 text-right">
-                  {(!isActive || plan !== row.planKey) && (
-                    <Link
-                      href={`/checkout?plan=${row.planKey}&billing=monthly`}
-                      className="text-[11px] text-[#39FF6A] hover:underline underline-offset-2"
-                    >
-                      {!isActive
-                        ? 'Subscribe'
-                        : PLAN_CREDITS[row.planKey] > planCap
-                        ? 'Upgrade'
-                        : 'Switch'}
-                    </Link>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
       {/* Payment */}
       <p className="text-[10px] font-semibold uppercase tracking-[0.10em] text-[#333] mb-3 mt-8">Payment</p>
@@ -311,7 +270,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <div className="flex items-center gap-3">
             <CreditCard className="w-4 h-4 text-[#4B5563]" />
             <span className="text-[13px] text-[#9CA3AF]">
-              {isActive ? 'Managed by Lemon Squeezy' : 'No active subscription'}
+              {isActive ? 'Managed by Lemon Squeezy' : 'No active license'}
             </span>
           </div>
           {portalUrl && (

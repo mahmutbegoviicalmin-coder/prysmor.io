@@ -11,81 +11,30 @@ import FinalCTA from "@/components/sections/FinalCTA";
 
 const pricingTiers: PriceTier[] = [
   {
-    id: "starter",
-    name: "Starter",
-    monthlyPrice: 29.9,
-    yearlyPrice: 299,
-    yearlyPerDay: "0.99",
-    yearlySave: 49,
-    generation: {
-      monthly: {
-        shots: "≈ 20 shots",
-        seconds: "90 sec",
-      },
-      yearly: {
-        shots: "≈ 650 shots",
-        seconds: "3,000 sec",
-      },
-    },
-    highlights: ["Relight, Background, and VFX", "4K output", "Email support"],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=starter",
-    lsMonthlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/c44b1138-5022-4a77-9ffc-f34a141f8999",
-    lsYearlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/ec075c85-1c0b-43f2-a19a-5f92d6b8e652",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    monthlyPrice: 49.9,
-    yearlyPrice: 499,
-    yearlyPerDay: "1.66",
-    yearlySave: 89,
+    id: "lifetime",
+    name: "Prysmor",
+    monthlyPrice: 99,
+    compareAtPrice: 199,
+    oneTime: true,
     featured: true,
-    badge: "Most popular",
+    badge: "Lifetime license",
     generation: {
       monthly: {
-        shots: "≈ 50 shots",
-        seconds: "200 sec",
-      },
-      yearly: {
-        shots: "≈ 1,300 shots",
-        seconds: "6,000 sec",
+        shots: "200 seconds of AI VFX",
+        seconds: "Premiere + After Effects included",
       },
     },
-    highlights: ["Priority render queue", "Reference images", "Faster support"],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=pro",
+    highlights: [
+      "Lifetime access — pay once",
+      "200 seconds of AI VFX included",
+      "Relight, Background, and VFX",
+      "4K output · macOS & Windows",
+      "Buy more credits anytime",
+    ],
+    cta: "Buy Prysmor",
+    ctaHref: "/checkout",
     lsMonthlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/85a598e3-f100-466b-be78-7d7a90c933ab",
-    lsYearlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/f6e4d82f-75dc-4eaa-897c-981119375475",
-  },
-  {
-    id: "exclusive",
-    name: "Exclusive",
-    monthlyPrice: 99.9,
-    yearlyPrice: 1299,
-    yearlyPerDay: "3.33",
-    yearlySave: 249,
-    generation: {
-      monthly: {
-        shots: "≈ 120 shots",
-        seconds: "500 sec",
-      },
-      yearly: {
-        shots: "≈ 2,600 shots",
-        seconds: "12,000 sec",
-      },
-    },
-    highlights: ["Multiple seats", "Dedicated render lane", "Engineering support"],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=exclusive",
-    lsMonthlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/717c1894-de84-4710-9936-c53946d4777e",
-    lsYearlyUrl:
-      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/8a5a6b84-56a9-46e3-a576-5f0b56d502c6",
+      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/41852cde-e7c2-45fb-bf7b-bcb952dddab0",
   },
 ];
 
@@ -96,7 +45,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Which Adobe apps are supported?",
-    a: "Prysmor includes panels for both Premiere Pro and After Effects on macOS and Windows. Both panels are included in every plan.",
+    a: "Prysmor includes panels for both Premiere Pro and After Effects on macOS and Windows. Both panels are included with your lifetime license.",
   },
   {
     q: "How long does a render take?",
@@ -104,7 +53,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Do my VFX credits expire?",
-    a: "Credits reset on your monthly billing date and do not roll over. Each plan includes a set number of seconds per cycle. Shot counts on the pricing page are estimates based on typical 4 to 6 second generations.",
+    a: "Your lifetime license includes 200 seconds of AI VFX. Credits do not reset monthly — use them anytime, and buy more credit packs when you need them.",
   },
   {
     q: "What if I'm not happy with the result?",
@@ -123,11 +72,9 @@ const JSON_LD_SOFTWARE = {
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Windows 10, Windows 11, macOS 12, macOS 13, macOS 14",
   offers: {
-    "@type": "AggregateOffer",
-    lowPrice: "29.90",
-    highPrice: "99.90",
+    "@type": "Offer",
+    price: "99",
     priceCurrency: "USD",
-    offerCount: "3",
   },
   description:
     "AI VFX panel for Adobe Premiere Pro and After Effects. Select a clip, describe the effect, get a 4K result on your timeline.",
@@ -181,10 +128,11 @@ export default function HomePageClient() {
         <VFXRealitySection />
 
         <PricingSection
-          title="Plans for every editing workflow."
+          title="One license. Lifetime access."
+          subtitle="Pay once for Prysmor — Premiere and After Effects panels included."
           tiers={pricingTiers}
-          showToggle
-          footerNote="Cancel anytime."
+          showToggle={false}
+          footerNote="7-day refund window. Buy more credits anytime."
         />
 
         <div id="faq">

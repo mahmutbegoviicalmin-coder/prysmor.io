@@ -89,11 +89,11 @@ export default function HeroSection() {
               className="mt-7 flex w-full flex-col gap-2.5 sm:mt-8 sm:w-auto sm:flex-row sm:items-center sm:gap-3"
             >
               <Link
-                href="/sign-up"
+                href="/checkout"
                 onClick={() => track("get_started", { location: "hero" })}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#39FF6A] px-7 text-[14px] font-semibold tracking-[-0.01em] text-black transition-opacity hover:opacity-90 sm:w-auto sm:px-8"
               >
-                Get Started Free
+                Buy Prysmor
               </Link>
               <button
                 type="button"
@@ -114,7 +114,7 @@ export default function HeroSection() {
               variants={fadeUp}
               className="mt-5 text-[11px] leading-relaxed tracking-[0.01em] text-white/30 sm:mt-6"
             >
-              Free account, 1 generation included, no credit card
+              $99 lifetime · 200 seconds of AI VFX · Premiere + After Effects
             </motion.p>
           </div>
         </div>

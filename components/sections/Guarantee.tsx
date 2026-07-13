@@ -15,13 +15,13 @@ const perks = [
   },
   {
     icon: Zap,
-    title: "24-hour free trial",
-    desc: "Try the full product free for 24 hours before committing to any plan.",
+    title: "Try before you buy",
+    desc: "Explore the product and buy a lifetime license when you're ready.",
   },
   {
     icon: ShieldCheck,
-    title: "No lock-in",
-    desc: "Cancel anytime from your dashboard. Your exported files are always yours.",
+    title: "Lifetime license",
+    desc: "Pay once for Prysmor. Your exported files are always yours.",
   },
 ];
 

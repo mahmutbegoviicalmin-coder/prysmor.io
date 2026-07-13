@@ -29,7 +29,7 @@ const THEIR_PAINS = [
 ];
 
 const OUR_WINS = [
-  "From $29.90/month",
+  "$99 one-time",
   "Done in 3 minutes",
   "Zero learning curve",
   "Unlimited revisions",

@@ -6,6 +6,7 @@ import { recordReferral }            from '@/lib/affiliates';
 import { FB_PIXEL_ID }               from '@/lib/pixel';
 import {
   ensurePurchaseMagicLink,
+  fulfillLifetimeOrder,
   processSubscriptionEvent,
 } from '@/lib/billing/fulfillment';
 
@@ -214,14 +215,61 @@ export async function POST(req: NextRequest) {
 
     switch (eventName) {
       case 'order_created': {
-        // One-time credit top-up purchase
         const orderStatus = attrs?.status as string | undefined;
         if (orderStatus !== 'paid') {
           console.log(`[ls-webhook] order_created skipped, status=${orderStatus}`);
           break;
         }
-        // pack_id is embedded in custom_data when the checkout URL was built
-        const packId       = customData?.pack_id;
+
+        const packId = customData?.pack_id;
+        const product = customData?.product;
+        const orderClaimId = customData?.claim_id ?? claimId;
+        const orderId = String(data?.id ?? '');
+        const buyerEmail = (attrs?.user_email as string) ?? '';
+
+        // Lifetime license purchase
+        if (product === 'lifetime' || (orderClaimId && !packId)) {
+          const result = await fulfillLifetimeOrder({
+            eventFingerprint: crypto.createHash('sha256')
+              .update(`lifetime_order:${orderId}`)
+              .digest('hex'),
+            orderId,
+            claimId: orderClaimId,
+            suppliedUserId: userId,
+            buyerEmail,
+            customerId: attrs?.customer_id ? String(attrs.customer_id) : undefined,
+            refCode,
+          });
+
+          if (result.needsMagicLink && result.buyerEmail) {
+            await ensurePurchaseMagicLink(result.claimId, result.buyerEmail, 'lifetime');
+          }
+          if (result.fresh && result.userId) {
+            const { onUserBecamePaid } = await import('@/lib/email/enrollments');
+            await onUserBecamePaid(result.userId, 'lifetime').catch(() => {});
+            if (!isTestMode && refCode) {
+              await recordReferral({
+                affiliateCode: refCode,
+                referredUserId: result.userId,
+                referredEmail: result.buyerEmail,
+                orderId,
+                plan: 'lifetime',
+                commission: 15,
+              }).catch(() => {});
+            }
+          }
+          if (result.fresh && !isTestMode) {
+            await sendMetaPurchaseEvent({
+              id: orderId,
+              total: (attrs?.total as number) ?? 0,
+              currency: (attrs?.currency as string) ?? 'USD',
+              email: buyerEmail,
+            });
+          }
+          break;
+        }
+
+        // Credit top-up pack
         const creditsToAdd = packId ? CREDIT_PACK_ID_TO_CREDITS[packId] : undefined;
         if (!creditsToAdd) {
           console.warn(`[ls-webhook] order_created, unknown pack_id "${packId}", no credits added`);
@@ -231,7 +279,6 @@ export async function POST(req: NextRequest) {
           console.warn('[ls-webhook] Credit top-up has no user_id, skipping');
           break;
         }
-        const orderId = String(data?.id ?? '');
         const orderEventRef = db.collection('ls_webhook_events').doc(
           crypto.createHash('sha256').update(`order_created:${orderId}`).digest('hex'),
         );
@@ -252,12 +299,11 @@ export async function POST(req: NextRequest) {
         });
         if (!shouldAdd) break;
         console.log(`[ls-webhook] +${creditsToAdd} credits added: userId=${userId} pack=${packId}`);
-        // Meta CAPI Purchase event for one-time top-up
         await sendMetaPurchaseEvent({
-          id:       String(data?.id ?? ''),
+          id:       orderId,
           total:    (attrs?.total as number) ?? 0,
           currency: (attrs?.currency as string) ?? 'USD',
-          email:    (attrs?.user_email as string) ?? '',
+          email:    buyerEmail,
         });
         break;
       }

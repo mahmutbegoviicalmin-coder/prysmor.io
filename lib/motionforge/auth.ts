@@ -71,6 +71,7 @@ export async function validatePanelToken(
 // ─── Plan limits ───────────────────────────────────────────────────────────────
 
 const PLAN_MONTHLY_RENDERS: Record<string, number> = {
+  lifetime:       50,
   starter:        25,
   pro:            50,
   exclusive:      100,
@@ -83,7 +84,7 @@ export function planRenderLimit(plan: string): number {
 }
 
 export function planHasVFXAccess(plan: string): boolean {
-  return ['starter', 'pro', 'exclusive', 'creator', 'creator-suite'].includes(plan);
+  return ['lifetime', 'starter', 'pro', 'exclusive', 'creator', 'creator-suite'].includes(plan);
 }
 
 /** Default credits per second (background, relight) */

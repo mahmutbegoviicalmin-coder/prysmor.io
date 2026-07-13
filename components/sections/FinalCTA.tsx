@@ -65,26 +65,26 @@ export default function FinalCTA() {
             </h2>
 
             <p className="mx-auto mt-4 max-w-md text-[15px] leading-7 text-white/55 lg:mx-0">
-              Create a free account, install the Premiere Pro and After Effects
-              panels, and start generating from your edit.
+              Buy once, install the Premiere Pro and After Effects panels, and
+              generate AI VFX on your timeline.
             </p>
 
             <p className="mt-4 hidden text-[12px] leading-5 text-white/30 lg:block">
-              7-day money-back guarantee on paid plans. Cancel anytime.
+              $99 lifetime license · 200 seconds included · 7-day money-back.
             </p>
           </div>
 
           <div className="relative mt-8 flex flex-col items-center gap-3 lg:mt-0 lg:shrink-0 lg:items-end">
             <Link
-              href="/sign-up"
+              href="/checkout"
               onClick={() => track("get_started", { location: "final_cta" })}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#39FF6A] px-6 py-3.5 text-[14px] font-semibold text-black transition-opacity hover:opacity-90 sm:w-auto"
             >
-              Get Started
+              Buy Prysmor
               <ArrowRight size={15} strokeWidth={2.5} />
             </Link>
             <p className="text-center text-[12px] leading-5 text-white/30 lg:hidden">
-              7-day money-back guarantee on paid plans. Cancel anytime.
+              $99 lifetime license · 200 seconds included · 7-day money-back.
             </p>
           </div>
         </motion.div>

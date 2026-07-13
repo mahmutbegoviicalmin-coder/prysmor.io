@@ -255,7 +255,7 @@ const steps: Step[] = [
 ];
 
 const compRows: ComparisonRow[] = [
-  { feature: "Cost", ours: "from $29/month", theirs: "$500–2,000/project" },
+  { feature: "Cost", ours: "$99 one-time", theirs: "$500–2,000/project" },
   { feature: "Time per effect", ours: "2-5 minutes", theirs: "1-3 days" },
   { feature: "Learning curve", ours: "None", theirs: "6+ months" },
   { feature: "Works in your editor", ours: true, theirs: false },
@@ -265,58 +265,30 @@ const compRows: ComparisonRow[] = [
 
 const pricingTiers: PriceTier[] = [
   {
-    id: "starter",
-    name: "Starter",
-    monthlyPrice: 29,
-    yearlyPrice: 20,
-    description: "Perfect for individual creators",
-    unit: "250s of AI VFX ≈ 4 min",
-    bullets: [
-      "Premiere Pro & After Effects plugin",
-      "Latest AI video generation",
-      "AI prompt enhancement",
-      "Timeline integration",
-      "4K output quality",
-    ],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=starter&billing=monthly",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    monthlyPrice: 49,
-    yearlyPrice: 34,
-    description: "Most Popular",
-    unit: "500s of AI VFX ≈ 8 min",
+    id: "lifetime",
+    name: "Prysmor",
+    monthlyPrice: 99,
+    compareAtPrice: 199,
+    oneTime: true,
     featured: true,
-    badge: "Most Popular",
-    bullets: [
-      "Premiere Pro & After Effects plugin",
-      "Latest AI video generation",
-      "AI prompt enhancement",
-      "Timeline integration",
-      "4K output quality",
+    badge: "Lifetime license",
+    generation: {
+      monthly: {
+        shots: "200 seconds of AI VFX",
+        seconds: "Premiere + After Effects included",
+      },
+    },
+    highlights: [
+      "Lifetime access — pay once",
+      "200 seconds of AI VFX included",
+      "Relight, Background, and VFX",
+      "4K output · macOS & Windows",
+      "Buy more credits anytime",
     ],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=pro&billing=monthly",
-  },
-  {
-    id: "exclusive",
-    name: "Exclusive",
-    monthlyPrice: 129,
-    yearlyPrice: 90,
-    description: "For studios & teams",
-    unit: "1000s of AI VFX ≈ 17 min",
-    bullets: [
-      "Premiere Pro & After Effects plugin",
-      "Latest AI video generation",
-      "AI prompt enhancement",
-      "Timeline integration",
-      "4K output quality",
-      "Priority support included",
-    ],
-    cta: "Get Started",
-    ctaHref: "/checkout?plan=exclusive&billing=monthly",
+    cta: "Buy Prysmor",
+    ctaHref: "/checkout",
+    lsMonthlyUrl:
+      "https://vfxpilot1.lemonsqueezy.com/checkout/buy/41852cde-e7c2-45fb-bf7b-bcb952dddab0",
   },
 ];
 
@@ -354,7 +326,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Is VFXPilot worth it if I only edit occasionally?",
-    a: "Absolutely. Even occasional editors save hours per project. The Starter plan at $29/month gives you enough VFX credits for most part-time workflows, and you can cancel anytime.",
+    a: "Absolutely. Even occasional editors save hours per project. The $99 lifetime license includes 200 seconds of AI VFX, and you can buy more credits anytime.",
   },
   {
     q: "What if I'm not satisfied?",
@@ -365,8 +337,8 @@ const faqItems: FAQItem[] = [
     a: "Traditional VFX work requires skilled artists, expensive software, and hours of rendering. VFXPilot automates the heavy lifting with AI, allowing us to offer professional-quality results at a fraction of the cost.",
   },
   {
-    q: "Do my credits expire at the end of the month?",
-    a: "Yes, VFX credits reset on your monthly billing date and do not roll over. We recommend choosing a plan that matches your typical monthly usage.",
+    q: "Do my credits expire?",
+    a: "No monthly reset. Your lifetime license includes 200 seconds of AI VFX — use them anytime. When you need more, buy a credit pack from the dashboard.",
   },
   {
     q: "What software is VFXPilot compatible with?",
@@ -469,8 +441,8 @@ export default function VFXPilotPage() {
                 className="flex flex-wrap gap-3"
               >
                 <Button size="lg" asChild>
-                  <Link href="/checkout?plan=starter&billing=monthly">
-                    Get Started <ArrowRight className="w-4 h-4" />
+                  <Link href="/checkout">
+                    Buy Prysmor <ArrowRight className="w-4 h-4" />
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
@@ -515,11 +487,11 @@ export default function VFXPilotPage() {
 
       {/* ── PRICING ── */}
       <PricingSection
-        title="Pick your plan"
-        subtitle="Same features, different amounts of VFX credits. Start small or go big, you can always change later."
+        title="One license. Lifetime access."
+        subtitle="Pay once for Prysmor — Premiere and After Effects panels included."
         tiers={pricingTiers}
-        showToggle={true}
-        footerNote="7-Day Money-Back Guarantee · Cancel Anytime"
+        showToggle={false}
+        footerNote="7-Day Money-Back Guarantee · Buy more credits anytime"
       />
 
       {/* ── TESTIMONIALS ── */}
@@ -534,9 +506,9 @@ export default function VFXPilotPage() {
       {/* ── FINAL CTA ── */}
       <FinalCTA
         title="Get started today"
-        subtitle="VFXPilot starts at $29/mo. 7-day money-back guarantee included."
-        primaryLabel="Get Started"
-        primaryHref="/sign-up"
+        subtitle="Prysmor is $99 one-time. 7-day money-back guarantee included."
+        primaryLabel="Buy Prysmor"
+        primaryHref="/checkout"
         secondaryLabel="View Pricing"
         secondaryHref="#pricing"
       />

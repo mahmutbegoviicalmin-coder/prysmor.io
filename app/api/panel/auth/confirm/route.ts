@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:   "subscription_required",
-        message: "An active Prysmor subscription is required to connect the panel. Visit prysmor.io/dashboard/billing to subscribe.",
+        message: "An active Prysmor license is required to connect the panel. Visit prysmor.io/dashboard/billing to buy or activate.",
       },
       { status: 403 }
     );

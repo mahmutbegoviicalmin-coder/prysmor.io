@@ -36,6 +36,10 @@ export interface PriceTier {
   yearlyPrice?: number;
   yearlyPerDay?: string;
   yearlySave?: number;
+  /** Shown as strikethrough next to the main price (e.g. 199 next to 99). */
+  compareAtPrice?: number;
+  /** One-time purchase — hide /mo and billing toggle behavior. */
+  oneTime?: boolean;
   tagline?: string;
   description?: string;
   generation?: {
@@ -68,6 +72,7 @@ interface PricingSectionProps {
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const CTA_LABELS: Record<string, string> = {
+  lifetime: "Buy Prysmor",
   starter: "Get Starter",
   pro: "Get Pro",
   exclusive: "Get Exclusive",
@@ -230,7 +235,7 @@ export default function PricingSection({
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
   const openCheckout = useCallback(
-    async (plan: string, billing: "monthly" | "yearly", tierName?: string, tierPrice?: number) => {
+    async (plan: string, billing: "monthly" | "yearly" | "once", tierName?: string, tierPrice?: number) => {
       try {
         if (typeof window !== "undefined" && window.fbq && tierName && tierPrice !== undefined) {
           initiateCheckout(tierName, tierPrice);
@@ -238,7 +243,7 @@ export default function PricingSection({
       } catch {
         /* pixel optional */
       }
-      const fallback = `/checkout?plan=${encodeURIComponent(plan)}&billing=${billing}`;
+      const fallback = `/checkout`;
       try {
         const response = await fetch("/api/checkout/subscription", {
           method: "POST",
@@ -264,7 +269,7 @@ export default function PricingSection({
   );
 
   const openLSOverlay = useCallback(
-    (plan: string, billing: "monthly" | "yearly", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
+    (plan: string, billing: "monthly" | "yearly" | "once", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
       e.preventDefault();
       if (tierName && tierPrice !== undefined) {
         track(`pricing_click_${tierName.toLowerCase()}`, {
@@ -314,27 +319,42 @@ export default function PricingSection({
           </div>
         </motion.div>
 
-        <div className="mt-8 grid gap-3 lg:mt-9 lg:grid-cols-3 lg:items-end lg:gap-3.5">
+        <div className={`mt-8 grid gap-3 lg:mt-9 lg:items-end lg:gap-3.5 ${
+          tiers.length === 1 ? "mx-auto max-w-md lg:grid-cols-1" : "lg:grid-cols-3"
+        }`}>
           {tiers.map((tier, i) => {
-            const isYearly = yearly && !!tier.yearlyPrice;
-            const price = isYearly ? tier.yearlyPrice! : tier.monthlyPrice;
-            const resolvedHref = tier.ctaHref.startsWith("/checkout")
-              ? `${tier.ctaHref}&billing=${isYearly ? "yearly" : "monthly"}`
-              : tier.ctaHref;
-            const lsBaseUrl = isYearly
-              ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl)
-              : tier.lsMonthlyUrl;
+            const isOneTime = tier.oneTime === true;
+            const isYearly = !isOneTime && yearly && !!tier.yearlyPrice;
+            const price = isOneTime
+              ? tier.monthlyPrice
+              : (isYearly ? tier.yearlyPrice! : tier.monthlyPrice);
+            const resolvedHref = isOneTime
+              ? (tier.ctaHref.startsWith("/checkout") ? "/checkout" : tier.ctaHref)
+              : tier.ctaHref.startsWith("/checkout")
+                ? `${tier.ctaHref}&billing=${isYearly ? "yearly" : "monthly"}`
+                : tier.ctaHref;
+            const lsBaseUrl = isOneTime
+              ? (tier.lsMonthlyUrl ?? true)
+              : isYearly
+                ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl)
+                : tier.lsMonthlyUrl;
             const ctaLabel = CTA_LABELS[tier.id] ?? tier.cta;
             const generation =
               (isYearly && tier.generation?.yearly) ||
               tier.generation?.monthly ||
               legacyGeneration(tier, isYearly);
             const highlights = resolveHighlights(tier);
-            const featured = tier.featured;
+            const featured = tier.featured || isOneTime;
 
             const handleCta = (e: React.MouseEvent) => {
               if (lsBaseUrl) {
-                openLSOverlay(tier.id, isYearly ? "yearly" : "monthly", e, tier.name, price);
+                openLSOverlay(
+                  tier.id,
+                  isOneTime ? "once" : (isYearly ? "yearly" : "monthly"),
+                  e,
+                  tier.name,
+                  price,
+                );
               }
               else if (tier.onCtaClick ?? onCtaClick) {
                 e.preventDefault();
@@ -355,7 +375,9 @@ export default function PricingSection({
                 transition={{ duration: 0.45, delay: i * 0.06, ease }}
                 className={`relative flex flex-col overflow-hidden rounded-xl border ${
                   featured
-                    ? "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7 lg:-translate-y-4 lg:scale-[1.05] lg:origin-bottom"
+                    ? tiers.length === 1
+                      ? "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7"
+                      : "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7 lg:-translate-y-4 lg:scale-[1.05] lg:origin-bottom"
                     : "border-white/[0.06] px-5 py-5 sm:px-5 sm:py-6"
                 }`}
               >
@@ -395,7 +417,12 @@ export default function PricingSection({
                   >
                     {tier.name}
                   </p>
-                  <div className="mt-2.5 flex items-baseline gap-0.5">
+                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    {tier.compareAtPrice != null && (
+                      <span className="text-[18px] font-medium text-white/30 line-through tracking-[-0.02em]">
+                        ${fmtPrice(tier.compareAtPrice)}
+                      </span>
+                    )}
                     <span className="text-[13px] text-white/25">$</span>
                     <span
                       className={`font-semibold tracking-[-0.04em] ${
@@ -406,9 +433,14 @@ export default function PricingSection({
                     >
                       {fmtPrice(price)}
                     </span>
-                    <span className="ml-1 text-[13px] text-white/25">
-                      /{isYearly ? "yr" : "mo"}
-                    </span>
+                    {!isOneTime && (
+                      <span className="ml-1 text-[13px] text-white/25">
+                        /{isYearly ? "yr" : "mo"}
+                      </span>
+                    )}
+                    {isOneTime && (
+                      <span className="ml-1 text-[13px] text-white/35">one-time</span>
+                    )}
                   </div>
 
                   {generation && (
@@ -421,10 +453,12 @@ export default function PricingSection({
                         }`}
                       >
                         {generation.shots}
-                        <span className="font-normal text-white/30">
-                          {" "}
-                          / {isYearly ? "yr" : "mo"}
-                        </span>
+                        {!isOneTime && (
+                          <span className="font-normal text-white/30">
+                            {" "}
+                            / {isYearly ? "yr" : "mo"}
+                          </span>
+                        )}
                       </p>
                       {generation.seconds && (
                         <p className="mt-0.5 text-[11px] text-white/20">

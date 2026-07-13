@@ -1,18 +1,12 @@
 import { getSessionUser } from '@/lib/auth/session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { createCheckout, PLAN_VARIANTS } from '@/lib/lemonsqueezy';
+import { createCheckout } from '@/lib/lemonsqueezy';
 
+/** Lifetime license checkout (path kept for existing frontend callers). */
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({})) as {
-    plan?: string;
-    billing?: string;
-  };
-  const plan = (body.plan ?? '').toLowerCase();
-  const billing = (body.billing ?? '').toLowerCase();
-  if (!PLAN_VARIANTS[plan] || !['monthly', 'yearly'].includes(billing)) {
-    return NextResponse.json({ error: 'Invalid plan or billing period' }, { status: 400 });
-  }
+  // Accept optional body for backward compatibility; always sells lifetime.
+  await req.json().catch(() => ({}));
 
   const session = await getSessionUser();
   const userId = session?.userId ?? null;
@@ -21,12 +15,9 @@ export async function POST(req: NextRequest) {
   const refCode = rawRefCode && /^[A-Z0-9_-]{1,20}$/i.test(rawRefCode)
     ? rawRefCode.toUpperCase()
     : null;
-  const variants = PLAN_VARIANTS[plan];
-  const variantId = billing === 'yearly' ? variants.yearly : variants.monthly;
 
   try {
-    const url = await createCheckout(variantId, {
-      billing: billing as 'monthly' | 'yearly',
+    const url = await createCheckout(undefined, {
       userId,
       email,
       refCode,

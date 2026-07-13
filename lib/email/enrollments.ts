@@ -254,6 +254,7 @@ export async function cancelAllFunnelsForUser(userId: string, reason: string): P
 
 export async function onUserBecamePaid(userId: string, plan: string): Promise<void> {
   await completeFunnel(userId, 'unpaid-starter', 'converted');
+  // Lifetime / paid tiers: no Starter→Pro upsell funnel
   if (plan === 'starter') {
     await enrollInFunnel(userId, 'starter-pro');
   } else {

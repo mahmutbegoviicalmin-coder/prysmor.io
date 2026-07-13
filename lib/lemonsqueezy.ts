@@ -5,13 +5,27 @@ const LS_API_BASE = 'https://api.lemonsqueezy.com';
 
 export const LS_STORE_ID = '216284';
 
-/** Variant IDs per plan and billing interval */
+/** Lifetime one-time Prysmor license (Premiere + AE). */
+export const LIFETIME_PRODUCT = {
+  slug: 'lifetime',
+  label: 'Prysmor',
+  checkoutUuid: '41852cde-e7c2-45fb-bf7b-bcb952dddab0',
+  credits: 800, // 200 seconds × 4 credits/sec
+  seconds: 200,
+  price: 99,
+  compareAt: 199,
+  priceLabel: '$99',
+  compareAtLabel: '$199',
+} as const;
+
+/** @deprecated Legacy subscription variants — kept for existing subscriber webhooks only */
 export const PLAN_VARIANTS: Record<string, { monthly: string; yearly: string; label: string }> = {
   starter:   { monthly: '1455040', yearly: '1455046', label: 'Starter'   },
   pro:       { monthly: '1455043', yearly: '1455047', label: 'Pro'        },
   exclusive: { monthly: '1455044', yearly: '1455048', label: 'Exclusive'  },
 };
 
+/** @deprecated Legacy checkout UUIDs */
 export const PLAN_CHECKOUT_UUIDS: Record<string, { monthly: string; yearly: string }> = {
   starter: {
     monthly: 'c44b1138-5022-4a77-9ffc-f34a141f8999',
@@ -27,7 +41,7 @@ export const PLAN_CHECKOUT_UUIDS: Record<string, { monthly: string; yearly: stri
   },
 };
 
-/** Reverse map: variant ID → plan slug */
+/** Reverse map: variant ID → plan slug (legacy subscriptions) */
 export const VARIANT_TO_PLAN: Record<string, string> = {
   '1455040': 'starter',
   '1455046': 'starter',
@@ -100,11 +114,11 @@ function lsHeaders() {
 }
 
 /**
- * Creates a Lemon Squeezy hosted checkout and returns the checkout URL.
- * Embeds userId in custom_data so the webhook can map the payment to a user.
+ * Creates a Lemon Squeezy hosted checkout for the lifetime license.
+ * Embeds claim_id + product=lifetime so order_created can fulfill.
  */
 export async function createCheckout(
-  variantId: string,
+  _variantIdOrIgnored?: string,
   options: {
     billing?: 'monthly' | 'yearly';
     userId?: string | null;
@@ -117,25 +131,22 @@ export async function createCheckout(
   const claimId = crypto.randomBytes(32).toString('hex');
   const redirectUrl = options.overrideRedirect
     ?? `${appUrl}/purchase/complete?claim=${encodeURIComponent(claimId)}`;
-  const plan = VARIANT_TO_PLAN[variantId];
-  if (!plan) throw new Error(`Unknown Lemon Squeezy variant: ${variantId}`);
-  const checkoutUuid = PLAN_CHECKOUT_UUIDS[plan]?.[options.billing ?? 'monthly'];
-  if (!checkoutUuid) throw new Error(`Missing checkout URL for ${plan}`);
 
   await db.collection('purchase_claims').doc(claimId).set({
     status: 'pending',
-    plan,
-    variantId,
+    plan: LIFETIME_PRODUCT.slug,
+    product: LIFETIME_PRODUCT.slug,
     userId: options.userId ?? null,
     createdAt: new Date(),
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   });
 
-  const base = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${checkoutUuid}`;
+  const base = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${LIFETIME_PRODUCT.checkoutUuid}`;
   const query = [
     'embed=1',
     'dark=1',
     `checkout[custom][claim_id]=${encodeURIComponent(claimId)}`,
+    `checkout[custom][product]=${encodeURIComponent(LIFETIME_PRODUCT.slug)}`,
     `checkout[redirect_url]=${encodeURIComponent(redirectUrl)}`,
   ];
   if (options.userId) {
@@ -152,16 +163,10 @@ export async function createCheckout(
 
 /**
  * Builds a LemonSqueezy checkout URL for a credit top-up pack.
- * Embeds user_id and pack_id as custom data so the order_created webhook
- * can identify the buyer and the pack without needing a variant ID lookup.
- * No API call needed, just constructs the URL with query parameters.
  */
 export function createTopUpCheckout(pack: CreditPack, userId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
   const base   = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${pack.checkoutUuid}`;
-  // Build query string manually, URLSearchParams encodes brackets (%5B%5D) which
-  // LemonSqueezy does not recognise. We need literal brackets for custom_data to
-  // be forwarded correctly in the webhook payload.
   const query = [
     `checkout[custom][user_id]=${encodeURIComponent(userId)}`,
     `checkout[custom][pack_id]=${encodeURIComponent(pack.id)}`,
@@ -171,8 +176,7 @@ export function createTopUpCheckout(pack: CreditPack, userId: string): string {
 }
 
 /**
- * Returns the LemonSqueezy customer portal URL for a subscription.
- * Used by the "Manage subscription" button in the dashboard.
+ * Returns the LemonSqueezy customer portal URL for a legacy subscription.
  */
 export async function getCustomerPortalUrl(subscriptionId: string): Promise<string | null> {
   const res = await fetch(`${LS_API_BASE}/v1/subscriptions/${subscriptionId}`, {

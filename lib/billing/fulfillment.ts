@@ -208,6 +208,99 @@ export async function processSubscriptionEvent(
   };
 }
 
+export interface LifetimeOrderInput {
+  eventFingerprint: string;
+  orderId: string;
+  claimId?: string;
+  suppliedUserId?: string;
+  buyerEmail?: string;
+  customerId?: string;
+  refCode?: string;
+}
+
+/** Fulfill one-time lifetime license from order_created. */
+export async function fulfillLifetimeOrder(
+  input: LifetimeOrderInput,
+): Promise<FulfillmentResult> {
+  const buyerEmail = normalizeBillingEmail(input.buyerEmail);
+  const { LIFETIME_PRODUCT } = await import('@/lib/lemonsqueezy');
+  const credits = LIFETIME_PRODUCT.credits;
+  const plan = LIFETIME_PRODUCT.slug;
+
+  let userId = input.suppliedUserId;
+  if (!userId && buyerEmail) userId = await resolveUserIdByEmail(buyerEmail);
+  if (!userId && buyerEmail) {
+    const ensured = await ensureUserForEmail(buyerEmail);
+    userId = ensured.userId;
+  }
+
+  const claimRef = input.claimId
+    ? db.collection('purchase_claims').doc(input.claimId)
+    : null;
+  const idempotencyRef = db.collection('ls_webhook_events').doc(
+    crypto.createHash('sha256').update(input.eventFingerprint).digest('hex'),
+  );
+
+  const fresh = await db.runTransaction(async (tx: any) => {
+    const processed = await tx.get(idempotencyRef);
+    if (processed.exists) return false;
+
+    const now = new Date();
+    if (userId) {
+      const userRef = db.collection('users').doc(userId);
+      const userSnap = await tx.get(userRef);
+      tx.set(userRef, {
+        plan,
+        licenseStatus: 'active',
+        credits,
+        creditsTotal: credits,
+        renewalDate: null,
+        lsOrderId: input.orderId,
+        deviceLimit: userSnap.exists ? (userSnap.data()?.deviceLimit ?? 1) : 1,
+        ...(buyerEmail && { email: buyerEmail, emailKey: emailHash(buyerEmail) }),
+        ...(!userSnap.exists && { createdAt: now }),
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    if (claimRef) {
+      tx.set(claimRef, {
+        status: userId ? 'fulfilled' : 'awaiting_account',
+        buyerEmail: buyerEmail || null,
+        orderId: input.orderId,
+        customerId: input.customerId ?? null,
+        plan,
+        product: plan,
+        userId: userId ?? null,
+        paidAt: now,
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    tx.set(idempotencyRef, {
+      eventName: 'order_created',
+      orderId: input.orderId,
+      claimId: input.claimId ?? null,
+      userId: userId ?? null,
+      product: plan,
+      processedAt: now,
+    });
+    return true;
+  });
+
+  if (userId && buyerEmail) {
+    await ensureEmailUserIndex(userId, buyerEmail).catch(() => {});
+  }
+
+  return {
+    fresh,
+    userId,
+    buyerEmail,
+    claimId: input.claimId,
+    needsMagicLink: fresh && !!buyerEmail && !!userId,
+  };
+}
+
 export async function ensurePurchaseMagicLink(
   claimId: string | undefined,
   buyerEmail: string,
