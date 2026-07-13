@@ -19,12 +19,17 @@ export async function GET(req: NextRequest) {
   const fulfilledForCurrentUser =
     data.status === 'fulfilled' && !!userId && data.userId === userId;
   const planKey = typeof data.plan === 'string' ? data.plan : null;
+  const activationUrl =
+    data.status === 'awaiting_account' && typeof data.activationUrl === 'string'
+      ? data.activationUrl
+      : null;
 
   return NextResponse.json(
     {
       status: data.status,
       fulfilledForCurrentUser,
       plan: planKey ? (PLAN_LABELS[planKey] ?? planKey) : null,
+      activationUrl,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

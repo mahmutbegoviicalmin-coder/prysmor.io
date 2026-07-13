@@ -102,6 +102,7 @@ export default function ActivatePage() {
   const ticket = searchParams.get("__clerk_ticket");
   const [status, setStatus] = useState<ClaimStatus>("loading");
   const [fulfilledForCurrentUser, setFulfilledForCurrentUser] = useState(false);
+  const [recoveringTicket, setRecoveringTicket] = useState(false);
 
   const claimValid = /^[a-f0-9]{64}$/.test(purchase);
   const afterActivate = claimValid
@@ -128,6 +129,12 @@ export default function ActivatePage() {
           setFulfilledForCurrentUser(data.fulfilledForCurrentUser === true);
         } else if (data.status === "awaiting_account") {
           setStatus("awaiting_account");
+          // Recover ticket if email client / redirect stripped query params
+          if (!ticket && typeof data.activationUrl === "string" && data.activationUrl.includes("__clerk_ticket=")) {
+            setRecoveringTicket(true);
+            window.location.replace(data.activationUrl);
+            return;
+          }
         } else {
           setStatus("invalid");
         }
@@ -139,7 +146,7 @@ export default function ActivatePage() {
     return () => {
       stopped = true;
     };
-  }, [claimValid, purchase]);
+  }, [claimValid, purchase, ticket]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !claimValid) return;
@@ -181,10 +188,12 @@ export default function ActivatePage() {
     );
   }
 
-  if (status === "loading" || !isLoaded) {
+  if (status === "loading" || !isLoaded || recoveringTicket) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
-        <p className="text-sm text-white/40">Loading activation…</p>
+        <p className="text-sm text-white/40">
+          {recoveringTicket ? "Opening activation…" : "Loading activation…"}
+        </p>
       </main>
     );
   }
@@ -201,10 +210,9 @@ export default function ActivatePage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
         <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Activation link expired</h1>
           <p className="mt-3 text-sm leading-6 text-white/50">
-            Open the Prysmor order email and click <strong className="text-white">Activate account</strong>.
-            That link verifies your checkout email so you only need to create a password.
+            Open the newest Prysmor order email and click <strong className="text-white">Activate account</strong> again.
           </p>
           <Link href="/dashboard/support" className="mt-6 inline-flex text-sm text-[#39FF6A]">
             Need help?
@@ -243,7 +251,6 @@ export default function ActivatePage() {
             appearance={appearance}
             forceRedirectUrl={afterActivate}
             fallbackRedirectUrl={afterActivate}
-            routing="hash"
           />
         </div>
       </div>

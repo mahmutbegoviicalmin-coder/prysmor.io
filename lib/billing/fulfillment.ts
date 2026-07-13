@@ -211,13 +211,28 @@ export async function processSubscriptionEvent(
   };
 }
 
-async function resolveInvitationActivateUrl(
+function appOrigin(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io').replace(/\/$/, '');
+}
+
+/** Build an on-site activate URL that embeds the Clerk invitation ticket. */
+export function buildActivateUrl(claimId: string, invitationUrl?: string | null): string {
+  const base = `${appOrigin()}/activate?purchase=${encodeURIComponent(claimId)}`;
+  if (!invitationUrl) return base;
+  try {
+    const ticket = new URL(invitationUrl).searchParams.get('ticket');
+    if (!ticket) return base;
+    return `${base}&__clerk_ticket=${encodeURIComponent(ticket)}&__clerk_status=sign_up`;
+  } catch {
+    return base;
+  }
+}
+
+async function createSilentInvitationUrl(
   buyerEmail: string,
   claimId: string,
-): Promise<string> {
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io').replace(/\/$/, '');
-  const redirectUrl = `${appUrl}/activate?purchase=${encodeURIComponent(claimId)}`;
-  const fallback = redirectUrl;
+): Promise<string | null> {
+  const redirectUrl = `${appOrigin()}/activate?purchase=${encodeURIComponent(claimId)}`;
 
   try {
     const invitation = await clerk.invitations.createInvitation({
@@ -225,7 +240,7 @@ async function resolveInvitationActivateUrl(
       redirectUrl,
       notify: false,
     });
-    return invitation.url || fallback;
+    return invitation.url ?? null;
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
     if (!message.includes('already') && !message.includes('exist')) throw error;
@@ -237,15 +252,15 @@ async function resolveInvitationActivateUrl(
         notify: false,
         ignoreExisting: true,
       });
-      return invitation.url || fallback;
+      return invitation.url ?? null;
     } catch (retryError) {
       const list = await clerk.invitations.getInvitationList({ status: 'pending', limit: 100 });
       const existing = list.data.find(
         (item) => normalizeBillingEmail(item.emailAddress) === buyerEmail,
       );
       if (existing?.url) return existing.url;
-      console.warn('[fulfillment] invitation exists but no URL; using activate fallback', retryError);
-      return fallback;
+      console.warn('[fulfillment] invitation exists but no URL', retryError);
+      return null;
     }
   }
 }
@@ -254,13 +269,16 @@ export async function ensurePurchaseInvitation(
   claimId: string,
   buyerEmail: string,
   plan?: string,
+  opts?: { forceResend?: boolean },
 ): Promise<void> {
   const claimRef = db.collection('purchase_claims').doc(claimId);
   const claim = await claimRef.get();
-  if (!claim.exists || claim.data()?.invitationSentAt) return;
+  if (!claim.exists) return;
+  if (claim.data()?.invitationSentAt && !opts?.forceResend) return;
 
   const resolvedPlan = plan ?? String(claim.data()?.plan ?? 'starter');
-  const activateUrl = await resolveInvitationActivateUrl(buyerEmail, claimId);
+  const invitationUrl = await createSilentInvitationUrl(buyerEmail, claimId);
+  const activateUrl = buildActivateUrl(claimId, invitationUrl);
 
   const { sendPurchaseActivationEmail } = await import('@/lib/email/transactional');
   const emailResult = await sendPurchaseActivationEmail({
@@ -274,7 +292,11 @@ export async function ensurePurchaseInvitation(
     return;
   }
 
-  await claimRef.set({ invitationSentAt: new Date(), updatedAt: new Date() }, { merge: true });
+  await claimRef.set({
+    invitationSentAt: new Date(),
+    activationUrl: activateUrl,
+    updatedAt: new Date(),
+  }, { merge: true });
 }
 
 export async function ensureOrderConfirmedEmail(
