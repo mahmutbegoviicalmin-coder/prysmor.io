@@ -243,7 +243,14 @@ async function createSilentInvitationUrl(
     return invitation.url ?? null;
   } catch (error) {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
-    if (!message.includes('already') && !message.includes('exist')) throw error;
+    const clerkCodes = Array.isArray((error as { errors?: { code?: string }[] })?.errors)
+      ? (error as { errors: { code?: string }[] }).errors.map((e) => (e.code ?? '').toLowerCase()).join(' ')
+      : '';
+    const isDuplicate = message.includes('already')
+      || message.includes('exist')
+      || message.includes('duplicate')
+      || clerkCodes.includes('duplicate');
+    if (!isDuplicate) throw error;
 
     try {
       const invitation = await clerk.invitations.createInvitation({
@@ -259,8 +266,18 @@ async function createSilentInvitationUrl(
         (item) => normalizeBillingEmail(item.emailAddress) === buyerEmail,
       );
       if (existing?.url) return existing.url;
-      console.warn('[fulfillment] invitation exists but no URL', retryError);
-      return null;
+      // Last resort: revoke pending invites for this email, then recreate
+      for (const item of list.data) {
+        if (normalizeBillingEmail(item.emailAddress) !== buyerEmail) continue;
+        await clerk.invitations.revokeInvitation(item.id).catch(() => {});
+      }
+      const invitation = await clerk.invitations.createInvitation({
+        emailAddress: buyerEmail,
+        redirectUrl,
+        notify: false,
+        ignoreExisting: true,
+      });
+      return invitation.url ?? null;
     }
   }
 }
