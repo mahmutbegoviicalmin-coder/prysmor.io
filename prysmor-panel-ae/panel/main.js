@@ -275,7 +275,8 @@ async function validateSessionThenEnter() {
     var data = res.ok ? await res.json().catch(function () { return {}; }) : {};
     if (res.ok && typeof data.credits === 'number') {
       state.usage.credits      = data.credits;
-      state.usage.creditsTotal = data.creditsTotal || 1000;
+      state.usage.creditsTotal = data.creditsTotal || 800;
+      if (data.plan) state.auth.plan = data.plan;
     }
   } catch (_) {
     // Network error — allow panel to load anyway, fetchCredits will retry
@@ -601,8 +602,8 @@ function showClipEmpty() {
   showClipThumbnail(null); // clear thumbnail
 }
 
-function creditsPerSecond(mode) {
-  return (mode || selectedMode) === 'vfx' ? 10 : 4;
+function creditsPerSecond(_mode) {
+  return 4; // 800 credits = 200 seconds of AI VFX
 }
 
 function calcCostPreview(durationSec, mode) {
@@ -628,10 +629,10 @@ function updateCostPreview() {
   var bal  = state.usage.credits || 0;
   var canAfford = bal >= cost;
 
-  // Show cost on the Generate button
+  // Show cost on the Generate button in seconds (1s = 4 credits)
   if (costBadge && costBadgeVal) {
     costBadge.style.display = '';
-    costBadgeVal.textContent = cost;
+    costBadgeVal.textContent = Math.max(1, Math.round(cost / 4)) + 's';
   }
 
   // Disable generate button if can't afford
@@ -2685,7 +2686,8 @@ async function fetchCredits() {
   try {
     var data = await apiFetch('/api/v1/motionforge/credits');
     state.usage.credits      = data.credits      || 0;
-    state.usage.creditsTotal = data.creditsTotal || 1000;
+    state.usage.creditsTotal = data.creditsTotal || 800;
+    if (data.plan) state.auth.plan = data.plan;
     renderUsage();
     updateCostPreview();
   } catch (e) {
@@ -2713,16 +2715,17 @@ function animateNumber(elId, toValue, duration) {
 
 function renderUsage() {
   var credits = state.usage.credits      || 0;
-  var total   = state.usage.creditsTotal || 1000;
+  var total   = state.usage.creditsTotal || 800;
   var pct     = total > 0 ? Math.min(Math.round((credits / total) * 100), 100) : 0;
-  var seconds = Math.floor(credits / creditsPerSecond(selectedMode));
+  var seconds = Math.floor(credits / 4);
+  var secondsTotal = Math.floor(total / 4);
   var isLow   = pct < 20;
+  var isLifetime = state.auth.plan === 'lifetime';
 
-  // Animate the big number
-  animateNumber('usage-used', credits, 600);
+  animateNumber('usage-used', seconds, 600);
 
   var limEl = el('usage-limit');
-  if (limEl) limEl.textContent = total.toLocaleString();
+  if (limEl) limEl.textContent = secondsTotal + 's';
 
   var barEl = el('progress-fill');
   if (barEl) {
@@ -2732,26 +2735,42 @@ function renderUsage() {
       : 'linear-gradient(90deg,#A3FF12,#5DFF00)';
   }
 
-  // Credits card low state
   var card = el('credits-card');
   if (card) card.classList.toggle('low', isLow);
 
-  // Seconds remaining
   var secEl = el('usage-seconds');
-  if (secEl) secEl.textContent = seconds > 0 ? '≈ ' + seconds + 's of AI VFX' : 'No time remaining';
+  if (secEl) {
+    if (seconds > 0) {
+      secEl.textContent = isLifetime
+        ? seconds + 's left · never expires'
+        : seconds + 's of AI VFX left';
+    } else {
+      secEl.textContent = 'No time remaining';
+    }
+  }
 
-  // Topbar credits (left side of header — shows clean number only)
   var badge    = el('topbar-credits');
   var badgeVal = el('topbar-credits-val');
   if (badge && badgeVal) {
     badge.style.display  = '';
-    badgeVal.textContent = credits.toLocaleString();
+    badgeVal.textContent = seconds + 's';
     badge.classList.toggle('low', isLow);
+  }
+
+  var planEl = el('topbar-plan');
+  if (planEl) {
+    if (isLifetime) {
+      planEl.style.display = '';
+      planEl.textContent = 'Lifetime · Never expires';
+    } else if (state.auth.planLabel) {
+      planEl.style.display = '';
+      planEl.textContent = state.auth.planLabel;
+    }
   }
 }
 
 function showNoCreditsMessage() {
-  showToast('No credits left. Upgrade your plan to continue generating.', 'error');
+  showToast('No seconds left. Buy more credits to continue generating.', 'error');
   var banner = el('no-credits-banner');
   if (banner) banner.classList.remove('hidden');
 }

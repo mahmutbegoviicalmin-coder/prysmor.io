@@ -56,7 +56,7 @@ function PaywallGate() {
           </div>
         </div>
         <div className="text-[11px] text-[#4B5563] space-y-0.5">
-          <p>200 seconds of AI VFX included</p>
+          <p>200 seconds of AI VFX included · Never expires</p>
           <p>Premiere + After Effects · pay once</p>
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-[#A3FF12] group-hover:gap-2 transition-all">

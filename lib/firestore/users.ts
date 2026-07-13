@@ -19,7 +19,7 @@ export interface UserDoc {
 
 export const PLAN_LABELS: Record<string, string> = {
   unpaid:          "Unpaid",
-  lifetime:        "Prysmor",
+  lifetime:        "Lifetime",
   starter:         "Starter",
   pro:             "Pro",
   exclusive:       "Exclusive",

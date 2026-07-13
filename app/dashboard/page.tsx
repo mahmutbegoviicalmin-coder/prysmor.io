@@ -247,7 +247,10 @@ export default async function DashboardOverviewPage() {
             {license.planName}
           </p>
           <div>
-            <DataRow label="Renewal date" value={license.renewalDate} />
+            <DataRow
+              label={license.planName === 'Lifetime' ? 'Expires' : 'Renewal date'}
+              value={license.renewalDate}
+            />
             <DataRow
               label="Last verified"
               value={
@@ -324,10 +327,12 @@ export default async function DashboardOverviewPage() {
         <Card>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "16px" }}>
             <p style={{ fontSize: "12px", color: "#444", textTransform: "uppercase" as const, letterSpacing: "1px", margin: 0 }}>
-              Credits
+              AI VFX time
             </p>
             {license.status === "active"
-              ? <span style={{ fontSize: "11px", color: "#444" }}>This cycle</span>
+              ? <span style={{ fontSize: "11px", color: "#444" }}>
+                  {license.planName === "Lifetime" ? "Never expires" : "This cycle"}
+                </span>
               : <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#333" }}>
                   <Lock style={{ width: "11px", height: "11px" }} /> Inactive
                 </span>
@@ -345,18 +350,18 @@ export default async function DashboardOverviewPage() {
               >
                 <Lock style={{ width: "16px", height: "16px", color: "#333" }} />
               </div>
-              <p style={{ fontSize: "13px", fontWeight: 500, color: "#333", margin: 0 }}>Credits locked</p>
-              <p style={{ fontSize: "11px", color: "#2a2a2a", margin: 0, textAlign: "center" as const }}>Requires an active plan</p>
+              <p style={{ fontSize: "13px", fontWeight: 500, color: "#333", margin: 0 }}>Generation locked</p>
+              <p style={{ fontSize: "11px", color: "#2a2a2a", margin: 0, textAlign: "center" as const }}>Requires an active license</p>
             </div>
           ) : (
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "8px" }}>
                 <p style={{ margin: 0, lineHeight: 1 }}>
                   <span style={{ fontSize: "32px", fontWeight: 800, color: "white", letterSpacing: "-1px" }}>
-                    {limits.credits.toLocaleString()}
+                    {creditSeconds}
                   </span>
                   <span style={{ fontSize: "15px", fontWeight: 300, color: "#333", marginLeft: "4px" }}>
-                    / {limits.creditsTotal.toLocaleString()}
+                    / {Math.floor(limits.creditsTotal / 4)}s
                   </span>
                 </p>
                 <span style={{ fontSize: "12px", color: pct < 20 ? "#fb923c" : "#555" }}>{pct}%</span>
@@ -373,14 +378,17 @@ export default async function DashboardOverviewPage() {
                 />
               </div>
               <p style={{ marginTop: "6px", fontSize: "12px", color: "#444" }}>
-                ≈ {creditSeconds}s remaining
+                {limits.credits.toLocaleString()} credits · 4 credits = 1 second
               </p>
             </div>
           )}
 
           <div>
             <DataRow label="Device seats" value={`${limits.devicesUsed} / ${limits.deviceLimit}`} />
-            <DataRow label="Resets on"    value={limits.resetDate} />
+            <DataRow
+              label={license.planName === "Lifetime" ? "Credits expire" : "Resets on"}
+              value={limits.resetDate}
+            />
           </div>
           {license.status === "active" && (
             <Link

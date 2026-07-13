@@ -70,7 +70,7 @@ export default function FinalCTA() {
             </p>
 
             <p className="mt-4 hidden text-[12px] leading-5 text-white/30 lg:block">
-              $99 lifetime license · 200 seconds included · 7-day money-back.
+              $99 lifetime · Never expires · 200 seconds of AI VFX
             </p>
           </div>
 
@@ -84,7 +84,7 @@ export default function FinalCTA() {
               <ArrowRight size={15} strokeWidth={2.5} />
             </Link>
             <p className="text-center text-[12px] leading-5 text-white/30 lg:hidden">
-              $99 lifetime license · 200 seconds included · 7-day money-back.
+              $99 lifetime · Never expires · 200 seconds of AI VFX
             </p>
           </div>
         </motion.div>

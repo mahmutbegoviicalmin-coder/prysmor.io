@@ -25,7 +25,7 @@ const pricingTiers: PriceTier[] = [
       },
     },
     highlights: [
-      "Lifetime access — pay once",
+      "Pay once — license never expires",
       "200 seconds of AI VFX included",
       "Relight, Background, and VFX",
       "4K output · macOS & Windows",
@@ -132,7 +132,7 @@ export default function HomePageClient() {
           subtitle="Pay once for Prysmor — Premiere and After Effects panels included."
           tiers={pricingTiers}
           showToggle={false}
-          footerNote="7-day refund window. Buy more credits anytime."
+          footerNote="Pay once. License never expires. 7-day refund window."
         />
 
         <div id="faq">

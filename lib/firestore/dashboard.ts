@@ -167,8 +167,10 @@ export async function getDashboardData(
     ? (PLAN_LABELS[plan] ?? plan)
     : "No Plan";
 
-  // Format renewal date, Firestore may contain raw ISO from old webhook calls
-  const renewalDate = formatRenewalDate(userDoc?.renewalDate);
+  // Format renewal date — lifetime licenses never expire
+  const renewalDate = plan === 'lifetime' || licenseStatus !== 'active'
+    ? (plan === 'lifetime' && licenseStatus === 'active' ? 'Never expires' : '—')
+    : formatRenewalDate(userDoc?.renewalDate);
 
   const license: DashboardLicense = {
     planName: planLabel,
@@ -233,12 +235,16 @@ export async function getDashboardData(
   resetAt.setMonth(resetAt.getMonth() + 1, 1);
   resetAt.setDate(0);
 
+  const resetDate = plan === 'lifetime'
+    ? 'Never expires'
+    : formatDate(resetAt);
+
   const limits: DashboardLimits = {
     credits,
     creditsTotal,
     devicesUsed: devices.length,
     deviceLimit: userDoc?.deviceLimit ?? 1,
-    resetDate: formatDate(resetAt),
+    resetDate,
   };
 
   // ── Security ───────────────────────────────────────────────────────────────

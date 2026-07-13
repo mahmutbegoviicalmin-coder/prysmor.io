@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (e.code === 'insufficient_credits') {
       return NextResponse.json(
         {
-          error:             `Not enough credits, need ${e.needed}, have ${e.creditsRemaining}. Upgrade your plan to continue.`,
+          error:             `Not enough time left — need ${Math.ceil((e.needed ?? 0) / 4)}s, have ${Math.floor((e.creditsRemaining ?? 0) / 4)}s. Buy more credits to continue.`,
           code:              'insufficient_credits',
           creditsRemaining:  e.creditsRemaining ?? 0,
           needed:            e.needed ?? creditCost,

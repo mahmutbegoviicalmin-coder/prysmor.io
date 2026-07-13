@@ -87,19 +87,18 @@ export function planHasVFXAccess(plan: string): boolean {
   return ['lifetime', 'starter', 'pro', 'exclusive', 'creator', 'creator-suite'].includes(plan);
 }
 
-/** Default credits per second (background, relight) */
+/** Credits cost per second of clip duration (all modes). 800 credits = 200s. */
 export const CREDITS_PER_SECOND = 4;
 
-/** VFX credits per second */
-export const CREDITS_PER_SECOND_VFX = 10;
+/** @deprecated Use CREDITS_PER_SECOND — kept so old imports don't break. */
+export const CREDITS_PER_SECOND_VFX = CREDITS_PER_SECOND;
 
-export function creditsPerSecond(mode?: string): number {
-  if (mode === 'vfx') return CREDITS_PER_SECOND_VFX;
+export function creditsPerSecond(_mode?: string): number {
   return CREDITS_PER_SECOND;
 }
 
 export function calcCreditCost(durationSec: number, mode = 'background'): number {
-  const rate   = creditsPerSecond(mode);
+  const rate   = CREDITS_PER_SECOND;
   const maxDur = mode === 'vfx' ? 30 : 8;
   const dur    = Math.min(Math.max(durationSec, 0.5), maxDur);
   const billableSec = Math.max(Math.ceil(dur), mode === 'vfx' ? 2 : 1);

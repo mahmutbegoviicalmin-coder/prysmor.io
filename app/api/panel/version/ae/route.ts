@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 /** After Effects panel OTA version, bump to push updates to installed AE panels. */
-const PANEL_AE_VERSION = '2.0.6';
+const PANEL_AE_VERSION = '2.0.7';
 
 const GITHUB_RAW =
   'https://raw.githubusercontent.com/mahmutbegoviicalmin-coder/prysmor.io/main/prysmor-panel-ae/panel';

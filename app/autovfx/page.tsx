@@ -279,7 +279,7 @@ const pricingTiers: PriceTier[] = [
       },
     },
     highlights: [
-      "Lifetime access — pay once",
+      "Pay once — license never expires",
       "200 seconds of AI VFX included",
       "Relight, Background, and VFX",
       "4K output · macOS & Windows",

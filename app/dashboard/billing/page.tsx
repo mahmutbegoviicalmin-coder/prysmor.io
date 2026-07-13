@@ -100,7 +100,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   const planSubtitle = (() => {
     if (!isActive) return 'No active license';
-    if (isLifetime) return 'Lifetime license · Premiere + After Effects';
+    if (isLifetime) return 'Never expires · Premiere + After Effects';
     if (renewalDate) return `Renews ${renewalDate}`;
     return 'Active subscription';
   })();
@@ -235,7 +235,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="mt-4 pt-4 border-t border-[#111] text-[12px] text-[#4B5563]">
           1 second of AI VFX = 4 credits
           {isLifetime
-            ? ' · Lifetime includes 200 seconds — buy more credits anytime'
+            ? ' · 200 seconds included · Never expires — buy more credits anytime'
             : isLegacySub
               ? ' · Credits reset on each billing date'
               : ''}
@@ -256,7 +256,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
               <span className="text-[12px] text-[#6B7280]">one-time</span>
             </div>
             <span className="text-[12px] text-[#6B7280]">
-              Lifetime license · 200 seconds of AI VFX · Premiere + After Effects
+              Lifetime license · Never expires · 200 seconds of AI VFX · Premiere + After Effects
             </span>
             <span className="mt-2 text-[12px] text-[#39FF6A] group-hover:underline">Buy Prysmor →</span>
           </Link>

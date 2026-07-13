@@ -114,7 +114,7 @@ export default function HeroSection() {
               variants={fadeUp}
               className="mt-5 text-[11px] leading-relaxed tracking-[0.01em] text-white/30 sm:mt-6"
             >
-              $99 lifetime · 200 seconds of AI VFX · Premiere + After Effects
+              $99 lifetime · Never expires · 200s AI VFX · Premiere + After Effects
             </motion.p>
           </div>
         </div>
