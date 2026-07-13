@@ -5,12 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Check, ShieldCheck, Lock, Monitor } from "lucide-react";
-import { initiateCheckout } from "@/lib/pixel";
+import { initiateCheckout, getMetaClickIds } from "@/lib/pixel";
 import { track } from "@/lib/track";
 
 declare global {
   interface Window {
-    fbq?: (...args: unknown[]) => void;
     LemonSqueezy?: {
       Setup: () => void;
       Url: { Open: (url: string) => void; Close: () => void };
@@ -237,7 +236,7 @@ export default function PricingSection({
   const openCheckout = useCallback(
     async (plan: string, billing: "monthly" | "yearly" | "once", tierName?: string, tierPrice?: number) => {
       try {
-        if (typeof window !== "undefined" && window.fbq && tierName && tierPrice !== undefined) {
+        if (tierName && tierPrice !== undefined) {
           initiateCheckout(tierName, tierPrice);
         }
       } catch {
@@ -245,10 +244,11 @@ export default function PricingSection({
       }
       const fallback = `/checkout`;
       try {
+        const meta = getMetaClickIds();
         const response = await fetch("/api/checkout/subscription", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan, billing }),
+          body: JSON.stringify({ plan, billing, ...meta }),
         });
         const data = await response.json();
         if (!response.ok || !data.url) throw new Error(data.error || "Checkout unavailable");

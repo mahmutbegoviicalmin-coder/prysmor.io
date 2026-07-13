@@ -55,6 +55,22 @@ export function TopUpModal({ open, onClose }: TopUpModalProps) {
     setLoading(packId);
     setError(null);
     try {
+      const pack = PACKS.find((p) => p.id === packId);
+      const price = pack ? Number(pack.price.replace(/[^0-9.]/g, '')) : 0;
+      if (pack && price > 0) {
+        const { initiateCheckout, getMetaClickIds } = await import('@/lib/pixel');
+        initiateCheckout(`Credits ${pack.label}`, price);
+        const meta = getMetaClickIds();
+        const res  = await fetch('/api/checkout/topup', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ packId, ...meta }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? 'Checkout failed');
+        window.location.href = json.url;
+        return;
+      }
       const res  = await fetch('/api/checkout/topup', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },

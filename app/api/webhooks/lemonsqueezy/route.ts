@@ -1,9 +1,9 @@
 import crypto                        from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
-import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
+import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS, LIFETIME_PRODUCT } from '@/lib/lemonsqueezy';
 import { recordReferral }            from '@/lib/affiliates';
-import { FB_PIXEL_ID }               from '@/lib/pixel';
+import { lemonTotalToValue, sendMetaPurchaseEvent } from '@/lib/meta/capi';
 import {
   ensurePurchaseMagicLink,
   fulfillLifetimeOrder,
@@ -12,54 +12,50 @@ import {
 
 export const runtime = 'nodejs';
 
-// ─── Meta CAPI ───────────────────────────────────────────────────────────────
+function metaFromCustom(customData: Record<string, string> | undefined) {
+  return {
+    fbp: customData?.fbp || null,
+    fbc: customData?.fbc || null,
+  };
+}
 
-async function sendMetaPurchaseEvent(order: {
-  id: string;
-  total: number;
-  currency: string;
+async function trackPaidOrder(opts: {
+  orderId: string;
+  attrs: Record<string, unknown>;
   email: string;
+  contentName: string;
+  contentIds: string[];
+  customData?: Record<string, string>;
+  claimId?: string | null;
+  fallbackValue?: number;
 }) {
-  const token = process.env.META_CAPI_TOKEN;
-  if (!token) return;
-  try {
-    const hashBuffer = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(order.email.toLowerCase().trim()),
-    );
-    const hashedEmail = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+  const value = lemonTotalToValue(opts.attrs) || opts.fallbackValue || 0;
+  const currency = String(opts.attrs.currency ?? 'USD');
+  const eventId = `purchase_${opts.orderId}`;
+  const { fbp, fbc } = metaFromCustom(opts.customData);
 
-    const res = await fetch(`https://graph.facebook.com/v19.0/${FB_PIXEL_ID}/events`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [{
-          event_name:    'Purchase',
-          event_time:    Math.floor(Date.now() / 1000),
-          event_id:      `purchase_${order.id}`,
-          action_source: 'website',
-          user_data:     { em: [hashedEmail] },
-          custom_data: {
-            value:        order.total / 100,
-            currency:     order.currency.toUpperCase(),
-            order_id:     order.id,
-            content_type: 'product',
-          },
-        }],
-        access_token: token,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.warn('[meta-capi] Purchase event failed:', body);
-    } else {
-      console.log(`[meta-capi] Purchase event sent: order=${order.id}`);
-    }
-  } catch (e) {
-    console.warn('[meta-capi] Error sending purchase event:', e);
+  if (opts.claimId) {
+    await db.collection('purchase_claims').doc(opts.claimId).set({
+      orderId: opts.orderId,
+      purchaseValue: value,
+      purchaseCurrency: currency.toUpperCase(),
+      metaEventId: eventId,
+      updatedAt: new Date(),
+    }, { merge: true }).catch(() => {});
   }
+
+  await sendMetaPurchaseEvent({
+    orderId: opts.orderId,
+    value,
+    currency,
+    email: opts.email,
+    contentName: opts.contentName,
+    contentIds: opts.contentIds,
+    fbp,
+    fbc,
+    eventId,
+    eventSourceUrl: 'https://prysmor.io/purchase/complete',
+  });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -191,11 +187,16 @@ export async function POST(req: NextRequest) {
 
       if (result.fresh && eventName === 'subscription_created') {
         if (!isTestMode) {
-          await sendMetaPurchaseEvent({
-            id: subscriptionId,
-            total: (attrs?.total as number) ?? 0,
-            currency: (attrs?.currency as string) ?? 'USD',
+          const orderId = String(attrs?.order_id ?? subscriptionId);
+          await trackPaidOrder({
+            orderId,
+            attrs: attrs ?? {},
             email: (attrs?.user_email as string) ?? '',
+            contentName: plan,
+            contentIds: [plan],
+            customData,
+            claimId,
+            fallbackValue: 0,
           });
         }
         if (!isTestMode && refCode && result.userId) {
@@ -259,11 +260,15 @@ export async function POST(req: NextRequest) {
             }
           }
           if (result.fresh && !isTestMode) {
-            await sendMetaPurchaseEvent({
-              id: orderId,
-              total: (attrs?.total as number) ?? 0,
-              currency: (attrs?.currency as string) ?? 'USD',
+            await trackPaidOrder({
+              orderId,
+              attrs: attrs ?? {},
               email: buyerEmail,
+              contentName: LIFETIME_PRODUCT.label,
+              contentIds: [LIFETIME_PRODUCT.slug],
+              customData,
+              claimId: orderClaimId,
+              fallbackValue: LIFETIME_PRODUCT.price,
             });
           }
           break;
@@ -299,12 +304,16 @@ export async function POST(req: NextRequest) {
         });
         if (!shouldAdd) break;
         console.log(`[ls-webhook] +${creditsToAdd} credits added: userId=${userId} pack=${packId}`);
-        await sendMetaPurchaseEvent({
-          id:       orderId,
-          total:    (attrs?.total as number) ?? 0,
-          currency: (attrs?.currency as string) ?? 'USD',
-          email:    buyerEmail,
-        });
+        if (!isTestMode) {
+          await trackPaidOrder({
+            orderId,
+            attrs: attrs ?? {},
+            email: buyerEmail,
+            contentName: `Credit pack: ${packId}`,
+            contentIds: [String(packId)],
+            customData,
+          });
+        }
         break;
       }
 

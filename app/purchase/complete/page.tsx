@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { trackPurchase } from "@/lib/pixel";
 
 type PurchaseState = "processing" | "awaiting_email" | "fulfilled" | "error";
 
@@ -12,6 +13,7 @@ function PurchaseCompleteInner() {
   const [state, setState] = useState<PurchaseState>("processing");
   const [plan, setPlan] = useState<string | null>(null);
   const [hasSession, setHasSession] = useState(false);
+  const purchaseTracked = useRef(false);
 
   useEffect(() => {
     if (!/^[a-f0-9]{64}$/.test(claim)) {
@@ -21,6 +23,40 @@ function PurchaseCompleteInner() {
 
     let stopped = false;
     let attempts = 0;
+
+    const firePurchasePixel = (purchase: {
+      value?: number;
+      currency?: string;
+      orderId?: string | null;
+      eventId?: string | null;
+      contentName?: string;
+      contentIds?: string[];
+    } | null | undefined) => {
+      if (purchaseTracked.current || !purchase?.value) return;
+      const dedupeKey = `meta_purchase_${claim}`;
+      try {
+        if (sessionStorage.getItem(dedupeKey) === "1") {
+          purchaseTracked.current = true;
+          return;
+        }
+      } catch {
+        /* private mode */
+      }
+      purchaseTracked.current = true;
+      try {
+        sessionStorage.setItem(dedupeKey, "1");
+      } catch {
+        /* ignore */
+      }
+      trackPurchase({
+        value: purchase.value,
+        currency: purchase.currency,
+        orderId: purchase.orderId ?? undefined,
+        eventId: purchase.eventId ?? undefined,
+        contentName: purchase.contentName,
+        contentIds: purchase.contentIds,
+      });
+    };
 
     const check = async () => {
       try {
@@ -43,9 +79,10 @@ function PurchaseCompleteInner() {
         if (data.plan) setPlan(String(data.plan));
 
         if (data.status === "fulfilled") {
+          firePurchasePixel(data.purchase);
           setState("fulfilled");
         } else if (data.status === "awaiting_account") {
-          // Legacy claims — treat as email step
+          firePurchasePixel(data.purchase);
           setState("awaiting_email");
         } else if (data.status === "checkout_failed" || data.status === "invalid") {
           setState("error");
@@ -53,6 +90,8 @@ function PurchaseCompleteInner() {
           attempts += 1;
           window.setTimeout(check, 2000);
         } else {
+          // Payment likely succeeded; still fire Purchase with claim defaults
+          firePurchasePixel(data.purchase);
           setState(me?.userId ? "fulfilled" : "awaiting_email");
         }
       } catch {
@@ -83,8 +122,8 @@ function PurchaseCompleteInner() {
       ? "We sent a secure Open dashboard link to your checkout email. No password needed."
       : state === "fulfilled"
         ? plan
-          ? `Your ${plan} plan and credits are active. Install the panels and start generating.`
-          : "Your subscription and credits are active. Install the panels and start generating."
+          ? `Your ${plan} license and credits are active. Install the panels and start generating.`
+          : "Your license and credits are active. Install the panels and start generating."
         : state === "error"
           ? "Please use the link in your order email or contact support."
           : "Payment was received. This usually takes only a few seconds.";

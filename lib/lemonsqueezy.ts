@@ -125,6 +125,9 @@ export async function createCheckout(
     email?: string | null;
     refCode?: string | null;
     overrideRedirect?: string;
+    /** Meta Pixel cookies for CAPI attribution */
+    fbp?: string | null;
+    fbc?: string | null;
   } = {},
 ): Promise<string> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
@@ -137,6 +140,10 @@ export async function createCheckout(
     plan: LIFETIME_PRODUCT.slug,
     product: LIFETIME_PRODUCT.slug,
     userId: options.userId ?? null,
+    purchaseValue: LIFETIME_PRODUCT.price,
+    purchaseCurrency: 'USD',
+    fbp: options.fbp ?? null,
+    fbc: options.fbc ?? null,
     createdAt: new Date(),
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   });
@@ -155,6 +162,12 @@ export async function createCheckout(
   if (options.refCode) {
     query.push(`checkout[custom][ref_code]=${encodeURIComponent(options.refCode)}`);
   }
+  if (options.fbp) {
+    query.push(`checkout[custom][fbp]=${encodeURIComponent(options.fbp)}`);
+  }
+  if (options.fbc) {
+    query.push(`checkout[custom][fbc]=${encodeURIComponent(options.fbc)}`);
+  }
   if (options.email) {
     query.push(`checkout[email]=${encodeURIComponent(options.email)}`);
   }
@@ -164,15 +177,21 @@ export async function createCheckout(
 /**
  * Builds a LemonSqueezy checkout URL for a credit top-up pack.
  */
-export function createTopUpCheckout(pack: CreditPack, userId: string): string {
+export function createTopUpCheckout(
+  pack: CreditPack,
+  userId: string,
+  meta?: { fbp?: string | null; fbc?: string | null },
+): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
   const base   = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${pack.checkoutUuid}`;
   const query = [
     `checkout[custom][user_id]=${encodeURIComponent(userId)}`,
     `checkout[custom][pack_id]=${encodeURIComponent(pack.id)}`,
-    `checkout[redirect_url]=${encodeURIComponent(`${appUrl}/dashboard/billing?topup=true`)}`,
-  ].join('&');
-  return `${base}?${query}`;
+    `checkout[redirect_url]=${encodeURIComponent(`${appUrl}/dashboard/billing?topup=true&pack=${encodeURIComponent(pack.id)}&value=${pack.priceUsd}`)}`,
+  ];
+  if (meta?.fbp) query.push(`checkout[custom][fbp]=${encodeURIComponent(meta.fbp)}`);
+  if (meta?.fbc) query.push(`checkout[custom][fbc]=${encodeURIComponent(meta.fbc)}`);
+  return `${base}?${query.join('&')}`;
 }
 
 /**

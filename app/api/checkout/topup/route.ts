@@ -1,4 +1,5 @@
 import { requireUser } from '@/lib/auth/session';
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { CREDIT_PACKS, createTopUpCheckout } from '@/lib/lemonsqueezy';
 import { getUser } from '@/lib/firestore/users';
@@ -11,12 +12,12 @@ export async function POST(req: NextRequest) {
   const userDoc = await getUser(userId).catch(() => null);
   if (!userDoc || userDoc.licenseStatus !== 'active') {
     return NextResponse.json(
-      { error: 'Active subscription required to purchase credit top-ups.' },
+      { error: 'Active license required to purchase credit top-ups.' },
       { status: 403 },
     );
   }
 
-  let body: { packId?: string };
+  let body: { packId?: string; fbp?: string; fbc?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
@@ -25,6 +26,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid pack ID' }, { status: 400 });
   }
 
-  const url = createTopUpCheckout(pack, userId);
+  const jar = cookies();
+  const fbp = body.fbp || jar.get('_fbp')?.value || null;
+  const fbc = body.fbc || jar.get('_fbc')?.value || null;
+
+  const url = createTopUpCheckout(pack, userId, { fbp, fbc });
   return NextResponse.json({ url });
 }
