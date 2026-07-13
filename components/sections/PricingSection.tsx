@@ -230,7 +230,7 @@ export default function PricingSection({
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
   const openCheckout = useCallback(
-    (plan: string, billing: "monthly" | "yearly", tierName?: string, tierPrice?: number) => {
+    async (plan: string, billing: "monthly" | "yearly", tierName?: string, tierPrice?: number) => {
       try {
         if (typeof window !== "undefined" && window.fbq && tierName && tierPrice !== undefined) {
           initiateCheckout(tierName, tierPrice);
@@ -238,7 +238,27 @@ export default function PricingSection({
       } catch {
         /* pixel optional */
       }
-      window.location.href = `/checkout?plan=${encodeURIComponent(plan)}&billing=${billing}`;
+      const fallback = `/checkout?plan=${encodeURIComponent(plan)}&billing=${billing}`;
+      try {
+        const response = await fetch("/api/checkout/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan, billing }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.url) throw new Error(data.error || "Checkout unavailable");
+
+        if (window.LemonSqueezy?.Url?.Open) {
+          window.LemonSqueezy.Url.Open(data.url);
+        } else if (window.createLemonSqueezy) {
+          window.createLemonSqueezy();
+          window.LemonSqueezy?.Url?.Open(data.url);
+        } else {
+          window.location.href = data.url;
+        }
+      } catch {
+        window.location.href = fallback;
+      }
     },
     [],
   );

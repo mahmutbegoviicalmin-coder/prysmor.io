@@ -28,7 +28,12 @@ export default async function CheckoutPage({ searchParams }: Props) {
 
   let checkoutUrl: string;
   try {
-    checkoutUrl = await createCheckout(variantId, { userId, email, refCode });
+    checkoutUrl = await createCheckout(variantId, {
+      billing: billing as 'monthly' | 'yearly',
+      userId,
+      email,
+      refCode,
+    });
   } catch (err) {
     console.error('[checkout]', err);
     redirect('/#pricing');

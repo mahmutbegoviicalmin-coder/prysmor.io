@@ -12,6 +12,21 @@ export const PLAN_VARIANTS: Record<string, { monthly: string; yearly: string; la
   exclusive: { monthly: '1455044', yearly: '1455048', label: 'Exclusive'  },
 };
 
+export const PLAN_CHECKOUT_UUIDS: Record<string, { monthly: string; yearly: string }> = {
+  starter: {
+    monthly: 'c44b1138-5022-4a77-9ffc-f34a141f8999',
+    yearly: 'ec075c85-1c0b-43f2-a19a-5f92d6b8e652',
+  },
+  pro: {
+    monthly: '85a598e3-f100-466b-be78-7d7a90c933ab',
+    yearly: 'f6e4d82f-75dc-4eaa-897c-981119375475',
+  },
+  exclusive: {
+    monthly: '717c1894-de84-4710-9936-c53946d4777e',
+    yearly: '8a5a6b84-56a9-46e3-a576-5f0b56d502c6',
+  },
+};
+
 /** Reverse map: variant ID → plan slug */
 export const VARIANT_TO_PLAN: Record<string, string> = {
   '1455040': 'starter',
@@ -91,6 +106,7 @@ function lsHeaders() {
 export async function createCheckout(
   variantId: string,
   options: {
+    billing?: 'monthly' | 'yearly';
     userId?: string | null;
     email?: string | null;
     refCode?: string | null;
@@ -103,6 +119,8 @@ export async function createCheckout(
     ?? `${appUrl}/purchase/complete?claim=${encodeURIComponent(claimId)}`;
   const plan = VARIANT_TO_PLAN[variantId];
   if (!plan) throw new Error(`Unknown Lemon Squeezy variant: ${variantId}`);
+  const checkoutUuid = PLAN_CHECKOUT_UUIDS[plan]?.[options.billing ?? 'monthly'];
+  if (!checkoutUuid) throw new Error(`Missing checkout URL for ${plan}`);
 
   await db.collection('purchase_claims').doc(claimId).set({
     status: 'pending',
@@ -113,51 +131,23 @@ export async function createCheckout(
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   });
 
-  const custom: Record<string, string> = { claim_id: claimId };
-  if (options.userId) custom.user_id = options.userId;
-  if (options.refCode) custom.ref_code = options.refCode;
-
-  const res = await fetch(`${LS_API_BASE}/v1/checkouts`, {
-    method:  'POST',
-    headers: lsHeaders(),
-    body: JSON.stringify({
-      data: {
-        type: 'checkouts',
-        attributes: {
-          checkout_data: {
-            custom,
-            ...(options.email && { email: options.email }),
-          },
-          checkout_options: {
-            dark:         true,
-            button_color: '#39FF6A',
-          },
-          product_options: {
-            redirect_url:         redirectUrl,
-            receipt_button_text:  'Activate Prysmor',
-            receipt_link_url:     redirectUrl,
-          },
-        },
-        relationships: {
-          store:   { data: { type: 'stores',   id: LS_STORE_ID } },
-          variant: { data: { type: 'variants', id: variantId   } },
-        },
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    await db.collection('purchase_claims').doc(claimId).set({
-      status: 'checkout_failed',
-      error: `Lemon Squeezy checkout error ${res.status}`,
-      updatedAt: new Date(),
-    }, { merge: true }).catch(() => {});
-    throw new Error(`LemonSqueezy checkout error ${res.status}: ${body}`);
+  const base = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${checkoutUuid}`;
+  const query = [
+    'embed=1',
+    'dark=1',
+    `checkout[custom][claim_id]=${encodeURIComponent(claimId)}`,
+    `checkout[redirect_url]=${encodeURIComponent(redirectUrl)}`,
+  ];
+  if (options.userId) {
+    query.push(`checkout[custom][user_id]=${encodeURIComponent(options.userId)}`);
   }
-
-  const json = await res.json();
-  return json.data.attributes.url as string;
+  if (options.refCode) {
+    query.push(`checkout[custom][ref_code]=${encodeURIComponent(options.refCode)}`);
+  }
+  if (options.email) {
+    query.push(`checkout[email]=${encodeURIComponent(options.email)}`);
+  }
+  return `${base}?${query.join('&')}`;
 }
 
 /**
