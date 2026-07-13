@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 
-const MAX_RETRIES = 6;   // 6 × 400ms = ~2.4s max wait
-const RETRY_MS   = 400;
+const MAX_RETRIES = 6;
+const RETRY_MS = 400;
 
 export default function AuthRedirectPage() {
   const { user, isLoaded } = useUser();
@@ -22,10 +22,30 @@ export default function AuthRedirectPage() {
         router.replace(`/purchase/complete?claim=${encodeURIComponent(purchase)}`);
         return;
       }
-      const createdAt = user.createdAt ? new Date(user.createdAt) : null;
-      const isNew = createdAt !== null && Date.now() - createdAt.getTime() < 5 * 60_000;
-      router.replace(isNew ? "/dashboard/playground" : "/dashboard");
-      return;
+
+      let cancelled = false;
+      const routePaidOrNew = async () => {
+        try {
+          await fetch("/api/purchase/claim", { method: "POST" }).catch(() => null);
+          const me = await fetch("/api/me", { cache: "no-store" }).then((r) => r.json()).catch(() => null);
+          if (cancelled) return;
+          if (me?.licenseStatus === "active") {
+            router.replace("/dashboard");
+            return;
+          }
+        } catch {
+          // fall through to new-user heuristic
+        }
+
+        const createdAt = user.createdAt ? new Date(user.createdAt) : null;
+        const isNew = createdAt !== null && Date.now() - createdAt.getTime() < 5 * 60_000;
+        router.replace(isNew ? "/dashboard/playground" : "/dashboard");
+      };
+
+      void routePaidOrNew();
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (tick < MAX_RETRIES) {
@@ -48,7 +68,6 @@ export default function AuthRedirectPage() {
         gap: "20px",
       }}
     >
-      {/* Logo, gives visual context so it doesn't look like a black screen */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo/vecilogo.png" alt="Prysmor" width={26} height={26} style={{ objectFit: "contain" }} />

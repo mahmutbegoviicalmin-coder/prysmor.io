@@ -211,27 +211,103 @@ export async function processSubscriptionEvent(
   };
 }
 
+async function resolveInvitationActivateUrl(
+  buyerEmail: string,
+  claimId: string,
+): Promise<string> {
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io').replace(/\/$/, '');
+  const redirectUrl = `${appUrl}/activate?purchase=${encodeURIComponent(claimId)}`;
+  const fallback = redirectUrl;
+
+  try {
+    const invitation = await clerk.invitations.createInvitation({
+      emailAddress: buyerEmail,
+      redirectUrl,
+      notify: false,
+    });
+    return invitation.url || fallback;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (!message.includes('already') && !message.includes('exist')) throw error;
+
+    try {
+      const invitation = await clerk.invitations.createInvitation({
+        emailAddress: buyerEmail,
+        redirectUrl,
+        notify: false,
+        ignoreExisting: true,
+      });
+      return invitation.url || fallback;
+    } catch (retryError) {
+      const list = await clerk.invitations.getInvitationList({ status: 'pending', limit: 100 });
+      const existing = list.data.find(
+        (item) => normalizeBillingEmail(item.emailAddress) === buyerEmail,
+      );
+      if (existing?.url) return existing.url;
+      console.warn('[fulfillment] invitation exists but no URL; using activate fallback', retryError);
+      return fallback;
+    }
+  }
+}
+
 export async function ensurePurchaseInvitation(
   claimId: string,
   buyerEmail: string,
+  plan?: string,
 ): Promise<void> {
   const claimRef = db.collection('purchase_claims').doc(claimId);
   const claim = await claimRef.get();
   if (!claim.exists || claim.data()?.invitationSentAt) return;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://prysmor.io';
-  try {
-    await clerk.invitations.createInvitation({
-      emailAddress: buyerEmail,
-      redirectUrl: `${appUrl}/sign-up?purchase=${encodeURIComponent(claimId)}`,
-      notify: true,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : '';
-    if (!message.includes('already') && !message.includes('exist')) throw error;
+  const resolvedPlan = plan ?? String(claim.data()?.plan ?? 'starter');
+  const activateUrl = await resolveInvitationActivateUrl(buyerEmail, claimId);
+
+  const { sendPurchaseActivationEmail } = await import('@/lib/email/transactional');
+  const emailResult = await sendPurchaseActivationEmail({
+    to: buyerEmail,
+    claimId,
+    plan: resolvedPlan,
+    activateUrl,
+  });
+  if (!emailResult.ok) {
+    console.warn('[fulfillment] activation email failed:', emailResult.error);
+    return;
   }
 
   await claimRef.set({ invitationSentAt: new Date(), updatedAt: new Date() }, { merge: true });
+}
+
+export async function ensureOrderConfirmedEmail(
+  claimId: string | undefined,
+  buyerEmail: string,
+  plan: string,
+): Promise<void> {
+  if (!buyerEmail) return;
+
+  if (claimId) {
+    const claimRef = db.collection('purchase_claims').doc(claimId);
+    const claim = await claimRef.get();
+    if (claim.exists && claim.data()?.confirmationEmailSentAt) return;
+
+    const { sendOrderConfirmedEmail } = await import('@/lib/email/transactional');
+    const emailResult = await sendOrderConfirmedEmail({ to: buyerEmail, plan });
+    if (!emailResult.ok) {
+      console.warn('[fulfillment] order confirmed email failed:', emailResult.error);
+      return;
+    }
+    if (claim.exists) {
+      await claimRef.set(
+        { confirmationEmailSentAt: new Date(), updatedAt: new Date() },
+        { merge: true },
+      );
+    }
+    return;
+  }
+
+  const { sendOrderConfirmedEmail } = await import('@/lib/email/transactional');
+  await sendOrderConfirmedEmail({ to: buyerEmail, plan }).then((result) => {
+    if (!result.ok) console.warn('[fulfillment] order confirmed email failed:', result.error);
+  });
 }
 
 export async function claimPendingEntitlements(

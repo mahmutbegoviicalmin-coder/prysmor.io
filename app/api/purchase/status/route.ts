@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/firebaseAdmin';
+import { PLAN_LABELS } from '@/lib/firestore/users';
 
 export async function GET(req: NextRequest) {
   const claimId = req.nextUrl.searchParams.get('claim') ?? '';
@@ -17,11 +18,13 @@ export async function GET(req: NextRequest) {
   const { userId } = await auth();
   const fulfilledForCurrentUser =
     data.status === 'fulfilled' && !!userId && data.userId === userId;
+  const planKey = typeof data.plan === 'string' ? data.plan : null;
 
   return NextResponse.json(
     {
       status: data.status,
       fulfilledForCurrentUser,
+      plan: planKey ? (PLAN_LABELS[planKey] ?? planKey) : null,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

@@ -10,7 +10,11 @@ import RefTracker from "@/components/site/RefTracker";
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname    = usePathname();
   const isDashboard = pathname.startsWith("/dashboard");
-  const isAuthFlow  = pathname === "/auth-redirect" || pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isAuthFlow  = pathname === "/auth-redirect"
+    || pathname === "/activate"
+    || pathname.startsWith("/purchase/")
+    || pathname.startsWith("/sign-in")
+    || pathname.startsWith("/sign-up");
   const { isSignedIn, isLoaded, user } = useUser();
 
   /* Bug 1 fix, keep prysmor_user_id in localStorage in sync with Clerk auth state */

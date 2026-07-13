@@ -2,6 +2,7 @@
 
 import { SignUp } from "@clerk/nextjs";
 import Image from "next/image";
+import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 const appearance = {
@@ -93,9 +94,30 @@ const STEPS = [
 export default function SignUpPage() {
   const searchParams = useSearchParams();
   const purchase = searchParams.get("purchase");
-  const afterSignUp = purchase && /^[a-f0-9]{64}$/.test(purchase)
-    ? `/auth-redirect?purchase=${encodeURIComponent(purchase)}`
+  const purchaseValid = !!purchase && /^[a-f0-9]{64}$/.test(purchase);
+
+  useEffect(() => {
+    if (!purchaseValid || !purchase) return;
+    const ticket = searchParams.get("__clerk_ticket");
+    const status = searchParams.get("__clerk_status");
+    const qs = new URLSearchParams({ purchase });
+    if (ticket) qs.set("__clerk_ticket", ticket);
+    if (status) qs.set("__clerk_status", status);
+    window.location.replace(`/activate?${qs.toString()}`);
+  }, [purchase, purchaseValid, searchParams]);
+
+  const afterSignUp = purchaseValid
+    ? `/auth-redirect?purchase=${encodeURIComponent(purchase!)}`
     : "/auth-redirect";
+
+  if (purchaseValid) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#09090b] text-white/40 text-sm">
+        Redirecting to activation…
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`

@@ -5,6 +5,7 @@ import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS } from '@/lib/lemonsqueezy';
 import { recordReferral }            from '@/lib/affiliates';
 import { FB_PIXEL_ID }               from '@/lib/pixel';
 import {
+  ensureOrderConfirmedEmail,
   ensurePurchaseInvitation,
   processSubscriptionEvent,
 } from '@/lib/billing/fulfillment';
@@ -170,8 +171,17 @@ export async function POST(req: NextRequest) {
         refCode,
       });
 
-      if (result.needsInvitation && claimId) {
-        await ensurePurchaseInvitation(claimId, result.buyerEmail);
+      if (result.needsInvitation && result.claimId) {
+        await ensurePurchaseInvitation(result.claimId, result.buyerEmail, plan);
+      }
+
+      if (
+        result.fresh
+        && eventName === 'subscription_created'
+        && result.userId
+        && result.buyerEmail
+      ) {
+        await ensureOrderConfirmedEmail(result.claimId, result.buyerEmail, plan);
       }
 
       if (result.fresh && ['subscription_created', 'subscription_updated', 'subscription_resumed'].includes(eventName) && result.userId) {

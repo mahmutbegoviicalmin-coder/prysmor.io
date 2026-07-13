@@ -72,14 +72,25 @@ export async function POST(req: NextRequest) {
         ? await claimPendingEntitlements(email, userId)
         : [];
       const activeClaims = claimed.filter((purchase) => purchase.active);
-      if (activeClaims.length === 0) {
+
+      // Prefer live Firestore license in case Lemon fulfilled this user before claim
+      const userSnap = await db.collection('users').doc(userId).get();
+      const licenseStatus = userSnap.exists
+        ? (userSnap.data()?.licenseStatus as string | undefined)
+        : undefined;
+      const alreadyPaid = licenseStatus === 'active' || activeClaims.length > 0;
+
+      if (!alreadyPaid) {
         const { enrollInFunnel } = await import('@/lib/email/enrollments');
         await enrollInFunnel(userId, 'unpaid-starter').catch((e) => {
           console.warn('[clerk-webhook] email enroll failed:', e);
         });
       } else {
         const { onUserBecamePaid } = await import('@/lib/email/enrollments');
-        await onUserBecamePaid(userId, activeClaims[activeClaims.length - 1].plan).catch(() => {});
+        const plan = activeClaims[activeClaims.length - 1]?.plan
+          ?? (userSnap.data()?.plan as string | undefined)
+          ?? 'starter';
+        await onUserBecamePaid(userId, plan).catch(() => {});
         for (const purchase of activeClaims) {
           if (!purchase.refCode) continue;
           await recordReferral({
