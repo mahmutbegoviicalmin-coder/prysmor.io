@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
   const refCode    = customData?.ref_code;
   const data       = payload.data as Record<string, unknown>;
   const attrs      = data?.attributes as Record<string, unknown>;
+  const isTestMode = attrs?.test_mode === true;
 
   console.log(`[ls-webhook] event=${eventName} userId=${userId}`);
 
@@ -187,13 +188,15 @@ export async function POST(req: NextRequest) {
       }
 
       if (result.fresh && eventName === 'subscription_created') {
-        await sendMetaPurchaseEvent({
-          id: subscriptionId,
-          total: (attrs?.total as number) ?? 0,
-          currency: (attrs?.currency as string) ?? 'USD',
-          email: (attrs?.user_email as string) ?? '',
-        });
-        if (refCode && result.userId) {
+        if (!isTestMode) {
+          await sendMetaPurchaseEvent({
+            id: subscriptionId,
+            total: (attrs?.total as number) ?? 0,
+            currency: (attrs?.currency as string) ?? 'USD',
+            email: (attrs?.user_email as string) ?? '',
+          });
+        }
+        if (!isTestMode && refCode && result.userId) {
           await recordReferral({
             affiliateCode: refCode,
             referredUserId: result.userId,
