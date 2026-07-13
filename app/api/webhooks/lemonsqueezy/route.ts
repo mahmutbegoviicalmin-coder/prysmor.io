@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db }                        from '@/lib/firebaseAdmin';
 import { VARIANT_TO_PLAN, CREDIT_PACK_ID_TO_CREDITS, LIFETIME_PRODUCT } from '@/lib/lemonsqueezy';
 import { recordReferral }            from '@/lib/affiliates';
-import { lemonTotalToValue, sendMetaPurchaseEvent } from '@/lib/meta/capi';
+import { resolvePurchaseValue, sendMetaPurchaseEvent } from '@/lib/meta/capi';
 import {
   ensurePurchaseMagicLink,
   fulfillLifetimeOrder,
@@ -29,7 +29,7 @@ async function trackPaidOrder(opts: {
   claimId?: string | null;
   fallbackValue?: number;
 }) {
-  const value = lemonTotalToValue(opts.attrs) || opts.fallbackValue || 0;
+  const value = resolvePurchaseValue(opts.attrs, opts.fallbackValue || 0);
   const currency = String(opts.attrs.currency ?? 'USD');
   const eventId = `purchase_${opts.orderId}`;
   const { fbp, fbc } = metaFromCustom(opts.customData);

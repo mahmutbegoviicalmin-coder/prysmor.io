@@ -23,16 +23,35 @@ function sha256(value: string): string {
 /** Normalize Lemon totals (cents int or dollar float) → major units. */
 export function lemonTotalToValue(attrs: Record<string, unknown> | null | undefined): number {
   if (!attrs) return 0;
+
+  // Prefer total_usd — Lemon documents this as integer cents.
   const usd = attrs.total_usd;
   if (typeof usd === 'number' && Number.isFinite(usd) && usd > 0) {
-    // API/docs: total_usd is integer cents
-    return Number.isInteger(usd) ? usd / 100 : usd;
+    return Math.round(usd) / 100;
   }
+
   const total = attrs.total;
   if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return 0;
-  // Webhook examples sometimes send dollar floats (e.g. 1859.76); API uses integer cents.
-  if (!Number.isInteger(total) || total < 50) return Math.round(total * 100) / 100;
+
+  // Webhook examples sometimes send dollar floats (e.g. 18.59 / 1859.76).
+  if (!Number.isInteger(total)) {
+    return Math.round(total * 100) / 100;
+  }
+
+  // Integer totals from the API are cents (e.g. 9900 → $99.00).
   return total / 100;
+}
+
+/** Pick a sane purchase value, preferring webhook totals and falling back to catalog price. */
+export function resolvePurchaseValue(
+  attrs: Record<string, unknown> | null | undefined,
+  fallbackValue = 0,
+): number {
+  const parsed = lemonTotalToValue(attrs);
+  if (parsed <= 0) return fallbackValue;
+  // Guard against mistaking $99 (as int 99) for 99 cents when total_usd is missing.
+  if (fallbackValue > 0 && parsed < fallbackValue * 0.25) return fallbackValue;
+  return parsed;
 }
 
 /**
