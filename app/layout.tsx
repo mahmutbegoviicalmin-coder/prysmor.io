@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import Script from "next/script";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 import { Suspense } from "react";
 import ConditionalShell from "@/components/site/ConditionalShell";
 import PageTracker from "@/components/PageTracker";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 import { FB_PIXEL_ID } from "@/lib/pixel";
 
 const outfit = Outfit({
@@ -81,21 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             alt=""
           />
         </noscript>
-        <Analytics
-          beforeSend={(event) => {
-            // Drop magic-link / token URLs from pageview paths
-            try {
-              const url = new URL(event.url);
-              if (url.pathname.startsWith("/auth/magic")) {
-                url.search = "";
-                return { ...event, url: url.toString() };
-              }
-            } catch {
-              /* keep original */
-            }
-            return event;
-          }}
-        />
+        <AnalyticsProvider />
       </body>
     </html>
   );
