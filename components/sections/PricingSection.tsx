@@ -233,8 +233,35 @@ export default function PricingSection({
   onCtaClick,
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
-  const openCheckout = useCallback(
-    async (plan: string, billing: "monthly" | "yearly" | "once", tierName?: string, tierPrice?: number) => {
+  const [emailModal, setEmailModal] = useState<{
+    plan: string;
+    billing: "monthly" | "yearly" | "once";
+    tierName?: string;
+    tierPrice?: number;
+  } | null>(null);
+  const [checkoutEmail, setCheckoutEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+
+  const launchLemon = useCallback((url: string) => {
+    if (window.LemonSqueezy?.Url?.Open) {
+      window.LemonSqueezy.Url.Open(url);
+    } else if (window.createLemonSqueezy) {
+      window.createLemonSqueezy();
+      window.LemonSqueezy?.Url?.Open(url);
+    } else {
+      window.location.href = url;
+    }
+  }, []);
+
+  const openCheckoutWithEmail = useCallback(
+    async (
+      plan: string,
+      billing: "monthly" | "yearly" | "once",
+      email: string,
+      tierName?: string,
+      tierPrice?: number,
+    ) => {
       try {
         if (tierName && tierPrice !== undefined) {
           initiateCheckout(tierName, tierPrice);
@@ -248,25 +275,58 @@ export default function PricingSection({
         const response = await fetch("/api/checkout/subscription", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan, billing, ...meta }),
+          body: JSON.stringify({ plan, billing, email, ...meta }),
         });
         const data = await response.json();
         if (!response.ok || !data.url) throw new Error(data.error || "Checkout unavailable");
-
-        if (window.LemonSqueezy?.Url?.Open) {
-          window.LemonSqueezy.Url.Open(data.url);
-        } else if (window.createLemonSqueezy) {
-          window.createLemonSqueezy();
-          window.LemonSqueezy?.Url?.Open(data.url);
-        } else {
-          window.location.href = data.url;
-        }
+        launchLemon(data.url);
       } catch {
         window.location.href = fallback;
       }
     },
-    [],
+    [launchLemon],
   );
+
+  const openCheckout = useCallback(
+    async (plan: string, billing: "monthly" | "yearly" | "once", tierName?: string, tierPrice?: number) => {
+      try {
+        const me = await fetch("/api/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null));
+        if (me?.email) {
+          await openCheckoutWithEmail(plan, billing, String(me.email), tierName, tierPrice);
+          return;
+        }
+      } catch {
+        /* ask for email */
+      }
+      setCheckoutEmail("");
+      setEmailError("");
+      setEmailModal({ plan, billing, tierName, tierPrice });
+    },
+    [openCheckoutWithEmail],
+  );
+
+  const submitEmailModal = useCallback(async () => {
+    if (!emailModal) return;
+    const email = checkoutEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setEmailError("Enter a valid email address.");
+      return;
+    }
+    setCheckoutBusy(true);
+    setEmailError("");
+    try {
+      await openCheckoutWithEmail(
+        emailModal.plan,
+        emailModal.billing,
+        email,
+        emailModal.tierName,
+        emailModal.tierPrice,
+      );
+      setEmailModal(null);
+    } finally {
+      setCheckoutBusy(false);
+    }
+  }, [checkoutEmail, emailModal, openCheckoutWithEmail]);
 
   const openLSOverlay = useCallback(
     (plan: string, billing: "monthly" | "yearly" | "once", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
@@ -534,6 +594,63 @@ export default function PricingSection({
           )}
         </motion.div>
       </div>
+
+      {emailModal && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkout-email-title"
+        >
+          <div className="w-full max-w-[400px] rounded-2xl border border-white/10 bg-[#111113] p-6 shadow-2xl">
+            <h3 id="checkout-email-title" className="text-[18px] font-semibold text-white">
+              Enter your email
+            </h3>
+            <p className="mt-2 text-[13px] leading-5 text-white/45">
+              Required for your license and the password setup link after payment.
+            </p>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.08em] text-white/30">
+                Email
+              </span>
+              <input
+                type="email"
+                required
+                autoFocus
+                value={checkoutEmail}
+                onChange={(e) => setCheckoutEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitEmailModal();
+                  }
+                }}
+                placeholder="you@email.com"
+                className="w-full rounded-[10px] border border-white/[0.08] bg-[#0e0e10] px-3.5 py-3 text-sm text-white outline-none focus:border-[#39FF6A]/40"
+                autoComplete="email"
+              />
+            </label>
+            {emailError && <p className="mt-2 text-[12px] text-[#F87171]">{emailError}</p>}
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEmailModal(null)}
+                className="flex-1 rounded-[10px] border border-white/[0.08] py-2.5 text-[12px] text-white/50 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={checkoutBusy}
+                onClick={() => void submitEmailModal()}
+                className="flex-1 rounded-[10px] bg-[#39FF6A] py-2.5 text-[12px] font-bold uppercase tracking-wide text-black disabled:opacity-60"
+              >
+                {checkoutBusy ? "Opening…" : "Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

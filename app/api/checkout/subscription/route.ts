@@ -2,6 +2,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createCheckout } from '@/lib/lemonsqueezy';
+import { normalizeEmail } from '@/lib/auth/identity';
 
 function readMetaIds(reqBody: Record<string, unknown>, jar: ReturnType<typeof cookies>) {
   const bodyFbp = typeof reqBody.fbp === 'string' ? reqBody.fbp : null;
@@ -18,7 +19,17 @@ export async function POST(req: NextRequest) {
 
   const session = await getSessionUser();
   const userId = session?.userId ?? null;
-  const email = session?.email ?? null;
+  const email = normalizeEmail(
+    (typeof body.email === 'string' ? body.email : null) || session?.email || '',
+  );
+
+  if (!email || !email.includes('@')) {
+    return NextResponse.json(
+      { error: 'Email is required for checkout', code: 'email_required' },
+      { status: 400 },
+    );
+  }
+
   const jar = cookies();
   const rawRefCode = jar.get('prysmor_ref')?.value ?? null;
   const refCode = rawRefCode && /^[A-Z0-9_-]{1,20}$/i.test(rawRefCode)
