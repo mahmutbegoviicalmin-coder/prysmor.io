@@ -5,23 +5,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Menu, X, LayoutDashboard } from "lucide-react";
-import { track } from "@vercel/analytics";
+import { track, trackCta, trackNav } from "@/lib/track";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { label: "How it Works", href: "/#how-it-works" },
-  { label: "Capabilities", href: "/#examples" },
-  { label: "Pricing", href: "/#pricing" },
-  { label: "FAQ", href: "/#faq" },
+  { label: "How it Works", href: "/#how-it-works", id: "how_it_works" },
+  { label: "Capabilities", href: "/#examples", id: "capabilities" },
+  { label: "Pricing", href: "/#pricing", id: "pricing" },
+  { label: "FAQ", href: "/#faq", id: "faq" },
 ];
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({ href, label, id }: { href: string; label: string; id: string }) {
   return (
     <Link
       href={href}
+      onClick={() => trackNav(id, "navbar")}
       className="group relative px-3.5 py-2 text-[13px] font-medium tracking-[-0.015em] text-white/38 transition-colors duration-200 hover:text-white/90"
     >
       {label}
@@ -53,8 +54,8 @@ export default function Navbar() {
   }, [pathname]);
 
   const handleSignUp = () => {
-    track("get_started", { location: "navbar" });
-    window.location.href = "/sign-in";
+    trackCta("navbar", "get_lifetime");
+    window.location.href = "/checkout";
   };
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function Navbar() {
 
           <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center lg:flex">
             {navLinks.map((l) => (
-              <NavLink key={l.href} href={l.href} label={l.label} />
+              <NavLink key={l.href} href={l.href} label={l.label} id={l.id} />
             ))}
           </nav>
 
@@ -132,6 +133,7 @@ export default function Navbar() {
               <>
                 <Link
                   href="/sign-in"
+                  onClick={() => track("sign_in_click", { location: "navbar" })}
                   className="cursor-pointer px-1 text-[13px] font-medium tracking-[-0.015em] text-white/40 transition-colors duration-200 hover:text-white/80"
                 >
                   Sign In
@@ -141,7 +143,7 @@ export default function Navbar() {
                   onClick={handleSignUp}
                   className="inline-flex cursor-pointer items-center rounded-md bg-[#39FF6A] px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] text-black transition-opacity duration-200 hover:opacity-90"
                 >
-                  Get Started Free
+                  Get lifetime access
                 </button>
               </>
             )}
@@ -206,6 +208,10 @@ export default function Navbar() {
                   <Link
                     key={l.href}
                     href={l.href}
+                    onClick={() => {
+                      trackNav(l.id, "mobile_nav");
+                      setMobileOpen(false);
+                    }}
                     className={cn(
                       "block rounded-lg px-3 py-2.5 text-[14px] font-medium tracking-[-0.015em] transition-colors duration-200",
                       pathname === l.href
@@ -221,6 +227,7 @@ export default function Navbar() {
                   {isSignedIn ? (
                     <Link
                       href="/dashboard"
+                      onClick={() => trackNav("dashboard", "mobile_nav")}
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
                     >
                       <LayoutDashboard className="h-4 w-4 text-white/35" />
@@ -230,7 +237,10 @@ export default function Navbar() {
                     <>
                       <Link
                         href="/sign-in"
-                        onClick={() => setMobileOpen(false)}
+                        onClick={() => {
+                          track("sign_in_click", { location: "mobile_nav" });
+                          setMobileOpen(false);
+                        }}
                         className="w-full rounded-lg py-2.5 text-center text-[14px] font-medium text-white/42 transition-colors hover:text-white/80"
                       >
                         Sign In
@@ -243,7 +253,7 @@ export default function Navbar() {
                         }}
                         className="w-full rounded-lg bg-[#39FF6A] py-2 text-[13px] font-semibold text-black transition-opacity hover:opacity-90"
                       >
-                        Get Started Free
+                        Get lifetime access
                       </button>
                     </>
                   )}

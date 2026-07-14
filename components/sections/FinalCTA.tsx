@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { track } from "@vercel/analytics";
+import { trackCta } from "@/lib/track";
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -77,10 +77,10 @@ export default function FinalCTA() {
           <div className="relative mt-8 flex flex-col items-center gap-3 lg:mt-0 lg:shrink-0 lg:items-end">
             <Link
               href="/checkout"
-              onClick={() => track("get_started", { location: "final_cta" })}
+              onClick={() => trackCta("final_cta", "get_lifetime")}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#39FF6A] px-6 py-3.5 text-[14px] font-semibold text-black transition-opacity hover:opacity-90 sm:w-auto"
             >
-              Buy Prysmor
+              Get lifetime access
               <ArrowRight size={15} strokeWidth={2.5} />
             </Link>
             <p className="text-center text-[12px] leading-5 text-white/30 lg:hidden">

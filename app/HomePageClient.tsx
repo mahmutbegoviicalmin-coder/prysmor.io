@@ -31,7 +31,7 @@ const pricingTiers: PriceTier[] = [
       "4K output · macOS & Windows",
       "Buy more credits anytime",
     ],
-    cta: "Buy Prysmor",
+    cta: "Get lifetime access",
     ctaHref: "/checkout",
     lsMonthlyUrl:
       "https://vfxpilot1.lemonsqueezy.com/checkout/buy/41852cde-e7c2-45fb-bf7b-bcb952dddab0",

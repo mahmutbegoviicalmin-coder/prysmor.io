@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { track } from "@/lib/track";
 
 function SignInInner() {
   const searchParams = useSearchParams();
@@ -30,9 +31,11 @@ function SignInInner() {
       }
       setStatus("sent");
       setMessage("Check your email for a sign-in link. It expires in 30 minutes.");
+      track("sign_in_submit", { status: "sent" });
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Something went wrong");
+      track("sign_in_submit", { status: "error" });
     }
   };
 
@@ -57,7 +60,7 @@ function SignInInner() {
           />
           <h1 className="text-2xl font-semibold tracking-tight">Sign in to Prysmor</h1>
           <p className="mt-2 text-sm text-white/45">
-            Enter the email you used at checkout. We&apos;ll send a one-click link — no password.
+            Enter the email you used at checkout. We&apos;ll send a one-click link. No password.
           </p>
         </div>
 

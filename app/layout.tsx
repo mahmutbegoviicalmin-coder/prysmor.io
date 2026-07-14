@@ -81,7 +81,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             alt=""
           />
         </noscript>
-        <Analytics />
+        <Analytics
+          beforeSend={(event) => {
+            // Drop magic-link / token URLs from pageview paths
+            try {
+              const url = new URL(event.url);
+              if (url.pathname.startsWith("/auth/magic")) {
+                url.search = "";
+                return { ...event, url: url.toString() };
+              }
+            } catch {
+              /* keep original */
+            }
+            return event;
+          }}
+        />
       </body>
     </html>
   );

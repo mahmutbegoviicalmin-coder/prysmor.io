@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { trackPurchase } from "@/lib/pixel";
+import { track } from "@/lib/track";
 
 type PurchaseState = "processing" | "awaiting_email" | "fulfilled" | "error";
 
@@ -55,6 +56,10 @@ function PurchaseCompleteInner() {
         eventId: purchase.eventId ?? undefined,
         contentName: purchase.contentName,
         contentIds: purchase.contentIds,
+      });
+      track("purchase_complete", {
+        plan: purchase.contentIds?.[0] ?? "lifetime",
+        value: purchase.value,
       });
     };
 

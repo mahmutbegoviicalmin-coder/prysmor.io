@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { track } from "@vercel/analytics";
+import { trackCta } from "@/lib/track";
 import { motion } from "framer-motion";
 import LazyVideo from "@/components/media/LazyVideo";
 import { HERO_VIDEO_POSTER, HERO_VIDEO_SRC } from "@/lib/heroMedia";
@@ -90,20 +90,20 @@ export default function HeroSection() {
             >
               <Link
                 href="/checkout"
-                onClick={() => track("get_started", { location: "hero" })}
+                onClick={() => trackCta("hero", "get_lifetime")}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#39FF6A] px-7 text-[14px] font-semibold tracking-[-0.01em] text-black transition-opacity hover:opacity-90 sm:w-auto sm:px-8"
               >
-                Buy Prysmor
+                Get lifetime access
               </Link>
               <button
                 type="button"
                 onClick={() => {
-                  track("see_pricing", { location: "hero" });
+                  trackCta("hero", "see_pricing");
                   document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
                 }}
                 className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/30 bg-transparent px-7 text-[14px] font-medium tracking-[-0.01em] text-white/88 transition-colors hover:border-white/50 hover:bg-white/[0.06] sm:w-auto sm:px-8"
               >
-                See Pricing
+                See pricing
               </button>
             </motion.div>
 
@@ -114,7 +114,7 @@ export default function HeroSection() {
               variants={fadeUp}
               className="mt-5 text-[11px] leading-relaxed tracking-[0.01em] text-white/30 sm:mt-6"
             >
-              $99 lifetime · Never expires · 200s AI VFX · Premiere + After Effects
+              $99 once. Never expires. 200 seconds of AI VFX for Premiere and After Effects.
             </motion.p>
           </div>
         </div>

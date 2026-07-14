@@ -3,23 +3,24 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Instagram } from "lucide-react";
+import { trackNav } from "@/lib/track";
 
 const footerLinks = {
   Product: [
-    { label: "How it works", href: "/#how-it-works" },
-    { label: "Capabilities", href: "/#examples" },
-    { label: "Pricing", href: "/#pricing" },
-    { label: "FAQ", href: "/#faq" },
+    { label: "How it works", href: "/#how-it-works", id: "how_it_works" },
+    { label: "Capabilities", href: "/#examples", id: "capabilities" },
+    { label: "Pricing", href: "/#pricing", id: "pricing" },
+    { label: "FAQ", href: "/#faq", id: "faq" },
   ],
   Support: [
-    { label: "Documentation", href: "/docs/install" },
-    { label: "Dashboard",     href: "/dashboard"    },
-    { label: "Sign In",       href: "/sign-in"      },
-    { label: "Get Started",   href: "/sign-up"      },
+    { label: "Documentation", href: "/docs/install", id: "docs" },
+    { label: "Dashboard",     href: "/dashboard", id: "dashboard" },
+    { label: "Sign In",       href: "/sign-in", id: "sign_in" },
+    { label: "Get lifetime access", href: "/checkout", id: "checkout" },
   ],
   Legal: [
-    { label: "Privacy Policy",   href: "/privacy" },
-    { label: "Terms of Service", href: "/terms"   },
+    { label: "Privacy Policy",   href: "/privacy", id: "privacy" },
+    { label: "Terms of Service", href: "/terms", id: "terms" },
   ],
 };
 
@@ -144,6 +145,7 @@ export default function Footer() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
+                    onClick={() => trackNav(item.id, "footer")}
                     style={{
                       fontSize: "13px",
                       color: "#999",

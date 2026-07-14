@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import { track } from "@/lib/track";
 
 export interface FAQItem {
   q: string;
@@ -170,7 +171,13 @@ export default function FAQ({ items }: FAQProps) {
               item={item}
               index={i}
               isOpen={openIndex === i}
-              onToggle={() => setOpenIndex(openIndex === i ? -1 : i)}
+              onToggle={() => {
+                const next = openIndex === i ? -1 : i;
+                if (next !== -1) {
+                  track("faq_open", { index: i, question: item.q.slice(0, 80) });
+                }
+                setOpenIndex(next);
+              }}
             />
           ))}
         </motion.div>
