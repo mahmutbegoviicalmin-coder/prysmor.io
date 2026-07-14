@@ -5,7 +5,7 @@ type PropValue = string | number | boolean | null;
 /**
  * Vercel Web Analytics custom events.
  * Pro plan allows max 2 properties per event — keep payloads lean.
- * Events appear under Project → Analytics → Events.
+ * Event NAMES encode what was clicked so the Events list is readable.
  */
 export function track(
   event: string,
@@ -13,6 +13,13 @@ export function track(
 ) {
   if (typeof window === 'undefined') return;
   try {
+    const safeName = event
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 64) || 'event';
+
     const entries = Object.entries(properties)
       .filter(([, v]) => v !== undefined)
       .slice(0, 2)
@@ -22,21 +29,30 @@ export function track(
       });
     const data = Object.fromEntries(entries) as Record<string, PropValue>;
     if (Object.keys(data).length === 0) {
-      vaTrack(event);
+      vaTrack(safeName);
     } else {
-      vaTrack(event, data);
+      vaTrack(safeName, data);
     }
   } catch {
     // never break the UI
   }
 }
 
-/** Primary / secondary CTA clicks across the marketing site. */
-export function trackCta(location: string, label: string) {
-  track('cta_click', { location, label });
+function slug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 32) || 'unknown';
 }
 
-/** In-page or route navigation clicks (nav, footer, anchors). */
+/** CTA click — event name is exact, e.g. cta_hero_get_lifetime */
+export function trackCta(location: string, label: string) {
+  track(`cta_${slug(location)}_${slug(label)}`);
+}
+
+/** Nav click — e.g. nav_navbar_pricing, nav_footer_docs */
 export function trackNav(label: string, location = 'nav') {
-  track('nav_click', { location, label });
+  track(`nav_${slug(location)}_${slug(label)}`);
 }

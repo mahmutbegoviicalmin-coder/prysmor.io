@@ -806,9 +806,17 @@ function SubStatusBadge({ status }: { status: string }) {
 
 const EVENT_META: Record<string, { label: string; color: string; bg: string; border: string }> = {
   page_view:      { label: 'Page View',      color: 'text-[#9CA3AF]',  bg: 'bg-white/[0.06]',       border: 'border-white/[0.08]' },
-  cta_click:      { label: 'CTA Click',      color: 'text-[#60A5FA]',  bg: 'bg-blue-500/[0.12]',    border: 'border-blue-500/25' },
-  pricing_click:  { label: 'Pricing Click',  color: 'text-[#A3FF12]',  bg: 'bg-[#A3FF12]/[0.10]',   border: 'border-[#A3FF12]/25' },
-  pricing_toggle: { label: 'Pricing Toggle', color: 'text-[#F59E0B]',  bg: 'bg-amber-500/[0.10]',   border: 'border-amber-500/25' },
+  cta_hero_get_lifetime: { label: 'Hero → Get lifetime', color: 'text-[#60A5FA]', bg: 'bg-blue-500/[0.12]', border: 'border-blue-500/25' },
+  cta_hero_see_pricing:  { label: 'Hero → See pricing',  color: 'text-[#60A5FA]', bg: 'bg-blue-500/[0.12]', border: 'border-blue-500/25' },
+  cta_navbar_get_lifetime: { label: 'Nav → Get lifetime', color: 'text-[#60A5FA]', bg: 'bg-blue-500/[0.12]', border: 'border-blue-500/25' },
+  cta_final_cta_get_lifetime: { label: 'Final CTA → Get lifetime', color: 'text-[#60A5FA]', bg: 'bg-blue-500/[0.12]', border: 'border-blue-500/25' },
+  pricing_buy_lifetime: { label: 'Pricing → Buy', color: 'text-[#A3FF12]', bg: 'bg-[#A3FF12]/[0.10]', border: 'border-[#A3FF12]/25' },
+  pricing_toggle_monthly: { label: 'Pricing → Monthly', color: 'text-[#F59E0B]', bg: 'bg-amber-500/[0.10]', border: 'border-amber-500/25' },
+  pricing_toggle_annual:  { label: 'Pricing → Annual',  color: 'text-[#F59E0B]', bg: 'bg-amber-500/[0.10]', border: 'border-amber-500/25' },
+  // legacy names (pre-rename)
+  cta_click:      { label: 'CTA Click (legacy)',      color: 'text-[#60A5FA]',  bg: 'bg-blue-500/[0.12]',    border: 'border-blue-500/25' },
+  pricing_click:  { label: 'Pricing Click (legacy)',  color: 'text-[#A3FF12]',  bg: 'bg-[#A3FF12]/[0.10]',   border: 'border-[#A3FF12]/25' },
+  pricing_toggle: { label: 'Pricing Toggle (legacy)', color: 'text-[#F59E0B]',  bg: 'bg-amber-500/[0.10]',   border: 'border-amber-500/25' },
   sign_up:        { label: 'Sign Up',        color: 'text-[#34D399]',  bg: 'bg-emerald-500/[0.12]', border: 'border-emerald-500/25' },
   sign_in:        { label: 'Sign In',        color: 'text-[#818CF8]',  bg: 'bg-indigo-500/[0.10]',  border: 'border-indigo-500/20' },
   dashboard_view: { label: 'Dashboard',      color: 'text-[#6B7280]',  bg: 'bg-white/[0.04]',       border: 'border-white/[0.06]' },

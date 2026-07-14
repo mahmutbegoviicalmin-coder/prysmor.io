@@ -32,13 +32,13 @@ function SignInInner() {
       if (!res.ok) {
         throw new Error(data.error || "Could not sign in");
       }
-      track("sign_in_submit", { status: "ok" });
+      track("sign_in_ok");
       const dest = redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/dashboard";
       router.replace(dest);
     } catch (err) {
       setStatus("error");
       setMessage(err instanceof Error ? err.message : "Something went wrong");
-      track("sign_in_submit", { status: "error" });
+      track("sign_in_error");
     }
   };
 

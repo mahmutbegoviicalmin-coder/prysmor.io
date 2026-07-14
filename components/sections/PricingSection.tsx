@@ -133,7 +133,7 @@ function BillingToggle({
         type="button"
         onClick={() => {
           onChange(false);
-        track("pricing_toggle", { billing: "monthly" });
+          track("pricing_toggle_monthly");
         }}
         className={`relative z-10 min-w-[108px] rounded-[8px] px-5 py-2 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
           !yearly ? "text-black" : "text-white/50 hover:text-white/70"
@@ -145,7 +145,7 @@ function BillingToggle({
         type="button"
         onClick={() => {
           onChange(true);
-          track("pricing_toggle", { billing: "annual" });
+          track("pricing_toggle_annual");
         }}
         className={`relative z-10 flex min-w-[148px] items-center justify-center gap-1.5 rounded-[8px] px-4 py-2 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
           yearly ? "text-black" : "text-white/50 hover:text-white/70"
@@ -272,8 +272,7 @@ export default function PricingSection({
     (plan: string, billing: "monthly" | "yearly" | "once", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
       e.preventDefault();
       if (tierName && tierPrice !== undefined) {
-        trackCta("pricing", tierName.toLowerCase());
-        track("pricing_click", { plan: tierName.toLowerCase(), price: tierPrice });
+        track(`pricing_buy_${tierName.toLowerCase()}`, { price: tierPrice });
       }
       openCheckout(plan, billing, tierName, tierPrice);
     },
