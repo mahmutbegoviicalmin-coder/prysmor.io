@@ -140,30 +140,13 @@ export async function DELETE(
   const admin = await requireAdmin();
   if (!admin.ok) return admin.response;
 
+  if (admin.user.userId === params.id) {
+    return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 403 });
+  }
+
   try {
-    const ref = db.collection('users').doc(params.id);
-
-    const [jobsSnap, devicesSnap] = await Promise.all([
-      ref.collection('jobs').limit(500).get(),
-      ref.collection('devices').get(),
-    ]);
-    if (jobsSnap.docs.length > 0 || devicesSnap.docs.length > 0) {
-      const batch = db.batch();
-      jobsSnap.docs.forEach(d => batch.delete(d.ref));
-      devicesSnap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-    }
-
-    await ref.delete();
-
-    // Also wipe web sessions for this user
-    const sessions = await db.collection('web_sessions').where('userId', '==', params.id).limit(100).get();
-    if (!sessions.empty) {
-      const batch = db.batch();
-      sessions.docs.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-    }
-
+    const { deleteUserDeep } = await import('@/lib/admin/deleteUser');
+    await deleteUserDeep(params.id);
     console.log(`[admin] Deleted user ${params.id}`);
     return NextResponse.json({ ok: true });
   } catch (err) {

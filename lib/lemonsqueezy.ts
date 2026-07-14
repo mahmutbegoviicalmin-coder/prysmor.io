@@ -205,3 +205,33 @@ export async function getCustomerPortalUrl(subscriptionId: string): Promise<stri
   const json = await res.json();
   return (json.data.attributes.urls?.customer_portal as string | undefined) ?? null;
 }
+
+export type LsCustomerBilling = {
+  name: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  countryFormatted: string | null;
+};
+
+/** Fetch Lemon Squeezy customer billing location (city / region / country). */
+export async function fetchLsCustomerBilling(customerId: string): Promise<LsCustomerBilling | null> {
+  if (!customerId) return null;
+  try {
+    const res = await fetch(`${LS_API_BASE}/v1/customers/${customerId}`, {
+      headers: lsHeaders(),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const a = json?.data?.attributes ?? {};
+    return {
+      name: typeof a.name === 'string' ? a.name : null,
+      city: typeof a.city === 'string' ? a.city : null,
+      region: typeof a.region === 'string' ? a.region : null,
+      country: typeof a.country === 'string' ? a.country : null,
+      countryFormatted: typeof a.country_formatted === 'string' ? a.country_formatted : null,
+    };
+  } catch {
+    return null;
+  }
+}

@@ -32,6 +32,10 @@ export async function createSession(email: string): Promise<{ sessionId: string;
     expiresAt: now + SESSION_TTL_MS,
     lastSeenAt: now,
   });
+  await db.collection('users').doc(userId).set({
+    lastSignInAt: new Date(now),
+    updatedAt: new Date(now),
+  }, { merge: true }).catch(() => {});
   return { sessionId, userId };
 }
 

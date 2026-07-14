@@ -36,9 +36,13 @@ interface AdminUser {
   lastSignInAt:     string | null;
   country:          string | null;
   countryCode:      string | null;
+  address:          string | null;
+  billingName:      string | null;
   lsSubscriptionId?: string;
+  lsOrderId?:       string;
   trialUsed:        boolean;
   trialUsedAt:      string | null;
+  isPaid?:          boolean;
 }
 
 type SortKey = 'createdAt' | 'lastSignInAt' | 'email' | 'plan' | 'credits' | 'licenseStatus';
@@ -55,6 +59,7 @@ const PLAN_COLORS: Record<string, string> = {
   starter:   'text-[#9CA3AF] bg-white/[0.06] border-white/[0.08]',
   pro:       'text-[#60A5FA] bg-blue-500/[0.08] border-blue-500/20',
   exclusive: 'text-[#F59E0B] bg-amber-500/[0.08] border-amber-500/20',
+  lifetime:  'text-[#A3FF12] bg-[#A3FF12]/[0.08] border-[#A3FF12]/20',
 };
 
 const PLAN_DOT: Record<string, string> = {
@@ -62,12 +67,15 @@ const PLAN_DOT: Record<string, string> = {
   starter:   'bg-[#6B7280]',
   pro:       'bg-[#60A5FA]',
   exclusive: 'bg-[#F59E0B]',
+  lifetime:  'bg-[#A3FF12]',
 };
 
 const PLANS = [
+  { id: 'lifetime',  label: 'Lifetime',   credits: 800  },
   { id: 'starter',   label: 'Starter',   credits: 360  },
   { id: 'pro',       label: 'Pro',        credits: 800  },
   { id: 'exclusive', label: 'Exclusive',  credits: 2000 },
+  { id: 'unpaid',    label: 'Unpaid',     credits: 0    },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -89,7 +97,8 @@ function fmtRelative(iso: string | null): string {
 }
 
 /** Returns display label + Tailwind color class for a plan's renewal date. */
-function expiryInfo(dateStr: string | null): { label: string; color: string } {
+function expiryInfo(dateStr: string | null, plan?: string): { label: string; color: string } {
+  if (plan === 'lifetime') return { label: 'Never expires', color: 'text-[#A3FF12]' };
   if (!dateStr) return { label: '-', color: 'text-[#374151]' };
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return { label: dateStr, color: 'text-[#9CA3AF]' };
@@ -473,12 +482,15 @@ function DetailModal({ user, onClose }: { user: AdminUser; onClose: () => void }
     ['Email',         user.email || '-'],
     ['First name',    user.firstName || '-'],
     ['Last name',     user.lastName  || '-'],
+    ['Billing name',  user.billingName || '-'],
+    ['Address',       user.address || '-'],
     ['Country',       user.country ? `${user.countryCode ? `[${user.countryCode}] ` : ''}${user.country}` : '-'],
     ['Plan',          user.planLabel],
     ['Status',        user.licenseStatus],
     ['Credits',       `${user.credits.toLocaleString()} / ${user.creditsTotal.toLocaleString()}`],
-    ['Renewal date',  user.renewalDate || '-'],
+    ['Renewal date',  user.plan === 'lifetime' ? 'Never expires' : (user.renewalDate || '-')],
     ['Device limit',  String(user.deviceLimit)],
+    ['LS Order ID',   user.lsOrderId || '-'],
     ['LS Sub ID',     user.lsSubscriptionId || '-'],
     ['Free trial',    user.trialUsed ? `Used ${user.trialUsedAt ? fmtDate(user.trialUsedAt) : ''}` : 'Not used'],
     ['Joined',        fmtDate(user.createdAt)],
@@ -543,8 +555,8 @@ function DeleteModal({ user, onClose, onConfirm }: {
 
       <p className="text-[13px] text-[#9CA3AF] leading-relaxed mb-1">
         Ovo će trajno obrisati korisnika iz{' '}
-        <span className="text-white font-medium">Clerk-a</span> i{' '}
-        <span className="text-white font-medium">Firestore-a</span>, uključujući sve njihove jobove.
+        <span className="text-white font-medium">Firestore-a</span>
+        {' '}(profil, sesije, uređaji, jobovi).
       </p>
       <p className="text-[12px] text-red-400 font-medium mb-5">Ova akcija se ne može poništiti.</p>
 
@@ -693,7 +705,7 @@ function UserCard({
   onRefreshLocation: () => void; onRevokeDevices: () => void;
   loading: boolean;
 }) {
-  const expiry = expiryInfo(user.renewalDate);
+  const expiry = expiryInfo(user.renewalDate, user.plan);
   return (
     <div className="bg-[#111113] border border-white/[0.07] rounded-[14px] p-4 space-y-3">
       {/* Header: Avatar + Name/Email + overflow menu */}
@@ -705,6 +717,9 @@ function UserCard({
               {user.displayName || <span className="text-[#6B7280] italic">No name</span>}
             </p>
             <p className="text-[11px] text-[#4B5563] truncate">{user.email}</p>
+            {user.address && (
+              <p className="text-[10px] text-[#4B5563] truncate mt-0.5">{user.address}</p>
+            )}
           </div>
         </div>
         <ActionMenu
@@ -1088,7 +1103,7 @@ export function AdminPanel() {
   const [loading,       setLoading]       = useState(true);
   const [search,        setSearch]        = useState('');
   const [planFilter,    setPlanFilter]    = useState('all');
-  const [statFilter,    setStatFilter]    = useState('all');
+  const [statFilter,    setStatFilter]    = useState('active');
   const [countryFilter, setCountryFilter] = useState('all');
   const [trialFilter,   setTrialFilter]   = useState<'all' | 'used' | 'unused'>('all');
   const [sortKey,       setSortKey]       = useState<SortKey>('createdAt');
@@ -1181,11 +1196,15 @@ export function AdminPanel() {
   const [purging, setPurging] = useState(false);
 
   async function purgeOrphans() {
-    if (!confirm('Delete all Firestore users with no Clerk account? This cannot be undone.')) return;
+    if (!confirm('Delete ALL inactive / unpaid users? Active plan holders and admin accounts stay. This cannot be undone.')) return;
     setPurging(true);
     try {
       const res  = await fetch('/api/admin/users', { method: 'DELETE' });
       const json = await res.json();
+      if (!res.ok) {
+        alert(json.error ?? 'Purge failed.');
+        return;
+      }
       alert(json.message ?? 'Done.');
       await load();
     } catch {
@@ -1196,12 +1215,12 @@ export function AdminPanel() {
   }
 
   function exportCsv() {
-    const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Credits', 'Credits Total', 'Country', 'Renewal Date', 'Trial Used', 'Trial Used At', 'Joined', 'Last Sign-in'];
+    const headers = ['ID', 'Name', 'Email', 'Plan', 'Status', 'Credits', 'Credits Total', 'Address', 'Country', 'Renewal Date', 'Trial Used', 'Trial Used At', 'Joined', 'Last Sign-in', 'LS Order', 'LS Sub'];
     const rows = filtered.map(u => [
       u.id, u.displayName, u.email, u.planLabel, u.licenseStatus,
-      u.credits, u.creditsTotal, u.country ?? '',
+      u.credits, u.creditsTotal, u.address ?? '', u.country ?? '',
       u.renewalDate ?? '', u.trialUsed ? 'Yes' : 'No', u.trialUsedAt ?? '',
-      u.createdAt ?? '', u.lastSignInAt ?? '',
+      u.createdAt ?? '', u.lastSignInAt ?? '', u.lsOrderId ?? '', u.lsSubscriptionId ?? '',
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -1249,7 +1268,7 @@ export function AdminPanel() {
     });
 
     return list;
-  }, [users, search, planFilter, statFilter, countryFilter, sortKey, sortDir]);
+  }, [users, search, planFilter, statFilter, trialFilter, countryFilter, sortKey, sortDir]);
 
   // ── Unique countries for filter ──────────────────────────────────────────────
   const countries = useMemo(() => {
@@ -1319,9 +1338,9 @@ export function AdminPanel() {
           </button>
           <button onClick={purgeOrphans} disabled={purging || loading}
             className="flex items-center gap-1.5 px-3 py-2 rounded-[8px] border border-red-500/[0.18] text-[11px] text-red-400/60 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-50"
-            title="Delete Firestore users with no Clerk account">
+            title="Delete inactive unpaid registrations; keep active buyers">
             {purging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            <span className="hidden sm:inline">Purge orphans</span>
+            <span className="hidden sm:inline">Purge inactive</span>
           </button>
         </div>
       </div>
@@ -1518,10 +1537,10 @@ export function AdminPanel() {
                   <SortHeader label="User"        col="email"         className="pl-4 min-w-[200px]" />
                   <SortHeader label="Plan"         col="plan"          className="min-w-[90px]" />
                   <SortHeader label="Status"       col="licenseStatus" className="min-w-[80px]" />
-                  <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[110px]">Country</th>
+                  <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[140px]">Address</th>
+                  <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[90px]">Country</th>
                   <SortHeader label="Credits"      col="credits"       className="min-w-[110px]" />
                   <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[120px]">Expires</th>
-                  <th className="px-3 py-3 text-left text-[10px] font-semibold text-[#374151] uppercase tracking-[0.08em] min-w-[90px]">Trial</th>
                   <SortHeader label="Last sign-in" col="lastSignInAt"  className="min-w-[110px]" />
                   <SortHeader label="Joined"       col="createdAt"     className="min-w-[90px]" />
                   <th className="px-3 py-3 w-10" />
@@ -1530,7 +1549,7 @@ export function AdminPanel() {
               <tbody className="divide-y divide-white/[0.03]">
                 {loading && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-[13px] text-[#4B5563]">
+                    <td colSpan={10} className="px-4 py-12 text-center text-[13px] text-[#4B5563]">
                       <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
                       Loading users…
                     </td>
@@ -1538,20 +1557,20 @@ export function AdminPanel() {
                 )}
                 {!loading && loadError && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-[13px] text-red-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-[13px] text-red-400">
                       {loadError}
                     </td>
                   </tr>
                 )}
                 {!loading && !loadError && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-[13px] text-[#4B5563]">
+                    <td colSpan={10} className="px-4 py-12 text-center text-[13px] text-[#4B5563]">
                       No users found
                     </td>
                   </tr>
                 )}
                 {!loading && filtered.map((user) => {
-                  const expiry = expiryInfo(user.renewalDate);
+                  const expiry = expiryInfo(user.renewalDate, user.plan);
                   return (
                     <tr key={user.id} className="hover:bg-white/[0.015] transition-colors group">
                       {/* User */}
@@ -1580,6 +1599,13 @@ export function AdminPanel() {
                         <StatusBadge status={user.licenseStatus} />
                       </td>
 
+                      {/* Address */}
+                      <td className="px-3 py-3">
+                        <p className="text-[11px] text-[#9CA3AF] max-w-[160px] truncate" title={user.address ?? undefined}>
+                          {user.address || <span className="text-[#374151]">-</span>}
+                        </p>
+                      </td>
+
                       {/* Country */}
                       <td className="px-3 py-3">
                         <CountryBadge code={user.countryCode} name={user.country} />
@@ -1593,16 +1619,6 @@ export function AdminPanel() {
                       {/* Expires, color-coded */}
                       <td className="px-3 py-3">
                         <span className={`text-[11px] ${expiry.color}`}>{expiry.label}</span>
-                      </td>
-
-                      {/* Trial */}
-                      <td className="px-3 py-3">
-                        {user.trialUsed
-                          ? <TrialBadge usedAt={user.trialUsedAt} />
-                          : <TrialUnusedBadge />}
-                        {user.trialUsed && user.trialUsedAt && (
-                          <p className="text-[10px] text-[#374151] mt-0.5">{fmtDate(user.trialUsedAt)}</p>
-                        )}
                       </td>
 
                       {/* Last sign-in */}

@@ -155,6 +155,7 @@ export async function processSubscriptionEvent(
     if (userId && userRef) {
       tx.set(userRef, {
         ...userMutation(input),
+        ...(input.customerId && { lsCustomerId: String(input.customerId) }),
         ...(buyerEmail && { email: buyerEmail, emailKey: emailHash(buyerEmail) }),
         ...(!userSnap?.exists && { deviceLimit: 1, createdAt: now }),
       }, { merge: true });
@@ -197,6 +198,13 @@ export async function processSubscriptionEvent(
 
   if (userId && buyerEmail) {
     await ensureEmailUserIndex(userId, buyerEmail).catch(() => {});
+  }
+
+  if (userId && input.customerId && isGranting) {
+    const { syncUserBillingFromLs } = await import('@/lib/billing/lsCustomer');
+    await syncUserBillingFromLs(userId, input.customerId).catch((err) => {
+      console.warn('[fulfillment] LS billing sync failed:', err);
+    });
   }
 
   return {
@@ -256,6 +264,7 @@ export async function fulfillLifetimeOrder(
         creditsTotal: credits,
         renewalDate: null,
         lsOrderId: input.orderId,
+        ...(input.customerId && { lsCustomerId: String(input.customerId) }),
         deviceLimit: userSnap.exists ? (userSnap.data()?.deviceLimit ?? 1) : 1,
         ...(buyerEmail && { email: buyerEmail, emailKey: emailHash(buyerEmail) }),
         ...(!userSnap.exists && { createdAt: now }),
@@ -290,6 +299,13 @@ export async function fulfillLifetimeOrder(
 
   if (userId && buyerEmail) {
     await ensureEmailUserIndex(userId, buyerEmail).catch(() => {});
+  }
+
+  if (userId && input.customerId) {
+    const { syncUserBillingFromLs } = await import('@/lib/billing/lsCustomer');
+    await syncUserBillingFromLs(userId, input.customerId).catch((err) => {
+      console.warn('[fulfillment] LS billing sync failed:', err);
+    });
   }
 
   return {
