@@ -19,16 +19,10 @@ export async function POST(req: NextRequest) {
 
   const session = await getSessionUser();
   const userId = session?.userId ?? null;
+  // Prefill Lemon when logged in; guests enter email inside Lemon checkout.
   const email = normalizeEmail(
     (typeof body.email === 'string' ? body.email : null) || session?.email || '',
-  );
-
-  if (!email || !email.includes('@')) {
-    return NextResponse.json(
-      { error: 'Email is required for checkout', code: 'email_required' },
-      { status: 400 },
-    );
-  }
+  ) || null;
 
   const jar = cookies();
   const rawRefCode = jar.get('prysmor_ref')?.value ?? null;

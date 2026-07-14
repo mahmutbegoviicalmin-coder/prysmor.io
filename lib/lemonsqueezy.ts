@@ -149,16 +149,10 @@ export async function createCheckout(
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   });
 
-  const email = options.email ? String(options.email).trim().toLowerCase() : '';
-  if (!email || !email.includes('@')) {
-    throw new Error('checkout email is required');
-  }
-
   const base = `https://vfxpilot1.lemonsqueezy.com/checkout/buy/${LIFETIME_PRODUCT.checkoutUuid}`;
   const query = [
     'embed=1',
     'dark=1',
-    `checkout[email]=${encodeURIComponent(email)}`,
     `checkout[custom][claim_id]=${encodeURIComponent(claimId)}`,
     `checkout[custom][product]=${encodeURIComponent(LIFETIME_PRODUCT.slug)}`,
     `checkout[redirect_url]=${encodeURIComponent(redirectUrl)}`,
@@ -174,6 +168,10 @@ export async function createCheckout(
   }
   if (options.fbc) {
     query.push(`checkout[custom][fbc]=${encodeURIComponent(options.fbc)}`);
+  }
+  // Prefill only when we already know the buyer (logged-in). Guests enter email in Lemon checkout.
+  if (options.email) {
+    query.push(`checkout[email]=${encodeURIComponent(String(options.email).trim().toLowerCase())}`);
   }
   return `${base}?${query.join('&')}`;
 }
