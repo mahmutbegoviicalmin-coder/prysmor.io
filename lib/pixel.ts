@@ -20,6 +20,11 @@ function canTrack(): boolean {
   return typeof window !== 'undefined' && typeof window.fbq === 'function';
 }
 
+function newEventId(prefix: string): string {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${Date.now()}_${rand}`;
+}
+
 /** Meta browser cookies used for CAPI attribution / ROAS. */
 export function getMetaClickIds(): { fbp?: string; fbc?: string } {
   if (typeof document === 'undefined') return {};
@@ -34,27 +39,64 @@ export function getMetaClickIds(): { fbp?: string; fbc?: string } {
   };
 }
 
+/** Mirror a browser Pixel event to Conversions API with the same event_id. */
+function mirrorToCapi(
+  eventName: string,
+  eventId: string,
+  customData?: Record<string, unknown>,
+) {
+  if (typeof window === 'undefined') return;
+  const meta = getMetaClickIds();
+  const payload = {
+    event_name: eventName,
+    event_id: eventId,
+    event_source_url: window.location.href,
+    custom_data: customData,
+    ...meta,
+  };
+  // Fire-and-forget — never block UX
+  fetch('/api/meta/capi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+export function trackPageView(eventId?: string) {
+  const id = eventId || newEventId('pv');
+  if (canTrack()) {
+    window.fbq!('track', 'PageView', {}, { eventID: id });
+  }
+  mirrorToCapi('PageView', id);
+  return id;
+}
+
 export function initiateCheckout(planName: string, value: number, currency = 'USD') {
-  if (!canTrack()) return;
-  window.fbq!('track', 'InitiateCheckout', {
+  const eventId = newEventId('ic');
+  const data = {
     content_name: planName,
     content_ids: [planName.toLowerCase().replace(/\s+/g, '_')],
     content_type: 'product',
     value,
     currency,
     num_items: 1,
-  });
+  };
+  if (canTrack()) {
+    window.fbq!('track', 'InitiateCheckout', data, { eventID: eventId });
+  }
+  mirrorToCapi('InitiateCheckout', eventId, data);
+  return eventId;
 }
 
 /**
- * Browser Purchase — fire on thank-you page with the same event_id as CAPI.
- * Dedupes against server Conversions API.
+ * Browser Purchase — fire on thank-you page with the same event_id as webhook CAPI.
+ * Also mirrors to our CAPI bridge (deduped by event_id if webhook already sent).
  */
 export function trackPurchase(payload: MetaPurchasePayload) {
-  if (!canTrack()) return;
   if (!(payload.value > 0)) return;
 
-  const eventId = payload.eventId || (payload.orderId ? `purchase_${payload.orderId}` : undefined);
+  const eventId = payload.eventId || (payload.orderId ? `purchase_${payload.orderId}` : newEventId('purchase'));
   const data: Record<string, unknown> = {
     value: payload.value,
     currency: (payload.currency || 'USD').toUpperCase(),
@@ -65,9 +107,9 @@ export function trackPurchase(payload: MetaPurchasePayload) {
   if (payload.contentIds?.length) data.content_ids = payload.contentIds;
   if (payload.orderId) data.order_id = payload.orderId;
 
-  if (eventId) {
+  if (canTrack()) {
     window.fbq!('track', 'Purchase', data, { eventID: eventId });
-  } else {
-    window.fbq!('track', 'Purchase', data);
   }
+  mirrorToCapi('Purchase', eventId, data);
+  return eventId;
 }
