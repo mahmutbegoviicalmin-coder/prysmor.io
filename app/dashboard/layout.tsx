@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Monitor, CreditCard,
-  Settings, Download, ShieldCheck, TrendingUp, LifeBuoy, Sparkles,
+  Settings, Download, ShieldCheck, TrendingUp, LifeBuoy, Sparkles, User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 const ADMIN_EMAIL = "mahmutbegoviic.almin@gmail.com";
@@ -342,13 +342,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               borderRadius: "8px",
             }}
           >
-            <Link href="/sign-out" style={{ fontSize: "12px", color: "#666", textDecoration: "none" }}>Sign out</Link>
-            <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "8px",
+                background: "rgba(57,255,106,0.08)",
+                border: "1px solid rgba(57,255,106,0.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              <User style={{ width: "14px", height: "14px", color: GREEN }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <p style={{ fontSize: "12px", fontWeight: 500, color: "#aaa", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {firstName}
+                {firstName || userEmail.split("@")[0] || "Account"}
               </p>
               <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>{planLabel}</p>
             </div>
+            <Link href="/sign-out" style={{ fontSize: "11px", color: "#555", textDecoration: "none", flexShrink: 0 }}>
+              Sign out
+            </Link>
           </div>
         </div>
       </aside>
@@ -381,11 +399,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-            {firstName && (
-              <span className="hidden sm:block" style={{ fontSize: "13px", color: "#666" }}>
-                {firstName}
-              </span>
-            )}
+            <div
+              className="hidden sm:flex"
+              style={{ alignItems: "center", gap: "8px" }}
+            >
+              <div
+                style={{
+                  width: "26px",
+                  height: "26px",
+                  borderRadius: "7px",
+                  background: "rgba(57,255,106,0.08)",
+                  border: "1px solid rgba(57,255,106,0.18)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+                aria-hidden
+              >
+                <User style={{ width: "13px", height: "13px", color: GREEN }} />
+              </div>
+              {firstName && (
+                <span style={{ fontSize: "13px", color: "#666" }}>
+                  {firstName}
+                </span>
+              )}
+            </div>
             <Link href="/sign-out" style={{ fontSize: "12px", color: "#666", textDecoration: "none" }}>Sign out</Link>
           </div>
         </header>
