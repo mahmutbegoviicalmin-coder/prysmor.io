@@ -15,6 +15,8 @@ export default function ConditionalShell({ children }: { children: React.ReactNo
     || pathname.startsWith("/sign-in")
     || pathname.startsWith("/sign-up")
     || pathname === "/sign-out"
+    || pathname.startsWith("/set-password")
+    || pathname.startsWith("/forgot-password")
     || pathname.startsWith("/panel-auth");
   const [userId, setUserId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+/** Legacy activate URL → set-password / sign-in flow. */
 export default function ActivatePage({
   searchParams,
 }: {
@@ -7,7 +8,7 @@ export default function ActivatePage({
 }) {
   const purchase = typeof searchParams?.purchase === "string" ? searchParams.purchase : null;
   if (purchase && /^[a-f0-9]{64}$/.test(purchase)) {
-    redirect(`/sign-in?redirect=${encodeURIComponent(`/purchase/complete?claim=${purchase}`)}`);
+    redirect(`/forgot-password`);
   }
   redirect("/sign-in");
 }

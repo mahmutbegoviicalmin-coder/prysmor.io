@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { db } from '@/lib/firebaseAdmin';
-import { ensureUserForEmail, normalizeEmail } from './identity';
+import { normalizeEmail, resolveUserIdByEmail } from './identity';
 
 export const SESSION_COOKIE = 'prysmor_sid';
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -19,10 +19,23 @@ function sessionSecretOk(): void {
   }
 }
 
+/**
+ * Create a web session for an existing user only.
+ * Does NOT create unpaid accounts — account must already exist (from purchase).
+ */
 export async function createSession(email: string): Promise<{ sessionId: string; userId: string }> {
   sessionSecretOk();
   const normalized = normalizeEmail(email);
-  const { userId } = await ensureUserForEmail(normalized);
+  const userId = await resolveUserIdByEmail(normalized);
+  if (!userId) {
+    throw new Error('NO_ACCOUNT');
+  }
+
+  const userSnap = await db.collection('users').doc(userId).get();
+  if (!userSnap.exists) {
+    throw new Error('NO_ACCOUNT');
+  }
+
   const sessionId = crypto.randomBytes(32).toString('hex');
   const now = Date.now();
   await db.collection('web_sessions').doc(sessionId).set({
@@ -61,7 +74,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const userId = String(data.userId ?? '');
   if (!email || !userId) return null;
 
-  // Sliding expiry (best-effort)
   snap.ref.set({
     lastSeenAt: Date.now(),
     expiresAt: Date.now() + SESSION_TTL_MS,
@@ -104,7 +116,6 @@ export function clearSessionCookie(response: NextResponse): void {
   });
 }
 
-/** Clear the session cookie from the request cookie store (Server Components). */
 export async function clearSessionCookieJar(): Promise<void> {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, '', {

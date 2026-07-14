@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeEmail } from '@/lib/auth/identity';
-import { sendMagicLoginEmail } from '@/lib/email/transactional';
+import { normalizeEmail, resolveUserIdByEmail } from '@/lib/auth/identity';
+import { sendSetPasswordEmail } from '@/lib/email/transactional';
 import { db } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
@@ -27,19 +27,18 @@ async function rateLimit(email: string, ip: string): Promise<boolean> {
   });
 }
 
+/**
+ * Legacy endpoint — no longer creates accounts or sends open magic login links.
+ * For active paid users without a password, sends a set-password email.
+ * Otherwise returns a message to use email + password sign-in.
+ */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const email = normalizeEmail(body.email as string | undefined);
-  const redirect = typeof body.redirect === 'string' ? body.redirect : '/dashboard';
 
   if (!email || !email.includes('@')) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
   }
-
-  // Only allow relative redirects
-  const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//')
-    ? redirect
-    : '/dashboard';
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
   const allowed = await rateLimit(email, ip).catch(() => true);
@@ -47,12 +46,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 });
   }
 
-  const result = await sendMagicLoginEmail({ to: email, redirect: safeRedirect });
+  const userId = await resolveUserIdByEmail(email);
+  if (!userId) {
+    return NextResponse.json({
+      error: 'No account for this email. Buy a plan first.',
+      code: 'no_account',
+    }, { status: 404 });
+  }
+
+  const snap = await db.collection('users').doc(userId).get();
+  const data = snap.data();
+  if (!data || (data.licenseStatus ?? 'inactive') !== 'active') {
+    return NextResponse.json({
+      error: 'No active license. Buy a plan to create an account.',
+      code: 'inactive',
+    }, { status: 403 });
+  }
+
+  const hasPassword = typeof data.passwordHash === 'string' && data.passwordHash.length > 0;
+  if (hasPassword) {
+    return NextResponse.json({
+      error: 'Use your email and password to sign in. Forgot password? Use the link on the sign-in page.',
+      code: 'use_password',
+    }, { status: 400 });
+  }
+
+  const result = await sendSetPasswordEmail({ to: email, purpose: 'set-password' });
   if (!result.ok) {
-    console.warn('[magic/request] send failed:', result.error);
+    console.warn('[magic/request] set-password send failed:', result.error);
     return NextResponse.json({ error: 'Could not send email' }, { status: 500 });
   }
 
-  // Always return ok (don't leak whether email exists)
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    message: 'Check your email for a link to set your password.',
+  });
 }

@@ -124,7 +124,7 @@ function PurchaseCompleteInner() {
 
   const description =
     state === "awaiting_email"
-      ? "We sent a secure Open dashboard link to your checkout email. No password needed."
+      ? "We sent a Set your password link to your checkout email. Choose a password to open the dashboard and connect the panels."
       : state === "fulfilled"
         ? plan
           ? `Your ${plan} license and credits are active. Install the panels and start generating.`
@@ -148,7 +148,7 @@ function PurchaseCompleteInner() {
               href={hasSession ? "/dashboard/downloads" : "/sign-in"}
               className="inline-flex items-center justify-center rounded-lg bg-[#39FF6A] px-5 py-3 text-sm font-semibold text-black"
             >
-              {hasSession ? "Install panels" : "Open dashboard link"}
+              {hasSession ? "Install panels" : "Sign in"}
             </Link>
             {hasSession && (
               <Link
@@ -163,9 +163,13 @@ function PurchaseCompleteInner() {
 
         {state === "awaiting_email" && (
           <p className="mt-6 text-xs text-white/35">
-            Already have a link?{" "}
+            Already set a password?{" "}
             <Link href="/sign-in" className="text-[#39FF6A]">
-              Request another
+              Sign in
+            </Link>
+            {" · "}
+            <Link href="/forgot-password" className="text-[#39FF6A]">
+              Resend link
             </Link>
           </p>
         )}

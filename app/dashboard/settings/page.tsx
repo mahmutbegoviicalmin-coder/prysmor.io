@@ -97,7 +97,7 @@ export default async function SettingsPage() {
           </div>
           <div className="flex-1">
             <p className="text-[13px] font-medium text-white">Magic link</p>
-            <p className="text-[11px] text-[#4B5563]">Passwordless email sign-in</p>
+            <p className="text-[11px] text-[#4B5563]">Email + password sign-in</p>
           </div>
           <Badge color="green">Active</Badge>
         </div>

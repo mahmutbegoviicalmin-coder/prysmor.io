@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { MARKETING_FROM, appBaseUrl } from './constants';
 import { PLAN_LABELS } from '@/lib/firestore/users';
-import { magicLinkUrl } from '@/lib/auth/magic';
+import { setPasswordLinkUrl } from '@/lib/auth/magic';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -30,6 +30,7 @@ function planLabel(plan: string): string {
   return PLAN_LABELS[plan] ?? plan;
 }
 
+/** After purchase: set password to activate web + panel login. */
 export async function sendPurchaseMagicEmail(opts: {
   to: string;
   plan: string;
@@ -37,10 +38,7 @@ export async function sendPurchaseMagicEmail(opts: {
 }): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: 'RESEND_API_KEY not configured' };
 
-  const link = magicLinkUrl(opts.to, {
-    redirect: opts.redirect ?? '/dashboard',
-    purpose: 'purchase',
-  });
+  const link = setPasswordLinkUrl(opts.to, 'purchase');
   const label = planLabel(opts.plan);
   const innerHtml = `
     <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:#ffffff;font-weight:700;">
@@ -48,14 +46,14 @@ export async function sendPurchaseMagicEmail(opts: {
     </h1>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#9ca3af;">
       Your <strong style="color:#ffffff;">${label}</strong> plan is ready.
-      Open your dashboard to install the Premiere Pro and After Effects panels.
+      Choose a password for <strong style="color:#ffffff;">${opts.to}</strong> to open your dashboard and connect Premiere / After Effects.
     </p>
     <a href="${link}"
        style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
-      Open dashboard
+      Set your password
     </a>
     <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">
-      This link signs you in securely — no password needed. It expires in 30 minutes.
+      This link expires in 48 hours. After that you can use Forgot password on the sign-in page.
     </p>
   `;
 
@@ -63,7 +61,7 @@ export async function sendPurchaseMagicEmail(opts: {
     const { error } = await resend.emails.send({
       from: MARKETING_FROM,
       to: opts.to,
-      subject: 'Thanks for your Prysmor order',
+      subject: 'Set your Prysmor password',
       html: wrapTransactionalHtml(innerHtml),
     });
     if (error) return { ok: false, error: error.message ?? String(error) };
@@ -73,29 +71,30 @@ export async function sendPurchaseMagicEmail(opts: {
   }
 }
 
-export async function sendMagicLoginEmail(opts: {
+export async function sendSetPasswordEmail(opts: {
   to: string;
-  redirect?: string;
+  purpose?: 'set-password' | 'reset-password';
 }): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: 'RESEND_API_KEY not configured' };
 
-  const link = magicLinkUrl(opts.to, {
-    redirect: opts.redirect ?? '/dashboard',
-    purpose: 'login',
-  });
+  const purpose = opts.purpose ?? 'set-password';
+  const link = setPasswordLinkUrl(opts.to, purpose);
+  const isReset = purpose === 'reset-password';
   const innerHtml = `
     <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:#ffffff;font-weight:700;">
-      Sign in to Prysmor
+      ${isReset ? 'Reset your password' : 'Set your password'}
     </h1>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#9ca3af;">
-      Click below to open your dashboard. No password needed.
+      ${isReset
+        ? 'Choose a new password to sign in to your Prysmor dashboard and panels.'
+        : 'Finish activating your Prysmor account by choosing a password.'}
     </p>
     <a href="${link}"
        style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
-      Open dashboard
+      ${isReset ? 'Reset password' : 'Set password'}
     </a>
     <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">
-      This link expires in 30 minutes. If you did not request it, you can ignore this email.
+      This link expires in 48 hours. If you did not request it, you can ignore this email.
     </p>
   `;
 
@@ -103,7 +102,7 @@ export async function sendMagicLoginEmail(opts: {
     const { error } = await resend.emails.send({
       from: MARKETING_FROM,
       to: opts.to,
-      subject: 'Your Prysmor sign-in link',
+      subject: isReset ? 'Reset your Prysmor password' : 'Set your Prysmor password',
       html: wrapTransactionalHtml(innerHtml),
     });
     if (error) return { ok: false, error: error.message ?? String(error) };
@@ -111,6 +110,14 @@ export async function sendMagicLoginEmail(opts: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Send failed' };
   }
+}
+
+/** @deprecated Magic login disabled — use password + forgot-password. */
+export async function sendMagicLoginEmail(opts: {
+  to: string;
+  redirect?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  return sendSetPasswordEmail({ to: opts.to, purpose: 'set-password' });
 }
 
 export async function sendOrderConfirmedEmail(opts: {
@@ -119,18 +126,19 @@ export async function sendOrderConfirmedEmail(opts: {
 }): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: 'RESEND_API_KEY not configured' };
 
-  const dashboardUrl = `${appBaseUrl()}/dashboard`;
+  const signInUrl = `${appBaseUrl()}/sign-in`;
   const label = planLabel(opts.plan);
   const innerHtml = `
     <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:#ffffff;font-weight:700;">
       Order confirmed
     </h1>
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#9ca3af;">
-      Your <strong style="color:#ffffff;">${label}</strong> plan and credits are active on your Prysmor account.
+      Your <strong style="color:#ffffff;">${label}</strong> plan and credits are active.
+      Sign in with your email and password to open the dashboard.
     </p>
-    <a href="${dashboardUrl}"
+    <a href="${signInUrl}"
        style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
-      Open dashboard
+      Sign in
     </a>
   `;
 

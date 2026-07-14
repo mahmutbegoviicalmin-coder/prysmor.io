@@ -325,22 +325,46 @@ export async function ensurePurchaseMagicLink(
 ): Promise<void> {
   if (!buyerEmail) return;
 
+  // Returning buyers who already set a password just get a confirmation email
+  const existingId = await resolveUserIdByEmail(buyerEmail);
+  if (existingId) {
+    const snap = await db.collection('users').doc(existingId).get();
+    const hasPassword = typeof snap.data()?.passwordHash === 'string'
+      && (snap.data()?.passwordHash as string).length > 0;
+    if (hasPassword && (snap.data()?.licenseStatus === 'active')) {
+      if (claimId) {
+        const claimRef = db.collection('purchase_claims').doc(claimId);
+        const claim = await claimRef.get();
+        if (claim.exists && claim.data()?.magicSentAt && !opts?.forceResend) return;
+        const { sendOrderConfirmedEmail } = await import('@/lib/email/transactional');
+        await sendOrderConfirmedEmail({ to: buyerEmail, plan });
+        if (claim.exists) {
+          await claimRef.set({
+            magicSentAt: new Date(),
+            status: 'fulfilled',
+            updatedAt: new Date(),
+          }, { merge: true });
+        }
+        return;
+      }
+      const { sendOrderConfirmedEmail } = await import('@/lib/email/transactional');
+      await sendOrderConfirmedEmail({ to: buyerEmail, plan });
+      return;
+    }
+  }
+
   if (claimId) {
     const claimRef = db.collection('purchase_claims').doc(claimId);
     const claim = await claimRef.get();
     if (claim.exists && claim.data()?.magicSentAt && !opts?.forceResend) return;
 
     const { sendPurchaseMagicEmail } = await import('@/lib/email/transactional');
-    const redirect = claimId
-      ? `/purchase/complete?claim=${encodeURIComponent(claimId)}`
-      : '/dashboard';
     const emailResult = await sendPurchaseMagicEmail({
       to: buyerEmail,
       plan,
-      redirect,
     });
     if (!emailResult.ok) {
-      console.warn('[fulfillment] magic email failed:', emailResult.error);
+      console.warn('[fulfillment] set-password email failed:', emailResult.error);
       return;
     }
     if (claim.exists) {
@@ -354,7 +378,7 @@ export async function ensurePurchaseMagicLink(
   }
 
   const { sendPurchaseMagicEmail } = await import('@/lib/email/transactional');
-  await sendPurchaseMagicEmail({ to: buyerEmail, plan, redirect: '/dashboard' });
+  await sendPurchaseMagicEmail({ to: buyerEmail, plan });
 }
 
 /** @deprecated use ensurePurchaseMagicLink */

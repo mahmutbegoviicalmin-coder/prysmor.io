@@ -1,35 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consumeMagicNonce, verifyMagicToken } from '@/lib/auth/magic';
-import { createSession, setSessionCookie } from '@/lib/auth/session';
-import { ensureUserForEmail } from '@/lib/auth/identity';
+import { verifyMagicToken } from '@/lib/auth/magic';
 import { appBaseUrl } from '@/lib/email/constants';
+import { resolveUserIdByEmail } from '@/lib/auth/identity';
+import { db } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 
-function safeRedirect(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
-  return raw;
-}
-
+/**
+ * Legacy magic consume — no longer auto-creates unpaid users or sessions.
+ * Password / purchase tokens are redirected to /set-password.
+ * Old login tokens for active users without a password also go to set-password.
+ */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token') ?? '';
-  const redirect = safeRedirect(req.nextUrl.searchParams.get('redirect'));
-
   const verified = verifyMagicToken(token);
+
   if (!verified) {
     return NextResponse.redirect(new URL('/sign-in?error=invalid', appBaseUrl()));
   }
 
-  const fresh = await consumeMagicNonce(verified.nonce);
-  if (!fresh) {
-    return NextResponse.redirect(new URL('/sign-in?error=used', appBaseUrl()));
+  if (
+    verified.purpose === 'set-password'
+    || verified.purpose === 'reset-password'
+    || verified.purpose === 'purchase'
+  ) {
+    const url = new URL('/set-password', appBaseUrl());
+    url.searchParams.set('token', token);
+    return NextResponse.redirect(url);
   }
 
-  await ensureUserForEmail(verified.email);
-  const { sessionId } = await createSession(verified.email);
+  // Legacy login magic: only help existing active buyers set a password
+  const userId = await resolveUserIdByEmail(verified.email);
+  if (userId) {
+    const snap = await db.collection('users').doc(userId).get();
+    const data = snap.data();
+    if (data && (data.licenseStatus ?? 'inactive') === 'active') {
+      const hasPassword = typeof data.passwordHash === 'string' && data.passwordHash.length > 0;
+      if (!hasPassword) {
+        const url = new URL('/set-password', appBaseUrl());
+        url.searchParams.set('token', token);
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.redirect(new URL('/sign-in?error=use_password', appBaseUrl()));
+    }
+  }
 
-  const destination = new URL(redirect, appBaseUrl());
-  const response = NextResponse.redirect(destination);
-  setSessionCookie(response, sessionId);
-  return response;
+  return NextResponse.redirect(new URL('/sign-in?error=no_account', appBaseUrl()));
 }
