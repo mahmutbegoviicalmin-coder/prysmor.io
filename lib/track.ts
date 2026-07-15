@@ -5,7 +5,7 @@ type PropValue = string | number | boolean | null;
 /**
  * Vercel Web Analytics custom events.
  * Pro plan allows max 2 properties per event — keep payloads lean.
- * Event NAMES encode what was clicked so the Events list is readable.
+ * Events appear under Project → Analytics → Events.
  */
 export function track(
   event: string,
@@ -13,13 +13,6 @@ export function track(
 ) {
   if (typeof window === 'undefined') return;
   try {
-    const safeName = event
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_|_$/g, '')
-      .slice(0, 64) || 'event';
-
     const entries = Object.entries(properties)
       .filter(([, v]) => v !== undefined)
       .slice(0, 2)
@@ -29,9 +22,9 @@ export function track(
       });
     const data = Object.fromEntries(entries) as Record<string, PropValue>;
     if (Object.keys(data).length === 0) {
-      vaTrack(safeName);
+      vaTrack(event);
     } else {
-      vaTrack(safeName, data);
+      vaTrack(event, data);
     }
   } catch {
     // never break the UI
@@ -42,17 +35,19 @@ function slug(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '')
-    .slice(0, 32) || 'unknown';
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40) || 'unknown';
 }
 
-/** CTA click — event name is exact, e.g. cta_hero_get_lifetime */
+/**
+ * CTA clicks — event name encodes where + which button.
+ * Examples: cta_hero_get_lifetime, cta_navbar_get_lifetime, cta_hero_see_pricing
+ */
 export function trackCta(location: string, label: string) {
   track(`cta_${slug(location)}_${slug(label)}`);
 }
 
-/** Nav click — e.g. nav_navbar_pricing, nav_footer_docs */
+/** In-page or route navigation clicks (nav, footer, anchors). */
 export function trackNav(label: string, location = 'nav') {
   track(`nav_${slug(location)}_${slug(label)}`);
 }

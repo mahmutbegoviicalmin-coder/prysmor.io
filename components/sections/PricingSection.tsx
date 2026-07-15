@@ -133,7 +133,7 @@ function BillingToggle({
         type="button"
         onClick={() => {
           onChange(false);
-          track("pricing_toggle_monthly");
+        track("pricing_toggle_monthly");
         }}
         className={`relative z-10 min-w-[108px] rounded-[8px] px-5 py-2 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 ${
           !yearly ? "text-black" : "text-white/50 hover:text-white/70"
@@ -272,7 +272,8 @@ export default function PricingSection({
     (plan: string, billing: "monthly" | "yearly" | "once", e: React.MouseEvent, tierName?: string, tierPrice?: number) => {
       e.preventDefault();
       if (tierName && tierPrice !== undefined) {
-        track(`pricing_buy_${tierName.toLowerCase()}`, { price: tierPrice });
+        trackCta("pricing", tierName.toLowerCase());
+        track(`pricing_buy_${tierName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`, { price: tierPrice });
       }
       openCheckout(plan, billing, tierName, tierPrice);
     },
