@@ -308,6 +308,13 @@ export async function fulfillLifetimeOrder(
     });
   }
 
+  if (fresh) {
+    const { claimLifetimeIntroSpot } = await import('@/lib/offers/lifetimeIntro');
+    await claimLifetimeIntroSpot().catch((err) => {
+      console.warn('[fulfillment] lifetime intro claim failed:', err);
+    });
+  }
+
   return {
     fresh,
     userId,

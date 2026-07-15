@@ -214,7 +214,7 @@ export default function InstallPanelPage() {
             <Monitor className="w-5 h-5 text-[#6B7280]" />
             <SectionHeading>Windows Installation</SectionHeading>
           </div>
-          <Lead>Tested on Windows 10 and Windows 11 with Premiere Pro 2020–2024.</Lead>
+          <Lead>Tested on Windows 10 and Windows 11 with Premiere Pro 2020-2024.</Lead>
 
           <div className="mb-8">
             <StepCard n={1} title="Enable unsigned extension loading">
@@ -279,7 +279,7 @@ export default function InstallPanelPage() {
             <Terminal className="w-5 h-5 text-[#6B7280]" />
             <SectionHeading>macOS Installation</SectionHeading>
           </div>
-          <Lead>Tested on macOS 11+ (Big Sur, Monterey, Ventura, Sonoma) with Premiere Pro 2020–2024.</Lead>
+          <Lead>Tested on macOS 11+ (Big Sur, Monterey, Ventura, Sonoma) with Premiere Pro 2020-2024.</Lead>
 
           <div className="mb-8">
             <StepCard n={1} title="Enable unsigned extension loading">
@@ -372,7 +372,7 @@ export default function InstallPanelPage() {
           <InfoBox type="warn">
             <strong className="text-[#D1D5DB]">Replace the demo clip:</strong> The bundled file at{" "}
             <CodeLine>panel/assets/prysmor-demo.mp4</CodeLine> is a text placeholder.
-            Replace it with a real H.264 MP4 (1920×1080, 4–8 sec) for Import and Insert to work.
+            Replace it with a real H.264 MP4 (1920×1080, 4-8 sec) for Import and Insert to work.
           </InfoBox>
         </section>
 

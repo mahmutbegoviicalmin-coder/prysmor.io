@@ -428,7 +428,7 @@ export function AffiliatesSection() {
                   className={inputClass}
                   value={newUserId}
                   onChange={(e) => setNewUserId(e.target.value)}
-                  placeholder="Leave empty — links when they log in"
+                  placeholder="Leave empty. Links when they log in"
                 />
               </div>
             </div>

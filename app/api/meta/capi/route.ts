@@ -33,9 +33,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const eventName = String(body.event_name || '');
-  const eventId = String(body.event_id || '');
-  if (!ALLOWED.has(eventName) || !eventId || eventId.length > 128) {
+  const eventNameRaw = body.event_name;
+  const eventIdRaw = body.event_id;
+  const eventName = typeof eventNameRaw === 'string' ? eventNameRaw.trim() : '';
+  const eventId = typeof eventIdRaw === 'string' ? eventIdRaw.trim() : '';
+
+  if (!eventName || !ALLOWED.has(eventName)) {
+    console.error('[meta-capi/bridge] refused: invalid or missing event_name', {
+      event_name: eventNameRaw,
+      event_id: eventIdRaw,
+    });
+    return NextResponse.json({ error: 'Invalid event' }, { status: 400 });
+  }
+  if (!eventId || eventId.length > 128) {
+    console.error('[meta-capi/bridge] refused: invalid or missing event_id', {
+      event_name: eventName,
+      event_id: eventIdRaw,
+    });
     return NextResponse.json({ error: 'Invalid event' }, { status: 400 });
   }
 

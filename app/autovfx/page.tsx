@@ -255,7 +255,7 @@ const steps: Step[] = [
 ];
 
 const compRows: ComparisonRow[] = [
-  { feature: "Cost", ours: "$99 one-time", theirs: "$500–2,000/project" },
+  { feature: "Cost", ours: "$99 one-time", theirs: "$500-2,000/project" },
   { feature: "Time per effect", ours: "2-5 minutes", theirs: "1-3 days" },
   { feature: "Learning curve", ours: "None", theirs: "6+ months" },
   { feature: "Works in your editor", ours: true, theirs: false },
@@ -279,7 +279,7 @@ const pricingTiers: PriceTier[] = [
       },
     },
     highlights: [
-      "Pay once — license never expires",
+      "Pay once. License never expires",
       "200 seconds of AI VFX included",
       "Relight, Background, and VFX",
       "4K output · macOS & Windows",
@@ -338,7 +338,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Do my credits expire?",
-    a: "No monthly reset. Your lifetime license includes 200 seconds of AI VFX — use them anytime. When you need more, buy a credit pack from the dashboard.",
+    a: "No monthly reset. Your lifetime license includes 200 seconds of AI VFX. Use them anytime. When you need more, buy a credit pack from the dashboard.",
   },
   {
     q: "What software is VFXPilot compatible with?",
@@ -350,7 +350,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "How long does it take to generate effects?",
-    a: "Most effects render in 2–5 minutes from the moment you submit your prompt. Complex or longer effects may take slightly longer.",
+    a: "Most effects render in 2-5 minutes from the moment you submit your prompt. Complex or longer effects may take slightly longer.",
   },
   {
     q: "Do I need any VFX experience?",
@@ -488,7 +488,7 @@ export default function VFXPilotPage() {
       {/* ── PRICING ── */}
       <PricingSection
         title="One license. Lifetime access."
-        subtitle="Pay once for Prysmor — Premiere and After Effects panels included."
+        subtitle="Pay once for Prysmor. Premiere and After Effects panels included."
         tiers={pricingTiers}
         showToggle={false}
         footerNote="7-Day Money-Back Guarantee · Buy more credits anytime"

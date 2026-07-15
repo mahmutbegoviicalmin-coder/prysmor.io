@@ -17,19 +17,19 @@ const pricingTiers: PriceTier[] = [
     compareAtPrice: 199,
     oneTime: true,
     featured: true,
-    badge: "Lifetime license",
+    badge: "First 100 buyers",
+    bonus: "Free Prompt Pack · unlocks in your dashboard",
     generation: {
       monthly: {
         shots: "200 seconds of AI VFX",
-        seconds: "Premiere + After Effects included",
+        seconds: "Works inside Premiere Pro & After Effects",
       },
     },
     highlights: [
-      "Pay once — license never expires",
-      "200 seconds of AI VFX included",
+      "Lifetime access at this intro price",
       "Relight, Background, and VFX",
       "4K output · macOS & Windows",
-      "Buy more credits anytime",
+      "7-day money-back guarantee",
     ],
     cta: "Get lifetime access",
     ctaHref: "/checkout",
@@ -49,11 +49,11 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "How long does a render take?",
-    a: "Most effects render in 2–5 minutes depending on clip length and complexity. Progress is shown in the panel while it processes.",
+    a: "Most effects render in 2-5 minutes depending on clip length and complexity. Progress is shown in the panel while it processes.",
   },
   {
     q: "Do my VFX credits expire?",
-    a: "Your lifetime license includes 200 seconds of AI VFX. Credits do not reset monthly — use them anytime, and buy more credit packs when you need them.",
+    a: "Your lifetime license includes 200 seconds of AI VFX. Credits do not reset monthly. Use them anytime, and buy more credit packs when you need them.",
   },
   {
     q: "What if I'm not happy with the result?",
@@ -61,7 +61,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Why is this cheaper than hiring a VFX artist?",
-    a: "A single VFX shot from a freelancer often runs $300–1,500 plus days of back-and-forth. Prysmor generates effects inside your timeline at a fraction of that cost.",
+    a: "A single VFX shot from a freelancer often runs $300-1,500 plus days of back-and-forth. Prysmor generates effects inside your timeline at a fraction of that cost.",
   },
 ];
 
@@ -129,7 +129,7 @@ export default function HomePageClient() {
 
         <PricingSection
           title="One license. Lifetime access."
-          subtitle="Pay once for Prysmor — Premiere and After Effects panels included."
+          subtitle="Pay once for Prysmor. Premiere and After Effects panels included."
           tiers={pricingTiers}
           showToggle={false}
           footerNote="Pay once. License never expires. 7-day refund window."

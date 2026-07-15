@@ -3,6 +3,7 @@ export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { processEmailQueue } from '@/lib/email/enrollments';
+import { processPromptPackFollowUps } from '@/lib/email/promptPackFollowUp';
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -15,8 +16,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await processEmailQueue(30);
-    return NextResponse.json({ ok: true, ...result });
+    const [funnels, promptPack] = await Promise.all([
+      processEmailQueue(30),
+      processPromptPackFollowUps(25),
+    ]);
+    return NextResponse.json({ ok: true, funnels, promptPack });
   } catch (err) {
     console.error('[cron/email-funnels]', err);
     return NextResponse.json(

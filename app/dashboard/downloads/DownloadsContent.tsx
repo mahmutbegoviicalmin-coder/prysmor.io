@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Monitor } from "lucide-react";
+import { FileText, Monitor } from "lucide-react";
 
 const PANEL_VERSION = "5.5.5";
 const PANEL_AE_VERSION = "2.0.6";
@@ -109,6 +109,26 @@ export default function DownloadsContent() {
       <div className="space-y-3 mb-6">
         <PluginCard {...premiere} />
         <PluginCard {...ae} />
+      </div>
+
+      <div className="rounded-[14px] border border-white/[0.07] bg-[#0c0c0c] p-5 sm:p-6 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#39FF6A]/20 bg-[#39FF6A]/[0.08]">
+            <FileText className="w-4 h-4 text-[#39FF6A]" />
+          </div>
+          <div>
+            <h2 className="text-[16px] font-semibold text-white">Prompt Pack</h2>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">
+              Free bonus with your license. 100 copy-ready prompts for Relight, Background, and VFX.
+            </p>
+          </div>
+        </div>
+        <a
+          href="/api/prompt-pack/download"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#39FF6A] px-4 py-3 text-[13px] font-semibold text-black hover:opacity-90 transition-opacity"
+        >
+          Download PDF
+        </a>
       </div>
 
       <p className="text-[12px] text-[#4B5563] leading-relaxed">

@@ -54,7 +54,7 @@ const PAIN_POINTS = [
   {
     title: "Freelancers",
     bullets: [
-      "2–5 days per delivery",
+      "2-5 days per delivery",
       "Brief and files every time",
       "Revisions over email",
       "Waiting on their schedule",
@@ -62,7 +62,7 @@ const PAIN_POINTS = [
     ],
     label: "External help",
     accent: "rgba(255,255,255,0.06)",
-    badge: { value: "$150–600" },
+    badge: { value: "$150-600" },
   },
   {
     title: "Too many steps",

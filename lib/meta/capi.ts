@@ -77,6 +77,34 @@ export function resolvePurchaseValue(
   return parsed;
 }
 
+const STANDARD_META_EVENTS = new Set([
+  'PageView',
+  'ViewContent',
+  'Search',
+  'AddToCart',
+  'AddToWishlist',
+  'InitiateCheckout',
+  'AddPaymentInfo',
+  'Purchase',
+  'Lead',
+  'CompleteRegistration',
+  'Contact',
+  'CustomizeProduct',
+  'Donate',
+  'FindLocation',
+  'Schedule',
+  'StartTrial',
+  'SubmitApplication',
+  'Subscribe',
+]);
+
+function normalizeEventName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const name = raw.trim();
+  if (!name) return null;
+  return name;
+}
+
 /** Generic Conversions API sender — pairs with browser fbq via matching event_id. */
 export async function sendMetaEvent(input: MetaCapiEventInput): Promise<boolean> {
   const token = process.env.META_CAPI_TOKEN;
@@ -84,13 +112,36 @@ export async function sendMetaEvent(input: MetaCapiEventInput): Promise<boolean>
     console.warn('[meta-capi] META_CAPI_TOKEN missing');
     return false;
   }
-  if (!input.eventName || !input.eventId) return false;
+
+  const eventName = normalizeEventName(input.eventName);
+  if (!eventName) {
+    console.error('[meta-capi] refused send: missing/empty event_name', {
+      eventName: input.eventName,
+      eventId: input.eventId ?? null,
+      eventSourceUrl: input.eventSourceUrl ?? null,
+    });
+    return false;
+  }
+
+  const eventId = typeof input.eventId === 'string' ? input.eventId.trim() : '';
+  if (!eventId) {
+    console.error('[meta-capi] refused send: missing/empty event_id', {
+      eventName,
+      eventId: input.eventId ?? null,
+    });
+    return false;
+  }
+
+  if (!STANDARD_META_EVENTS.has(eventName)) {
+    // Allow custom names, but make them visible in logs for debugging Meta diagnostics.
+    console.warn('[meta-capi] non-standard event_name (custom allowed)', { eventName, eventId });
+  }
 
   const payload = {
     data: [{
-      event_name: input.eventName,
+      event_name: eventName,
       event_time: Math.floor(Date.now() / 1000),
-      event_id: input.eventId,
+      event_id: eventId,
       action_source: 'website' as const,
       event_source_url: input.eventSourceUrl || 'https://prysmor.io',
       user_data: buildUserData(input.userData),
@@ -108,12 +159,12 @@ export async function sendMetaEvent(input: MetaCapiEventInput): Promise<boolean>
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      console.warn(`[meta-capi] ${input.eventName} failed:`, await res.text());
+      console.warn(`[meta-capi] ${eventName} failed:`, await res.text());
       return false;
     }
     return true;
   } catch (e) {
-    console.warn(`[meta-capi] ${input.eventName} error:`, e);
+    console.warn(`[meta-capi] ${eventName} error:`, e);
     return false;
   }
 }

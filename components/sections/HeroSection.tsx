@@ -106,16 +106,6 @@ export default function HeroSection() {
                 See pricing
               </button>
             </motion.div>
-
-            <motion.p
-              custom={0.28}
-              initial="hidden"
-              animate="show"
-              variants={fadeUp}
-              className="mt-5 text-[11px] leading-relaxed tracking-[0.01em] text-white/30 sm:mt-6"
-            >
-              $99 once. Never expires. 200 seconds of AI VFX for Premiere and After Effects.
-            </motion.p>
           </div>
         </div>
       </div>

@@ -133,7 +133,7 @@ export default function Navbar() {
               <>
                 <Link
                   href="/sign-in"
-                  onClick={() => track("sign_in_navbar")}
+                  onClick={() => track("sign_in_click", { location: "navbar" })}
                   className="cursor-pointer px-1 text-[13px] font-medium tracking-[-0.015em] text-white/40 transition-colors duration-200 hover:text-white/80"
                 >
                   Sign In
@@ -238,7 +238,7 @@ export default function Navbar() {
                       <Link
                         href="/sign-in"
                         onClick={() => {
-                          track("sign_in_mobile_nav");
+                          track("sign_in_click", { location: "mobile_nav" });
                           setMobileOpen(false);
                         }}
                         className="w-full rounded-lg py-2.5 text-center text-[14px] font-medium text-white/42 transition-colors hover:text-white/80"

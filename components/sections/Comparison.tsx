@@ -20,8 +20,8 @@ const GREEN = "#39FF6A";
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const THEIR_PAINS = [
-  "$500–2,000 per shot",
-  "1–3 days turnaround",
+  "$500-2,000 per shot",
+  "1-3 days turnaround",
   "6+ months to learn",
   "Revision emails, back and forth",
   "Out of your timeline",

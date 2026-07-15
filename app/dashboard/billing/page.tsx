@@ -235,7 +235,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div className="mt-4 pt-4 border-t border-[#111] text-[12px] text-[#4B5563]">
           1 second of AI VFX = 4 credits
           {isLifetime
-            ? ' · 200 seconds included · Never expires — buy more credits anytime'
+            ? ' · 200 seconds included · Never expires. Buy more credits anytime'
             : isLegacySub
               ? ' · Credits reset on each billing date'
               : ''}

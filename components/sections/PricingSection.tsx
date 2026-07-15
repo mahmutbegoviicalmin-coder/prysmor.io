@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Check, ShieldCheck, Lock, Monitor } from "lucide-react";
 import { initiateCheckout, getMetaClickIds } from "@/lib/pixel";
 import { track, trackCta } from "@/lib/track";
+import OfferCountdown from "@/components/sections/OfferCountdown";
 
 declare global {
   interface Window {
@@ -37,8 +38,10 @@ export interface PriceTier {
   yearlySave?: number;
   /** Shown as strikethrough next to the main price (e.g. 199 next to 99). */
   compareAtPrice?: number;
-  /** One-time purchase — hide /mo and billing toggle behavior. */
+  /** One-time purchase: hide /mo and billing toggle behavior. */
   oneTime?: boolean;
+  /** Free gift / bonus callout shown as a gift strip (not a paid feature). */
+  bonus?: string;
   tagline?: string;
   description?: string;
   generation?: {
@@ -82,6 +85,86 @@ const TRUST_ITEMS = [
   { icon: Lock, label: "Secure checkout" },
   { icon: ShieldCheck, label: "7-day money-back guarantee" },
 ];
+
+const EDITOR_AVATARS = [
+  { src: "/chris-boustet.jpg", alt: "Chris" },
+  { src: "/asim-nauwag.jpg", alt: "Asim" },
+  { src: "/suari-mahmed.jpg", alt: "Suari" },
+  { src: "/editor-static-1.jpg", alt: "Editor" },
+] as const;
+
+function LifetimeSpotsBar({
+  claimed,
+  limit,
+  soldOut,
+}: {
+  claimed: number;
+  limit: number;
+  soldOut: boolean;
+}) {
+  const pct = Math.min(100, Math.round((claimed / Math.max(limit, 1)) * 100));
+  return (
+    <div className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 text-[11px]">
+        <span className="font-medium text-white/55">
+          {soldOut ? "Intro price sold out" : "Lifetime spots at this price"}
+        </span>
+        <span className={`font-semibold tabular-nums ${soldOut ? "text-white/40" : "text-[#39FF6A]/85"}`}>
+          {claimed} / {limit} claimed
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+        <div
+          className={`h-full rounded-full transition-[width] duration-500 ${
+            soldOut ? "bg-white/25" : "bg-[#39FF6A]"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SocialProofBar({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`flex items-center ${
+        compact ? "justify-start gap-3" : "flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4"
+      }`}
+    >
+      <div className="flex items-center -space-x-2.5">
+        {EDITOR_AVATARS.map((avatar) => (
+          <div
+            key={avatar.src}
+            className={`relative overflow-hidden rounded-full border-2 bg-[#1a1a1a] ${
+              compact
+                ? "h-8 w-8 border-[#0c0c0c]"
+                : "h-9 w-9 border-[#080808]"
+            }`}
+          >
+            <Image
+              src={avatar.src}
+              alt={avatar.alt}
+              width={compact ? 32 : 36}
+              height={compact ? 32 : 36}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ))}
+      </div>
+      <p
+        className={`tracking-[-0.01em] ${
+          compact
+            ? "text-left text-[12px] text-white/45"
+            : "text-center text-[13px] text-white/50"
+        }`}
+      >
+        Trusted by{" "}
+        <span className="font-semibold text-white/80">2,000+ editors</span>
+      </p>
+    </div>
+  );
+}
 
 const ADOBE_APPS = [
   { src: "/pr.png", name: "Premiere Pro", alt: "Adobe Premiere Pro" },
@@ -224,6 +307,12 @@ function AdobeTrustBar() {
   );
 }
 
+type LifetimeIntroState = {
+  claimed: number;
+  limit: number;
+  soldOut: boolean;
+};
+
 export default function PricingSection({
   title = "Plans for every editing workflow.",
   subtitle,
@@ -233,6 +322,32 @@ export default function PricingSection({
   onCtaClick,
 }: PricingSectionProps) {
   const [yearly, setYearly] = useState(false);
+  const [introOffer, setIntroOffer] = useState<LifetimeIntroState>({
+    claimed: 45,
+    limit: 100,
+    soldOut: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/offers/lifetime-intro")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || typeof data.claimed !== "number") return;
+        setIntroOffer({
+          claimed: data.claimed,
+          limit: typeof data.limit === "number" ? data.limit : 100,
+          soldOut: Boolean(data.soldOut),
+        });
+      })
+      .catch(() => {
+        /* keep seed fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const openCheckout = useCallback(
     async (plan: string, billing: "monthly" | "yearly" | "once", tierName?: string, tierPrice?: number) => {
       try {
@@ -318,7 +433,11 @@ export default function PricingSection({
         </motion.div>
 
         <div className={`mt-8 grid gap-3 lg:mt-9 lg:items-end lg:gap-3.5 ${
-          tiers.length === 1 ? "mx-auto max-w-md lg:grid-cols-1" : "lg:grid-cols-3"
+          tiers.length === 1
+            ? "mx-auto max-w-md lg:grid-cols-1"
+            : tiers.length === 2
+              ? "mx-auto max-w-3xl lg:grid-cols-2"
+              : "lg:grid-cols-3"
         }`}>
           {tiers.map((tier, i) => {
             const isOneTime = tier.oneTime === true;
@@ -332,7 +451,7 @@ export default function PricingSection({
                 ? `${tier.ctaHref}&billing=${isYearly ? "yearly" : "monthly"}`
                 : tier.ctaHref;
             const lsBaseUrl = isOneTime
-              ? (tier.lsMonthlyUrl ?? true)
+              ? tier.lsMonthlyUrl
               : isYearly
                 ? (tier.lsYearlyUrl ?? tier.lsMonthlyUrl)
                 : tier.lsMonthlyUrl;
@@ -342,7 +461,7 @@ export default function PricingSection({
               tier.generation?.monthly ||
               legacyGeneration(tier, isYearly);
             const highlights = resolveHighlights(tier);
-            const featured = tier.featured || isOneTime;
+            const featured = tier.featured === true;
 
             const handleCta = (e: React.MouseEvent) => {
               if (lsBaseUrl) {
@@ -374,8 +493,8 @@ export default function PricingSection({
                 className={`relative flex flex-col overflow-hidden rounded-xl border ${
                   featured
                     ? tiers.length === 1
-                      ? "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7"
-                      : "z-10 border-white/[0.11] px-6 py-6 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-7 lg:-translate-y-4 lg:scale-[1.05] lg:origin-bottom"
+                      ? "z-10 border-white/[0.11] px-6 py-5 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-6"
+                      : "z-10 border-white/[0.11] px-6 py-5 shadow-[0_16px_48px_rgba(0,0,0,0.45)] sm:px-6 sm:py-6 lg:-translate-y-4 lg:scale-[1.05] lg:origin-bottom"
                     : "border-white/[0.06] px-5 py-5 sm:px-5 sm:py-6"
                 }`}
               >
@@ -415,11 +534,24 @@ export default function PricingSection({
                   >
                     {tier.name}
                   </p>
-                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                     {tier.compareAtPrice != null && (
-                      <span className="text-[18px] font-medium text-white/30 line-through tracking-[-0.02em]">
-                        ${fmtPrice(tier.compareAtPrice)}
-                      </span>
+                      featured ? (
+                        <span
+                          className="relative inline-block text-[17px] font-medium tracking-[-0.02em] text-red-300/65"
+                          aria-label={`Was $${fmtPrice(tier.compareAtPrice)}`}
+                        >
+                          ${fmtPrice(tier.compareAtPrice)}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-[-4%] top-[52%] h-[2.5px] w-[108%] -translate-y-1/2 rounded-full bg-red-400/90"
+                          />
+                        </span>
+                      ) : (
+                        <span className="text-[18px] font-medium text-white/30 line-through tracking-[-0.02em]">
+                          ${fmtPrice(tier.compareAtPrice)}
+                        </span>
+                      )
                     )}
                     <span className="text-[13px] text-white/25">$</span>
                     <span
@@ -441,12 +573,28 @@ export default function PricingSection({
                     )}
                   </div>
 
+                  {featured && isOneTime && (
+                    <OfferCountdown
+                      variant="urgency"
+                      label="Ends in"
+                      className="mt-2.5"
+                    />
+                  )}
+
+                  {featured && isOneTime && (
+                    <LifetimeSpotsBar
+                      claimed={introOffer.claimed}
+                      limit={introOffer.limit}
+                      soldOut={introOffer.soldOut}
+                    />
+                  )}
+
                   {generation && (
-                    <div className="mt-3">
+                    <div className={featured && isOneTime ? "mt-3.5" : "mt-3"}>
                       <p
                         className={`font-semibold tracking-[-0.02em] ${
                           featured
-                            ? "text-[18px] text-white sm:text-[19px]"
+                            ? "text-[17px] text-white sm:text-[18px]"
                             : "text-[16px] text-white/75 sm:text-[17px]"
                         }`}
                       >
@@ -459,28 +607,39 @@ export default function PricingSection({
                         )}
                       </p>
                       {generation.seconds && (
-                        <p className="mt-0.5 text-[11px] text-white/20">
+                        <p className={`mt-0.5 text-[12px] ${featured ? "text-white/40" : "text-white/20"}`}>
                           {generation.seconds}
                         </p>
                       )}
                     </div>
                   )}
 
+                  {tier.bonus && (
+                    <div className="mt-3.5 rounded-lg border border-[#39FF6A]/25 bg-[#39FF6A]/[0.08] px-3 py-2.5">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-snug">
+                        <span className="rounded-[5px] bg-[#39FF6A] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-black">
+                          Free
+                        </span>
+                        <span className="font-medium text-[#39FF6A]/90">{tier.bonus}</span>
+                      </p>
+                    </div>
+                  )}
+
                   {highlights.length > 0 && (
-                    <ul className="mt-4 flex flex-1 flex-col gap-1.5 border-t border-white/[0.06] pt-4">
+                    <ul className="mt-3.5 flex flex-col gap-2 border-t border-white/[0.06] pt-3.5">
                       {highlights.map((item) => (
                         <li key={item} className="flex items-center gap-2.5">
                           <Check
                             size={13}
                             strokeWidth={2}
                             className={`shrink-0 ${
-                              featured ? "text-[#39FF6A]/45" : "text-white/15"
+                              featured ? "text-[#39FF6A]/55" : "text-white/15"
                             }`}
                             aria-hidden
                           />
                           <span
                             className={`text-[12px] leading-snug ${
-                              featured ? "text-white/55" : "text-white/38"
+                              featured ? "text-white/60" : "text-white/38"
                             }`}
                           >
                             {item}
@@ -507,12 +666,30 @@ export default function PricingSection({
                         {ctaLabel}
                       </Link>
                     )}
+                    {featured && isOneTime && (
+                      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-white/35">
+                        <ShieldCheck size={12} strokeWidth={2} className="text-[#39FF6A]/50" aria-hidden />
+                        7-day money-back guarantee
+                      </p>
+                    )}
                   </div>
+
+                  {featured && tiers.length === 1 && (
+                    <div className="mt-4 border-t border-white/[0.06] pt-4">
+                      <SocialProofBar compact />
+                    </div>
+                  )}
                 </div>
               </motion.article>
             );
           })}
         </div>
+
+        {tiers.length !== 1 && (
+          <div className="mt-8 flex justify-center">
+            <SocialProofBar />
+          </div>
+        )}
 
         <motion.div
           initial={{ opacity: 0 }}
