@@ -64,7 +64,7 @@ export const pricingTiers: PricingTier[] = [
   {
     id: "suite",
     name: "Creator Suite",
-    price: 99,
+    price: 49.99,
     period: "/mo",
     description: "Full access to CutSync + MotionForge, best value.",
     icon: Package,

@@ -252,7 +252,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
           >
             <div className="flex items-baseline gap-2">
               <span className="text-[14px] text-[#6B7280] line-through">$199</span>
-              <span className="text-[18px] font-semibold text-white">$99</span>
+              <span className="text-[18px] font-semibold text-white">$49.99</span>
               <span className="text-[12px] text-[#6B7280]">one-time</span>
             </div>
             <span className="text-[12px] text-[#6B7280]">

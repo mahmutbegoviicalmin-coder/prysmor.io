@@ -255,7 +255,7 @@ const steps: Step[] = [
 ];
 
 const compRows: ComparisonRow[] = [
-  { feature: "Cost", ours: "$99 one-time", theirs: "$500-2,000/project" },
+  { feature: "Cost", ours: "$49.99 one-time", theirs: "$500-2,000/project" },
   { feature: "Time per effect", ours: "2-5 minutes", theirs: "1-3 days" },
   { feature: "Learning curve", ours: "None", theirs: "6+ months" },
   { feature: "Works in your editor", ours: true, theirs: false },
@@ -267,7 +267,7 @@ const pricingTiers: PriceTier[] = [
   {
     id: "lifetime",
     name: "Prysmor",
-    monthlyPrice: 99,
+    monthlyPrice: 49.99,
     compareAtPrice: 199,
     oneTime: true,
     featured: true,
@@ -326,7 +326,7 @@ const faqItems: FAQItem[] = [
   },
   {
     q: "Is VFXPilot worth it if I only edit occasionally?",
-    a: "Absolutely. Even occasional editors save hours per project. The $99 lifetime license includes 200 seconds of AI VFX, and you can buy more credits anytime.",
+    a: "Absolutely. Even occasional editors save hours per project. The $49.99 lifetime license includes 200 seconds of AI VFX, and you can buy more credits anytime.",
   },
   {
     q: "What if I'm not satisfied?",
@@ -506,7 +506,7 @@ export default function VFXPilotPage() {
       {/* ── FINAL CTA ── */}
       <FinalCTA
         title="Get started today"
-        subtitle="Prysmor is $99 one-time. 7-day money-back guarantee included."
+        subtitle="Prysmor is $49.99 one-time. 7-day money-back guarantee included."
         primaryLabel="Buy Prysmor"
         primaryHref="/checkout"
         secondaryLabel="View Pricing"

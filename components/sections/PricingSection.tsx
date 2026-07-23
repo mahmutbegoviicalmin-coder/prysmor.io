@@ -36,7 +36,7 @@ export interface PriceTier {
   yearlyPrice?: number;
   yearlyPerDay?: string;
   yearlySave?: number;
-  /** Shown as strikethrough next to the main price (e.g. 199 next to 99). */
+  /** Shown as strikethrough above the main price (e.g. 199 above 49.99). */
   compareAtPrice?: number;
   /** One-time purchase: hide /mo and billing toggle behavior. */
   oneTime?: boolean;
@@ -534,43 +534,61 @@ export default function PricingSection({
                   >
                     {tier.name}
                   </p>
-                  <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                  <div className="mt-3">
                     {tier.compareAtPrice != null && (
-                      featured ? (
-                        <span
-                          className="relative inline-block text-[17px] font-medium tracking-[-0.02em] text-red-300/65"
-                          aria-label={`Was $${fmtPrice(tier.compareAtPrice)}`}
-                        >
-                          ${fmtPrice(tier.compareAtPrice)}
+                      <p className="mb-1.5">
+                        {featured ? (
                           <span
-                            aria-hidden
-                            className="pointer-events-none absolute left-[-4%] top-[52%] h-[2.5px] w-[108%] -translate-y-1/2 rounded-full bg-red-400/90"
-                          />
+                            className="relative inline-block text-[13px] font-medium tracking-[-0.01em] text-white/35"
+                            aria-label={`Was $${fmtPrice(tier.compareAtPrice)}`}
+                          >
+                            ${fmtPrice(tier.compareAtPrice)}
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute left-[-3%] top-1/2 h-[1.5px] w-[106%] -translate-y-1/2 rounded-full bg-red-400/80"
+                            />
+                          </span>
+                        ) : (
+                          <span className="text-[13px] font-medium text-white/28 line-through tracking-[-0.01em]">
+                            ${fmtPrice(tier.compareAtPrice)}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
+                      <p
+                        className={`flex items-start leading-none tracking-[-0.045em] ${
+                          featured ? "text-white" : "text-white/90"
+                        }`}
+                      >
+                        <span
+                          className={`mr-0.5 mt-[0.18em] font-semibold ${
+                            featured ? "text-[1.35rem]" : "text-[1.15rem]"
+                          } text-white/55`}
+                        >
+                          $
                         </span>
-                      ) : (
-                        <span className="text-[18px] font-medium text-white/30 line-through tracking-[-0.02em]">
-                          ${fmtPrice(tier.compareAtPrice)}
+                        <span
+                          className={`font-semibold ${
+                            featured
+                              ? "text-[clamp(2.5rem,5vw,3.25rem)]"
+                              : "text-[clamp(2rem,4vw,2.5rem)]"
+                          }`}
+                        >
+                          {fmtPrice(price)}
                         </span>
-                      )
-                    )}
-                    <span className="text-[13px] text-white/25">$</span>
-                    <span
-                      className={`font-semibold tracking-[-0.04em] ${
-                        featured
-                          ? "text-[clamp(2.25rem,4vw,3rem)] text-white"
-                          : "text-[clamp(1.875rem,3.5vw,2.375rem)] text-white/90"
-                      }`}
-                    >
-                      {fmtPrice(price)}
-                    </span>
-                    {!isOneTime && (
-                      <span className="ml-1 text-[13px] text-white/25">
-                        /{isYearly ? "yr" : "mo"}
-                      </span>
-                    )}
-                    {isOneTime && (
-                      <span className="ml-1 text-[13px] text-white/35">one-time</span>
-                    )}
+                      </p>
+                      {!isOneTime && (
+                        <span className="mb-1.5 text-[13px] text-white/30">
+                          /{isYearly ? "yr" : "mo"}
+                        </span>
+                      )}
+                      {isOneTime && (
+                        <span className="mb-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium tracking-[-0.01em] text-white/45">
+                          one-time
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {featured && isOneTime && (

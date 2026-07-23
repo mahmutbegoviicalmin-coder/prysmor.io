@@ -37,7 +37,7 @@ function PaywallGate() {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[9px] bg-[#A3FF12] text-[#050505] text-[13px] font-bold hover:bg-[#B6FF3C] transition-colors"
         >
           <Zap className="w-4 h-4" />
-          Buy Prysmor · $99
+          Buy Prysmor · $49.99
         </Link>
       </div>
 
@@ -52,7 +52,7 @@ function PaywallGate() {
           <span className="text-[14px] font-semibold text-white">Prysmor</span>
           <div className="flex items-baseline gap-2">
             <span className="text-[12px] text-[#4B5563] line-through">$199</span>
-            <span className="text-[14px] font-bold text-[#A3FF12]">$99</span>
+            <span className="text-[14px] font-bold text-[#A3FF12]">$49.99</span>
           </div>
         </div>
         <div className="text-[11px] text-[#4B5563] space-y-0.5">

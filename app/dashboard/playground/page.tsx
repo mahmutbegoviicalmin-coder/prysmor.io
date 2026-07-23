@@ -840,7 +840,7 @@ export default function PlaygroundPage() {
               {[
                 { text: "7-day guarantee", color: "rgba(57,255,106,0.55)",  bg: "rgba(57,255,106,0.05)",  border: "rgba(57,255,106,0.12)" },
                 { text: "Cancel anytime",  color: "rgba(255,255,255,0.25)", bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.07)" },
-                { text: "$99 lifetime", color: "rgba(255,255,255,0.25)", bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.07)" },
+                { text: "$49.99 lifetime", color: "rgba(255,255,255,0.25)", bg: "rgba(255,255,255,0.03)", border: "rgba(255,255,255,0.07)" },
               ].map(({ text, color, bg, border }) => (
                 <span key={text} style={{
                   fontSize: "11px", fontWeight: 500, color,

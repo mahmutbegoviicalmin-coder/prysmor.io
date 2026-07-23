@@ -223,7 +223,7 @@ export async function sendPromptPackFollowUpEmail(opts: {
     </p>
     <a href="${pricingUrl}"
        style="display:inline-block;background:#39FF6A;color:#000000;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;padding:13px 20px;border-radius:10px;">
-      Get lifetime access · $99
+      Get lifetime access · $49.99
     </a>
     <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7280;">
       7-day refund window if it is not for you.

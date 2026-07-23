@@ -13,7 +13,7 @@ const pricingTiers: PriceTier[] = [
   {
     id: "lifetime",
     name: "Prysmor",
-    monthlyPrice: 99,
+    monthlyPrice: 49.99,
     compareAtPrice: 199,
     oneTime: true,
     featured: true,
@@ -73,7 +73,7 @@ const JSON_LD_SOFTWARE = {
   operatingSystem: "Windows 10, Windows 11, macOS 12, macOS 13, macOS 14",
   offers: {
     "@type": "Offer",
-    price: "99",
+    price: "49.99",
     priceCurrency: "USD",
   },
   description:

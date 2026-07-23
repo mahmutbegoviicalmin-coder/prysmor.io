@@ -12,9 +12,9 @@ export const LIFETIME_PRODUCT = {
   checkoutUuid: '41852cde-e7c2-45fb-bf7b-bcb952dddab0',
   credits: 800, // 200 seconds × 4 credits/sec
   seconds: 200,
-  price: 99,
+  price: 49.99,
   compareAt: 199,
-  priceLabel: '$99',
+  priceLabel: '$49.99',
   compareAtLabel: '$199',
 } as const;
 
